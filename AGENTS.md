@@ -170,13 +170,14 @@ https://sshzyu.com (443)
 | `sshzyu-local-site/nginx/` | 站点配置，与线上同构（`listen 80`，无 TLS） | `proxy_pass` 指容器名，不改 |
 | `sshzyu-local-site/sshzyu-ui/current|shared/` | 新 UI 静态产物，bind-mount 直读，**重建后无需重启容器** | 产物由构建链生成，不要手改 |
 | `sshzyu-local-site/rebuild.sh` | 一键重建站点：fetch → checkout 本地 fork 分支 → 前端 build → 装配 | 它会 `git reset --hard`：功能改动必须**先 commit 到本地分支**再跑 |
-| `_build/sshzyu-frontend/` | 新 UI 构建工作副本，分支 `fork/codex/sshzyu-frontend`（本地含功能提交 `fc8773476`，未 push） | 上游 GitHub 无此提交；push 需用户拍板 |
+| `_build/sshzyu-frontend/` | 新 UI 构建工作副本，分支 `fork/codex/sshzyu-frontend`（HEAD `344f64705`，另有 26 个未提交品牌定制文件——这两者共同构成线上产物源） | 上游 GitHub 无这些提交；push 需用户拍板 |
 | `_build/online-reference/` | 线上产物参考快照，只读比对用 | 不改 |
 
 ### 6.3 前端代码与两个 UI 的关系（最容易搞错的一点）
 
 - sub2api 内嵌前端（Go embed，r2 镜像里的）**≠ 线上/本地站点用的 sshzyu 新 UI**。
 - 新 UI 源码 = sub2api 仓库的 **`fork/codex/sshzyu-frontend` 分支**，由 `rebuild.sh` 独立构建成静态产物。**改 UI 功能：改 fork 分支 → rebuild.sh → 刷新 8080**；只改内嵌前端并打进镜像，用户在 8080 上看不到。
+- **统一仓库 `frontend/` 与 fork 分支的关系（2026-09-29 起）**：`frontend/` 已对齐线上构建源（`fork/codex/sshzyu-frontend` @ `344f64705` + `_build` 未提交定制，含 image-playground / image-studio / lottery 等），是源码**快照副本**。⚠️ 改 UI 的**正源仍是 fork 分支（`_build/sshzyu-frontend`）**；若直接改本仓库 `frontend/`，需要同步回 fork 分支，两边各改各的会再次分叉（本次对齐前的分叉即由此产生）。
 - 本地栈后端用 `SUB2API_TAG` 钉预构建镜像（构建时必须传 `--build-arg VERSION=<tag> COMMIT=<sha>`，否则版本自报回退成 `commit: docker`）。管理端新参数（如 `api_key_provider`）需要后端与前端**同时**具备才生效。
 
 ### 6.4 日常操作速查

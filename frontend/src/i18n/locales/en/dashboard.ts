@@ -83,21 +83,6 @@ export default {
     columnAlwaysVisible: 'This column is always visible',
     createKey: 'Create API Key',
     editKey: 'Edit API Key',
-    bulkEdit: {
-      title: 'Bulk Edit',
-      selectedCount: '{count} keys selected',
-      selectKey: 'Select key {name}',
-      clearSelection: 'Clear selection',
-      hint: 'Check the fields to update. Unchecked fields keep their current values.',
-      limitHint: 'Enter 0 for no limit. Existing usage is preserved.',
-      ipHint: 'One IP or CIDR per line. Leave empty to clear this list on the selected keys.',
-      invalidLimit: 'Enter a valid amount greater than or equal to 0.',
-      invalidExpiration: 'Choose a valid expiration date or select Never expires.',
-      apply: 'Apply to {count} keys',
-      success: 'Updated {count} keys',
-      partialFailure: 'Updated {success} keys; {failed} failed',
-      failureHint: 'These keys could not be updated. Adjust the settings and retry. Only failed keys will be retried.'
-    },
     deleteKey: 'Delete API Key',
     deleteConfirmMessage: "Are you sure you want to delete '{name}'? This action cannot be undone.",
     id: 'ID',
@@ -219,12 +204,6 @@ export default {
       deepseek: {
         description: 'Configure Claude Code, Codex, or OpenCode through the current DeepSeek group.',
         codexDescription: 'Configure Codex with API key authentication through the current DeepSeek group.',
-        codexConfigTomlHint: 'Download the model catalog below, save both files under the Codex config directory, and restart Codex.',
-        codexNote: 'Export SUB2API_API_KEY before starting Codex. The downloaded catalog contains model metadata only, not your API key.',
-      },
-      minimax: {
-        description: 'Configure Claude Code, Codex, or OpenCode through the current MiniMax group.',
-        codexDescription: 'Configure Codex with API key authentication through the current MiniMax group.',
         codexConfigTomlHint: 'Download the model catalog below, save both files under the Codex config directory, and restart Codex.',
         codexNote: 'Export SUB2API_API_KEY before starting Codex. The downloaded catalog contains model metadata only, not your API key.',
       },
@@ -500,9 +479,7 @@ export default {
       antigravity: 'Antigravity',
       kimi: 'Kimi',
       zhipu: 'Zhipu GLM',
-      deepseek: 'DeepSeek',
-      minimax: 'MiniMax',
-      opencode_go: 'OpenCode'
+      deepseek: 'DeepSeek'
     },
     // Check modes (how a monitor performs its checks)
     checkMode: {
@@ -519,7 +496,6 @@ export default {
         '7dSonnet': '7d Sonnet',
         '7dFable': '7d Fable',
         weekly: 'Weekly',
-        monthly: 'Monthly',
         daily: 'Daily',
         '30d': '30d',
         total: 'Total'
@@ -784,10 +760,55 @@ export default {
     days: ' days',
     codeRedeemSuccess: 'Code redeemed successfully!',
     failedToRedeem: 'Failed to redeem code. Please check the code and try again.',
-    historyLoadFailed: 'Failed to load activity. Please try again.',
-    userRefreshFailed: 'Redeemed successfully, but failed to refresh account information.',
     subscriptionRefreshFailed: 'Redeemed successfully, but failed to refresh subscription status.',
     pleaseEnterCode: 'Please enter a redeem code'
+  },
+
+  // Lottery
+  lottery: {
+    title: 'Lucky Draw',
+    description: 'Draw once logged in — try your luck today',
+    noActivity: 'No lottery activity is running right now',
+    rulesSummary: 'Plenty of surprises in the prize pool — every draw brings good luck',
+    availableDraws: 'Available draws',
+    spentSoFar: 'Spent ${spent}',
+    nextAt: 'Next unlock at ${threshold}',
+    drawNow: 'Draw Now',
+    drawing: 'Drawing...',
+    activityClosed: 'Activity closed',
+    noDrawsLeft: 'No draws left',
+    howToEarnMore: 'Keep using the service to unlock more draws',
+    prizes: 'Prizes',
+    resultTitle: 'Draw Result',
+    congrats: 'Congratulations! You won',
+    betterLuck: 'Better luck next time',
+    records: 'Draw Records',
+    noRecords: 'No draw records yet',
+    outOfStock: 'Sold out',
+    fulfillmentGranted: 'Granted',
+    fulfillmentPending: 'Processing',
+    fulfillmentFailed: 'Failed, please contact the administrator',
+    drawsBadge: '{count} left',
+    cardReady: 'You have draws available, try your luck now',
+    cardIdle: 'Activity not open yet',
+    goDraw: 'Go Draw',
+    // Tier progress panel
+    tierPanel: 'My Tier',
+    currentTier: 'Current tier',
+    tierProgress: 'To next tier',
+    nextDrawAway: 'Next draw in: ${amount}',
+    tierReached: 'Unlocked',
+    tierLocked: 'Locked',
+    tierMax: 'Max tier reached',
+    tierThreshold: 'Spending threshold',
+    tierList: 'Tiers',
+    tierCurrent: 'Current',
+    prizeMinTier: 'Requires {tier}',
+    tier0: 'Bronze',
+    tier1: 'Silver',
+    tier2: 'Gold',
+    tier3: 'Diamond',
+    tier4: 'King'
   },
 
   // Profile

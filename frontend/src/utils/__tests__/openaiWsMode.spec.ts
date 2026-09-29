@@ -7,7 +7,7 @@ import {
   isOpenAIWSModeEnabled,
   normalizeOpenAIWSMode,
   openAIWSModeFromEnabled,
-  resolveOpenAIWSModeHintKey,
+  resolveOpenAIWSModeConcurrencyHintKey,
   resolveOpenAIWSModeFromExtra
 } from '@/utils/openaiWsMode'
 
@@ -59,16 +59,18 @@ describe('openaiWsMode utils', () => {
     expect(isOpenAIWSModeEnabled(OPENAI_WS_MODE_HTTP_BRIDGE)).toBe(true)
   })
 
-  it('hides the off hint and resolves each active mode separately', () => {
-    expect(resolveOpenAIWSModeHintKey(OPENAI_WS_MODE_OFF)).toBeNull()
-    expect(resolveOpenAIWSModeHintKey(OPENAI_WS_MODE_CTX_POOL)).toBe(
-      'admin.accounts.openai.wsModeCtxPoolHint'
+  it('resolves concurrency hint key by mode', () => {
+    expect(resolveOpenAIWSModeConcurrencyHintKey(OPENAI_WS_MODE_OFF)).toBe(
+      'admin.accounts.openai.wsModeConcurrencyHint'
     )
-    expect(resolveOpenAIWSModeHintKey(OPENAI_WS_MODE_PASSTHROUGH)).toBe(
+    expect(resolveOpenAIWSModeConcurrencyHintKey(OPENAI_WS_MODE_CTX_POOL)).toBe(
+      'admin.accounts.openai.wsModeConcurrencyHint'
+    )
+    expect(resolveOpenAIWSModeConcurrencyHintKey(OPENAI_WS_MODE_PASSTHROUGH)).toBe(
       'admin.accounts.openai.wsModePassthroughHint'
     )
-    expect(resolveOpenAIWSModeHintKey(OPENAI_WS_MODE_HTTP_BRIDGE)).toBe(
-      'admin.accounts.openai.wsModeHttpBridgeHint'
+    expect(resolveOpenAIWSModeConcurrencyHintKey(OPENAI_WS_MODE_HTTP_BRIDGE)).toBe(
+      'admin.accounts.openai.wsModePassthroughHint'
     )
   })
 })

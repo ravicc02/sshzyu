@@ -6,6 +6,17 @@
     @close="emit('close')"
   >
     <div class="space-y-4">
+      <router-link
+        v-if="imageStudioPath"
+        :to="imageStudioPath"
+        data-testid="image-studio-key-link"
+        class="btn btn-secondary inline-flex items-center gap-2"
+        @click="emit('close')"
+      >
+        <Icon name="photograph" size="sm" />
+        {{ t('imageStudio.title') }}
+        <Icon name="arrowRight" size="sm" />
+      </router-link>
       <!-- No Group Assigned Warning -->
       <div v-if="!platform" class="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
         <svg class="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -257,12 +268,14 @@
 <script setup lang="ts">
 import { ref, computed, h, watch, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import { saveAs } from 'file-saver'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { fetchCodexModelsManifest } from '@/api/codex'
 import type { GroupPlatform } from '@/types'
+import { imageStudioKeyPath } from '@/utils/imageStudioKeyHandoff'
 import {
   findCodexCatalogModel,
   formatCodexReasoningEffortTomlLine,
@@ -276,6 +289,7 @@ interface Props {
   baseUrl: string
   platform: GroupPlatform | null
   allowMessagesDispatch?: boolean
+  imageStudioKeyId?: number
 }
 
 interface Emits {
@@ -299,6 +313,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const { t } = useI18n()
+const imageStudioPath = computed(() => imageStudioKeyPath(props.imageStudioKeyId))
 const { copyToClipboard: clipboardCopy } = useClipboard()
 
 const copiedIndex = ref<number | null>(null)
@@ -469,7 +484,6 @@ const clientTabs = computed((): TabConfig[] => {
         { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
       ]
     case 'deepseek':
-    case 'minimax':
     case 'composite':
       return [
         { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
@@ -518,7 +532,6 @@ const platformDescription = computed(() => {
     props.platform !== 'openai' &&
     props.platform !== 'grok' &&
     props.platform !== 'deepseek' &&
-    props.platform !== 'minimax' &&
     props.platform !== 'composite') {
     return t('keys.useKeyModal.routedCodex.description')
   }
@@ -544,10 +557,6 @@ const platformDescription = computed(() => {
       return activeClientTab.value === 'codex'
         ? t('keys.useKeyModal.deepseek.codexDescription')
         : t('keys.useKeyModal.deepseek.description')
-    case 'minimax':
-      return activeClientTab.value === 'codex'
-        ? t('keys.useKeyModal.minimax.codexDescription')
-        : t('keys.useKeyModal.minimax.description')
     case 'composite':
       return activeClientTab.value === 'codex'
         ? t('keys.useKeyModal.composite.codexDescription')
@@ -562,7 +571,6 @@ const platformNote = computed(() => {
     props.platform !== 'openai' &&
     props.platform !== 'grok' &&
     props.platform !== 'deepseek' &&
-    props.platform !== 'minimax' &&
     props.platform !== 'composite') {
     return t('keys.useKeyModal.routedCodex.note')
   }
@@ -600,10 +608,6 @@ const platformNote = computed(() => {
     case 'deepseek':
       return activeClientTab.value === 'codex'
         ? t('keys.useKeyModal.deepseek.codexNote')
-        : t('keys.useKeyModal.note')
-    case 'minimax':
-      return activeClientTab.value === 'codex'
-        ? t('keys.useKeyModal.minimax.codexNote')
         : t('keys.useKeyModal.note')
     case 'composite':
       return activeClientTab.value === 'codex'
@@ -766,11 +770,6 @@ const currentFiles = computed((): FileConfig[] => {
     case 'deepseek':
       if (activeClientTab.value === 'codex') {
         return generateRoutedCodexFiles(apiBase, apiKey, 'deepseek')
-      }
-      return generateAnthropicFiles(baseRoot, apiKey)
-    case 'minimax':
-      if (activeClientTab.value === 'codex') {
-        return generateRoutedCodexFiles(apiBase, apiKey, 'minimax')
       }
       return generateAnthropicFiles(baseRoot, apiKey)
     case 'composite':
@@ -1235,8 +1234,6 @@ function generateRoutedCodexFiles(
     kimi: 'kimi-k2.5',
     zhipu: 'glm-4.7',
     deepseek: 'deepseek-v4-pro',
-    minimax: 'MiniMax-M3',
-    opencode_go: 'glm-5.3',
     composite: 'gpt-5.5'
   }
   const preferredModel = preferredModels[platform] || ''
@@ -1250,8 +1247,6 @@ function generateRoutedCodexFiles(
     kimi: 'Kimi',
     zhipu: 'Zhipu',
     deepseek: 'DeepSeek',
-    minimax: 'MiniMax',
-    opencode_go: 'OpenCode',
     composite: 'Composite'
   }
   const label = labels[platform]
@@ -1280,7 +1275,7 @@ supports_websockets = false`
       path: joinConfigPath(configDir, 'config.toml', isWindows),
       content: configContent,
       hint: t(
-        platform === 'deepseek' || platform === 'minimax' || platform === 'composite'
+        platform === 'deepseek' || platform === 'composite'
           ? `keys.useKeyModal.${platform}.codexConfigTomlHint`
           : 'keys.useKeyModal.routedCodex.configTomlHint'
       )

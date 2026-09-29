@@ -4,7 +4,7 @@ import enBatchImage from '@/i18n/locales/en/batchImage'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BatchImageGuideView from '../BatchImageGuideView.vue'
-import { keyAllowsBatchImage, openAIImageSizes, supportsBatchImagePlatform } from '@/utils/batchImage'
+import { geminiImageSizes, keyAllowsBatchImage, openAIImageSizes, supportsBatchImagePlatform } from '@/utils/batchImage'
 import type { ApiKey } from '@/types'
 
 const { listKeys, listModels, listJobs, listItems, submitJob, retryInput, showError } = vi.hoisted(() => ({
@@ -123,6 +123,19 @@ describe('batch image platform support', () => {
     expect(openAIImageSizes['4K']['1:1']).toBe('2880x2880')
   })
 
+  it('uses valid Gemini dimensions aligned with the official Flash Image table', () => {
+    const ratios = ['1:1', '3:2', '2:3', '16:9', '9:16', '4:3', '3:4', '21:9']
+    for (const [tier, table] of Object.entries(geminiImageSizes)) {
+      expect(Object.keys(table)).toEqual(ratios)
+    }
+    // 与 image-playground 的 GEMINI_COMMON_SIZE_PRESETS 逐值一致；
+    // 上游实测 2026-09-28：1K 16:9→1376x768、2K 16:9→2752x1536、4K 16:9→5504x3072。
+    expect(geminiImageSizes['1K']['16:9']).toBe('1376x768')
+    expect(geminiImageSizes['1K']['21:9']).toBe('1584x672')
+    expect(geminiImageSizes['2K']['16:9']).toBe('2752x1536')
+    expect(geminiImageSizes['4K']['16:9']).toBe('5504x3072')
+  })
+
   it('offers provider-specific sizes, resets invalid ratios, and preserves Gemini UI', async () => {
     listModels.mockImplementation(async (token: string) => ({ data: [{
       id: token === openai.key ? 'gpt-image-2' : 'gemini-3-pro-image-preview',
@@ -158,9 +171,72 @@ describe('batch image platform support', () => {
       const keySelect = wrapper.findAll('select').find(select => select.findAll('option').some(option => option.text().includes('gemini-2')))!
       await keySelect.setValue('2')
       await flushPromises()
-      expect(wrapper.find('[data-testid="image-size"]').exists()).toBe(false)
-      expect(wrapper.find('[data-testid="aspect-ratio"]').exists()).toBe(false)
+      // gemini 分组同样获得尺寸/宽高比选择器，比例 label 显示 gemini 官方表像素值。
+      expect(wrapper.get('[data-testid="image-size"]').findAll('option').map(option => option.attributes('value'))).toEqual(['1K', '2K'])
+      expect(wrapper.get('[data-testid="aspect-ratio"]').text()).toContain('16:9 · 1376x768')
       expect(wrapper.text()).toContain('WebP')
+    } finally { wrapper.unmount() }
+  })
+
+  it('routes parameters by platform so every gpt-image model gets size and ratio selectors', async () => {
+    listModels.mockImplementation(async (token: string) => ({ data: [
+      { id: 'gpt-image-2', supported_image_sizes: ['1K', '2K'], supported_mime_types: ['image/png', 'image/jpeg', 'image/webp'] },
+      { id: 'gpt-image-2.5', supported_image_sizes: ['1K', '2K'], supported_mime_types: ['image/png', 'image/jpeg', 'image/webp'] }
+    ] }))
+    const wrapper = mount(BatchImageGuideView, { global: { stubs: {
+      AppLayout: SlotStub, TablePageLayout: SlotStub, DataTable: true,
+      BaseDialog: DialogStub, Select: true, SearchInput: true, Icon: true, 'i18n-t': true
+    } } })
+    try {
+      await flushPromises()
+      await wrapper.findAll('button').find(button => button.text().includes('batchImage.actions.createJob'))!.trigger('click')
+      await flushPromises()
+      const modelSelect = wrapper.findAll('select').find(select =>
+        select.findAll('option').some(option => option.attributes('value') === 'gpt-image-2.5'))!
+      await modelSelect.setValue('gpt-image-2.5')
+      await flushPromises()
+      // 参数矩阵按平台路由（与后端 provider 一致）：openai 平台下 2.5 家族同样可选尺寸与宽高比。
+      await wrapper.get('[data-testid="image-size"]').setValue('2K')
+      await wrapper.get('[data-testid="aspect-ratio"]').setValue('9:16')
+      await wrapper.find('textarea').setValue('A test portrait')
+      submitJob.mockRejectedValueOnce(new Error('test capture'))
+      await wrapper.findAll('button').find(button => button.text().includes('batchImage.actions.submitJob'))!.trigger('click')
+      await flushPromises()
+      expect(submitJob).toHaveBeenCalledWith(openai.key, expect.objectContaining({
+        model: 'gpt-image-2.5', image_size: '2K', aspect_ratio: '9:16', response_mime_type: 'image/png',
+      }), expect.any(String))
+    } finally { wrapper.unmount() }
+  })
+
+  it('routes gemini groups to the gemini pixel table and submits aspect_ratio', async () => {
+    listModels.mockImplementation(async (token: string) => ({ data: [{
+      id: token === openai.key ? 'gpt-image-2' : 'gemini-3.1-flash-image',
+      supported_image_sizes: ['1K', '2K', '4K'], supported_mime_types: ['image/png', 'image/jpeg', 'image/webp']
+    }] }))
+    const wrapper = mount(BatchImageGuideView, { global: { stubs: {
+      AppLayout: SlotStub, TablePageLayout: SlotStub, DataTable: true,
+      BaseDialog: DialogStub, Select: true, SearchInput: true, Icon: true, 'i18n-t': true
+    } } })
+    try {
+      await flushPromises()
+      await wrapper.findAll('button').find(button => button.text().includes('batchImage.actions.createJob'))!.trigger('click')
+      await flushPromises()
+      const keySelect = wrapper.findAll('select').find(select => select.findAll('option').some(option => option.text().includes('gemini-2')))!
+      await keySelect.setValue('2')
+      await flushPromises()
+      const modelSelect = wrapper.findAll('select').find(select =>
+        select.findAll('option').some(option => option.attributes('value') === 'gemini-3.1-flash-image'))!
+      await modelSelect.setValue('gemini-3.1-flash-image')
+      await flushPromises()
+      await wrapper.get('[data-testid="image-size"]').setValue('2K')
+      await wrapper.get('[data-testid="aspect-ratio"]').setValue('21:9')
+      await wrapper.find('textarea').setValue('A gemini panorama')
+      submitJob.mockRejectedValueOnce(new Error('test capture'))
+      await wrapper.findAll('button').find(button => button.text().includes('batchImage.actions.submitJob'))!.trigger('click')
+      await flushPromises()
+      expect(submitJob).toHaveBeenCalledWith(gemini.key, expect.objectContaining({
+        model: 'gemini-3.1-flash-image', image_size: '2K', aspect_ratio: '21:9', response_mime_type: 'image/png',
+      }), expect.any(String))
     } finally { wrapper.unmount() }
   })
 

@@ -75,13 +75,6 @@ export interface PluginTestResult {
   success: boolean
   message: string
   latency_ms: number
-  status_json?: string
-}
-
-export interface PluginStatusResult {
-  healthy: boolean
-  message: string
-  status_json?: string
 }
 
 export interface PluginUISession {
@@ -145,11 +138,6 @@ export async function test(id: number): Promise<PluginTestResult> {
   return data
 }
 
-export async function status(id: number): Promise<PluginStatusResult> {
-  const { data } = await apiClient.get<PluginStatusResult>(`/admin/plugins/${id}/status`)
-  return data
-}
-
 export async function createUISession(id: number): Promise<PluginUISession> {
   const { data } = await apiClient.post<PluginUISession>(`/admin/plugins/${id}/ui-session`)
   return data
@@ -164,6 +152,5 @@ export default {
   getConfig,
   saveConfig,
   test,
-  status,
   createUISession
 }

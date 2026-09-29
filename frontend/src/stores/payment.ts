@@ -20,20 +20,14 @@ export const usePaymentStore = defineStore('payment', () => {
 
   const configLoading = ref(false)
   const configLoaded = ref(false)
-  let configPromise: Promise<PaymentConfig | null> | null = null
 
   // ==================== Actions ====================
 
   /** Fetch payment configuration */
   async function fetchConfig(force = false): Promise<PaymentConfig | null> {
     if (configLoaded.value && !force) return config.value
-    if (configPromise) return configPromise
+    if (configLoading.value) return config.value
 
-    configPromise = loadConfig()
-    return configPromise
-  }
-
-  async function loadConfig(): Promise<PaymentConfig | null> {
     configLoading.value = true
     try {
       const response = await paymentAPI.getConfig()
@@ -45,7 +39,6 @@ export const usePaymentStore = defineStore('payment', () => {
       return null
     } finally {
       configLoading.value = false
-      configPromise = null
     }
   }
 

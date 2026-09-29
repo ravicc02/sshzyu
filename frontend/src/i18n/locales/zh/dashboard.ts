@@ -83,21 +83,6 @@ export default {
     columnAlwaysVisible: '该列固定显示，不可隐藏',
     createKey: '创建密钥',
     editKey: '编辑密钥',
-    bulkEdit: {
-      title: '批量编辑',
-      selectedCount: '已选择 {count} 个密钥',
-      selectKey: '选择密钥 {name}',
-      clearSelection: '取消选择',
-      hint: '勾选需要修改的字段，未勾选的字段保持原值。',
-      limitHint: '输入 0 表示不限制；已用额度保持不变。',
-      ipHint: '每行一个 IP 或 CIDR；留空将清空所选密钥的此项名单。',
-      invalidLimit: '请输入大于或等于 0 的有效金额。',
-      invalidExpiration: '请选择有效的过期时间，或勾选永久有效。',
-      apply: '应用到 {count} 个密钥',
-      success: '已更新 {count} 个密钥',
-      partialFailure: '已更新 {success} 个密钥，{failed} 个失败',
-      failureHint: '以下密钥更新失败，可修改设置后重试。再次提交只会更新失败的密钥。'
-    },
     deleteKey: '删除密钥',
     deleteConfirmMessage: "确定要删除 '{name}' 吗？此操作无法撤销。",
     id: 'ID',
@@ -223,12 +208,6 @@ export default {
       deepseek: {
         description: '通过当前 DeepSeek 分组配置 Claude Code、Codex 或 OpenCode。',
         codexDescription: '使用 API Key 配置 Codex，并通过当前 DeepSeek 分组发送请求。',
-        codexConfigTomlHint: '下载下方模型目录，将两个文件保存到 Codex 配置目录后重启 Codex。',
-        codexNote: '启动 Codex 前先导出 SUB2API_API_KEY。下载的目录只包含模型元数据，不包含 API Key。'
-      },
-      minimax: {
-        description: '通过当前 MiniMax 分组配置 Claude Code、Codex 或 OpenCode。',
-        codexDescription: '使用 API Key 配置 Codex，并通过当前 MiniMax 分组发送请求。',
         codexConfigTomlHint: '下载下方模型目录，将两个文件保存到 Codex 配置目录后重启 Codex。',
         codexNote: '启动 Codex 前先导出 SUB2API_API_KEY。下载的目录只包含模型元数据，不包含 API Key。'
       },
@@ -505,9 +484,7 @@ export default {
       antigravity: 'Antigravity',
       kimi: 'Kimi',
       zhipu: '智谱 GLM',
-      deepseek: 'DeepSeek',
-      minimax: 'MiniMax',
-      opencode_go: 'OpenCode'
+      deepseek: 'DeepSeek'
     },
     // 检查模式（监控条目的工作方式）
     checkMode: {
@@ -524,7 +501,6 @@ export default {
         '7dSonnet': '7 天 Sonnet',
         '7dFable': '7 天 Fable',
         weekly: '周',
-        monthly: '月',
         daily: '日',
         '30d': '30 天',
         total: '总量'
@@ -788,10 +764,56 @@ export default {
     days: '天',
     codeRedeemSuccess: '兑换成功！',
     failedToRedeem: '兑换失败，请检查兑换码后重试。',
-    historyLoadFailed: '加载兑换记录失败，请重试。',
-    userRefreshFailed: '兑换成功，但账户信息刷新失败。',
     subscriptionRefreshFailed: '兑换成功，但订阅状态刷新失败。',
     pleaseEnterCode: '请输入兑换码'
+  },
+
+  // Lottery
+  lottery: {
+    title: '幸运抽奖',
+    description: '登录即可抽奖，试试今天的手气',
+    noActivity: '当前没有进行中的抽奖活动',
+    rulesSummary: '奖池惊喜多多，每一抽都有好运',
+    availableDraws: '可用次数',
+    spentSoFar: '累计消耗 ${spent}',
+    nextAt: '下次解锁 ${threshold}',
+    drawNow: '立即抽奖',
+    drawing: '抽奖中...',
+    activityClosed: '活动未开放',
+    noDrawsLeft: '暂无抽奖次数',
+    howToEarnMore: '继续使用即可解锁更多抽奖次数',
+    prizes: '奖品一览',
+    resultTitle: '抽奖结果',
+    congrats: '恭喜您获得',
+    betterLuck: '谢谢参与',
+    records: '抽奖记录',
+    noRecords: '暂无抽奖记录',
+    outOfStock: '已抽完',
+    fulfillmentGranted: '已发放',
+    fulfillmentPending: '发放中',
+    fulfillmentFailed: '发放失败，请联系管理员',
+    drawsBadge: '{count} 次',
+    cardReady: '您有可用的抽奖机会，快来试试手气',
+    cardIdle: '活动暂未开放',
+    goDraw: '去抽奖',
+
+    // 阶梯进度面板
+    tierPanel: '我的阶梯',
+    currentTier: '当前阶梯',
+    tierProgress: '距下一阶梯',
+    nextDrawAway: '距离下次抽奖还需要：${amount}',
+    tierReached: '已解锁',
+    tierLocked: '未解锁',
+    tierMax: '已达最高阶梯',
+    tierThreshold: '消耗门槛',
+    tierList: '阶梯一览',
+    tierCurrent: '当前',
+    prizeMinTier: '需达到 {tier}',
+    tier0: '青铜',
+    tier1: '白银',
+    tier2: '黄金',
+    tier3: '钻石',
+    tier4: '王者'
   },
 
   // Profile

@@ -1,12 +1,19 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import { Chart as ChartJS } from 'chart.js'
 import App from './App.vue'
 import router from './router'
 import i18n, { initI18n } from './i18n'
 import { useAppStore } from '@/stores/app'
 import { updateFavicon } from '@/utils/branding'
+import { BRAND_LOGO, resolveBrandName } from '@/utils/brandIdentity'
 import { isIOSDevice } from '@/utils/device'
 import './style.css'
+
+ChartJS.defaults.font.family =
+  "'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+ChartJS.defaults.font.size = 12
+ChartJS.defaults.font.lineHeight = 1.45
 
 function initIOSViewportZoomFix() {
   // iOS Safari 在输入框字号小于 16px 时聚焦会自动放大页面，且失焦后不会恢复。
@@ -45,10 +52,8 @@ async function bootstrap() {
   appStore.initFromInjectedConfig()
 
   // Set document title immediately after config is loaded
-  if (appStore.siteName && appStore.siteName !== 'Sub2API') {
-    document.title = `${appStore.siteName} - AI API Gateway`
-  }
-  updateFavicon(appStore.siteLogo)
+  document.title = `${resolveBrandName(appStore.siteName)} - AI API Gateway`
+  updateFavicon(appStore.siteLogo || BRAND_LOGO)
 
   await initI18n()
 

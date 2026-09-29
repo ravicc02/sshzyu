@@ -28,22 +28,6 @@
             :api-base-url="publicSettings?.api_base_url || ''"
             :custom-endpoints="publicSettings?.custom_endpoints || []"
           />
-          <div v-if="selectedIds.length" class="flex flex-wrap items-center gap-3 text-sm">
-            <span class="text-gray-600 dark:text-gray-300">
-              {{ t('keys.bulkEdit.selectedCount', { count: selectedIds.length }) }}
-            </span>
-            <button
-              class="btn btn-primary btn-sm"
-              :disabled="loading"
-              data-test="bulk-edit-keys"
-              @click="showBulkEditModal = true"
-            >
-              {{ t('keys.bulkEdit.title') }}
-            </button>
-            <button class="btn btn-secondary btn-sm" @click="selectedIds = []">
-              {{ t('keys.bulkEdit.clearSelection') }}
-            </button>
-          </div>
         </div>
       </template>
 
@@ -101,11 +85,6 @@
           :columns="columns"
           :data="apiKeys"
           :loading="loading"
-          selectable
-          row-key="id"
-          :selected-keys="selectedIds"
-          :selection-label="(key: ApiKey) => t('keys.bulkEdit.selectKey', { name: key.name })"
-          @update:selected-keys="handleSelectionChange"
           :server-side-sort="true"
           default-sort-key="created_at"
           default-sort-order="desc"
@@ -392,6 +371,15 @@
 
           <template #cell-actions="{ row }">
             <div class="flex items-center gap-1">
+              <router-link
+                v-if="imageStudioKeyRoute(row)"
+                :to="imageStudioKeyRoute(row) || '/image-studio'"
+                data-testid="image-studio-key-link"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
+              >
+                <Icon name="photograph" size="sm" />
+                <span class="text-xs">{{ t('imageStudio.title') }}</span>
+              </router-link>
               <!-- Use Key Button -->
               <button
                 @click="openUseKeyModal(row)"
@@ -1025,14 +1013,6 @@
       </template>
     </BaseDialog>
 
-    <BulkEditKeysModal
-      :show="showBulkEditModal"
-      :selected-keys="selectedApiKeys"
-      :groups="groups"
-      @close="showBulkEditModal = false"
-      @updated="handleBulkUpdated"
-    />
-
     <!-- Delete Confirmation Dialog -->
     <ConfirmDialog
       :show="showDeleteDialog"
@@ -1076,6 +1056,7 @@
       :base-url="publicSettings?.api_base_url || ''"
       :platform="selectedKey?.group?.platform || null"
       :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"
+      :image-studio-key-id="selectedKey && imageStudioKeyRoute(selectedKey) ? selectedKey.id : undefined"
       @close="closeUseKeyModal"
     />
 
@@ -1209,7 +1190,6 @@ const { t } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
-import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
 	import DataTable from '@/components/common/DataTable.vue'
 	import Pagination from '@/components/common/Pagination.vue'
 	import BaseDialog from '@/components/common/BaseDialog.vue'
@@ -1227,6 +1207,7 @@ import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
 import { maskApiKey } from '@/utils/maskApiKey'
+import { imageStudioKeyRoute } from '@/utils/imageStudioKeyHandoff'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { platformBadgeLightClass } from '@/utils/platformColors'
 import { KEY_GROUP_PROVIDERS, KEY_GROUP_PROVIDER_ICONS, getKeyGroupProvider, type KeyGroupProvider } from '@/utils/keyGroupProviders'
@@ -1355,21 +1336,6 @@ const columns = computed<Column[]>(() =>
 )
 
 const apiKeys = ref<ApiKey[]>([])
-const selectedIds = ref<number[]>([])
-const showBulkEditModal = ref(false)
-const selectedApiKeys = computed(() => apiKeys.value.filter((key) => selectedIds.value.includes(key.id)))
-
-const handleSelectionChange = (ids: Array<string | number>) => {
-  const visibleIds = new Set(apiKeys.value.map((key) => key.id))
-  selectedIds.value = [...new Set(ids.map(Number))].filter((id) => visibleIds.has(id))
-}
-
-const handleBulkUpdated = (succeededIds: number[]) => {
-  const succeeded = new Set(succeededIds)
-  selectedIds.value = selectedIds.value.filter((id) => !succeeded.has(id))
-  loadApiKeys()
-}
-
 const groups = ref<Group[]>([])
 const loading = ref(false)
 const submitting = ref(false)
@@ -1493,7 +1459,6 @@ const statusFilterOptions = computed(() => [
 ])
 
 const onFilterChange = () => {
-  selectedIds.value = []
   pagination.value.page = 1
   loadApiKeys()
 }
@@ -1607,7 +1572,6 @@ const loadApiKeys = async () => {
     })
     if (signal.aborted) return
     apiKeys.value = response.items
-    handleSelectionChange(selectedIds.value)
     pagination.value.total = response.total
     pagination.value.pages = response.pages
 
@@ -1671,20 +1635,17 @@ const closeUseKeyModal = () => {
 }
 
 const handlePageChange = (page: number) => {
-  selectedIds.value = []
   pagination.value.page = page
   loadApiKeys()
 }
 
 const handlePageSizeChange = (pageSize: number) => {
-  selectedIds.value = []
   pagination.value.page_size = pageSize
   pagination.value.page = 1
   loadApiKeys()
 }
 
 const handleSort = (key: string, order: 'asc' | 'desc') => {
-  selectedIds.value = []
   sortState.value.sort_by = key
   sortState.value.sort_order = order
   pagination.value.page = 1
@@ -1957,18 +1918,14 @@ const setExpirationDays = (days: number) => {
 
 // Reset quota used for an API key
 const resetQuotaUsed = async () => {
-  const key = selectedKey.value
-  if (!key) return
+  if (!selectedKey.value) return
   showResetQuotaDialog.value = false
   try {
-    const updatedKey = await keysAPI.update(key.id, { reset_quota: true })
+    await keysAPI.update(selectedKey.value.id, { reset_quota: true })
     appStore.showSuccess(t('keys.quotaResetSuccess'))
-    key.quota_used = updatedKey.quota_used
-    if (key.status !== updatedKey.status) {
-      key.status = updatedKey.status
-      if (selectedKey.value?.id === key.id) {
-        formData.value.status = updatedKey.status === 'active' ? 'active' : 'inactive'
-      }
+    // Update local state
+    if (selectedKey.value) {
+      selectedKey.value.quota_used = 0
     }
   } catch (error: any) {
     const errorMsg = error.response?.data?.detail || t('keys.failedToResetQuota')

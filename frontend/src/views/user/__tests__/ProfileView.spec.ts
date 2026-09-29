@@ -29,6 +29,22 @@ vi.mock('@/utils/format', () => ({
   formatDate: () => 'April 2026'
 }))
 
+vi.mock('@/api/lottery', () => ({
+  lotteryAPI: {
+    getStatus: vi.fn().mockResolvedValue({
+      activity_open: true,
+      available_draws: 1,
+      used_draws: 0,
+      first_draw_granted: true,
+      threshold_entitlement: 0,
+      manual_adjustment: 0,
+      balance_spent: 0,
+      next_threshold: 5,
+      rules_version: 1
+    })
+  }
+}))
+
 vi.mock('vue-i18n', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-i18n')>()
   return {
@@ -83,6 +99,7 @@ describe('ProfileView', () => {
           ProfileBalanceNotifyCard: { template: '<div data-testid="profile-balance-notify-card" />' },
           ProfilePasswordForm: { template: '<div data-testid="profile-password-form" />' },
           ProfileTotpCard: { template: '<div data-testid="profile-totp-card" />' },
+          ProfileLotteryCard: { template: '<div data-testid="profile-lottery-card" />' },
           Icon: true
         }
       }
@@ -95,5 +112,6 @@ describe('ProfileView', () => {
     expect(wrapper.get('[data-testid="profile-shell"]').html()).toContain('profile-info-card')
     expect(wrapper.get('[data-testid="profile-shell"]').html()).toContain('profile-password-form')
     expect(wrapper.get('[data-testid="profile-shell"]').html()).toContain('profile-totp-card')
+    expect(wrapper.get('[data-testid="profile-shell"]').html()).toContain('profile-lottery-card')
   })
 })

@@ -1,19 +1,11 @@
 <template>
-  <div v-if="siteKey" class="turnstile-wrapper relative">
-    <div
-      v-if="loading"
-      role="status"
-      class="absolute inset-0 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-500 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-400"
-    >
-      {{ t('auth.captchaLoading') }}
-    </div>
+  <div v-if="siteKey" class="turnstile-wrapper">
     <div ref="containerRef" class="turnstile-container"></div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
 
 interface TurnstileRenderOptions {
   sitekey: string
@@ -55,8 +47,6 @@ const emit = defineEmits<{
   (e: 'error'): void
 }>()
 
-const { t } = useI18n()
-const loading = ref(true)
 const containerRef = ref<HTMLElement | null>(null)
 const widgetId = ref<string | null>(null)
 const scriptLoaded = ref(false)
@@ -151,8 +141,6 @@ onMounted(async () => {
   } catch (error) {
     console.error('Failed to initialize Turnstile:', error)
     emit('error')
-  } finally {
-    loading.value = false
   }
 })
 

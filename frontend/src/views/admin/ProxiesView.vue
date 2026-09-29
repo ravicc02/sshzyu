@@ -24,7 +24,7 @@
               v-model="filters.protocol"
               :options="protocolOptions"
               :placeholder="t('admin.proxies.allProtocols')"
-              @change="handleFilterChange"
+              @change="loadProxies"
             />
           </div>
           <div class="w-full sm:w-36">
@@ -32,7 +32,7 @@
               v-model="filters.status"
               :options="statusOptions"
               :placeholder="t('admin.proxies.allStatus')"
-              @change="handleFilterChange"
+              @change="loadProxies"
             />
           </div>
 
@@ -513,7 +513,7 @@
             class="input mb-2"
             :placeholder="t('admin.proxies.expiryDaysPlaceholder')"
           />
-          <input v-model="createForm.expires_at" type="date" max="9999-12-31" class="input" />
+          <input v-model="createForm.expires_at" type="date" class="input" />
         </div>
         <div>
           <label class="input-label">{{ t('admin.proxies.fallbackMode') }}</label>
@@ -746,7 +746,7 @@
             class="input mb-2"
             :placeholder="t('admin.proxies.expiryDaysPlaceholder')"
           />
-          <input v-model="editForm.expires_at" type="date" max="9999-12-31" class="input" />
+          <input v-model="editForm.expires_at" type="date" class="input" />
         </div>
         <div>
           <label class="input-label">{{ t('admin.proxies.fallbackMode') }}</label>
@@ -1221,11 +1221,6 @@ const loadProxies = async () => {
   }
 }
 
-const handleFilterChange = () => {
-  pagination.page = 1
-  loadProxies()
-}
-
 let searchTimeout: ReturnType<typeof setTimeout>
 const handleSearch = () => {
   clearTimeout(searchTimeout)
@@ -1461,7 +1456,7 @@ const handleUpdateProxy = async () => {
       protocol: editForm.protocol,
       host: editForm.host.trim(),
       port: editForm.port,
-      username: editForm.username.trim(),
+      username: editForm.username.trim() || null,
       status: editForm.status,
       expires_at: editForm.expires_at ? Math.floor(new Date(editForm.expires_at).getTime() / 1000) : null,
       fallback_mode: editForm.fallback_mode,
@@ -1471,7 +1466,7 @@ const handleUpdateProxy = async () => {
 
     // Only include password if user actually modified the field
     if (editPasswordDirty.value) {
-      updateData.password = editForm.password.trim()
+      updateData.password = editForm.password.trim() || null
     }
 
     await adminAPI.proxies.update(editingProxy.value.id, updateData)
@@ -1791,14 +1786,6 @@ const qualityTargetLabel = (target: string) => {
       return 'Gemini'
     case 'grok':
       return 'Grok'
-    case 'kimi':
-      return 'Kimi'
-    case 'zhipu':
-      return 'Zhipu GLM'
-    case 'deepseek':
-      return 'DeepSeek'
-    case 'minimax':
-      return 'MiniMax'
     default:
       return target
   }
