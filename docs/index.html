@@ -206,7 +206,11 @@
         });
       });
       const links = [...document.querySelectorAll(".side-nav a")];
-      const sections = links.map((link) => document.querySelector(link.getAttribute("href"))).filter(Boolean);
+      // 用 getElementById 而非 querySelector：id 允许以数字开头(如 "1-quick-start")，
+      // 但 "#1-quick-start" 不是合法 CSS 选择器，querySelector 会抛 SyntaxError。
+      const sections = links
+        .map((link) => document.getElementById(link.getAttribute("href").slice(1)))
+        .filter(Boolean);
       const observer = new IntersectionObserver((entries) => entries.forEach((entry) => {
         if (entry.isIntersecting) links.forEach((link) => link.classList.toggle("active", link.getAttribute("href") === "#" + entry.target.id));
       }), { rootMargin: "-90px 0px -65% 0px", threshold: 0 });
