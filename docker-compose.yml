@@ -32,8 +32,8 @@ services:
     volumes:
       - ./ui:/opt/sshzyu-ui:ro
       - ./docs:/opt/sshzyu-docs:ro
-      # 可选：生图工作室静态产物（不属于本仓库，缺失时 /image/ 路由 404，不影响其它功能）
-      - ${IMAGE_PLAYGROUND_DIST:-../gpt_image_playground/dist}:/opt/imageplayground:ro
+      # 生图工作室静态产物（仓库内嵌，直接可用）
+      - ./playground:/opt/imageplayground:ro
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/00-sub2api-map.conf:/etc/nginx/conf.d/00-sub2api-map.conf:ro
       - ./nginx/20-sshzyu-ui-map.conf:/etc/nginx/conf.d/20-sshzyu-ui-map.conf:ro
