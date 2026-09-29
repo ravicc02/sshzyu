@@ -33,7 +33,9 @@ const idx = fs.readFileSync(path.resolve(fileURLToPath(new URL('../ui/current/in
 const preloads = [...idx.matchAll(/(?:src|href)="\/assets\/([^"]+)"/g)].map((m) => m[1]);
 let missPre = 0;
 for (const p of preloads) {
-  const ok = fs.existsSync(path.join(SITE, p));
+  // 剥离 ?v= query（fw-cachebust.js?v=<hash> 这类入口引用），否则会把带 query 的路径当文件名检查
+  const file = p.split('?')[0];
+  const ok = fs.existsSync(path.join(SITE, file));
   if (!ok) { missPre++; console.log('   MISSING preload:', p); }
 }
 console.log('index.html asset refs:', preloads.length, ' missing:', missPre);
