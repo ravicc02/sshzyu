@@ -1,0 +1,1 @@
+import{d as t,o as s,z as o,B as n,C as a}from"./vendor-vue-CEBwzko5.js";const r={class:"flex min-h-[60vh] items-center justify-center"},m=t({__name:"DocsView",setup(c){return s(()=>{window.location.href="/docs/"}),(i,e)=>(a(),o("div",r,[...e[0]||(e[0]=[n("p",{class:"text-sm text-gray-500 dark:text-gray-400"},"正在打开接入文档…",-1)])]))}});export{m as default};

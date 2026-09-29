@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="sshzyu.com 接入指南：OpenAI 兼容 API 接入教程，从创建密钥、发出第一个请求，到接入 Claude Code / Codex 与 NewMax 等客户端，以及让 Codex 接入生图能力。">
+  <title>接入指南 · sshzyu.com</title>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #607086;
+      --line: #dce4ee;
+      --soft: #f5f8fc;
+      --blue: #2459d6;
+      --blue-dark: #143e9f;
+      --blue-soft: #eaf0ff;
+      --code: #101827;
+      --code-ink: #d7e3f4;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #fff;
+      font: 15px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { color: var(--blue-dark); text-decoration: underline; }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      height: 64px;
+      border-bottom: 1px solid rgba(220,228,238,.9);
+      background: rgba(255,255,255,.94);
+      backdrop-filter: blur(12px);
+    }
+    .topbar-inner { max-width: 1240px; height: 100%; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: flex; align-items: center; gap: 11px; color: var(--ink); font-weight: 750; letter-spacing: .01em; }
+    .brand:hover { text-decoration: none; color: var(--ink); }
+    .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; color: #fff; background: linear-gradient(145deg, #356fe6, #1a3c9c); font-weight: 800; }
+    .top-links { display: flex; align-items: center; gap: 22px; color: var(--muted); font-size: 14px; }
+    .top-links a { color: inherit; }
+    .top-links a:hover { color: var(--blue); text-decoration: none; }
+    .layout { max-width: 1240px; margin: 0 auto; padding: 40px 28px 80px; display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 58px; }
+    .sidebar { position: sticky; top: 96px; align-self: start; max-height: calc(100vh - 120px); overflow: auto; padding-right: 8px; }
+    .side-label { margin: 0 0 14px; color: #8794a7; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .side-nav { display: grid; gap: 3px; }
+    .side-nav a { padding: 7px 10px; border-left: 2px solid transparent; border-radius: 0 6px 6px 0; color: var(--muted); font-size: 14px; }
+    .side-nav a:hover, .side-nav a.active { border-left-color: var(--blue); color: var(--blue); background: var(--blue-soft); text-decoration: none; }
+    main { min-width: 0; max-width: 820px; }
+    h1 { margin: 0; font-size: clamp(30px, 5vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+    h2 { margin: 68px 0 14px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 26px; line-height: 1.25; letter-spacing: -.015em; scroll-margin-top: 90px; }
+    h3 { margin: 30px 0 8px; font-size: 18px; scroll-margin-top: 90px; }
+    p { margin: 12px 0; color: var(--muted); }
+    .code-wrap { position: relative; margin: 16px 0 22px; }
+    pre { margin: 0; padding: 18px 20px; border-radius: 9px; overflow: auto; color: var(--code-ink); background: var(--code); font: 13px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    code { font: .92em ui-monospace, SFMono-Regular, Consolas, monospace; }
+    p code, li code, td code { padding: 2px 5px; border-radius: 4px; color: #214ea7; background: var(--blue-soft); }
+    .copy { position: absolute; top: 9px; right: 9px; padding: 5px 9px; border: 1px solid #3b4a60; border-radius: 5px; color: #bdcbe0; background: #172235; cursor: pointer; font-size: 12px; }
+    .copy:hover { color: #fff; border-color: #8195b4; }
+    table { width: 100%; margin: 18px 0; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: #536278; background: var(--soft); font-weight: 700; }
+    ul, ol { padding-left: 22px; color: var(--muted); }
+    li { margin: 7px 0; }
+    .footer { margin-top: 78px; padding-top: 20px; border-top: 1px solid var(--line); color: #8b98a9; font-size: 13px; }
+    .mobile-menu { display: none; }
+
+    /* === 文档渲染 === */
+    .markdown-body img { display: block; max-width: min(100%, 640px); height: auto; margin: 0 auto; border: 1px solid var(--line); border-radius: 8px; }
+    .markdown-body img[alt="交流群"] { max-width: 260px; }
+
+    /* === 新手向导增强 === */
+    blockquote { margin: 22px 0; padding: 15px 18px; border: 1px solid #cbd9f7; border-left: 4px solid var(--blue); border-radius: 8px; background: #f6f8ff; }
+    blockquote p { margin: 0; color: #405372; }
+    blockquote strong { color: #143e9f; }
+    ul > li { color: var(--ink); }
+    ol { counter-reset: step; list-style: none; padding-left: 0; }
+    ol > li { position: relative; padding: 7px 0 7px 40px; color: var(--ink); }
+    ol > li::before {
+      counter-increment: step; content: counter(step);
+      position: absolute; left: 0; top: 9px;
+      width: 27px; height: 27px; border-radius: 7px;
+      display: grid; place-items: center;
+      color: #fff; background: var(--blue);
+      font: 800 13px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    @media (max-width: 820px) {
+      .topbar-inner { padding: 0 18px; }
+      .top-links { display: none; }
+      .mobile-menu { display: inline-block; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: #fff; cursor: pointer; }
+      .layout { display: block; padding: 28px 18px 60px; }
+      .sidebar { position: static; max-height: none; margin-bottom: 38px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
+      .sidebar.collapsed .side-nav { display: none; }
+      h2 { margin-top: 52px; font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/"><span class="brand-mark">S</span><span>接入文档</span></a>
+      <button class="mobile-menu" type="button" aria-expanded="true">目录</button>
+    </div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <p class="side-label">Documentation</p>
+      <nav class="side-nav" aria-label="文档目录"></nav>
+    </aside>
+    <main></main>
+  </div>
+  <script>
+    const sidebar = document.getElementById("sidebar");
+
+    function escapeHtml(value) {
+      return value.replace(/[&<>"']/g, (char) => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", "\"":"&quot;", "'":"&#39;"}[char]));
+    }
+
+    function inlineMarkdown(value) {
+      const tokens = [];
+      const stash = (html) => { tokens.push(html); return "\u0000" + (tokens.length - 1) + "\u0000"; };
+      let text = escapeHtml(value);
+      text = text.replace(/`([^`]+)`/g, (_, code) => stash("<code>" + code + "</code>"));
+      text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_, alt, url) => stash("<img src=\"" + url + "\" alt=\"" + alt + "\" loading=\"lazy\">"));
+      text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]*)\)/g, (_, label, url) => stash("<a href=\"" + url + "\">" + label + "</a>"));
+      text = text.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      text = text.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+      text = text.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+      text = text.replace(/_([^_]+)_/g, "<em>$1</em>");
+      return text.replace(/\u0000(\d+)\u0000/g, (_, index) => tokens[Number(index)]);
+    }
+
+    function renderMarkdown(markdown) {
+      const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+      const html = [];
+      let i = 0;
+      const isBlank = (line) => /^\s*$/.test(line);
+      while (i < lines.length) {
+        const line = lines[i];
+        if (isBlank(line)) { i += 1; continue; }
+        const fence = line.match(/^\s*```\s*([\w+-]*)\s*$/);
+        if (fence) {
+          const language = fence[1] || "text";
+          const code = [];
+          i += 1;
+          while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) { code.push(lines[i]); i += 1; }
+          if (i < lines.length) i += 1;
+          html.push(`<div class="code-wrap"><button class="copy" type="button">复制</button><pre><code class="language-${language}">${escapeHtml(code.join("\n"))}</code></pre></div>`);
+          continue;
+        }
+        const heading = line.match(/^\s*(#{1,6})\s+(.+?)\s*#*\s*$/);
+        if (heading) {
+          const level = heading[1].length;
+          const text = heading[2].trim();
+          const id = text.toLowerCase().replace(/[^\w一-鿿]+/g, "-").replace(/^-|-$/g, "") || ("section-" + i);
+          html.push(`<h${level} id="${id}">${inlineMarkdown(text)}</h${level}>`);
+          i += 1;
+          continue;
+        }
+        if (/^\s*(---+|\*\*\*+)\s*$/.test(line)) { html.push("<hr>"); i += 1; continue; }
+        if (/^\s*>/.test(line)) {
+          const quote = [];
+          while (i < lines.length && /^\s*>/.test(lines[i])) { quote.push(lines[i].replace(/^\s*>\s?/, "")); i += 1; }
+          html.push(`<blockquote>${renderMarkdown(quote.join("\n"))}</blockquote>`);
+          continue;
+        }
+        if (/^\s*\|/.test(line) && i + 1 < lines.length && /^\s*\|?\s*:?-{3,}/.test(lines[i + 1])) {
+          const cells = (row) => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+          const headers = cells(line); i += 2; const rows = [];
+          while (i < lines.length && /^\s*\|/.test(lines[i])) { rows.push(cells(lines[i])); i += 1; }
+          html.push(`<table><thead><tr>${headers.map((cell) => `<th>${inlineMarkdown(cell)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${headers.map((_, index) => `<td>${inlineMarkdown(row[index] || "")}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
+          continue;
+        }
+        const unordered = line.match(/^\s*[-*+]\s+(.+)$/);
+        const ordered = line.match(/^\s*\d+[.)]\s+(.+)$/);
+        if (unordered || ordered) {
+          const tag = unordered ? "ul" : "ol"; const items = [];
+          while (i < lines.length) {
+            const match = lines[i].match(unordered ? /^\s*[-*+]\s+(.+)$/ : /^\s*\d+[.)]\s+(.+)$/);
+            if (!match) break;
+            items.push(`<li>${inlineMarkdown(match[1])}</li>`); i += 1;
+          }
+          html.push(`<${tag}>${items.join("")}</${tag}>`);
+          continue;
+        }
+        const paragraph = [line]; i += 1;
+        while (i < lines.length && !isBlank(lines[i]) && !/^\s*(#{1,6})\s+/.test(lines[i]) && !/^\s*```/.test(lines[i]) && !/^\s*[-*+]\s+/.test(lines[i]) && !/^\s*\d+[.)]\s+/.test(lines[i]) && !/^\s*>/.test(lines[i]) && !/^\s*\|/.test(lines[i])) { paragraph.push(lines[i]); i += 1; }
+        html.push(`<p>${inlineMarkdown(paragraph.join("\n").replace(/\n/g, " "))}</p>`);
+      }
+      return html.join("\n");
+    }
+
+    function bindInteractions() {
+      document.querySelectorAll(".copy").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const code = button.nextElementSibling.innerText;
+          try {
+            await navigator.clipboard.writeText(code);
+            const old = button.innerText; button.innerText = "已复制";
+            setTimeout(() => { button.innerText = old; }, 1200);
+          } catch (_) {}
+        });
+      });
+      const links = [...document.querySelectorAll(".side-nav a")];
+      const sections = links.map((link) => document.querySelector(link.getAttribute("href"))).filter(Boolean);
+      const observer = new IntersectionObserver((entries) => entries.forEach((entry) => {
+        if (entry.isIntersecting) links.forEach((link) => link.classList.toggle("active", link.getAttribute("href") === "#" + entry.target.id));
+      }), { rootMargin: "-90px 0px -65% 0px", threshold: 0 });
+      sections.forEach((section) => observer.observe(section));
+    }
+
+    async function loadMarkdownDocs() {
+      const response = await fetch("content.md", { cache: "no-store" });
+      if (!response.ok) throw new Error("Markdown fetch failed: " + response.status);
+      const markdown = await response.text();
+      const main = document.querySelector("main");
+      main.innerHTML = `<div class="markdown-body">${renderMarkdown(markdown)}<footer class="footer">sshzyu.com 接入指南</footer></div>`;
+      const headings = [...main.querySelectorAll("h2")];
+      document.querySelector(".side-nav").innerHTML = headings.map((heading) => `<a href="#${heading.id}">${heading.innerText}</a>`).join("");
+      bindInteractions();
+    }
+
+    document.querySelector(".mobile-menu").addEventListener("click", (event) => {
+      const collapsed = sidebar.classList.toggle("collapsed");
+      event.currentTarget.setAttribute("aria-expanded", String(!collapsed));
+    });
+    loadMarkdownDocs().catch((error) => {
+      console.error(error);
+      document.querySelector("main").innerHTML = '<div class="markdown-body"><p>文档加载失败，请刷新重试。</p></div>';
+    });
+  </script>
+</body>
+</html>

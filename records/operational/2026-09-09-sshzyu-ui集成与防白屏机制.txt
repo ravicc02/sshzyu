@@ -1,0 +1,70 @@
+sshzyu_ui 前端集成与防白屏机制（2026-09-09）
+
+== 背景 ==
+0.2.4-r1 发布当天公网白屏。根因：旧 UI 集成（r7 接管版）用 nginx sub_filter 把容器
+index.html 里硬编码的旧 hash（index-kHNMS7Ri.js）删掉换新资源，而容器每次发版 hash
+都变（0.2.4-r1 实际输出 index-DWS0sufL.js），替换落空 → 页面入口脚本失效/拿到
+200+HTML 当 JS → 白屏。无痕窗口同样白屏（问题在 nginx 层，非浏览器缓存）。
+已先回退恢复可用（见 2026-09-09-nginx-ui-r7回退记录.txt），本次完成正式集成。
+
+== 根因链（实测证据）==
+1. 服务器本机 443 取容器直出 HTML：入口 hash = index-DWS0sufL.js
+2. r7 接管版 page.conf 的 sub_filter 目标 = index-kHNMS7Ri.js（对不上）
+3. 旧机制 /assets/ 回落容器（try_files ... @embedded）→ 容器 SPA fallback 把
+   不存在的 JS 路径回成 index.html（200 + text/html）→ 浏览器当 JS 解析 → 白屏
+
+== 新机制（2026-09-09 19:55 UTC 上线）==
+/etc/nginx/sites-enabled/sub2api 重构：
+- /                  → 直接出 /opt/sshzyu-ui/current/index.html（current 符号链接，
+                       现指向 releases/20260909-ui-r7），不再代理容器、不再 sub_filter
+- /assets/*          → /opt/sshzyu-ui/shared/assets/（852 个文件的全版本 hash 累积库）
+                       try_files $uri =404，绝不回落容器
+- /_sshzyu_ui/releases/* → alias releases/（历史链接兼容）
+- API 白名单（与容器 embed 白名单 shouldBypassEmbeddedFrontend 一致）：
+  ^/(api|v1|v1beta|backend-api|antigravity|setup|health|models|responses|
+    alpha/search|images|videos)(/|$) → 原样代理 127.0.0.1:8080
+  （代理参数与回退版逐行一致，含 SSE 的 proxy_buffering off，抽至
+   /etc/nginx/snippets/sub2api-proxy.conf）
+- 其余路径           → SPA fallback 出 current/index.html，Cache-Control: no-cache
+- 防白屏守卫正则（API 正则之后）：SPA 路由下缺失静态文件一律 404
+- docs（/opt/sshzyu-docs）与 image playground（/opt/imageplayground）原样保留
+- 80 端口 server / Certbot 证书结构原样未动
+
+== 验收数据（服务器本机 443 + 本机代理公网双视角）==
+1. 首页引用 r7 资源（index-BTTZSulf.js 等 7 项），容器 hash DWS0sufL 出现 0 次
+2. 入口 JS：200 + application/javascript + immutable + nosniff
+3. 容器 hash 资源 /assets/index-DWS0sufL.js → 404（陷阱消除）
+4. SPA /login → 返回 r7 index（客户端路由正常）
+5. SPA 下缺失静态文件 → 404 text/html（明确报错，不再无声白屏）
+6. /health=200、/api/v1/auth/me=401、/v1/models=401（API 链路与鉴权正常）
+7. /docs/=200、/image/=200（保留功能正常）
+8. index Cache-Control: no-cache（UI 换版本立即生效）
+9. vendor-vue 分包含 createApp（2 处）、入口 JS 含 .mount("#app")（应用会启动）
+10. 公网下载入口 JS md5 与服务器原文件一致（f788068719dc9c2a80bac7530aaa710b，
+    182994 字节，传输完整无截断）
+11. 容器 healthy；nginx -t PASS
+
+== UI 发版流程（以后唯一流程，nginx 零改动）==
+1. 完整产物上传 /opt/sshzyu-ui/releases/<日期-ui-rN>/（index.html + assets/）
+2. /opt/sshzyu-ui/switch-release.sh <日期-ui-rN>
+   （自动：校验引用资源落盘 → 同步 shared/assets 只增不覆盖 → flip current →
+    本机 443 验证首页与新版一致 → 不一致自动回滚上一版本）
+3. 浏览器 Ctrl+F5
+幂等自检已通过（对 r7 执行：CHECK_OK/SYNC_OK/SWITCHED/VERIFY_OK）。
+
+== 红线（详见 /opt/sshzyu-ui/README.md）==
+- 禁止再用 sub_filter 改写容器 HTML；禁止把 sshzyu-ui include 加回 location /
+- 禁止删 shared/assets（旧版本缓存页面仍引用）
+- 半截产物上传会被切换脚本拒绝
+- 后端新增顶层 API 前缀时同步 nginx 白名单正则
+
+== 备份 ==
+- 切换前配置：/root/sub2api.nginx.bak-pre-ui-integration-20260909-195541（2048B）
+- r7 接管版配置：/root/sub2api.nginx.bak-ui-r7-20260909-111512（1583B，现场保留）
+- 本地副本：F:/中转站运营/backups/nginx-ui-integration-20260909/
+  （sub2api、sub2api-proxy.conf、switch-release.sh、README.md）
+
+== 边界 ==
+- 验证覆盖 HTTP 层（HTML 引用、JS 真实性与完整性、SPA 路由、API 链路、缓存头、404 行为），
+  未做真实浏览器点击渲染；如页面仍异常，F12 Console 第一条报错发运维侧排查。
+- UI 与后端解耦后，容器内嵌的官方前端仍可经内网 8080 访问，公网不再暴露。

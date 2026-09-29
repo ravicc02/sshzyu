@@ -1,0 +1,54 @@
+批量生图 0.2.0-r3 发布记录（2026-09-06）
+
+== 发布内容 ==
+提交 919e4aaf3 "fix: complete OpenAI batch image adaptation and harden pipeline"
+32 文件 +2213/-276，含：
+- OpenAI 批量生图完整适配：size=WxH 映射（1K/2K/4K 档 17 预设）、output_format
+  png/jpeg/webp、参考图走 /images/edits、独立响应解析（b64_json + url）
+- 单项重试预算（每项最多 2 次，持久化），单项失败隔离；跨实例执行租约
+- 取消父任务同事务终结 pending 子项（batch_image_repo.go）
+- 上游错误细分（401/403 拆分、脱敏错误码）；图片下载 CDN 受控跳转 + SSRF 防护
+- 前端：分组表单/批量页支持 OpenAI、任务详情完整结果查看
+- Windows 插件包 ZIP 句柄修复、审核配置测试时间竞争修复
+- 无数据库迁移（本次改动不涉及 schema）
+
+== 发布前核验 ==
+- 本地基线与服务器一致（均为 932425b4a），无覆盖服务器功能风险
+- 官方 v0.2.1 对 batch_image 文件零改动（升级预期无冲突，另见升级记录）
+- 遗留项闭环：Redis 认证一致 / 生产单副本+持久化目录 / 取消子项缺陷已修 /
+  上游 401/403 已由用户实测跑通（本地验收通过）
+- 定向回归：go test ./internal/service ./internal/repository（批量+取消）PASS
+
+== 备份（服务器 /root/sub2api-backup-pre-0.2.0-r3/，权限 700/600）==
+- pre-release-r3.dump 170MB（pg_dump -Fc）
+- deploy-compose.yml（实际部署 /opt/sub2api-deploy/docker-compose.yml，改前版）
+- config.yaml（从运行容器 /app/data/config.yaml 拷出）
+- 旧镜像 local/sub2api-batch:0.2.0-r2 保留（回滚点）
+- 部署目录另有 docker-compose.yml.bak-batch-r3-<时间戳>
+
+== 发布步骤（已完成）==
+1. fork push rebase-v0.2.0 → 919e4aaf3
+2. 服务器 git pull --ff-only → 919e4aaf3
+3. docker build → local/sub2api-batch:0.2.0-r3（183MB）
+4. sed 替换部署 compose image tag 0.2.0-r2→0.2.0-r3
+5. docker compose up -d --no-deps sub2api（仅重建主应用，postgres/redis 未动）
+
+== 验收结果 ==
+- 容器：sub2api Up (healthy) 0.2.0-r3；postgres/redis Up 7 days (healthy)
+- 内网 /health 200、首页 200；公网 https://sshzyu.com/health 200、首页 200
+- 启动日志无 panic/fatal（grep 命中均为正常 security_audit 业务审计）
+- 分组配置与发布前基线一致：
+  16「1K生图组」openai  allow_batch=true bdisc=1.0 price_1k=0.05 → 批量 0.05
+  18「124K生图组」openai allow_batch=true bdisc=1.0 price_1k=0.12 → 批量 0.12
+  22「nano-banana」gemini allow_batch=true bdisc=1.0 price_1k=0.12
+- Gemini 账号 55/158 mapping 仅存 3pro + 3.1flash（发布前已核验）
+
+== 边界与未尽事项 ==
+- 未发起线上真实付费生图验收（本地已实测 2K/16:9 真实出图+下载成功）
+- 上游 api.mikoto.vip / sshzyu.com 对全部尺寸组合的兼容性未逐一实测
+- 多实例部署前提（共享持久化目录）当前单副本不触发，扩容时需确认
+
+== 回滚方式 ==
+- 代码：git checkout 932425b4a（或 fork rebase-v0.2.0 回退）
+- 镜像：部署 compose image 改回 local/sub2api-batch:0.2.0-r2，up -d --no-deps sub2api
+- 数据：pg_restore pre-release-r3.dump（本次无迁移，正常无需回灌）

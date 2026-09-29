@@ -1,0 +1,44 @@
+2026-09-09 sshzyu.com 白屏事故回退记录
+================================================
+
+【现象】
+0.2.4-r1 发布验收通过后，公网 sshzyu.com 白屏；无痕窗口同样白屏，且"闪了一下旧前端"。
+
+【根因（实锤）】
+/etc/nginx/sites-enabled/sub2api 于 Sep 9 05:24 被新前端发布（sshzyu_ui / ui-r7）接管：
+- location / 仍 proxy 到 127.0.0.1:8080，但通过 include snippets/sshzyu-ui/20260909-ui-r7/
+  的 page.conf 用 sub_filter 删除 HTML 中 6 条旧前端 JS/CSS 引用，
+  由 /_sshzyu_ui/releases/ 与 /assets/（root /opt/sshzyu-ui/shared）静态目录提供新前端。
+- page.conf 中 sub_filter 匹配的入口 hash 为 index-kHNMS7Ri.js，
+  与 0.2.4-r1 容器实际输出 hash（index-DWS0sufL.js）不一致，
+  "删旧引新"机制落空 → 页面入口脚本被删 → 静态骨架闪一下后白屏（与浏览器缓存无关）。
+
+【回退动作】
+1. 现场备份：/root/sub2api.nginx.bak-ui-r7-20260909-111512（1583B，r7 接管版配置）
+2. 回退配置（本地留档 F:/中转站运营/backups/nginx-rollback-20260909/sub2api）：
+   - location / 恢复为纯 proxy_pass http://127.0.0.1:8080（抄自 sites-available/sub2api 原版）
+   - 保留 docs（/opt/sshzyu-docs）与 image playground（/opt/imageplayground）两个 location
+   - 删除对 snippets/sshzyu-ui/20260909-ui-r7/locations.conf 的 include
+3. nginx -t 校验 PASS → systemctl reload nginx
+4. 未删除任何 r7 发布产物：snippets/sshzyu-ui/（r1~r7）、conf.d/20-sshzyu-ui-map.conf、
+   /opt/sshzyu-ui/ 均保留，供后续重新衔接。
+
+【验证结果（公网视角，与用户浏览器一致）】
+- https://sshzyu.com/health        → 200
+- https://sshzyu.com/              → 200，HTML 直出容器 0.2.4-r1 前端（index-DWS0sufL.js）
+- HTML 中 _sshzyu_ui 引用数        → 0
+- /assets/index-DWS0sufL.js        → 200, text/javascript, 182069 字节（真实 JS 非 HTML 兜底）
+- /assets/vendor-misc-DB0Q8XAf.css → 200, text/css
+- /login                           → 200
+- /v1/models（无 key）             → 401（API 链路通，鉴权正常）
+- 容器 sub2api（0.2.4-r1）         → healthy，30 分钟内 0 panic、无 OOM
+- nginx error log 中 09:55:40 的 connection reset 为容器切换瞬间一次性记录，非持续故障
+
+【遗留：新前端衔接待修（用户指示"然后再改"）】
+r7 的"sub_filter 删旧引用 + 静态目录出新资源"方案与 0.2.4-r1 容器 hash 对不上。
+重新衔接前需先对齐机制，可选方向：
+a) 发布流水线改为读取容器实际 index.html 中的 hash 再生成 sub_filter 规则；
+b) 改为"整页替换"：location / 直接返回 /opt/sshzyu-ui/releases/<ver>/index.html，
+   API/资源路径按现有 locations.conf 白名单代理（需确认新前端对后端 API 前缀的依赖）；
+c) 放弃 nginx 层改写，直接把新前端构建产物替换进镜像前端目录随版本发布。
+与发布方（sshzyu_ui 流水线维护者）确认机制后再实施。

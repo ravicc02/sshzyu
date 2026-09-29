@@ -1,0 +1,219 @@
+# =============================================================================
+# SSHZYU — 统一本地栈
+# =============================================================================
+# 一个命令启动全部服务：
+#   cp .env.example .env      # 编辑 POSTGRES_PASSWORD 等
+#   docker compose up -d --build
+#
+# 访问：http://localhost:8080
+#
+# 服务：
+#   sshzyu-ui  → nginx :8080  前端界面 + 文档站点 + API 反向代理
+#   sub2api    → 后端 :8081   由本地源码构建（不拉取任何远程业务镜像）
+#   postgres   → 数据库
+#   redis      → 缓存
+#
+# 说明：本编排对齐原先本地运行的 sub2api/deploy/docker-compose.dev.yml 与
+#      sshzyu-local-site/docker-compose.yml，合并为单一文件。
+# =============================================================================
+
+services:
+
+  # ===========================================================================
+  # 前端 / Nginx 反向代理（本地 :8080 栈）
+  # 托管：前端产物 (/)、文档站点 (/docs/)，并把 API 请求代理到后端。
+  # ===========================================================================
+  sshzyu-ui:
+    image: nginx:alpine
+    container_name: sshzyu-ui-local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./ui:/opt/sshzyu-ui:ro
+      - ./docs:/opt/sshzyu-docs:ro
+      # 可选：生图工作室静态产物（不属于本仓库，缺失时 /image/ 路由 404，不影响其它功能）
+      - ${IMAGE_PLAYGROUND_DIST:-../gpt_image_playground/dist}:/opt/imageplayground:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/00-sub2api-map.conf:/etc/nginx/conf.d/00-sub2api-map.conf:ro
+      - ./nginx/20-sshzyu-ui-map.conf:/etc/nginx/conf.d/20-sshzyu-ui-map.conf:ro
+      - ./nginx/sub2api-proxy.conf:/etc/nginx/snippets/sub2api-proxy.conf:ro
+    depends_on:
+      sub2api:
+        condition: service_healthy
+    networks:
+      - sub2api-network
+
+  # ===========================================================================
+  # Sub2API 后端
+  # 由仓库根 Dockerfile 多阶段构建（含前端嵌入），不依赖远程业务镜像。
+  # ===========================================================================
+  sub2api:
+    image: local/sshzyu:${SUB2API_TAG:-dev}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}
+    container_name: sub2api-dev
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "${BIND_HOST:-127.0.0.1}:${SERVER_PORT:-8081}:8080"
+    volumes:
+      - ./deploy/data:/app/data:Z
+    environment:
+      - AUTO_SETUP=true
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - SERVER_MODE=${SERVER_MODE:-release}
+      - ENABLE_SERVER_TIMING=${ENABLE_SERVER_TIMING:-false}
+      - RUN_MODE=${RUN_MODE:-standard}
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=${POSTGRES_USER:-sub2api}
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - DATABASE_DBNAME=${POSTGRES_DB:-sub2api}
+      - DATABASE_SSLMODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_USERNAME=${REDIS_USERNAME:-}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@sub2api.local}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - JWT_SECRET=${JWT_SECRET:-}
+      - SETUP_MIGRATION_TIMEOUT_SECONDS=${SETUP_MIGRATION_TIMEOUT_SECONDS:-0}
+      - TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY:-}
+      - TZ=${TZ:-Asia/Shanghai}
+      # 容器内出网代理（默认留空 = 直连）。国内环境如需走本机代理，
+      # 在 .env 里设置 CONTAINER_HTTP_PROXY / CONTAINER_HTTPS_PROXY 等。
+      - HTTP_PROXY=${CONTAINER_HTTP_PROXY:-}
+      - HTTPS_PROXY=${CONTAINER_HTTPS_PROXY:-}
+      - ALL_PROXY=${CONTAINER_ALL_PROXY:-}
+      - NO_PROXY=${CONTAINER_NO_PROXY:-127.0.0.1,localhost,::1,postgres,redis,sub2api,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,.local}
+      # 网关调度与图片参数（缺省值即后端默认，保留原样）
+      - GATEWAY_FORCE_CODEX_CLI=${GATEWAY_FORCE_CODEX_CLI:-false}
+      - GATEWAY_OPENAI_COMPACT_MODEL=${GATEWAY_OPENAI_COMPACT_MODEL:-gpt-5.5}
+      - SUB2API_IMAGES_MAIN_MODEL=${SUB2API_IMAGES_MAIN_MODEL:-gpt-5.6-luna}
+      - GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT=${GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT:-0}
+      - GATEWAY_OPENAI_WS_FORCE_HTTP=${GATEWAY_OPENAI_WS_FORCE_HTTP:-false}
+      - GATEWAY_OPENAI_HTTP2_ENABLED=${GATEWAY_OPENAI_HTTP2_ENABLED:-true}
+      - GATEWAY_OPENAI_HTTP2_ALLOW_PROXY_FALLBACK_TO_HTTP1=${GATEWAY_OPENAI_HTTP2_ALLOW_PROXY_FALLBACK_TO_HTTP1:-true}
+      - GATEWAY_OPENAI_HTTP2_FALLBACK_ERROR_THRESHOLD=${GATEWAY_OPENAI_HTTP2_FALLBACK_ERROR_THRESHOLD:-2}
+      - GATEWAY_OPENAI_HTTP2_FALLBACK_WINDOW_SECONDS=${GATEWAY_OPENAI_HTTP2_FALLBACK_WINDOW_SECONDS:-60}
+      - GATEWAY_OPENAI_HTTP2_FALLBACK_TTL_SECONDS=${GATEWAY_OPENAI_HTTP2_FALLBACK_TTL_SECONDS:-600}
+      - GATEWAY_OPENAI_PROXY_STREAM_CIRCUIT_FAILURE_THRESHOLD=${GATEWAY_OPENAI_PROXY_STREAM_CIRCUIT_FAILURE_THRESHOLD:-2}
+      - GATEWAY_OPENAI_PROXY_STREAM_CIRCUIT_WINDOW_SECONDS=${GATEWAY_OPENAI_PROXY_STREAM_CIRCUIT_WINDOW_SECONDS:-60}
+      - GATEWAY_OPENAI_PROXY_STREAM_CIRCUIT_TTL_SECONDS=${GATEWAY_OPENAI_PROXY_STREAM_CIRCUIT_TTL_SECONDS:-600}
+      - GATEWAY_MAX_BODY_SIZE=${GATEWAY_MAX_BODY_SIZE:-268435456}
+      - GATEWAY_MAX_CONNS_PER_HOST=${GATEWAY_MAX_CONNS_PER_HOST:-1024}
+      - GATEWAY_MAX_IDLE_CONNS=${GATEWAY_MAX_IDLE_CONNS:-2560}
+      - GATEWAY_MAX_IDLE_CONNS_PER_HOST=${GATEWAY_MAX_IDLE_CONNS_PER_HOST:-120}
+      - GATEWAY_SCHEDULING_STICKY_SESSION_MAX_WAITING=${GATEWAY_SCHEDULING_STICKY_SESSION_MAX_WAITING:-3}
+      - GATEWAY_SCHEDULING_STICKY_SESSION_WAIT_TIMEOUT=${GATEWAY_SCHEDULING_STICKY_SESSION_WAIT_TIMEOUT:-120s}
+      - GATEWAY_SCHEDULING_FALLBACK_WAIT_TIMEOUT=${GATEWAY_SCHEDULING_FALLBACK_WAIT_TIMEOUT:-30s}
+      - GATEWAY_SCHEDULING_FALLBACK_MAX_WAITING=${GATEWAY_SCHEDULING_FALLBACK_MAX_WAITING:-100}
+      - GATEWAY_SCHEDULING_LOAD_BATCH_ENABLED=${GATEWAY_SCHEDULING_LOAD_BATCH_ENABLED:-true}
+      - GATEWAY_SCHEDULING_SLOT_CLEANUP_INTERVAL=${GATEWAY_SCHEDULING_SLOT_CLEANUP_INTERVAL:-30s}
+      - GATEWAY_SCHEDULING_DB_FALLBACK_ENABLED=${GATEWAY_SCHEDULING_DB_FALLBACK_ENABLED:-true}
+      - GATEWAY_SCHEDULING_DB_FALLBACK_TIMEOUT_SECONDS=${GATEWAY_SCHEDULING_DB_FALLBACK_TIMEOUT_SECONDS:-0}
+      - GATEWAY_SCHEDULING_DB_FALLBACK_MAX_QPS=${GATEWAY_SCHEDULING_DB_FALLBACK_MAX_QPS:-0}
+      - GATEWAY_SCHEDULING_OUTBOX_POLL_INTERVAL_SECONDS=${GATEWAY_SCHEDULING_OUTBOX_POLL_INTERVAL_SECONDS:-1}
+      - GATEWAY_SCHEDULING_OUTBOX_LAG_WARN_SECONDS=${GATEWAY_SCHEDULING_OUTBOX_LAG_WARN_SECONDS:-5}
+      - GATEWAY_SCHEDULING_OUTBOX_LAG_REBUILD_SECONDS=${GATEWAY_SCHEDULING_OUTBOX_LAG_REBUILD_SECONDS:-10}
+      - GATEWAY_SCHEDULING_OUTBOX_LAG_REBUILD_FAILURES=${GATEWAY_SCHEDULING_OUTBOX_LAG_REBUILD_FAILURES:-3}
+      - GATEWAY_SCHEDULING_OUTBOX_BACKLOG_REBUILD_ROWS=${GATEWAY_SCHEDULING_OUTBOX_BACKLOG_REBUILD_ROWS:-10000}
+      - GATEWAY_SCHEDULING_FULL_REBUILD_INTERVAL_SECONDS=${GATEWAY_SCHEDULING_FULL_REBUILD_INTERVAL_SECONDS:-300}
+      - GATEWAY_IMAGE_STREAM_DATA_INTERVAL_TIMEOUT=${GATEWAY_IMAGE_STREAM_DATA_INTERVAL_TIMEOUT:-900}
+      - GATEWAY_IMAGE_STREAM_KEEPALIVE_INTERVAL=${GATEWAY_IMAGE_STREAM_KEEPALIVE_INTERVAL:-10}
+      - GATEWAY_IMAGE_NONSTREAM_KEEPALIVE_INTERVAL=${GATEWAY_IMAGE_NONSTREAM_KEEPALIVE_INTERVAL:-0}
+      - GATEWAY_IMAGE_CONCURRENCY_ENABLED=${GATEWAY_IMAGE_CONCURRENCY_ENABLED:-false}
+      - GATEWAY_IMAGE_CONCURRENCY_MAX_CONCURRENT_REQUESTS=${GATEWAY_IMAGE_CONCURRENCY_MAX_CONCURRENT_REQUESTS:-0}
+      - GATEWAY_IMAGE_CONCURRENCY_OVERFLOW_MODE=${GATEWAY_IMAGE_CONCURRENCY_OVERFLOW_MODE:-reject}
+      - GATEWAY_IMAGE_CONCURRENCY_WAIT_TIMEOUT_SECONDS=${GATEWAY_IMAGE_CONCURRENCY_WAIT_TIMEOUT_SECONDS:-30}
+      - GATEWAY_IMAGE_CONCURRENCY_MAX_WAITING_REQUESTS=${GATEWAY_IMAGE_CONCURRENCY_MAX_WAITING_REQUESTS:-100}
+      # 批量生图（保留原 dev 配置）
+      - BATCH_IMAGE_ENABLED=${BATCH_IMAGE_ENABLED:-true}
+      - BATCH_IMAGE_QUEUE_ENABLED=${BATCH_IMAGE_QUEUE_ENABLED:-true}
+      - BATCH_IMAGE_VERTEX_ENABLED=${BATCH_IMAGE_VERTEX_ENABLED:-true}
+      - BATCH_IMAGE_VERTEX_PROJECT_ID=${BATCH_IMAGE_VERTEX_PROJECT_ID:-project-28424c50-8df2-46e2-a27}
+      - BATCH_IMAGE_VERTEX_LOCATION=${BATCH_IMAGE_VERTEX_LOCATION:-global}
+      - BATCH_IMAGE_VERTEX_MANAGED_GCS_BUCKET=${BATCH_IMAGE_VERTEX_MANAGED_GCS_BUCKET:-sub2-batch-image-prod-project-28424c50-8df2-46e2-a27}
+      - BATCH_IMAGE_VERTEX_MANAGED_GCS_PREFIX=${BATCH_IMAGE_VERTEX_MANAGED_GCS_PREFIX:-batch-image/prod/{batch_id}}
+      - BATCH_IMAGE_VERTEX_INPUT_RETENTION_HOURS=${BATCH_IMAGE_VERTEX_INPUT_RETENTION_HOURS:-24}
+      - BATCH_IMAGE_VERTEX_OUTPUT_RETENTION_HOURS=${BATCH_IMAGE_VERTEX_OUTPUT_RETENTION_HOURS:-72}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sub2api-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ===========================================================================
+  # PostgreSQL
+  # ===========================================================================
+  postgres:
+    image: postgres:18-alpine
+    container_name: sub2api-postgres-dev
+    restart: unless-stopped
+    volumes:
+      - ./deploy/postgres_data:/var/lib/postgresql/data:Z
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-sub2api}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - POSTGRES_DB=${POSTGRES_DB:-sub2api}
+      - PGDATA=/var/lib/postgresql/data
+      - TZ=${TZ:-Asia/Shanghai}
+    networks:
+      - sub2api-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sub2api} -d ${POSTGRES_DB:-sub2api}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ===========================================================================
+  # Redis
+  # ===========================================================================
+  redis:
+    image: redis:8-alpine
+    container_name: sub2api-redis-dev
+    restart: unless-stopped
+    volumes:
+      - ./deploy/redis_data:/data:Z
+    command: >
+        sh -c '
+          redis-server \
+          --save 60 1 \
+          --appendonly yes \
+          --appendfsync everysec \
+          ${REDIS_PASSWORD:+--requirepass "$REDIS_PASSWORD"}'
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+      - REDISCLI_AUTH=${REDIS_PASSWORD:-}
+    networks:
+      - sub2api-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+# =============================================================================
+# Network
+# =============================================================================
+networks:
+  sub2api-network:
+    name: sub2api-network
+    driver: bridge

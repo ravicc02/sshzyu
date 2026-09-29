@@ -1,0 +1,50 @@
+# 0.2.4-r1 发布记录（2026-09-09）
+
+## 本次发布内容
+- 升级官方 sub2api v0.2.1 → v0.2.4（官方 181 个提交：v0.2.2 / v0.2.3 / v0.2.4）
+- 保留全部 6 个定制提交（cherry-pick 到 rebase-v0.2.4 分支）：
+  1. DeepSeek reasoning.effort 白名单（edc72c2d4）
+  2. OpenAI 批量生图 provider（90441a5c3）
+  3. 批量队列 MVP fixture（a26160be2）
+  4. OpenAI 批量完整适配加固（7bfffcbb4）
+  5. Gemini 批量 base_url 绑定 + 本地降级执行器（a24bfa027）
+  6. gpt-image 批量参考图上限 1→16（95ffb8dec）
+- 跳过单独的 0.2.1-r2，参考图上限 16 修复随本版一并上线
+
+## 冲突处理（cherry-pick 共 3 处）
+- VERSION ×2：解决为 0.2.4-r1
+- plugin_package.go：官方 v0.2.2~v0.2.4 已自行实现同款 Windows ZIP 句柄修复，取官方版，功能等价
+
+## 数据库迁移
+- 自动执行官方新迁移 3 个：235_group_model_allowlist、236_group_model_allowlist_repair、237_add_minimax_platform
+- 我方 234_batch_image_idempotency_unique 未重复执行（checksum 一致）
+
+## 线上验收结果
+| 项目 | 结果 |
+|---|---|
+| 发布提交 | 95ffb8dec，本地 = fork = 服务器一致 |
+| 容器 | sub2api 运行 local/sub2api-batch:0.2.4-r1（186MB），healthy |
+| postgres / redis | 未动（Up 10 days） |
+| 内网 /health | 200 |
+| 公网 https://sshzyu.com/health | 200；首页 200 |
+| 日志扫描（panic/fatal） | 0 |
+| 分组基线 | 16→0.05、18→0.12、22→0.12，bdisc=1.0、批量开，与发布前一致 |
+| Gemini mapping | 账号 55/158 仅 3pro + 3.1flash，不变 |
+
+## 本地回归（发布前）
+- go build ./... 通过
+- 批量全家族定向回归 ok 2.210s；race 定向 ok 3.184s
+- 前端：i18n 完整性 3 项通过（本地需 --maxWorkers=1 --minWorkers=1 绕过线程配置冲突，属本地环境问题非代码问题）、vue-tsc 类型检查通过、vite 生产构建 47.64s
+
+## 备份与回滚
+- 备份目录：/root/sub2api-backup-pre-0.2.1-r2-20260909/
+  - db-dump.sql.gz 182,720,054 字节（gzip -t PASS，发布时点数据）
+  - config.yaml 712 字节（容器内实际路径 /app/data/config.yaml，本轮已补齐）
+  - docker-compose.yml（部署目录）
+- 回滚路径：镜像切回 local/sub2api-batch:0.2.1-r1（旧镜像保留）
+- 注意：235/236/237 迁移已执行；回滚到旧镜像后 schema 含新增列/表，通常向后兼容，236 为数据修复类迁移如需严格回滚应连同 dump 恢复
+
+## 边界（如实说明）
+- 官方 181 个提交的功能面（分组模型白名单、minimax 平台等）未逐一人工验收，依赖官方测试与本地编译/回归
+- 批量生图真实付费出图未在本轮重新发起（此前本地已实测通过，线上同代码）
+- 本地 Windows 的 pnpm build 因 vitest 线程配置冲突失败，属本地环境问题；分步执行等价通过

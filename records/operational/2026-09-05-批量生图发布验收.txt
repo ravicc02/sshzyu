@@ -1,0 +1,62 @@
+批量生图发布验收记录
+日期：2026-09-05
+
+一、基线与提交
+本地仓库 F:/中转站运营/sub2api，初始工作树干净，HEAD 48f34c67c。
+发现 TestBatchImageMVPFlow 夹具漏设 QueueEnabled，导致 BATCH_IMAGE_DISABLED；仅补齐 QueueEnabled=true，未放宽生产保护。
+新增提交 932425b4aed8a82591be8d1a61353753d9bfae64（test: enable batch queue in MVP smoke fixture）。
+fork=https://github.com/qiuy-collab/sshzyu-sub2api.git，分支 rebase-v0.2.0；push成功，ls-remote核验与本地一致。origin为官方 Wei-Shaw/sub2api，未推送官方仓库。
+最终本地及服务器工作树均干净。
+
+二、实际执行命令概要
+1. git status/log/branch/remote/ls-remote；只读核验hk-server容器、源码与数据库。
+2. go -C F:/中转站运营/sub2api/backend test -tags=unit ./internal/service -run BatchImage -count=1。
+   首次失败：MVP冒烟夹具漏开队列；修复后通过，0.384s。
+3. go -C F:/中转站运营/sub2api/backend build ./cmd/server：通过。
+4. go test -tags=unit ./internal/service -run 'OpenAIBatchImageProvider|BatchImagePublicService|BatchImageSettlement' -count=1 -v：通过；覆盖参考图 /v1/images/edits、纯文本 generations、非法模型映射、取消、幂等、费用及队列开关。
+5. git diff --check；git add 指定测试文件；git commit；git push fork rebase-v0.2.0。
+6. 服务器 git -C /opt/sub2api-deepseek-fix-20260828-102633 pull --ff-only origin rebase-v0.2.0。
+7. docker build --build-arg VERSION=0.2.0-batch-r2 --build-arg COMMIT=932425b4a --label org.opencontainers.image.revision=932425b4a -t local/sub2api-batch:0.2.0-r2 /opt/sub2api-deepseek-fix-20260828-102633：通过。
+8. pg_dump -Fc及pg_restore -l验证；备份compose/config；事务内定向更新目标分组及账号映射。
+9. config.yaml batch_image内添加queue_enabled:true；compose仅替换sub2api镜像；docker compose config --quiet通过；docker compose up -d --no-deps sub2api，仅重建主应用一次。
+10. docker inspect、程序-version、内外网health、无鉴权批量路由、定向SQL验收。
+
+三、部署及备份
+工作区旧说明中的 /opt/sub2api 并不存在。实际发布源码路径 /opt/sub2api-deepseek-fix-20260828-102633；/opt/sub2api-git 是另一个较旧源码仓库，未改动。
+生产主机：hk-server，hostname HKE278301。
+旧镜像 local/sub2api-deepseek-fix:0.2.0-r1，旧源码75e0602bf。
+新镜像 local/sub2api-batch:0.2.0-r2。
+镜像ID sha256:8c3f8332d7e880c03a0a1efc798d500a0542f2d43d1f10f922c9e4b06d3809c3。
+程序版本 0.2.0-batch-r2，commit 932425b4a，built 2026-09-05T11:56:21Z。
+容器启动 2026-09-05T11:58:55.460565411Z；最终healthy，RestartCount=0。
+本机 http://127.0.0.1:8080/health=200；公网 https://sshzyu.com/health=200。
+GET /v1/images/batches/nonexistent 无鉴权=401。
+postgres/redis均healthy，未重建。未操作nginx/mpay及其他服务。
+持久化 /opt/sub2api-deploy/data -> /app/data，适用于单实例OpenAI批量输入输出存储。
+备份目录 /opt/sub2api-deploy/backups/batch-20260905-932425b4a。
+pre-release.dump=167231958 bytes，权限600；pg_restore -l成功。另存原docker-compose.yml及config.yaml；目录700。备份只留服务器，未输出内容或拷贝凭据。
+服务器构建日志 /tmp/sub2api-batch-build-20260905.log。
+
+四、数据库最小修改与脱敏结果
+组16：allow_batch=true，discount=1，hold=1；原1K/2K/4K价格0.05全部保留。
+组18：allow_batch=true，discount=1，hold=1；原1K/2K/4K价格0.12全部保留。
+组22：原allow_batch=true，discount=1，hold=1，1K/2K/4K价格0.12已符合，无更新。
+以上组rate_multiplier=1，image_rate_independent=false，image_rate_multiplier=1；无目标组user_group_rate_multipliers覆盖。
+相关账号倍率均1。按当前费用快照代码：基础图片单价 × 有效分组倍率 × 账号倍率 × 批量折扣，三个目标组每张批量费用分别0.05、0.12、0.12。
+账号55/158确认仅关联组22，平台gemini/apikey，使用jsonb_set仅改credentials.model_mapping，保留两项原有映射：
+ gemini-3-pro-image-preview -> gemini-3-pro-image-preview
+ gemini-3.1-flash-image-preview -> gemini-3.1-flash-image-preview
+其他credentials及其他字段未重写（仅updated_at同步更新）。
+组16/18还关联账号52，其gpt-image-2映射为nano-banana-1k；当前OpenAI批量代码拒绝非精确gpt-image-2映射，不擅改账号52。
+迁移前幂等重复分组数0；启动后索引batch_image_jobs_user_api_key_idempotency_uq存在。
+batch_image_jobs总数0，没有真实付费生图或扣款。
+
+五、队列及验收边界
+生产batch_image.enabled已为true，此次添加queue_enabled=true，容器环境没有覆盖这两项。
+Redis Lua evalsha计数3秒内增加7；当前队列通过Lua原子轮询，不使用BRPOP，故blocking client=0不是停工证据。未提交实际任务，不能把共享Redis命令计数当作完整端到端队列证明。
+本次没有真实付费上游请求，成功生图、上游真实edits兼容及实际账单扣款仍未验证。费用结论为定向测试+生产配置公式核验，不冒称真实扣款验收。
+当前batch_image_public.go统一限制image_size=1K；组18名称为124K不代表批量2K/4K已支持。如需该能力，需要单独代码变更与测试。
+未连接Ravi-server：工作区AGENTS.md要求跨工作区操作先单独确认用途。香港真实部署已明确，不对Ravi-server进行排查、重启或配置。
+
+六、回滚注意
+保留旧镜像与原配置备份。必要时先审查是否已有新批量任务，再停止新任务入口；恢复备份中的主应用镜像/config并仅重建sub2api。数据库不要全库回灌以免覆盖期间其他业务数据；目标字段回滚应从服务器备份提取并最小定向恢复。当前无需回滚。

@@ -1,0 +1,101 @@
+生图工作室硬接入「个人空间 → 工作空间」实施记录
+=====================================================
+日期：2026-09-12
+执行者：NewMax（Ravi 授权）
+范围：仅前端编译产物热补丁 + 服务器 README 红线；未动后端、数据库、nginx、sub2api 容器
+
+一、问题
+用户在「嵌入」（custom_menu_items）里添加的「生图工作台」在侧边栏展示不出来；
+充值中心、接入文档正常。用户要求：嵌入方案优先，把生图工作室接进「工作空间」分组，
+且创作画布与嵌入的生图工作台两个都要显示。
+
+二、根因（r8 产物实锤）
+1. custom_menu_items 渲染进侧边栏时，AppLayout 有硬编码排除：
+   Rt = custom_menu_items.filter(z => z.visibility==="user" && z.id !== pe.legacyImage)
+   pe.legacyImage = "4ac01eacf764b20a" —— 恰好就是「生图工作台」菜单项的 id。
+   全部产物中 legacyImage 仅有定义 + 两处排除，无任何消费点 —— r7/r8 开发者预留
+   「legacy 生图工作室」约定但未实现，排除生效、使用缺失，导致该项永不渲染。
+2. 侧边栏分组函数 dt 按 path 精确匹配归组（overview/work/account），
+   未匹配项全部落入「快捷方式(shortcuts)」组；/custom/:id 路由不在任何分组 paths 中，
+   即使解除排除，嵌入项也只能进「快捷方式」组，进不了「工作空间」组。
+3. 充值中心/接入文档 id 不在排除名单 → 正常显示（在「快捷方式」组）。
+
+三、补丁（3 处幂等替换，作用于 AppLayout chunk）
+1) filter(z=>z.visibility==="user"&&z.id!==pe.legacyImage)  →  filter(z=>z.visibility==="user")
+   解除 user 菜单侧排除（admin 侧 lt 保留，与 user 菜单无关）。
+2) work 分组 paths 末尾插入 "/custom/4ac01eacf764b20a"
+   → 嵌入的生图工作台随 dt 精确匹配进入「工作空间」分组。
+3) {path:"/image-studio",...,hideInSimpleMode:!0} 去掉 hideInSimpleMode
+   → 创作画布在「简单模式」侧边栏也显示（用户要求两个都显示）。
+
+四、★关键更正（2026-09-12，首轮补丁实际未生效的原因）★
+nginx 实际配置：
+    location ^~ /assets/ { root /opt/sshzyu-ui/shared;  try_files $uri =404; }   ← JS 全部从这里出
+    location /         { root /opt/sshzyu-ui/current; }                          ← 只有 index.html 从这里出
+
+即：浏览器加载的 JS 全部来自 **shared 累积库**，不是 current/releases。
+首轮补丁只打在了 current/assets（releases/r8）里，而 nginx 服务的是 shared/assets 里的同名文件，
+所以用户强刷也看不到任何变化。
+
+实测证据（首轮补丁后）：
+    公网 /assets/AppLayout...BZzLUn9g.js          → 96901 B，补丁串 0、旧排除 1   （未生效）
+    公网 /_sshzyu_ui/releases/.../AppLayout...js  → 补丁串 1                     （首轮误测的路径）
+首轮「验证通过」是因为拉取的是 /_sshzyu_ui/releases/... 路径，而非浏览器真正加载的 /assets/ 路径，
+属于自证清白式的错误验证。教训：验证必须走浏览器真实请求的 URL。
+
+修正动作：
+- 对 /opt/sshzyu-ui/shared/assets/AppLayout...BZzLUn9g.js 应用同样 3 处替换
+- patch-workspace-embed.sh 改为【同时补丁 shared + current 两份】+ 动态识别当前 chunk 名
+- 补丁后公网 /assets/ 实测：Content-Length 96885、patchStr=1、legacyExcl=0、ETag 已变
+
+五、发布与验证（修正后实测）
+- 执行：/opt/sshzyu-ui/patch-workspace-embed.sh（幂等：两份均识别为已补丁版并跳过）
+- 备份：patches/backup/shared_AppLayout-BZzLUn9g.js.bak-20260912（96901 B）
+        patches/backup/AppLayout...BZzLUn9g.js.bak-20260912-070519（96901 B）
+- 公网 /assets/ 路径实测：patchStr=1、legacyExcl=0、Content-Length 96885、ETag "6aa50184-17a75"
+- /custom/4ac01eacf764b20a → 200（CustomPageView SPA 路由正常）
+- /image/ → 200；sw.js 为 2026-09-12 自毁版（上轮白屏修复在位）
+- custom_menu_items 复核：生图工作台 id=4ac01eac...、url=https://sshzyu.com/image/（尾斜杠）、visibility=user
+- 服务端无 Service Worker（不会二次缓存 chunk）；index.html 为 no-cache，chunk 为 immutable 一年
+- README（/opt/sshzyu-ui/README.md）已追加发版红线 + 本次更正
+
+六、红线（重要）
+每次 UI 发版（switch-release.sh 切新版本）后，shared 累积库会加入新版本 assets，必须重放：
+    /opt/sshzyu-ui/patch-workspace-embed.sh
+脚本幂等（已打补丁自动跳过）、带时间戳备份、目标串不唯一时拒绝执行并提示人工复核。
+若 UI 源码将来自行修复此逻辑，以源码为准并停用本补丁。
+
+七、边界
+- chunk 缓存为 immutable 一年，改名会牵连整条 import 链故未改名：
+  浏览器需 Ctrl+F5 强刷一次才能拿到新 AppLayout。
+- 「管理后台」侧边栏按设计只渲染 visibility==="admin" 的菜单项，本项为 user 可见，
+  因此 admin 视图下不会出现；如需 admin 侧也显示，需另行补丁（尚未做）。
+- HTTP 层全部验证通过；侧边栏实际渲染效果需浏览器确认（无真实浏览器）。
+- 补丁对象是编译产物（r8）；r9+ 需重放（见红线）。
+
+八、★最终生效方案：fw-cachebust.js 引导入口（2026-09-12，用户已确认「有了」）★
+补丁已打在 shared 正确文件上后，用户仍看不到，原因是 AppLayout chunk 为 immutable 一年缓存，
+补丁是「原地改内容、文件名/hash 不变」，浏览器一直用旧副本（且该 chunk 被 45 个其他 chunk 引用，
+改名会打断 import 链，不能改名）。
+
+采用「入口引导」破缓存，只改 1 个文件、不动 45 条引用链：
+  1) 新增 /assets/fw-cachebust.js（642B），逻辑：
+       - 对 BUST 列表（=被补丁过的 chunk）发 fetch(url,{cache:"no-cache"}) 强制回源校验，
+         内容已变 → ETag 变 → 浏览器更新缓存副本
+       - 再 import 真正的 Vue 入口 /assets/index-C7MNXNPX.js
+       任何一步失败都不阻塞页面
+  2) current/index.html 入口由 index-C7MNXNPX.js 换成 fw-cachebust.js
+  3) 双写 shared + current 两份 fw-cachebust.js
+  4) 备份 index.html → patches/backup/index.html.bak-20260912-cachebust
+本地留档：backups/sshzyu-ui-cachebust-20260912/{fw-cachebust.js,index.html}
+
+最终链路（已实测自洽）：index.html(no-cache) → fw-cachebust.js → 强制回源 BZzLUn9g(补丁版)
+→ import index-C7MNXNPX.js → 该入口 import 的正是 BZzLUn9g(补丁版)。
+
+核验教训：shared/assets 是【累积库】，同名的历史版本会堆很多（当前有 8 个 AppLayout 版本）。
+用 `ls AppLayout*.js | head -1` 会取到字典序最小的历史版本，造成误判（本轮第二次踩）。
+必须按【入口实际 import 的 hash】定位目标文件，不能靠 ls 排序。
+
+服务器 README 已追加「破缓存机制」小节（含路径、触发条件、UI 换版后重做步骤）。
+下次 UI switch-release 后：先重跑 patch-workspace-embed.sh；若补丁目标是「已发布过的同名 chunk」，
+同样需要破缓存（或让用户 Ctrl+Shift+R 一次）。

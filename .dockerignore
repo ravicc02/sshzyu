@@ -1,0 +1,103 @@
+# =============================================================================
+# Docker Ignore File for Sub2API
+# =============================================================================
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+!deploy/DOCKER.md
+docs/
+# admin-compliance gate (LegalDocumentView.vue) build-time imports
+# docs/legal/*.md?raw into the frontend bundle; keep that subtree in the
+# Docker build context even though docs/ is otherwise excluded.
+!docs/legal/
+!docs/legal/*.md
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# 前端托管产物（后端镜像不需要，避免把 110MB 打进构建上下文）
+ui/
+# nginx 配置（不进后端镜像）
+nginx/
+# 运营记录（不进镜像）
+records/
+# 本仓库自身的部署契约（compose / env 模板）
+docker-compose.yml
+README.md
+.env.example
+.gitignore
+
+# Build artifacts
+dist/
+build/
+
+# Node modules (will be installed in container)
+frontend/node_modules/
+node_modules/
+
+# Go build cache (will be built in container)
+backend/vendor/
+
+# Test files
+*_test.go
+**/*.test.js
+coverage/
+.nyc_output/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# 本地闭源插件目录可能包含发布签名私钥，绝不能进入 Docker 构建上下文。
+/plugins/
+
+# Local config
+config.yaml
+config.local.yaml
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Deploy files (not needed in image)
+deploy/install.sh
+deploy/sub2api.service
+deploy/sub2api-sudoers
+deploy/data/
+deploy/postgres_data/
+deploy/redis_data/
+# Local acceptance records may contain historical request metadata; never send to builder.
+deploy/local-run-logs/
+# Local-only service safety overrides are not release inputs.
+deploy/docker-compose.local-safety.yml
+# Host executable is not a Linux image build input.
+backend/server.exe
+
+# GoReleaser
+.goreleaser.yaml
+
+# GitHub
+.github/
+
+# Claude files
+.claude/
+issues/
+CLAUDE.md

@@ -1,0 +1,45 @@
+2026-09-12 生图工作室嵌入白屏修复记录
+========================================
+
+## 问题
+管理员自定义菜单嵌入「生图工作台」iframe 展示不出来；充值中心、接入文档正常。
+
+## 根因（两层）
+1. 主因：/opt/imageplayground 的 sw.js（Service Worker）navigate 分支为 network-first，
+   将上游 304（无响应体）原样 respondWith → 规范规定 SW 返回 304 等同网络错误
+   → 导航失败 → iframe 白屏。
+   触发条件：/image/ 配置 Cache-Control: no-cache，每次导航 revalidate 必拿 304，
+   故 SW 激活后几乎 100% 复现（首次访问 200 时正常，之后全白屏）。
+   日志实锤：05:12:03 GET /image/ 200（正常），05:12:22 起全 304；
+   05:21:34 用户嵌入访问序列 301→304→sw.js，无任何 JS 资源请求。
+2. 次因：settings.custom_menu_items 中生图工作台 url 为 https://sshzyu.com/image（无尾斜杠），
+   nginx 301 跳转时丢弃全部嵌入参数（user_id/token/theme/ui_mode）。
+
+## 排除项（均实测）
+- 服务端无 X-Frame-Options/CSP，/image/ 及 JS/CSS 均 200
+- playground JS 的 window.self!==window.top 检测为软适配（剪贴板提示/触屏监听），不阻止渲染
+- 充值(wzyp.cn)与文档(/docs/)无 Service Worker，304 由浏览器 HTTP 缓存正常处理，故不受影响
+
+## 修复内容
+1. sw.js 替换为自毁脚本（无 fetch listener，激活后清空缓存并注销 SW）：
+   - 备份：/opt/imageplayground/sw.js.bak-20260912-142829（md5 66eda4ac727c72569a6dd06e36d5816f）
+   - 本地副本：F:/中转站运营/backups/imageplayground-sw-fix-20260912/sw.js
+2. 数据库 settings.custom_menu_items 生图工作台 url → https://sshzyu.com/image/（事务+按id精准更新）：
+   - 备份：F:/中转站运营/backups/imageplayground-sw-fix-20260912/custom_menu_items-backup.json
+   - SQL：F:/中转站运营/backups/imageplayground-sw-fix-20260912/fix-menu-url.sql
+
+## 验证结果
+- /image/sw.js 公网 200，ETag 已变（no-cache 保证浏览器导航时更新检查拿到新脚本）
+- GET /api/v1/settings/public 已下发新 url（https://sshzyu.com/image/）
+- /image/?user_id=...&token=...&ui_mode=embedded 直接 200，无重定向，嵌入参数保留
+- 旧链接 /image 仍 301 兼容
+- nginx 未改动；sub2api 容器/数据库其他数据未动
+
+## 用户侧过渡
+刷新两次即可：第一次浏览器更新检查拿到新 sw.js 并激活注销（本次导航可能仍被旧 SW 拦截），
+第二次起无 SW 接管，嵌入与直接访问均正常。
+
+## 遗留建议
+playground 页面 JS 仍会重新注册 sw.js（自毁版注册即注销，无害）。
+若后续拿到 playground 源码，建议正式修复：navigate 分支对 304 回退缓存，
+或 fetch 加 cache:'no-store'，或直接移除 SW 注册。
