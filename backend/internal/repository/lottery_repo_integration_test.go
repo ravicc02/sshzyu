@@ -79,6 +79,54 @@ func (s *LotteryRepoSuite) newService() *service.LotteryService {
 	return service.NewLotteryService(s.repo, NewUserRepository(s.client, integrationDB), s.client, nil)
 }
 
+func (s *LotteryRepoSuite) TestActivityTiersRequireValidPrizePool() {
+	activity, err := s.client.LotteryActivity.Create().
+		SetName("档位配置测试").
+		SetStatus(service.LotteryActivityStatusActive).
+		Save(s.ctx)
+	s.Require().NoError(err)
+	prize, err := s.client.LotteryPrize.Create().
+		SetActivityID(activity.ID).
+		SetName("谢谢参与").
+		SetPrizeType(service.LotteryPrizeTypeNone).
+		SetWeight(100).
+		SetTierWeights(map[string]int{"5": 0}).
+		Save(s.ctx)
+	s.Require().NoError(err)
+
+	svc := s.newService()
+	mode := service.LotteryTierModeCustom
+	definitions := append(service.DefaultLotteryTierConfig().TierDefinitions(),
+		service.LotteryTierDefinition{Name: "新增档", ThresholdCents: 20500})
+	err = svc.AdminUpdateActivity(s.ctx, activity.ID, service.LotteryActivityUpdateInput{
+		TierMode: &mode, TierDefinitions: &definitions,
+	})
+	s.Require().Error(err, "新增档位奖池为零时必须拒绝保存")
+	unchanged, err := s.repo.GetActivityByID(s.ctx, activity.ID)
+	s.Require().NoError(err)
+	s.Equal(service.LotteryTierModeFixed, unchanged.TierConfig().Mode, "失败时不得部分保存档位")
+	s.Equal(activity.RulesVersion, unchanged.RulesVersion, "失败时不得递增规则版本")
+
+	// 先为尚未开放的档位预配概率，再更新档位；两个保存过程均保持有效奖池。
+	err = svc.AdminUpdatePrizeWeights(s.ctx, activity.ID, []service.LotteryPrizeWeightUpdate{{
+		ID: prize.ID, Weight: 100, TierWeights: map[string]int{"5": 100}, Enabled: true, MinTier: 0,
+	}})
+	s.Require().NoError(err)
+	err = svc.AdminUpdateActivity(s.ctx, activity.ID, service.LotteryActivityUpdateInput{
+		TierMode: &mode, TierDefinitions: &definitions,
+	})
+	s.Require().NoError(err)
+	updated, err := s.repo.GetActivityByID(s.ctx, activity.ID)
+	s.Require().NoError(err)
+	s.Equal(int64(6), updated.TierConfig().DisplayTierCount())
+
+	empty := []service.LotteryTierDefinition{}
+	err = svc.AdminUpdateActivity(s.ctx, activity.ID, service.LotteryActivityUpdateInput{
+		TierMode: &mode, TierDefinitions: &empty,
+	})
+	s.Require().Error(err, "显式提交空自定义档位必须被拒绝")
+}
+
 // --- 库存原子扣减 ---
 
 func (s *LotteryRepoSuite) TestDeductStockConcurrentExactlyStockTimes() {

@@ -24,6 +24,8 @@ const (
 	FieldTierMode = "tier_mode"
 	// FieldTierThresholds holds the string denoting the tier_thresholds field in the database.
 	FieldTierThresholds = "tier_thresholds"
+	// FieldTierDefinitions holds the string denoting the tier_definitions field in the database.
+	FieldTierDefinitions = "tier_definitions"
 	// FieldStartsAt holds the string denoting the starts_at field in the database.
 	FieldStartsAt = "starts_at"
 	// FieldEndsAt holds the string denoting the ends_at field in the database.
@@ -53,6 +55,7 @@ var Columns = []string{
 	FieldRulesVersion,
 	FieldTierMode,
 	FieldTierThresholds,
+	FieldTierDefinitions,
 	FieldStartsAt,
 	FieldEndsAt,
 	FieldCreatedAt,

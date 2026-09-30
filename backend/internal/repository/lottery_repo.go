@@ -27,6 +27,35 @@ type lotteryRepository struct {
 	client *dbent.Client
 }
 
+func lotteryTierDefinitionsFromJSON(raw []map[string]interface{}) []service.LotteryTierDefinition {
+	defs := make([]service.LotteryTierDefinition, 0, len(raw))
+	for _, item := range raw {
+		name, _ := item["name"].(string)
+		var threshold int64
+		switch value := item["threshold_cents"].(type) {
+		case float64:
+			threshold = int64(value)
+		case int64:
+			threshold = value
+		case int:
+			threshold = int64(value)
+		}
+		defs = append(defs, service.LotteryTierDefinition{Name: name, ThresholdCents: threshold})
+	}
+	return defs
+}
+
+func lotteryTierDefinitionsToJSON(defs []service.LotteryTierDefinition) []map[string]interface{} {
+	out := make([]map[string]interface{}, 0, len(defs))
+	for _, def := range defs {
+		out = append(out, map[string]interface{}{
+			"name":            def.Name,
+			"threshold_cents": def.ThresholdCents,
+		})
+	}
+	return out
+}
+
 // NewLotteryRepository 构造抽奖仓储。
 func NewLotteryRepository(client *dbent.Client) service.LotteryRepository {
 	return &lotteryRepository{client: client}
@@ -38,16 +67,17 @@ func NewLotteryRepository(client *dbent.Client) service.LotteryRepository {
 
 func lotteryActivityToService(m *dbent.LotteryActivity) *service.LotteryActivity {
 	return &service.LotteryActivity{
-		ID:             m.ID,
-		Name:           m.Name,
-		Status:         m.Status,
-		RulesVersion:   m.RulesVersion,
-		TierMode:       m.TierMode,
-		TierThresholds: append([]int64(nil), m.TierThresholds...),
-		StartsAt:       m.StartsAt,
-		EndsAt:         m.EndsAt,
-		CreatedAt:      m.CreatedAt,
-		UpdatedAt:      m.UpdatedAt,
+		ID:              m.ID,
+		Name:            m.Name,
+		Status:          m.Status,
+		RulesVersion:    m.RulesVersion,
+		TierMode:        m.TierMode,
+		TierThresholds:  append([]int64(nil), m.TierThresholds...),
+		TierDefinitions: lotteryTierDefinitionsFromJSON(m.TierDefinitions),
+		StartsAt:        m.StartsAt,
+		EndsAt:          m.EndsAt,
+		CreatedAt:       m.CreatedAt,
+		UpdatedAt:       m.UpdatedAt,
 	}
 }
 
@@ -183,6 +213,22 @@ func (r *lotteryRepository) GetActivityByID(ctx context.Context, id int64) (*ser
 	return lotteryActivityToService(m), nil
 }
 
+// GetActivityByIDForUpdate 在事务中锁定活动，串行化阶梯与概率配置修改。
+func (r *lotteryRepository) GetActivityByIDForUpdate(ctx context.Context, id int64) (*service.LotteryActivity, error) {
+	client := clientFromContext(ctx, r.client)
+	m, err := client.LotteryActivity.Query().
+		Where(lotteryactivity.IDEQ(id)).
+		ForUpdate().
+		Only(ctx)
+	if err != nil {
+		if dbent.IsNotFound(err) {
+			return nil, service.ErrLotteryActivityNotFound
+		}
+		return nil, err
+	}
+	return lotteryActivityToService(m), nil
+}
+
 func (r *lotteryRepository) UpdateActivity(ctx context.Context, id int64, input service.LotteryActivityUpdateInput) error {
 	client := clientFromContext(ctx, r.client)
 	builder := client.LotteryActivity.UpdateOneID(id)
@@ -197,6 +243,9 @@ func (r *lotteryRepository) UpdateActivity(ctx context.Context, id int64, input 
 	}
 	if input.TierThresholds != nil {
 		builder.SetTierThresholds(*input.TierThresholds)
+	}
+	if input.TierDefinitions != nil {
+		builder.SetTierDefinitions(lotteryTierDefinitionsToJSON(*input.TierDefinitions))
 	}
 	if input.StartsAt != nil {
 		builder.SetStartsAt(*input.StartsAt)
@@ -448,7 +497,7 @@ func (r *lotteryRepository) DeleteUserStats(ctx context.Context, userID int64) e
 
 // SumBalanceSpentSince 汇总用户自 effective window 起的余额计费实际扣费
 // (usage_logs.actual_cost, billing_type = 0 钱包余额)。调用方传入
-// max(baseline_at, now-48h)，从而保证功能启用前消耗不追溯且窗口滚动重置。
+// max(baseline_at, now-24h)，从而保证功能启用前消耗不追溯且窗口滚动重置。
 func (r *lotteryRepository) SumBalanceSpentSince(ctx context.Context, userID int64, since time.Time) (float64, error) {
 	client := clientFromContext(ctx, r.client)
 	const sumSQL = `
@@ -481,6 +530,22 @@ func (r *lotteryRepository) CountDraws(ctx context.Context, userID int64) (int, 
 		Count(ctx)
 }
 
+func (r *lotteryRepository) ListDrawTimes(ctx context.Context, userID int64) ([]time.Time, error) {
+	client := clientFromContext(ctx, r.client)
+	records, err := client.LotteryDraw.Query().
+		Where(lotterydraw.UserIDEQ(userID)).
+		Order(dbent.Asc(lotterydraw.FieldCreatedAt)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	times := make([]time.Time, 0, len(records))
+	for _, record := range records {
+		times = append(times, record.CreatedAt)
+	}
+	return times, nil
+}
+
 // CountDrawsBySource 统计指定来源的抽奖流水。threshold 来源会传入滚动窗口起点；
 // first/manual 传 nil，保持长期资格口径。
 func (r *lotteryRepository) CountDrawsBySource(ctx context.Context, userID int64, source string, since *time.Time) (int, error) {
@@ -490,7 +555,7 @@ func (r *lotteryRepository) CountDrawsBySource(ctx context.Context, userID int64
 		lotterydraw.SourceEQ(source),
 	)
 	if since != nil {
-		q = q.Where(lotterydraw.CreatedAtGT(*since))
+		q = q.Where(lotterydraw.CreatedAtGTE(*since))
 	}
 	return q.Count(ctx)
 }

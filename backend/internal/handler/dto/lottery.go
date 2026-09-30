@@ -73,16 +73,17 @@ func drawUserRefFromService(summary *service.DrawUserSummary) *LotteryDrawUserRe
 
 // LotteryAdminActivity 管理端活动 DTO(snake_case,与前端类型对齐)。
 type LotteryAdminActivity struct {
-	ID             int64      `json:"id"`
-	Name           string     `json:"name"`
-	Status         string     `json:"status"`
-	RulesVersion   int        `json:"rules_version"`
-	TierMode       string     `json:"tier_mode"`
-	TierThresholds []int64    `json:"tier_thresholds"`
-	StartsAt       *time.Time `json:"starts_at"`
-	EndsAt         *time.Time `json:"ends_at"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID              int64                           `json:"id"`
+	Name            string                          `json:"name"`
+	Status          string                          `json:"status"`
+	RulesVersion    int                             `json:"rules_version"`
+	TierMode        string                          `json:"tier_mode"`
+	TierThresholds  []int64                         `json:"tier_thresholds"`
+	TierDefinitions []service.LotteryTierDefinition `json:"tier_definitions"`
+	StartsAt        *time.Time                      `json:"starts_at"`
+	EndsAt          *time.Time                      `json:"ends_at"`
+	CreatedAt       time.Time                       `json:"created_at"`
+	UpdatedAt       time.Time                       `json:"updated_at"`
 }
 
 // LotteryAdminActivityFromService 服务层活动转管理端 DTO。
@@ -91,33 +92,34 @@ func LotteryAdminActivityFromService(a *service.LotteryActivity) *LotteryAdminAc
 		return nil
 	}
 	return &LotteryAdminActivity{
-		ID:             a.ID,
-		Name:           a.Name,
-		Status:         a.Status,
-		RulesVersion:   a.RulesVersion,
-		TierMode:       a.TierConfig().Mode,
-		TierThresholds: append([]int64(nil), a.TierConfig().Thresholds...),
-		StartsAt:       a.StartsAt,
-		EndsAt:         a.EndsAt,
-		CreatedAt:      a.CreatedAt,
-		UpdatedAt:      a.UpdatedAt,
+		ID:              a.ID,
+		Name:            a.Name,
+		Status:          a.Status,
+		RulesVersion:    a.RulesVersion,
+		TierMode:        a.TierConfig().Mode,
+		TierThresholds:  append([]int64(nil), a.TierConfig().Thresholds...),
+		TierDefinitions: a.TierConfig().TierDefinitions(),
+		StartsAt:        a.StartsAt,
+		EndsAt:          a.EndsAt,
+		CreatedAt:       a.CreatedAt,
+		UpdatedAt:       a.UpdatedAt,
 	}
 }
 
 // LotteryAdminPrize 管理端奖品原始配置 DTO(未做概率换算,供展示与编辑)。
 type LotteryAdminPrize struct {
-	ID          int64           `json:"id"`
-	ActivityID  int64           `json:"activity_id"`
-	Name        string          `json:"name"`
-	PrizeType   string          `json:"prize_type"`
-	Value       float64         `json:"value"`
-	Weight      int             `json:"weight"`
-	MinTier     int             `json:"min_tier"`
-	TierWeights map[string]int  `json:"tier_weights"`
-	Stock       int             `json:"stock"`
-	StockIssued int             `json:"stock_issued"`
-	Enabled     bool            `json:"enabled"`
-	SortOrder   int             `json:"sort_order"`
+	ID          int64          `json:"id"`
+	ActivityID  int64          `json:"activity_id"`
+	Name        string         `json:"name"`
+	PrizeType   string         `json:"prize_type"`
+	Value       float64        `json:"value"`
+	Weight      int            `json:"weight"`
+	MinTier     int            `json:"min_tier"`
+	TierWeights map[string]int `json:"tier_weights"`
+	Stock       int            `json:"stock"`
+	StockIssued int            `json:"stock_issued"`
+	Enabled     bool           `json:"enabled"`
+	SortOrder   int            `json:"sort_order"`
 }
 
 // LotteryAdminPrizeFromService 服务层奖品转管理端 DTO。

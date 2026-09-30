@@ -198,6 +198,14 @@
         </div>
       </div>
 
+      <!-- Lottery beta notice belongs with user redemption history, not admin draw management. -->
+      <div class="card border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-900/20">
+        <div class="flex items-start gap-3 p-4">
+          <Icon name="infoCircle" size="md" class="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <p class="text-sm text-amber-800 dark:text-amber-300">{{ t('redeem.lotteryBetaNotice') }}</p>
+        </div>
+      </div>
+
       <!-- Recent Activity -->
       <div class="card">
         <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">

@@ -55,14 +55,14 @@ func (LotteryPrize) Fields() []ent.Field {
 			Comment("奖品数值: balance_bonus 为金额，quota 为额度，none 为 0"),
 		field.Int("weight").
 			Default(0).
-			Comment("中奖权重(基础)，0 表示不参与随机；tier_weights 未覆盖的 tier 使用该值"),
+			Comment("历史兼容字段；新的中奖概率配置统一存储在 tier_weights"),
 		field.Int("min_tier").
 			Default(0).
 			Comment("可中该奖品的最低用户阶梯(0 青铜/1 白银/2 黄金/3 钻石/4 王者)，低于该阶梯的奖品不参与随机"),
 		field.JSON("tier_weights", map[string]int{}).
 			Optional().
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
-			Comment("按阶梯覆盖权重: key 为 tier 数字字符串，如 {\"0\":70,\"1\":50}；缺失的 tier 回退 weight，显式 0 表示该 tier 不可中"),
+			Comment("按动态阶梯保存显式中奖概率: key 为 tier 数字字符串，值为百分比；显式 0 表示该 tier 不可中"),
 		field.Int("stock").
 			Default(-1).
 			Comment("库存，-1 表示无限"),

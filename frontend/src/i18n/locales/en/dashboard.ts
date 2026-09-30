@@ -756,6 +756,7 @@ export default {
     codeRule4: 'Balance and concurrency updates are immediate',
     recentActivity: 'Recent Activity',
     historyWillAppear: 'Your redemption history will appear here',
+    lotteryBetaNotice: 'Lottery is in beta and may be incomplete; reward status and redemption history reflect actual fulfillment.',
     balanceAddedRedeem: 'Balance Added (Redeem)',
     balanceAddedAffiliate: 'Balance Added (Affiliate Transfer)',
     balanceAddedAdmin: 'Balance Added (Admin)',
@@ -824,7 +825,10 @@ export default {
     tier1: 'Silver',
     tier2: 'Gold',
     tier3: 'Diamond',
-    tier4: 'King'
+    tier4: 'King',
+    tierFallback: 'Tier {tier}',
+    redeemHistory: 'View redemption history',
+    pointsExpiresAt: 'This spending qualification expires at {time}; continue using the service before then to refresh it.'
   },
 
   // Profile

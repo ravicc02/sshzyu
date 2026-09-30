@@ -28,6 +28,9 @@
             {{ t('lottery.cardIdle') }}
           </template>
         </p>
+        <p v-if="pointsExpiryLabel" class="mt-1 truncate text-xs text-amber-600 dark:text-amber-400">
+          {{ t('lottery.pointsExpiresAt', { time: pointsExpiryLabel }) }}
+        </p>
       </div>
       <RouterLink
         to="/lottery"
@@ -47,7 +50,7 @@ import { RouterLink } from 'vue-router'
 import { Icon } from '@/components/icons'
 import { lotteryAPI, type LotteryStatus } from '@/api/lottery'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const status = ref<LotteryStatus | null>(null)
 
 // 距离下次抽奖解锁还差金额(美元),与 LotteryView 侧边面板同一口径;null 表示暂无可解锁阈值。
@@ -59,15 +62,23 @@ const nextDrawAwayAmount = computed<number | null>(() => {
 })
 
 // 阶梯图标与展示名(与 LotteryView 保持一致)。
-const TIER_ICONS = ['🥉', '🥈', '🥇', '💎', '👑']
+const TIER_ICONS = ['🥉', '🥈', '🥇', '💎', '👑', '🏆', '🌟', '✨', '🔥', '🚀']
 
 function tierIcon(tier: number): string {
   return TIER_ICONS[Math.min(Math.max(tier, 0), TIER_ICONS.length - 1)]
 }
 
 function tierLabel(tier: number): string {
+  if (status.value?.tier_name && status.value.current_tier === tier) return status.value.tier_name
   return t(`lottery.tier${Math.min(Math.max(tier, 0), 4)}`)
 }
+
+const pointsExpiryLabel = computed(() => {
+  if (!status.value?.points_expires_at) return ''
+  const expiry = new Date(status.value.points_expires_at)
+  if (Number.isNaN(expiry.getTime())) return ''
+  return expiry.toLocaleString(locale.value === 'zh' ? 'zh-CN' : 'en-US')
+})
 
 onMounted(async () => {
   try {

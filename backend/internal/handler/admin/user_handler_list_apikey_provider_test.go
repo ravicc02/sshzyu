@@ -10,38 +10,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestAdminUserList_ParsesAPIKeyProvider verifies api_key_provider parsing:
-// only known provider buckets are captured, anything else means "no filter".
-func TestAdminUserList_ParsesAPIKeyProvider(t *testing.T) {
+// TestAdminUserList_IgnoresLegacyAPIKeyProvider verifies the removed provider
+// query parameter cannot silently override the current exact group ID filter.
+func TestAdminUserList_IgnoresLegacyAPIKeyProvider(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	cases := []struct {
-		name  string
-		query string
-		want  string
-	}{
-		{"anthropic", "?api_key_provider=anthropic", "anthropic"},
-		{"openai", "?api_key_provider=openai", "openai"},
-		{"domestic", "?api_key_provider=domestic", "domestic"},
-		{"other", "?api_key_provider=other", "other"},
-		{"missing", "", ""},
-		{"unknown ignored", "?api_key_provider=qwen", ""},
-		{"whitespace trimmed", "?api_key_provider=%20domestic%20", "domestic"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			stub := &listUsersFilterStub{AdminService: newStubAdminService()}
-			r := gin.New()
-			h := NewUserHandler(stub, nil, nil, nil, nil, nil, nil)
-			r.GET("/admin/users", h.List)
+	stub := &listUsersFilterStub{AdminService: newStubAdminService()}
+	r := gin.New()
+	h := NewUserHandler(stub, nil, nil, nil, nil, nil, nil)
+	r.GET("/admin/users", h.List)
 
-			w := httptest.NewRecorder()
-			req, _ := http.NewRequest(http.MethodGet, "/admin/users"+tc.query, nil)
-			r.ServeHTTP(w, req)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/admin/users?api_key_provider=anthropic&api_key_group_id=42", nil)
+	r.ServeHTTP(w, req)
 
-			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, tc.want, stub.captured.APIKeyProvider)
-		})
-	}
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, int64(42), stub.captured.APIKeyGroupID)
 }
 
 // TestKeyGroupProviderPlatformsUnit guards the domain mapping contract used by

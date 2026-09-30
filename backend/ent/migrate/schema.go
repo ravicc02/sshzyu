@@ -1105,6 +1105,7 @@ var (
 		{Name: "rules_version", Type: field.TypeInt, Default: 1},
 		{Name: "tier_mode", Type: field.TypeString, Size: 20, Default: "fixed"},
 		{Name: "tier_thresholds", Type: field.TypeJSON, Nullable: true},
+		{Name: "tier_definitions", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "starts_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "ends_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},

@@ -27,12 +27,13 @@ func NewAdminLotteryHandler(lotteryService *service.LotteryService) *AdminLotter
 
 // AdminUpdateActivityRequest PUT /admin/lottery/activity/:id 请求体(局部更新,nil 不改)。
 type AdminUpdateActivityRequest struct {
-	Name           *string  `json:"name"`
-	Status         *string  `json:"status"`
-	TierMode       *string  `json:"tier_mode"`
-	TierThresholds *[]int64 `json:"tier_thresholds"`
-	StartsAt       *string  `json:"starts_at"`
-	EndsAt         *string  `json:"ends_at"`
+	Name            *string                          `json:"name"`
+	Status          *string                          `json:"status"`
+	TierMode        *string                          `json:"tier_mode"`
+	TierThresholds  *[]int64                         `json:"tier_thresholds"`
+	TierDefinitions *[]service.LotteryTierDefinition `json:"tier_definitions"`
+	StartsAt        *string                          `json:"starts_at"`
+	EndsAt          *string                          `json:"ends_at"`
 }
 
 // AdminUpdatePrizeRequest PUT /admin/lottery/prizes/:id 请求体(局部更新,nil 不改)。
@@ -153,10 +154,11 @@ func (h *AdminLotteryHandler) AdminUpdateActivity(c *gin.Context) {
 		return
 	}
 	input := service.LotteryActivityUpdateInput{
-		Name:           req.Name,
-		Status:         req.Status,
-		TierMode:       req.TierMode,
-		TierThresholds: req.TierThresholds,
+		Name:            req.Name,
+		Status:          req.Status,
+		TierMode:        req.TierMode,
+		TierThresholds:  req.TierThresholds,
+		TierDefinitions: req.TierDefinitions,
 	}
 	if req.StartsAt != nil {
 		t, perr := parseLotteryTimeParam(*req.StartsAt)

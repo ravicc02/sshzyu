@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"time"
+
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -33,8 +35,10 @@ type LotteryStatusResponse struct {
 	// CurrentTier 当前阶梯(0 青铜/1 白银/2 黄金/3 钻石/4 王者)。
 	CurrentTier int64 `json:"current_tier"`
 	// TierName 当前阶梯展示名。
-	TierName     string `json:"tier_name"`
-	RulesVersion int    `json:"rules_version"`
+	TierName        string     `json:"tier_name"`
+	RulesVersion    int        `json:"rules_version"`
+	PointsExpiresAt *time.Time `json:"points_expires_at"`
+	ServerTime      time.Time  `json:"server_time"`
 }
 
 // LotteryDrawRequest POST /lottery/draw 请求体。
@@ -90,6 +94,8 @@ func (h *LotteryHandler) GetStatus(c *gin.Context) {
 		CurrentTier:          status.CurrentTier,
 		TierName:             status.TierName,
 		RulesVersion:         status.RulesVersion,
+		PointsExpiresAt:      status.PointsExpiresAt,
+		ServerTime:           status.ServerTime,
 	})
 }
 
@@ -160,4 +166,3 @@ func (h *LotteryHandler) GetRewards(c *gin.Context) {
 	}
 	response.Paginated(c, out, result.Total, page, pageSize)
 }
-

@@ -60,6 +60,10 @@ export interface LotteryStatus {
   current_tier: number
   tier_name: string
   rules_version: number
+  /** 当前累计消耗资格的失效时间；null 表示尚未建立有效期。 */
+  points_expires_at: string | null
+  /** 服务端当前时间，用于在客户端显示准确的剩余有效期。 */
+  server_time: string
 }
 
 export interface LotteryDrawRecord {

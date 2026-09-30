@@ -29567,27 +29567,29 @@ func (m *IdentityAdoptionDecisionMutation) ResetEdge(name string) error {
 // LotteryActivityMutation represents an operation that mutates the LotteryActivity nodes in the graph.
 type LotteryActivityMutation struct {
 	config
-	op                    Op
-	typ                   string
-	id                    *int64
-	name                  *string
-	status                *string
-	rules_version         *int
-	addrules_version      *int
-	tier_mode             *string
-	tier_thresholds       *[]int64
-	appendtier_thresholds []int64
-	starts_at             *time.Time
-	ends_at               *time.Time
-	created_at            *time.Time
-	updated_at            *time.Time
-	clearedFields         map[string]struct{}
-	prizes                map[int64]struct{}
-	removedprizes         map[int64]struct{}
-	clearedprizes         bool
-	done                  bool
-	oldValue              func(context.Context) (*LotteryActivity, error)
-	predicates            []predicate.LotteryActivity
+	op                     Op
+	typ                    string
+	id                     *int64
+	name                   *string
+	status                 *string
+	rules_version          *int
+	addrules_version       *int
+	tier_mode              *string
+	tier_thresholds        *[]int64
+	appendtier_thresholds  []int64
+	tier_definitions       *[]map[string]interface{}
+	appendtier_definitions []map[string]interface{}
+	starts_at              *time.Time
+	ends_at                *time.Time
+	created_at             *time.Time
+	updated_at             *time.Time
+	clearedFields          map[string]struct{}
+	prizes                 map[int64]struct{}
+	removedprizes          map[int64]struct{}
+	clearedprizes          bool
+	done                   bool
+	oldValue               func(context.Context) (*LotteryActivity, error)
+	predicates             []predicate.LotteryActivity
 }
 
 var _ ent.Mutation = (*LotteryActivityMutation)(nil)
@@ -29917,6 +29919,71 @@ func (m *LotteryActivityMutation) ResetTierThresholds() {
 	delete(m.clearedFields, lotteryactivity.FieldTierThresholds)
 }
 
+// SetTierDefinitions sets the "tier_definitions" field.
+func (m *LotteryActivityMutation) SetTierDefinitions(value []map[string]interface{}) {
+	m.tier_definitions = &value
+	m.appendtier_definitions = nil
+}
+
+// TierDefinitions returns the value of the "tier_definitions" field in the mutation.
+func (m *LotteryActivityMutation) TierDefinitions() (r []map[string]interface{}, exists bool) {
+	v := m.tier_definitions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTierDefinitions returns the old "tier_definitions" field's value of the LotteryActivity entity.
+// If the LotteryActivity object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LotteryActivityMutation) OldTierDefinitions(ctx context.Context) (v []map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTierDefinitions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTierDefinitions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTierDefinitions: %w", err)
+	}
+	return oldValue.TierDefinitions, nil
+}
+
+// AppendTierDefinitions adds value to the "tier_definitions" field.
+func (m *LotteryActivityMutation) AppendTierDefinitions(value []map[string]interface{}) {
+	m.appendtier_definitions = append(m.appendtier_definitions, value...)
+}
+
+// AppendedTierDefinitions returns the list of values that were appended to the "tier_definitions" field in this mutation.
+func (m *LotteryActivityMutation) AppendedTierDefinitions() ([]map[string]interface{}, bool) {
+	if len(m.appendtier_definitions) == 0 {
+		return nil, false
+	}
+	return m.appendtier_definitions, true
+}
+
+// ClearTierDefinitions clears the value of the "tier_definitions" field.
+func (m *LotteryActivityMutation) ClearTierDefinitions() {
+	m.tier_definitions = nil
+	m.appendtier_definitions = nil
+	m.clearedFields[lotteryactivity.FieldTierDefinitions] = struct{}{}
+}
+
+// TierDefinitionsCleared returns if the "tier_definitions" field was cleared in this mutation.
+func (m *LotteryActivityMutation) TierDefinitionsCleared() bool {
+	_, ok := m.clearedFields[lotteryactivity.FieldTierDefinitions]
+	return ok
+}
+
+// ResetTierDefinitions resets all changes to the "tier_definitions" field.
+func (m *LotteryActivityMutation) ResetTierDefinitions() {
+	m.tier_definitions = nil
+	m.appendtier_definitions = nil
+	delete(m.clearedFields, lotteryactivity.FieldTierDefinitions)
+}
+
 // SetStartsAt sets the "starts_at" field.
 func (m *LotteryActivityMutation) SetStartsAt(t time.Time) {
 	m.starts_at = &t
@@ -30175,7 +30242,7 @@ func (m *LotteryActivityMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *LotteryActivityMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 10)
 	if m.name != nil {
 		fields = append(fields, lotteryactivity.FieldName)
 	}
@@ -30190,6 +30257,9 @@ func (m *LotteryActivityMutation) Fields() []string {
 	}
 	if m.tier_thresholds != nil {
 		fields = append(fields, lotteryactivity.FieldTierThresholds)
+	}
+	if m.tier_definitions != nil {
+		fields = append(fields, lotteryactivity.FieldTierDefinitions)
 	}
 	if m.starts_at != nil {
 		fields = append(fields, lotteryactivity.FieldStartsAt)
@@ -30221,6 +30291,8 @@ func (m *LotteryActivityMutation) Field(name string) (ent.Value, bool) {
 		return m.TierMode()
 	case lotteryactivity.FieldTierThresholds:
 		return m.TierThresholds()
+	case lotteryactivity.FieldTierDefinitions:
+		return m.TierDefinitions()
 	case lotteryactivity.FieldStartsAt:
 		return m.StartsAt()
 	case lotteryactivity.FieldEndsAt:
@@ -30248,6 +30320,8 @@ func (m *LotteryActivityMutation) OldField(ctx context.Context, name string) (en
 		return m.OldTierMode(ctx)
 	case lotteryactivity.FieldTierThresholds:
 		return m.OldTierThresholds(ctx)
+	case lotteryactivity.FieldTierDefinitions:
+		return m.OldTierDefinitions(ctx)
 	case lotteryactivity.FieldStartsAt:
 		return m.OldStartsAt(ctx)
 	case lotteryactivity.FieldEndsAt:
@@ -30299,6 +30373,13 @@ func (m *LotteryActivityMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTierThresholds(v)
+		return nil
+	case lotteryactivity.FieldTierDefinitions:
+		v, ok := value.([]map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTierDefinitions(v)
 		return nil
 	case lotteryactivity.FieldStartsAt:
 		v, ok := value.(time.Time)
@@ -30376,6 +30457,9 @@ func (m *LotteryActivityMutation) ClearedFields() []string {
 	if m.FieldCleared(lotteryactivity.FieldTierThresholds) {
 		fields = append(fields, lotteryactivity.FieldTierThresholds)
 	}
+	if m.FieldCleared(lotteryactivity.FieldTierDefinitions) {
+		fields = append(fields, lotteryactivity.FieldTierDefinitions)
+	}
 	if m.FieldCleared(lotteryactivity.FieldStartsAt) {
 		fields = append(fields, lotteryactivity.FieldStartsAt)
 	}
@@ -30398,6 +30482,9 @@ func (m *LotteryActivityMutation) ClearField(name string) error {
 	switch name {
 	case lotteryactivity.FieldTierThresholds:
 		m.ClearTierThresholds()
+		return nil
+	case lotteryactivity.FieldTierDefinitions:
+		m.ClearTierDefinitions()
 		return nil
 	case lotteryactivity.FieldStartsAt:
 		m.ClearStartsAt()
@@ -30427,6 +30514,9 @@ func (m *LotteryActivityMutation) ResetField(name string) error {
 		return nil
 	case lotteryactivity.FieldTierThresholds:
 		m.ResetTierThresholds()
+		return nil
+	case lotteryactivity.FieldTierDefinitions:
+		m.ResetTierDefinitions()
 		return nil
 	case lotteryactivity.FieldStartsAt:
 		m.ResetStartsAt()

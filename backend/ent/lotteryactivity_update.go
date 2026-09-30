@@ -111,6 +111,24 @@ func (_u *LotteryActivityUpdate) ClearTierThresholds() *LotteryActivityUpdate {
 	return _u
 }
 
+// SetTierDefinitions sets the "tier_definitions" field.
+func (_u *LotteryActivityUpdate) SetTierDefinitions(v []map[string]interface{}) *LotteryActivityUpdate {
+	_u.mutation.SetTierDefinitions(v)
+	return _u
+}
+
+// AppendTierDefinitions appends value to the "tier_definitions" field.
+func (_u *LotteryActivityUpdate) AppendTierDefinitions(v []map[string]interface{}) *LotteryActivityUpdate {
+	_u.mutation.AppendTierDefinitions(v)
+	return _u
+}
+
+// ClearTierDefinitions clears the value of the "tier_definitions" field.
+func (_u *LotteryActivityUpdate) ClearTierDefinitions() *LotteryActivityUpdate {
+	_u.mutation.ClearTierDefinitions()
+	return _u
+}
+
 // SetStartsAt sets the "starts_at" field.
 func (_u *LotteryActivityUpdate) SetStartsAt(v time.Time) *LotteryActivityUpdate {
 	_u.mutation.SetStartsAt(v)
@@ -292,6 +310,17 @@ func (_u *LotteryActivityUpdate) sqlSave(ctx context.Context) (_node int, err er
 	if _u.mutation.TierThresholdsCleared() {
 		_spec.ClearField(lotteryactivity.FieldTierThresholds, field.TypeJSON)
 	}
+	if value, ok := _u.mutation.TierDefinitions(); ok {
+		_spec.SetField(lotteryactivity.FieldTierDefinitions, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedTierDefinitions(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, lotteryactivity.FieldTierDefinitions, value)
+		})
+	}
+	if _u.mutation.TierDefinitionsCleared() {
+		_spec.ClearField(lotteryactivity.FieldTierDefinitions, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.StartsAt(); ok {
 		_spec.SetField(lotteryactivity.FieldStartsAt, field.TypeTime, value)
 	}
@@ -450,6 +479,24 @@ func (_u *LotteryActivityUpdateOne) AppendTierThresholds(v []int64) *LotteryActi
 // ClearTierThresholds clears the value of the "tier_thresholds" field.
 func (_u *LotteryActivityUpdateOne) ClearTierThresholds() *LotteryActivityUpdateOne {
 	_u.mutation.ClearTierThresholds()
+	return _u
+}
+
+// SetTierDefinitions sets the "tier_definitions" field.
+func (_u *LotteryActivityUpdateOne) SetTierDefinitions(v []map[string]interface{}) *LotteryActivityUpdateOne {
+	_u.mutation.SetTierDefinitions(v)
+	return _u
+}
+
+// AppendTierDefinitions appends value to the "tier_definitions" field.
+func (_u *LotteryActivityUpdateOne) AppendTierDefinitions(v []map[string]interface{}) *LotteryActivityUpdateOne {
+	_u.mutation.AppendTierDefinitions(v)
+	return _u
+}
+
+// ClearTierDefinitions clears the value of the "tier_definitions" field.
+func (_u *LotteryActivityUpdateOne) ClearTierDefinitions() *LotteryActivityUpdateOne {
+	_u.mutation.ClearTierDefinitions()
 	return _u
 }
 
@@ -663,6 +710,17 @@ func (_u *LotteryActivityUpdateOne) sqlSave(ctx context.Context) (_node *Lottery
 	}
 	if _u.mutation.TierThresholdsCleared() {
 		_spec.ClearField(lotteryactivity.FieldTierThresholds, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.TierDefinitions(); ok {
+		_spec.SetField(lotteryactivity.FieldTierDefinitions, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedTierDefinitions(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, lotteryactivity.FieldTierDefinitions, value)
+		})
+	}
+	if _u.mutation.TierDefinitionsCleared() {
+		_spec.ClearField(lotteryactivity.FieldTierDefinitions, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.StartsAt(); ok {
 		_spec.SetField(lotteryactivity.FieldStartsAt, field.TypeTime, value)

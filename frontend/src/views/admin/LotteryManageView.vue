@@ -170,7 +170,7 @@
 
       <!-- ====================== 参数配置 ====================== -->
       <template v-else #table>
-        <div class="space-y-6">
+        <div class="lottery-config-scroll space-y-6">
           <!-- 活动配置 -->
           <div class="rounded-xl border border-gray-200 p-4 dark:border-dark-600 dark:bg-dark-700/50">
             <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.lottery.activitySection') }}</h3>
@@ -206,22 +206,30 @@
                 <p class="input-hint">{{ t('admin.lottery.tierModeHint') }}</p>
               </div>
               <div v-if="activityForm.tier_mode === 'custom'" class="md:col-span-2">
-                <label class="input-label">{{ t('admin.lottery.customTierThresholds') }}</label>
-                <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-                  <div v-for="tier in [1, 2, 3, 4]" :key="tier">
-                    <label class="mb-1 block text-xs text-gray-500 dark:text-dark-400">
-                      {{ t(`admin.lottery.tierNames.${tier}`) }}
-                    </label>
-                    <input
-                      v-model.number="activityForm.tier_threshold_dollars[tier - 1]"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      class="input"
-                    />
+                <div class="mb-2 flex items-center justify-between gap-3">
+                  <label class="input-label">{{ t('admin.lottery.customTierThresholds') }}</label>
+                  <button type="button" class="btn btn-secondary btn-sm" @click="addTier">
+                    {{ t('admin.lottery.addTier') }}
+                  </button>
+                </div>
+                <div class="space-y-3">
+                  <div v-for="(tier, index) in activityForm.tier_definitions" :key="tier.id" class="grid grid-cols-[auto_1fr_1fr_auto] items-end gap-3">
+                    <span class="pb-2 text-xs font-semibold text-gray-500 dark:text-dark-400">{{ index }}</span>
+                    <div>
+                      <label class="mb-1 block text-xs text-gray-500 dark:text-dark-400">{{ t('admin.lottery.tierName') }}</label>
+                      <input v-model="tier.name" type="text" class="input" maxlength="50" />
+                    </div>
+                    <div>
+                      <label class="mb-1 block text-xs text-gray-500 dark:text-dark-400">{{ t('admin.lottery.tierThreshold') }}</label>
+                      <input v-model.number="tier.threshold_dollars" type="number" min="0" step="0.01" class="input" :disabled="index === 0" />
+                    </div>
+                    <button v-if="index > 0" type="button" class="btn btn-danger btn-sm" @click="removeTier(index)">
+                      {{ t('common.delete') }}
+                    </button>
                   </div>
                 </div>
                 <p class="input-hint">{{ t('admin.lottery.customTierThresholdsHint') }}</p>
+                <p class="input-hint">{{ t('admin.lottery.newTierSaveOrderHint') }}</p>
               </div>
               <div class="md:col-span-2">
                 <button @click="handleSaveActivity" :disabled="savingActivity" class="btn btn-primary">
@@ -262,14 +270,8 @@
               <template #cell-value="{ value }">
                 <span class="text-sm">${{ value.toFixed(2) }}</span>
               </template>
-              <template #cell-weight="{ row }">
-                <span class="text-sm">{{ row.weight }}</span>
-                <div v-if="Object.keys(row.tier_weights || {}).length" class="text-xs text-gray-400">
-                  {{ t('admin.lottery.tierOverrideHint') }}
-                </div>
-              </template>
               <template #cell-min_tier="{ value }">
-                <span class="badge badge-gray">{{ t(`admin.lottery.tierNames.${value}`) }}</span>
+                <span class="badge badge-gray">{{ tierDefinitions.find((tier) => tier.index === value)?.name || t('admin.lottery.tierFallback', { tier: value + 1 }) }}</span>
               </template>
               <template #cell-stock="{ row }">
                 <div class="text-sm">
@@ -292,9 +294,26 @@
           <div class="rounded-xl border border-gray-200 p-4 dark:border-dark-600 dark:bg-dark-700/50">
             <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.lottery.adjustSection') }}</h3>
             <div class="flex flex-wrap items-end gap-3">
-              <div>
-                <label class="input-label">{{ t('admin.lottery.filterUserId') }}</label>
-                <input v-model="adjustUserId" type="number" min="1" class="input w-32" />
+              <div class="relative min-w-64">
+                <label class="input-label">{{ t('admin.lottery.adjustUser') }}</label>
+                <input
+                  v-model="adjustUserQuery"
+                  type="search"
+                  :placeholder="t('admin.lottery.adjustUserPlaceholder')"
+                  class="input w-full"
+                  @input="searchAdjustUsers"
+                />
+                <div v-if="adjustUserResults.length" class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-600 dark:bg-dark-800">
+                  <button
+                    v-for="user in adjustUserResults"
+                    :key="user.id"
+                    type="button"
+                    class="block w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-dark-700"
+                    @click="selectAdjustUser(user)"
+                  >
+                    {{ user.email }} (#{{ user.id }})
+                  </button>
+                </div>
               </div>
               <div>
                 <label class="input-label">{{ t('admin.lottery.adjustDelta') }}</label>
@@ -337,8 +356,8 @@
                 <th class="px-2 py-2">{{ t('admin.lottery.prizeName') }}</th>
                 <th class="min-w-20 px-2 py-2 text-center">{{ t('admin.lottery.prizeEnabled') }}</th>
                 <th class="min-w-28 px-2 py-2 text-center">{{ t('admin.lottery.prizeMinTier') }}</th>
-                <th v-for="tier in [0, 1, 2, 3, 4]" :key="tier" class="min-w-24 px-2 py-2 text-center">
-                  {{ t(`admin.lottery.tierNames.${tier}`) }}
+                <th v-for="tier in tierDefinitions" :key="tier.index" class="min-w-24 px-2 py-2 text-center">
+                  {{ tier.name }}
                 </th>
               </tr>
             </thead>
@@ -352,19 +371,19 @@
                 </td>
                 <td class="px-2 py-2">
                   <select v-model.number="item.minTier" class="input min-w-24">
-                    <option v-for="tier in [0, 1, 2, 3, 4]" :key="tier" :value="tier">
-                      {{ t(`admin.lottery.tierNames.${tier}`) }}
+                    <option v-for="tier in tierDefinitions" :key="tier.index" :value="tier.index">
+                      {{ tier.name }}
                     </option>
                   </select>
                 </td>
-                <td v-for="tier in [0, 1, 2, 3, 4]" :key="tier" class="px-2 py-2">
+                <td v-for="tier in tierDefinitions" :key="tier.index" class="px-2 py-2">
                   <input
-                    v-model.number="item.weights[tier]"
+                    v-model.number="item.weights[tier.index]"
                     type="number"
                     min="0"
                     max="100"
                     class="input min-w-20 text-center"
-                    :disabled="!isWeightApplicable(item, tier)"
+                    :disabled="!isWeightApplicable(item, tier.index)"
                   />
                 </td>
               </tr>
@@ -372,9 +391,9 @@
             <tfoot>
               <tr class="font-semibold">
                 <td colspan="3" class="px-2 py-3 text-gray-700 dark:text-dark-200">{{ t('admin.lottery.probabilityTotal') }}</td>
-                <td v-for="tier in [0, 1, 2, 3, 4]" :key="tier" class="px-2 py-3 text-center">
-                  <span :class="weightTotal(tier) === 100 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                    {{ weightTotal(tier) }}%
+                <td v-for="tier in tierDefinitions" :key="tier.index" class="px-2 py-3 text-center">
+                  <span :class="weightTotal(tier.index) === 100 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                    {{ weightTotal(tier.index) }}%
                   </span>
                 </td>
               </tr>
@@ -444,6 +463,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatDateTime, formatDateTimeLocalInput, parseDateTimeLocalInput } from '@/utils/format'
+import { searchUsers, type SimpleUser } from '@/api/admin/usage'
 import type { Column } from '@/components/common/types'
 import {
   listDraws,
@@ -459,7 +479,8 @@ import {
   reverseGrant,
   type AdminLotteryDraw,
   type AdminLotteryActivity,
-  type AdminLotteryPrize
+  type AdminLotteryPrize,
+  type AdminUpdateActivityRequest
 } from '@/api/admin/lottery'
 
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -629,8 +650,7 @@ const activityForm = ref<{
   name: string
   status: AdminLotteryActivity['status']
   tier_mode: 'fixed' | 'custom'
-  /** 白银、黄金、钻石、王者四档金额，提交时转换为美分。 */
-  tier_threshold_dollars: number[]
+  tier_definitions: Array<{ id: string; name: string; threshold_dollars: number }>
   starts_at_input: string
   ends_at_input: string
 } | null>(null)
@@ -651,13 +671,22 @@ const tierModeOptions = computed(() => [
   { value: 'custom', label: t('admin.lottery.tierModeCustom') }
 ])
 
-const defaultTierThresholdDollars = [5, 55, 105, 155]
+const defaultTierDefinitions = [
+  { name: '青铜', threshold_dollars: 0 },
+  { name: '白银', threshold_dollars: 5 },
+  { name: '黄金', threshold_dollars: 55 },
+  { name: '钻石', threshold_dollars: 105 },
+  { name: '王者', threshold_dollars: 155 }
+]
+
+const tierDefinitions = computed(() =>
+  (activityForm.value?.tier_definitions || []).map((tier, index) => ({ ...tier, index }))
+)
 
 const prizeColumns = computed<Column[]>(() => [
   { key: 'name', label: t('admin.lottery.prizeName') },
   { key: 'prize_type', label: t('admin.lottery.prizeType') },
   { key: 'value', label: t('admin.lottery.prizeValue') },
-  { key: 'weight', label: t('admin.lottery.prizeWeight') },
   { key: 'min_tier', label: t('admin.lottery.prizeMinTier') },
   { key: 'stock', label: t('admin.lottery.prizeStock') },
   { key: 'sort_order', label: t('admin.lottery.prizeSortOrder') },
@@ -684,6 +713,21 @@ async function loadActivities(selectFirst = false) {
   }
 }
 
+function addTier() {
+  if (!activityForm.value) return
+  const last = activityForm.value.tier_definitions.at(-1)
+  activityForm.value.tier_definitions.push({
+    id: `tier-${Date.now()}-${activityForm.value.tier_definitions.length}`,
+    name: `${t('admin.lottery.tierName')} ${activityForm.value.tier_definitions.length}`,
+    threshold_dollars: last ? Number(last.threshold_dollars) + 50 : 0
+  })
+}
+
+function removeTier(index: number) {
+  if (!activityForm.value || index <= 0 || activityForm.value.tier_definitions.length <= 1) return
+  activityForm.value.tier_definitions.splice(index, 1)
+}
+
 function syncActivityForm() {
   const current = activities.value.find((a) => a.id === activeActivityId.value) || null
   activity.value = current
@@ -692,10 +736,17 @@ function syncActivityForm() {
         name: current.name,
         status: current.status,
         tier_mode: current.tier_mode || 'fixed',
-        tier_threshold_dollars:
-          current.tier_mode === 'custom' && current.tier_thresholds.length === 4
-            ? current.tier_thresholds.map((value) => value / 100)
-            : [...defaultTierThresholdDollars],
+        tier_definitions:
+          current.tier_mode === 'custom' && current.tier_definitions?.length
+            ? current.tier_definitions.map((tier, index) => ({
+                id: `tier-${current.id}-${index}`,
+                name: tier.name,
+                threshold_dollars: tier.threshold_cents / 100
+              }))
+            : defaultTierDefinitions.map((tier, index) => ({
+                id: `tier-${current.id}-${index}`,
+                ...tier
+              })),
         starts_at_input: toLocalInput(current.starts_at),
         ends_at_input: toLocalInput(current.ends_at)
       }
@@ -725,12 +776,16 @@ function toLocalInput(iso: string | null): string {
 async function handleSaveActivity() {
   if (!activity.value || !activityForm.value) return
   const form = activityForm.value
-  let tier_thresholds: number[] = []
+  const tier_definitions = form.tier_definitions.map((tier) => ({
+    name: tier.name.trim(),
+    threshold_cents: Math.round(Number(tier.threshold_dollars) * 100)
+  }))
   if (form.tier_mode === 'custom') {
-    tier_thresholds = form.tier_threshold_dollars.map((value) => Math.round(Number(value) * 100))
-    const valid =
-      tier_thresholds.length === 4 &&
-      tier_thresholds.every((value, index) => value > 0 && (index === 0 || value > tier_thresholds[index - 1]))
+    const valid = tier_definitions.length > 0 && tier_definitions.length <= 100 &&
+      tier_definitions[0].threshold_cents === 0 &&
+      tier_definitions.every((tier, index) =>
+        tier.name.length > 0 && tier.threshold_cents >= 0 &&
+        (index === 0 || tier.threshold_cents > tier_definitions[index - 1].threshold_cents))
     if (!valid) {
       appStore.showError(t('admin.lottery.customTierThresholdsInvalid'))
       return
@@ -741,14 +796,29 @@ async function handleSaveActivity() {
   try {
     const starts = parseDateTimeLocalInput(form.starts_at_input)
     const ends = parseDateTimeLocalInput(form.ends_at_input)
-    await updateActivity(activity.value.id, {
+    const savedActivity = activity.value
+    const savedDefinitions = savedActivity.tier_definitions || []
+    const tierConfigChanged = form.tier_mode !== savedActivity.tier_mode || (
+      form.tier_mode === 'custom' && (
+        tier_definitions.length !== savedDefinitions.length ||
+        tier_definitions.some((tier, index) =>
+          tier.name !== savedDefinitions[index]?.name ||
+          tier.threshold_cents !== savedDefinitions[index]?.threshold_cents)
+      )
+    )
+    const request: AdminUpdateActivityRequest = {
       name: form.name,
       status: form.status,
-      tier_mode: form.tier_mode,
-      tier_thresholds,
       starts_at: starts !== null ? new Date(starts * 1000).toISOString() : null,
       ends_at: ends !== null ? new Date(ends * 1000).toISOString() : null
-    })
+    }
+    if (tierConfigChanged) {
+      request.tier_mode = form.tier_mode
+      request.tier_thresholds = []
+      request.tier_definitions = form.tier_mode === 'custom' ? tier_definitions : []
+    }
+    await updateActivity(savedActivity.id, request)
+
     appStore.showSuccess(t('admin.lottery.saveSuccess'))
     await loadActivities()
   } catch (e) {
@@ -777,9 +847,9 @@ function openWeightsEdit() {
     name: prize.name,
     enabled: prize.enabled,
     minTier: prize.min_tier,
-    weights: [0, 1, 2, 3, 4].map((tier) => {
-      const overridden = prize.tier_weights?.[String(tier)]
-      return typeof overridden === 'number' ? overridden : prize.weight
+    weights: tierDefinitions.value.map((tier) => {
+      const configured = prize.tier_weights?.[String(tier.index)]
+      return typeof configured === 'number' ? configured : prize.weight
     })
   }))
   showWeightsDialog.value = true
@@ -800,7 +870,7 @@ function weightTotal(tier: number) {
 }
 
 const allWeightTotalsValid = computed(() =>
-  [0, 1, 2, 3, 4].every((tier) => weightTotal(tier) === 100)
+  tierDefinitions.value.every((tier) => weightTotal(tier.index) === 100)
 )
 
 async function handleSaveWeights() {
@@ -814,9 +884,9 @@ async function handleSaveWeights() {
         // 每档均显式保存；后端据此执行活动级原子100%校验。
         weight: Math.max(0, Number(item.weights[0]) || 0),
         tier_weights: Object.fromEntries(
-          [0, 1, 2, 3, 4].map((tier) => [
-            String(tier),
-            isWeightApplicable(item, tier) ? Math.max(0, Number(item.weights[tier]) || 0) : 0
+          tierDefinitions.value.map((tier) => [
+            String(tier.index),
+            isWeightApplicable(item, tier.index) ? Math.max(0, Number(item.weights[tier.index]) || 0) : 0
           ])
         ),
         enabled: item.enabled,
@@ -825,8 +895,14 @@ async function handleSaveWeights() {
     )
     appStore.showSuccess(t('admin.lottery.probabilitySaveSuccess'))
     closeWeightsEdit()
+    // 新档位须先预配概率，再保存活动；刷新奖品时保留尚未提交的档位草稿。
+    const pendingActivityForm = activityForm.value
+    const pendingActivityId = activity.value.id
     await loadPrizes()
     await loadActivities()
+    if (activity.value?.id === pendingActivityId && pendingActivityForm) {
+      activityForm.value = pendingActivityForm
+    }
   } catch (e) {
     appStore.showError(e instanceof Error ? e.message : String(e))
   } finally {
@@ -886,8 +962,32 @@ async function handleSavePrize() {
 
 // ---- 次数调整 ----
 const adjustUserId = ref('')
+const adjustUserQuery = ref('')
+const adjustUserResults = ref<SimpleUser[]>([])
 const adjustDelta = ref('1')
 const adjusting = ref(false)
+let adjustSearchTimer: ReturnType<typeof setTimeout> | undefined
+
+function searchAdjustUsers() {
+  const query = adjustUserQuery.value.trim()
+  adjustUserId.value = ''
+  adjustUserResults.value = []
+  if (adjustSearchTimer) clearTimeout(adjustSearchTimer)
+  if (!query) return
+  adjustSearchTimer = setTimeout(async () => {
+    try {
+      adjustUserResults.value = await searchUsers(query)
+    } catch (e) {
+      appStore.showError(e instanceof Error ? e.message : String(e))
+    }
+  }, 250)
+}
+
+function selectAdjustUser(user: SimpleUser) {
+  adjustUserId.value = String(user.id)
+  adjustUserQuery.value = `${user.email} (#${user.id})`
+  adjustUserResults.value = []
+}
 
 async function handleAdjust() {
   const uid = Number(adjustUserId.value)
@@ -910,3 +1010,20 @@ onMounted(async () => {
   await loadPrizes()
 })
 </script>
+
+<style scoped>
+.lottery-config-scroll {
+  max-height: calc(100dvh - 250px);
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  scrollbar-gutter: stable;
+}
+
+@media (max-width: 1023px) {
+  .lottery-config-scroll {
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
+  }
+}
+</style>

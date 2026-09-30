@@ -77,6 +77,12 @@ func (_c *LotteryActivityCreate) SetTierThresholds(v []int64) *LotteryActivityCr
 	return _c
 }
 
+// SetTierDefinitions sets the "tier_definitions" field.
+func (_c *LotteryActivityCreate) SetTierDefinitions(v []map[string]interface{}) *LotteryActivityCreate {
+	_c.mutation.SetTierDefinitions(v)
+	return _c
+}
+
 // SetStartsAt sets the "starts_at" field.
 func (_c *LotteryActivityCreate) SetStartsAt(v time.Time) *LotteryActivityCreate {
 	_c.mutation.SetStartsAt(v)
@@ -287,6 +293,10 @@ func (_c *LotteryActivityCreate) createSpec() (*LotteryActivity, *sqlgraph.Creat
 		_spec.SetField(lotteryactivity.FieldTierThresholds, field.TypeJSON, value)
 		_node.TierThresholds = value
 	}
+	if value, ok := _c.mutation.TierDefinitions(); ok {
+		_spec.SetField(lotteryactivity.FieldTierDefinitions, field.TypeJSON, value)
+		_node.TierDefinitions = value
+	}
 	if value, ok := _c.mutation.StartsAt(); ok {
 		_spec.SetField(lotteryactivity.FieldStartsAt, field.TypeTime, value)
 		_node.StartsAt = &value
@@ -440,6 +450,24 @@ func (u *LotteryActivityUpsert) UpdateTierThresholds() *LotteryActivityUpsert {
 // ClearTierThresholds clears the value of the "tier_thresholds" field.
 func (u *LotteryActivityUpsert) ClearTierThresholds() *LotteryActivityUpsert {
 	u.SetNull(lotteryactivity.FieldTierThresholds)
+	return u
+}
+
+// SetTierDefinitions sets the "tier_definitions" field.
+func (u *LotteryActivityUpsert) SetTierDefinitions(v []map[string]interface{}) *LotteryActivityUpsert {
+	u.Set(lotteryactivity.FieldTierDefinitions, v)
+	return u
+}
+
+// UpdateTierDefinitions sets the "tier_definitions" field to the value that was provided on create.
+func (u *LotteryActivityUpsert) UpdateTierDefinitions() *LotteryActivityUpsert {
+	u.SetExcluded(lotteryactivity.FieldTierDefinitions)
+	return u
+}
+
+// ClearTierDefinitions clears the value of the "tier_definitions" field.
+func (u *LotteryActivityUpsert) ClearTierDefinitions() *LotteryActivityUpsert {
+	u.SetNull(lotteryactivity.FieldTierDefinitions)
 	return u
 }
 
@@ -617,6 +645,27 @@ func (u *LotteryActivityUpsertOne) UpdateTierThresholds() *LotteryActivityUpsert
 func (u *LotteryActivityUpsertOne) ClearTierThresholds() *LotteryActivityUpsertOne {
 	return u.Update(func(s *LotteryActivityUpsert) {
 		s.ClearTierThresholds()
+	})
+}
+
+// SetTierDefinitions sets the "tier_definitions" field.
+func (u *LotteryActivityUpsertOne) SetTierDefinitions(v []map[string]interface{}) *LotteryActivityUpsertOne {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.SetTierDefinitions(v)
+	})
+}
+
+// UpdateTierDefinitions sets the "tier_definitions" field to the value that was provided on create.
+func (u *LotteryActivityUpsertOne) UpdateTierDefinitions() *LotteryActivityUpsertOne {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.UpdateTierDefinitions()
+	})
+}
+
+// ClearTierDefinitions clears the value of the "tier_definitions" field.
+func (u *LotteryActivityUpsertOne) ClearTierDefinitions() *LotteryActivityUpsertOne {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.ClearTierDefinitions()
 	})
 }
 
@@ -968,6 +1017,27 @@ func (u *LotteryActivityUpsertBulk) UpdateTierThresholds() *LotteryActivityUpser
 func (u *LotteryActivityUpsertBulk) ClearTierThresholds() *LotteryActivityUpsertBulk {
 	return u.Update(func(s *LotteryActivityUpsert) {
 		s.ClearTierThresholds()
+	})
+}
+
+// SetTierDefinitions sets the "tier_definitions" field.
+func (u *LotteryActivityUpsertBulk) SetTierDefinitions(v []map[string]interface{}) *LotteryActivityUpsertBulk {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.SetTierDefinitions(v)
+	})
+}
+
+// UpdateTierDefinitions sets the "tier_definitions" field to the value that was provided on create.
+func (u *LotteryActivityUpsertBulk) UpdateTierDefinitions() *LotteryActivityUpsertBulk {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.UpdateTierDefinitions()
+	})
+}
+
+// ClearTierDefinitions clears the value of the "tier_definitions" field.
+func (u *LotteryActivityUpsertBulk) ClearTierDefinitions() *LotteryActivityUpsertBulk {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.ClearTierDefinitions()
 	})
 }
 

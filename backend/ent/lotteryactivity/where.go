@@ -340,6 +340,16 @@ func TierThresholdsNotNil() predicate.LotteryActivity {
 	return predicate.LotteryActivity(sql.FieldNotNull(FieldTierThresholds))
 }
 
+// TierDefinitionsIsNil applies the IsNil predicate on the "tier_definitions" field.
+func TierDefinitionsIsNil() predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldIsNull(FieldTierDefinitions))
+}
+
+// TierDefinitionsNotNil applies the NotNil predicate on the "tier_definitions" field.
+func TierDefinitionsNotNil() predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldNotNull(FieldTierDefinitions))
+}
+
 // StartsAtEQ applies the EQ predicate on the "starts_at" field.
 func StartsAtEQ(v time.Time) predicate.LotteryActivity {
 	return predicate.LotteryActivity(sql.FieldEQ(FieldStartsAt, v))

@@ -48,7 +48,11 @@ func (LotteryActivity) Fields() []ent.Field {
 			Comment("Tier mode: fixed or custom"),
 		field.JSON("tier_thresholds", []int64{}).
 			Optional().
-			Comment("Custom tier thresholds in cents for custom mode"),
+			Comment("Legacy custom tier thresholds in cents"),
+		field.JSON("tier_definitions", []map[string]any{}).
+			Optional().
+			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
+			Comment("Custom tier definitions with name and threshold_cents"),
 		field.Time("starts_at").
 			Optional().
 			Nillable().

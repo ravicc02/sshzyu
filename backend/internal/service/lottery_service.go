@@ -158,7 +158,7 @@ func (s *LotteryService) GetUserActivityView(ctx context.Context) (*LotteryActiv
 	for tier := int64(0); tier < tierConfig.DisplayTierCount(); tier++ {
 		tv := LotteryTierView{
 			Tier:      tier,
-			Name:      LotteryTierName(tier),
+			Name:      tierConfig.TierName(tier),
 			Threshold: BalanceSpentCentsToFloat(tierConfig.TierThresholdCents(tier)),
 			Prizes:    make([]LotteryTierPrizeChance, 0, len(prizes)),
 		}
@@ -253,19 +253,23 @@ func (s *LotteryService) ensureUserStats(ctx context.Context, userID int64) (*Lo
 
 // computeUserDraws 计算用户的资格与剩余次数。
 //
-// 首抽和手动补发是长期资格；仅余额消耗解锁的 threshold 资格与其已使用次数
-// 都受同一个 48 小时滚动窗口约束。这样窗口到期后旧消耗和旧阶梯抽奖会同时
-// 退出计算，用户重新消费即可重新解锁，而不会被历史 threshold 流水永久占用。
+// 首抽和手动补发是长期资格。积分会话内成功抽奖将有效期刷新为24小时，
+// 但不移动会话消费起点；会话过期后，旧消费与旧threshold流水同时失效。
 func (s *LotteryService) computeUserDraws(ctx context.Context, userID int64, stats *LotteryUserStats, activity *LotteryActivity) (*LotteryUserStatus, error) {
-	windowStart := s.nowFunc().Add(-LotterySpendWindow)
-	if stats.BaselineAt.After(windowStart) {
-		windowStart = stats.BaselineAt
+	now := s.nowFunc()
+	drawTimes, err := s.repo.ListDrawTimes(ctx, userID)
+	if err != nil {
+		return nil, err
 	}
+	windowStart, pointsExpiresAt := lotteryPointsWindow(now, stats.BaselineAt, drawTimes)
 	spentF, err := s.repo.SumBalanceSpentSince(ctx, userID, windowStart)
 	if err != nil {
 		return nil, err
 	}
-	spentCents := BalanceSpentFloatToCents(spentF) + stats.SpendOffsetCents
+	spentCents := BalanceSpentFloatToCents(spentF)
+	if pointsExpiresAt == nil || now.Before(*pointsExpiresAt) {
+		spentCents += stats.SpendOffsetCents
+	}
 	if spentCents < 0 {
 		spentCents = 0
 	}
@@ -315,12 +319,46 @@ func (s *LotteryService) computeUserDraws(ctx context.Context, userID int64, sta
 		BalanceSpentCents:    spentCents,
 		NextThresholdCents:   tierConfig.NextThresholdCents(spentCents),
 		CurrentTier:          currentTier,
-		TierName:             LotteryTierName(currentTier),
+		TierName:             tierConfig.TierName(currentTier),
 		RulesVersion:         activity.RulesVersion,
+		PointsExpiresAt:      pointsExpiresAt,
+		ServerTime:           now,
 		firstRemaining:       firstRemaining,
 		thresholdRemaining:   thresholdRemaining,
 		manualRemaining:      manualRemaining,
 	}, nil
+}
+
+// lotteryPointsWindow 保留当前会话消费起点，续期只延长截止时间。
+// times 必须升序；幂等重试不会新增流水，因此不可能延长有效期。
+func lotteryPointsWindow(now, baseline time.Time, times []time.Time) (time.Time, *time.Time) {
+	start := now.Add(-LotterySpendWindow)
+	var expires *time.Time
+	for _, drawnAt := range times {
+		if drawnAt.Before(baseline) {
+			continue
+		}
+		if expires == nil {
+			start = drawnAt.Add(-LotterySpendWindow)
+		} else if !drawnAt.Before(*expires) {
+			start = drawnAt.Add(-LotterySpendWindow)
+			if expires.After(start) {
+				start = *expires
+			}
+		}
+		deadline := drawnAt.Add(LotterySpendWindow)
+		expires = &deadline
+	}
+	if expires != nil && !now.Before(*expires) {
+		start = now.Add(-LotterySpendWindow)
+		if expires.After(start) {
+			start = *expires
+		}
+	}
+	if baseline.After(start) {
+		start = baseline
+	}
+	return start, expires
 }
 
 // GetUserStatus 查询用户抽奖状态(次数/消耗/下一阈值)。
@@ -469,6 +507,13 @@ func (s *LotteryService) Draw(ctx context.Context, userID int64, idempotencyKey 
 		return nil, err
 	}
 
+	// 已过期的本地模拟积分也必须清除，不能被本次续期重新激活。
+	if status.PointsExpiresAt != nil && !status.ServerTime.Before(*status.PointsExpiresAt) && stats.SpendOffsetCents != 0 {
+		if err := s.repo.UpdateUserStatsSpendOffset(txCtx, userID, 0); err != nil {
+			doRollback()
+			return nil, err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("lottery commit: %w", err)
 	}
@@ -500,7 +545,7 @@ func (s *LotteryService) remainingAfterNoop(ctx context.Context, userID int64) (
 }
 
 // classifyDrawSource 判定本次抽奖消耗的次数来源。
-// 名额顺序: 首抽 -> 当前48小时阶梯 -> 手动补发。
+// 名额顺序: 首抽 -> 当前24小时阶梯 -> 手动补发。
 func classifyDrawSource(status *LotteryUserStatus, _ bool) string {
 	switch {
 	case status.firstRemaining > 0:
@@ -830,8 +875,8 @@ func (s *LotteryService) AdminListPrizes(ctx context.Context, activityID int64) 
 	return s.repo.ListPrizesByActivity(ctx, activityID, false)
 }
 
-// AdminUpdateActivity 管理端更新活动配置(名称/状态/时间)。状态变更不改
-// rules_version;奖品/概率变更由 AdminUpdatePrize 触发版本递增。
+// AdminUpdateActivity 管理端原子更新活动配置；档位变更须保证每档奖池合计 100%，
+// 并递增 rules_version。名称、状态及时间变更不改变抽奖规则版本。
 func (s *LotteryService) AdminUpdateActivity(ctx context.Context, id int64, input LotteryActivityUpdateInput) error {
 	if input.Status != nil {
 		switch *input.Status {
@@ -842,7 +887,15 @@ func (s *LotteryService) AdminUpdateActivity(ctx context.Context, id int64, inpu
 		}
 	}
 
-	activity, err := s.repo.GetActivityByID(ctx, id)
+	tx, err := s.entClient.Tx(ctx)
+	if err != nil {
+		return fmt.Errorf("lottery begin activity update tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	txCtx := dbent.NewTxContext(ctx, tx)
+
+	// 与批量概率更新共用活动行锁，避免两个请求各自校验旧奖池后交错写入。
+	activity, err := s.repo.GetActivityByIDForUpdate(txCtx, id)
 	if err != nil {
 		return err
 	}
@@ -852,28 +905,52 @@ func (s *LotteryService) AdminUpdateActivity(ctx context.Context, id int64, inpu
 	}
 	if input.TierThresholds != nil {
 		config.Thresholds = append([]int64(nil), (*input.TierThresholds)...)
+		// tier_thresholds 是旧版 API 的完整配置。若请求没有携带新字段，
+		// 清掉已存的定义，避免旧字段被残留 tier_definitions 覆盖。
+		if input.TierDefinitions == nil {
+			config.Definitions = nil
+		}
 	}
-	if input.TierMode != nil || input.TierThresholds != nil {
+	if input.TierDefinitions != nil {
+		config.Definitions = append([]LotteryTierDefinition(nil), (*input.TierDefinitions)...)
+	}
+	tierChanged := input.TierMode != nil || input.TierThresholds != nil || input.TierDefinitions != nil
+	if tierChanged {
+		// 旧活动读取时可回退默认档位；管理端显式提交空自定义档位必须拒绝。
+		if config.Mode == LotteryTierModeCustom &&
+			((input.TierDefinitions != nil && len(*input.TierDefinitions) == 0) ||
+				(input.TierDefinitions == nil && input.TierThresholds != nil && len(*input.TierThresholds) == 0)) {
+			return infraerrors.BadRequest("LOTTERY_INVALID_TIER_CONFIG", "custom tiers cannot be empty")
+		}
 		if !config.IsValid() {
-			return infraerrors.BadRequest("LOTTERY_INVALID_TIER_CONFIG", "tier_mode must be fixed or custom; custom thresholds must be strictly increasing positive cents")
+			return infraerrors.BadRequest("LOTTERY_INVALID_TIER_CONFIG", "tier_mode must be fixed or custom; custom tiers need unique names and strictly increasing thresholds")
 		}
-		mode := config.Normalized().Mode
+		normalized := config.Normalized()
+		prizes, err := s.repo.ListPrizesByActivity(txCtx, id, false)
+		if err != nil {
+			return err
+		}
+		if err := validateLotteryTierWeightSumsForTierCount(prizes, int(normalized.DisplayTierCount())); err != nil {
+			return err
+		}
+		mode := normalized.Mode
 		input.TierMode = &mode
-		if mode == LotteryTierModeFixed {
-			empty := []int64{}
-			input.TierThresholds = &empty
-		} else {
-			thresholds := append([]int64(nil), config.Thresholds...)
-			input.TierThresholds = &thresholds
-		}
+		thresholds := append([]int64(nil), normalized.Thresholds...)
+		input.TierThresholds = &thresholds
+		definitions := append([]LotteryTierDefinition(nil), normalized.Definitions...)
+		input.TierDefinitions = &definitions
 	}
 
-	if err := s.repo.UpdateActivity(ctx, id, input); err != nil {
+	if err := s.repo.UpdateActivity(txCtx, id, input); err != nil {
 		return err
 	}
-	if input.TierMode != nil || input.TierThresholds != nil {
-		_, err := s.repo.BumpActivityRulesVersion(ctx, id)
-		return err
+	if tierChanged {
+		if _, err := s.repo.BumpActivityRulesVersion(txCtx, id); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("lottery commit activity update: %w", err)
 	}
 	return nil
 }
@@ -915,7 +992,8 @@ func (s *LotteryService) AdminUpdatePrizeWeights(ctx context.Context, activityID
 	defer func() { _ = tx.Rollback() }()
 	txCtx := dbent.NewTxContext(ctx, tx)
 
-	if _, err := s.repo.GetActivityByID(txCtx, activityID); err != nil {
+	activity, err := s.repo.GetActivityByIDForUpdate(txCtx, activityID)
+	if err != nil {
 		return err
 	}
 	prizes, err := s.repo.ListPrizesByActivity(txCtx, activityID, false)
@@ -965,7 +1043,7 @@ func (s *LotteryService) AdminUpdatePrizeWeights(ctx context.Context, activityID
 		prizes[i].Enabled = update.Enabled
 		prizes[i].MinTier = update.MinTier
 	}
-	if err := validateLotteryTierWeightSums(prizes); err != nil {
+	if err := validateLotteryTierWeightSumsForTierCount(prizes, int(activity.TierConfig().DisplayTierCount())); err != nil {
 		return err
 	}
 
@@ -1013,8 +1091,8 @@ func validateLotteryPrizeUpdate(input LotteryPrizeUpdateInput) error {
 	if input.Value != nil && *input.Value < 0 {
 		return infraerrors.BadRequest("LOTTERY_INVALID_VALUE", "value must be >= 0")
 	}
-	if input.MinTier != nil && (*input.MinTier < 0 || *input.MinTier > int(LotteryMaxTier)) {
-		return infraerrors.BadRequest("LOTTERY_INVALID_MIN_TIER", "min_tier must be between 0 and 4")
+	if input.MinTier != nil && *input.MinTier < 0 {
+		return infraerrors.BadRequest("LOTTERY_INVALID_MIN_TIER", "min_tier must be >= 0")
 	}
 	if input.PrizeType != nil && *input.PrizeType != LotteryPrizeTypeNone &&
 		*input.PrizeType != LotteryPrizeTypeBalanceBonus && *input.PrizeType != LotteryPrizeTypeQuota {
@@ -1023,8 +1101,8 @@ func validateLotteryPrizeUpdate(input LotteryPrizeUpdateInput) error {
 	if input.TierWeights != nil {
 		for key, weight := range *input.TierWeights {
 			tier, err := strconv.ParseInt(key, 10, 64)
-			if err != nil || tier < 0 || tier > LotteryMaxTier {
-				return infraerrors.BadRequest("LOTTERY_INVALID_TIER_WEIGHT", "tier_weights keys must be between 0 and 4")
+			if err != nil || tier < 0 || tier >= 100 {
+				return infraerrors.BadRequest("LOTTERY_INVALID_TIER_WEIGHT", "tier_weights keys must be between 0 and 99")
 			}
 			if weight < 0 {
 				return infraerrors.BadRequest("LOTTERY_INVALID_TIER_WEIGHT", "tier_weights values must be >= 0")
@@ -1068,14 +1146,32 @@ func applyLotteryPrizeUpdate(prize *LotteryPrize, input LotteryPrizeUpdateInput)
 }
 
 func validateLotteryTierWeightSums(prizes []LotteryPrize) error {
-	for tier := int64(0); tier <= LotteryMaxTier; tier++ {
+	maxTier := int64(0)
+	for i := range prizes {
+		for key := range prizes[i].TierWeights {
+			tier, err := strconv.ParseInt(key, 10, 64)
+			if err == nil && tier > maxTier {
+				maxTier = tier
+			}
+		}
+		if int64(prizes[i].MinTier) > maxTier {
+			maxTier = int64(prizes[i].MinTier)
+		}
+	}
+	return validateLotteryTierWeightSumsForTierCount(prizes, int(maxTier+1))
+}
+
+func validateLotteryTierWeightSumsForTierCount(prizes []LotteryPrize, tierCount int) error {
+	if tierCount < 1 || tierCount > 100 {
+		return infraerrors.BadRequest("LOTTERY_INVALID_TIER_CONFIG", "tier count must be between 1 and 100")
+	}
+	for tier := 0; tier < tierCount; tier++ {
 		total := 0
 		for i := range prizes {
 			prize := &prizes[i]
-			// 库存是运行态，不影响配置合法性；库存售罄时运行时会自动
-			// 在候选池剔除并重抽，不能导致保存概率配置时总和失效。
-			if prize.Enabled && prize.AvailableAtTier(tier) {
-				total += prize.EffectiveWeight(tier)
+			// 库存是运行态，不影响配置合法性；库存售罄奖品仍参与配置总和。
+			if prize.Enabled && prize.AvailableAtTier(int64(tier)) {
+				total += prize.EffectiveWeight(int64(tier))
 			}
 		}
 		if total != 100 {

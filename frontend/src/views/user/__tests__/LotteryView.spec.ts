@@ -209,7 +209,7 @@ describe('LotteryView', () => {
     // 侧边阶梯面板渲染 5 个阶梯,当前为白银(tier 1)
     const tierItems = wrapper.findAll('[data-testid="tier-list"] li')
     expect(tierItems).toHaveLength(5)
-    expect(wrapper.get('[data-testid="current-tier"]').text()).toBe('lottery.tier1')
+    expect(wrapper.get('[data-testid="current-tier"]').text()).toBe('白银')
     // 概率不外放: 不渲染概率卡片,页面文本不含百分比
     expect(wrapper.find('[data-testid="tier-prizes"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('%')

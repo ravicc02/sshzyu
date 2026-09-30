@@ -760,6 +760,7 @@ export default {
     codeRule4: '余额和并发数即时更新',
     recentActivity: '最近活动',
     historyWillAppear: '您的兑换历史将显示在这里',
+    lotteryBetaNotice: '抽奖功能还在内测，暂不完善；奖励状态和兑换记录以实际到账为准。',
     balanceAddedRedeem: '余额充值（兑换）',
     balanceAddedAffiliate: '余额充值（返利转入）',
     balanceAddedAdmin: '余额充值（管理员）',
@@ -829,7 +830,10 @@ export default {
     tier1: '白银',
     tier2: '黄金',
     tier3: '钻石',
-    tier4: '王者'
+    tier4: '王者',
+    tierFallback: '阶梯 {tier}',
+    redeemHistory: '查看兑换记录',
+    pointsExpiresAt: '本轮消耗资格将于 {time} 过期；在过期前继续使用将重新计算有效期'
   },
 
   // Profile

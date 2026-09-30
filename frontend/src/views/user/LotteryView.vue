@@ -103,6 +103,13 @@
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   {{ t('lottery.rulesSummary') }}
                 </p>
+                <p
+                  v-if="pointsExpiryLabel"
+                  class="mt-2 text-xs text-amber-600 dark:text-amber-400"
+                  data-testid="points-expiry"
+                >
+                  {{ t('lottery.pointsExpiresAt', { time: pointsExpiryLabel }) }}
+                </p>
               </div>
               <div class="text-right">
                 <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -192,7 +199,12 @@
 
           <!-- 抽奖记录 -->
           <div class="card p-6">
-            <h3 class="mb-4 font-semibold">{{ t('lottery.records') }}</h3>
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h3 class="font-semibold">{{ t('lottery.records') }}</h3>
+              <RouterLink to="/redeem" class="text-sm text-primary-600 hover:underline dark:text-primary-400">
+                {{ t('lottery.redeemHistory') }}
+              </RouterLink>
+            </div>
             <EmptyState v-if="records.length === 0" :description="t('lottery.noRecords')" />
             <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800" data-testid="record-list">
               <li
@@ -243,7 +255,7 @@ import {
 const { t, locale } = useI18n()
 
 // 阶梯图标(与后端 tier 序号一一对应)。
-const TIER_ICONS = ['🥉', '🥈', '🥇', '💎', '👑']
+const TIER_ICONS = ['🥉', '🥈', '🥇', '💎', '👑', '🏆', '🌟', '✨', '🔥', '🚀']
 
 const loading = ref(true)
 const drawing = ref(false)
@@ -258,14 +270,15 @@ const canDraw = computed(
 )
 
 // 当前阶梯(服务端为准;无状态时按青铜处理)。
-const currentTier = computed(() => Math.min(Math.max(status.value?.current_tier ?? 0, 0), 4))
+const currentTier = computed(() => Math.max(status.value?.current_tier ?? 0, 0))
 
 function tierIcon(tier: number): string {
   return TIER_ICONS[Math.min(Math.max(tier, 0), TIER_ICONS.length - 1)]
 }
 
 function tierLabel(tier: number): string {
-  return t(`lottery.tier${Math.min(Math.max(tier, 0), 4)}`)
+  const configured = activity.value?.tiers.find((item) => item.tier === tier)
+  return configured?.name || t('lottery.tierFallback', { tier: tier + 1 })
 }
 
 function reachedTier(tier: number): boolean {
@@ -288,6 +301,13 @@ const tierProgressPercent = computed(() => {
   }
   const pct = (status.value.balance_spent / status.value.next_threshold) * 100
   return Math.min(100, Math.max(0, Math.round(pct * 10) / 10))
+})
+
+const pointsExpiryLabel = computed(() => {
+  if (!status.value?.points_expires_at) return ''
+  const expiry = new Date(status.value.points_expires_at)
+  if (Number.isNaN(expiry.getTime())) return ''
+  return expiry.toLocaleString(locale.value === 'zh' ? 'zh-CN' : 'en-US')
 })
 
 function prizeInStock(prize: LotteryPrize): boolean {

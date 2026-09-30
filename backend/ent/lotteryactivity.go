@@ -26,8 +26,10 @@ type LotteryActivity struct {
 	RulesVersion int `json:"rules_version,omitempty"`
 	// Tier mode: fixed or custom
 	TierMode string `json:"tier_mode,omitempty"`
-	// Custom tier thresholds in cents for custom mode
+	// Legacy custom tier thresholds in cents
 	TierThresholds []int64 `json:"tier_thresholds,omitempty"`
+	// Custom tier definitions with name and threshold_cents
+	TierDefinitions []map[string]interface{} `json:"tier_definitions,omitempty"`
 	// 活动开始时间，null 表示立即开始
 	StartsAt *time.Time `json:"starts_at,omitempty"`
 	// 活动结束时间，null 表示不自动结束
@@ -65,7 +67,7 @@ func (*LotteryActivity) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case lotteryactivity.FieldTierThresholds:
+		case lotteryactivity.FieldTierThresholds, lotteryactivity.FieldTierDefinitions:
 			values[i] = new([]byte)
 		case lotteryactivity.FieldID, lotteryactivity.FieldRulesVersion:
 			values[i] = new(sql.NullInt64)
@@ -124,6 +126,14 @@ func (_m *LotteryActivity) assignValues(columns []string, values []any) error {
 			} else if value != nil && len(*value) > 0 {
 				if err := json.Unmarshal(*value, &_m.TierThresholds); err != nil {
 					return fmt.Errorf("unmarshal field tier_thresholds: %w", err)
+				}
+			}
+		case lotteryactivity.FieldTierDefinitions:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field tier_definitions", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.TierDefinitions); err != nil {
+					return fmt.Errorf("unmarshal field tier_definitions: %w", err)
 				}
 			}
 		case lotteryactivity.FieldStartsAt:
@@ -207,6 +217,9 @@ func (_m *LotteryActivity) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("tier_thresholds=")
 	builder.WriteString(fmt.Sprintf("%v", _m.TierThresholds))
+	builder.WriteString(", ")
+	builder.WriteString("tier_definitions=")
+	builder.WriteString(fmt.Sprintf("%v", _m.TierDefinitions))
 	builder.WriteString(", ")
 	if v := _m.StartsAt; v != nil {
 		builder.WriteString("starts_at=")

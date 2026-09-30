@@ -5,7 +5,7 @@
 //   - 基线后累计余额消耗达 $5 解锁第 2 次,此后每新增 $50 解锁 1 次
 //     (阈值 $5, $55, $105, ...);
 //   - "余额消耗"权威口径 = SUM(usage_logs.actual_cost) WHERE billing_type = 0
-//     (钱包余额计费),仅统计 baseline_at 与最近 48 小时两者中较晚时点之后的消耗;
+//     (钱包余额计费),仅统计 baseline_at 与最近 24 小时两者中较晚时点之后的消耗;
 //   - 禁用/封禁/已删除账号不参与抽奖;
 //   - 中奖结果完全由服务端生成,前端只做展示。
 package service
@@ -14,6 +14,7 @@ import (
 	"context"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -30,7 +31,8 @@ const (
 )
 
 // LotterySpendWindow 是阶梯余额消耗和阶梯抽奖次数的滚动统计窗口。
-const LotterySpendWindow = 48 * time.Hour
+// 首抽和管理端手动补发不属于滚动资格，不受此窗口影响。
+const LotterySpendWindow = 24 * time.Hour
 
 // 阶梯配置模式。fixed 使用 $5 起、每 $50 递增；custom 使用活动保存的门槛列表。
 const (
@@ -38,30 +40,83 @@ const (
 	LotteryTierModeCustom = "custom"
 )
 
-// LotteryTierConfig 描述活动的阶梯解锁规则。Thresholds 单位为美分。
+// LotteryTierDefinition 描述一个可自定义阶梯。第一档必须是门槛为 0 的基础档，
+// 后续档位的门槛必须严格递增；ThresholdCents 单位为美分。
+type LotteryTierDefinition struct {
+	Name           string `json:"name"`
+	ThresholdCents int64  `json:"threshold_cents"`
+}
+
+// LotteryTierConfig 描述活动的阶梯解锁规则。Definitions 是新的动态配置；
+// Thresholds 仅用于兼容旧版 custom 活动的四个门槛。
 type LotteryTierConfig struct {
-	Mode       string
-	Thresholds []int64
+	Mode        string
+	Thresholds  []int64
+	Definitions []LotteryTierDefinition
+}
+
+func defaultLotteryTierDefinitions() []LotteryTierDefinition {
+	return []LotteryTierDefinition{
+		{Name: "青铜", ThresholdCents: 0},
+		{Name: "白银", ThresholdCents: 500},
+		{Name: "黄金", ThresholdCents: 5500},
+		{Name: "钻石", ThresholdCents: 10500},
+		{Name: "王者", ThresholdCents: 15500},
+	}
 }
 
 func DefaultLotteryTierConfig() LotteryTierConfig {
-	return LotteryTierConfig{Mode: LotteryTierModeFixed}
+	return LotteryTierConfig{Mode: LotteryTierModeFixed, Definitions: defaultLotteryTierDefinitions()}
 }
 
-// IsValid 校验自定义模式的严格递增门槛。最多四档，对应白银至王者。
+func legacyLotteryTierDefinitions(thresholds []int64) []LotteryTierDefinition {
+	names := []string{"白银", "黄金", "钻石", "王者"}
+	defs := []LotteryTierDefinition{{Name: "青铜", ThresholdCents: 0}}
+	for i, threshold := range thresholds {
+		name := "阶梯 " + strconv.Itoa(i+1)
+		if i < len(names) {
+			name = names[i]
+		}
+		defs = append(defs, LotteryTierDefinition{Name: name, ThresholdCents: threshold})
+	}
+	return defs
+}
+
+func (c LotteryTierConfig) definitions() []LotteryTierDefinition {
+	if len(c.Definitions) > 0 {
+		return c.Definitions
+	}
+	if len(c.Thresholds) > 0 {
+		return legacyLotteryTierDefinitions(c.Thresholds)
+	}
+	return defaultLotteryTierDefinitions()
+}
+
+// IsValid 校验动态阶梯：至少一个基础档，名称非空，第一档门槛为 0，
+// 其余门槛严格递增。最多 100 档，防止异常请求制造过大配置。
 func (c LotteryTierConfig) IsValid() bool {
 	if c.Mode == "" || c.Mode == LotteryTierModeFixed {
 		return true
 	}
-	if c.Mode != LotteryTierModeCustom || len(c.Thresholds) != int(LotteryMaxTier) {
+	if c.Mode != LotteryTierModeCustom {
 		return false
 	}
-	var previous int64
-	for i, threshold := range c.Thresholds {
-		if threshold <= 0 || (i > 0 && threshold <= previous) {
+	defs := c.definitions()
+	if len(defs) < 1 || len(defs) > 100 || defs[0].ThresholdCents != 0 {
+		return false
+	}
+	var previous int64 = -1
+	seenNames := make(map[string]struct{}, len(defs))
+	for _, def := range defs {
+		name := strings.TrimSpace(def.Name)
+		if name == "" || def.ThresholdCents < 0 || def.ThresholdCents <= previous {
 			return false
 		}
-		previous = threshold
+		if _, exists := seenNames[name]; exists {
+			return false
+		}
+		seenNames[name] = struct{}{}
+		previous = def.ThresholdCents
 	}
 	return true
 }
@@ -74,7 +129,8 @@ func (c LotteryTierConfig) Normalized() LotteryTierConfig {
 	if !c.IsValid() {
 		return DefaultLotteryTierConfig()
 	}
-	return LotteryTierConfig{Mode: LotteryTierModeCustom, Thresholds: append([]int64(nil), c.Thresholds...)}
+	defs := append([]LotteryTierDefinition(nil), c.definitions()...)
+	return LotteryTierConfig{Mode: LotteryTierModeCustom, Definitions: defs}
 }
 
 // Entitlement 返回滚动窗口内消耗对应的阶梯解锁次数。
@@ -90,8 +146,8 @@ func (c LotteryTierConfig) Entitlement(spentCents int64) int64 {
 		return 1 + (spentCents-LotterySecondDrawThresholdCents)/LotteryStepCents
 	}
 	var count int64
-	for _, threshold := range c.Thresholds {
-		if spentCents < threshold {
+	for i := 1; i < len(c.Definitions); i++ {
+		if spentCents < c.Definitions[i].ThresholdCents {
 			break
 		}
 		count++
@@ -105,43 +161,57 @@ func (c LotteryTierConfig) NextThresholdCents(spentCents int64) int64 {
 	if c.Mode == LotteryTierModeFixed {
 		return LotterySecondDrawThresholdCents + c.Entitlement(spentCents)*LotteryStepCents
 	}
-	for _, threshold := range c.Thresholds {
-		if spentCents < threshold {
-			return threshold
+	for i := 1; i < len(c.Definitions); i++ {
+		if spentCents < c.Definitions[i].ThresholdCents {
+			return c.Definitions[i].ThresholdCents
 		}
 	}
 	return -1
 }
 
 func (c LotteryTierConfig) UserTier(spentCents int64) int64 {
-	tier := c.Entitlement(spentCents)
-	if tier > LotteryMaxTier {
-		tier = LotteryMaxTier
+	var tier int64
+	if c.Normalized().Mode == LotteryTierModeFixed {
+		tier = LotteryUserTier(spentCents)
+	} else {
+		tier = c.Entitlement(spentCents)
+	}
+	maxTier := c.DisplayTierCount() - 1
+	if tier > maxTier {
+		tier = maxTier
 	}
 	return tier
 }
 
-func (c LotteryTierConfig) TierThresholdCents(tier int64) int64 {
-	if tier <= 0 {
-		return 0
-	}
+func (c LotteryTierConfig) TierName(tier int64) string {
 	c = c.Normalized()
-	if c.Mode == LotteryTierModeFixed {
-		return LotterySecondDrawThresholdCents + (tier-1)*LotteryStepCents
+	if tier >= 0 && tier < int64(len(c.Definitions)) {
+		return c.Definitions[tier].Name
 	}
-	idx := tier - 1
-	if idx >= int64(len(c.Thresholds)) {
+	return LotteryTierName(tier)
+}
+
+func (c LotteryTierConfig) TierThresholdCents(tier int64) int64 {
+	if tier < 0 {
 		return -1
 	}
-	return c.Thresholds[idx]
+	c = c.Normalized()
+	if c.Mode == LotteryTierModeFixed && tier >= int64(len(c.Definitions)) {
+		return LotterySecondDrawThresholdCents + (tier-1)*LotteryStepCents
+	}
+	if tier >= int64(len(c.Definitions)) {
+		return -1
+	}
+	return c.Definitions[tier].ThresholdCents
 }
 
 func (c LotteryTierConfig) DisplayTierCount() int64 {
-	c = c.Normalized()
-	if c.Mode == LotteryTierModeCustom {
-		return int64(len(c.Thresholds)) + 1
-	}
-	return LotteryMaxTier + 1
+	return int64(len(c.Normalized().Definitions))
+}
+
+// TierDefinitions 返回前端/管理端可安全消费的标准化阶梯定义副本。
+func (c LotteryTierConfig) TierDefinitions() []LotteryTierDefinition {
+	return append([]LotteryTierDefinition(nil), c.Normalized().Definitions...)
 }
 
 // 抽奖活动状态。
@@ -219,7 +289,7 @@ var (
 	ErrLotteryFulfillmentNotRetryable = infraerrors.Conflict("LOTTERY_FULFILLMENT_NOT_RETRYABLE", "fulfillment is not retryable in current status")
 )
 
-// LotteryThresholdEntitlement 计算近 48h 累计消耗(美分)对应的阶梯抽奖应得次数。
+// LotteryThresholdEntitlement 计算近 24h 累计消耗(美分)对应的阶梯抽奖应得次数。
 //
 //	spent < $5       -> 0
 //	$5 <= spent      -> 1 + floor((spent - $5) / $50)
@@ -238,7 +308,7 @@ func LotteryNextThresholdCents(entitlement int64) int64 {
 	return LotterySecondDrawThresholdCents + entitlement*LotteryStepCents
 }
 
-// 用户阶梯(tier)常量: 按近 48h 累计余额消耗划分,门槛与次数解锁阈值一致。
+// 用户阶梯(tier)常量: 按近 24h 累计余额消耗划分,门槛与次数解锁阈值一致。
 const (
 	LotteryTierBronze  = int64(0) // 青铜: < $5
 	LotteryTierSilver  = int64(1) // 白银: >= $5
@@ -248,7 +318,7 @@ const (
 	LotteryMaxTier     = int64(4)
 )
 
-// LotteryUserTier 按近 48h 累计余额消耗(美分)计算用户阶梯。
+// LotteryUserTier 按近 24h 累计余额消耗(美分)计算用户阶梯。
 //
 //	spent < $5  -> 0(青铜)
 //	$5 <= spent -> 1 + floor((spent - $5) / $50), 封顶王者(4)
@@ -309,16 +379,17 @@ func BalanceSpentFloatToCents(spent float64) int64 {
 
 // LotteryActivity 抽奖活动领域对象。
 type LotteryActivity struct {
-	ID             int64
-	Name           string
-	Status         string
-	RulesVersion   int
-	TierMode       string
-	TierThresholds []int64
-	StartsAt       *time.Time
-	EndsAt         *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID              int64
+	Name            string
+	Status          string
+	RulesVersion    int
+	TierMode        string
+	TierThresholds  []int64
+	TierDefinitions []LotteryTierDefinition
+	StartsAt        *time.Time
+	EndsAt          *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // TierConfig 返回活动当前有效的阶梯规则。旧活动未设置字段时回退固定模式。
@@ -326,7 +397,7 @@ func (a *LotteryActivity) TierConfig() LotteryTierConfig {
 	if a == nil {
 		return DefaultLotteryTierConfig()
 	}
-	return LotteryTierConfig{Mode: a.TierMode, Thresholds: a.TierThresholds}.Normalized()
+	return LotteryTierConfig{Mode: a.TierMode, Thresholds: a.TierThresholds, Definitions: a.TierDefinitions}.Normalized()
 }
 
 // IsOpen 判断活动当前是否可抽奖: 状态为 active 且在时间窗口内。
@@ -353,8 +424,8 @@ type LotteryPrize struct {
 	Weight     int
 	// MinTier 可中该奖品的最低用户阶梯;低于该阶梯的奖品不参与随机。
 	MinTier int
-	// TierWeights 按阶梯覆盖权重,key 为 tier 数字字符串(如 "0".."4")。
-	// 缺失的 tier 回退 Weight;显式 0 表示该阶梯不可中。
+	// TierWeights 按动态阶梯保存的显式中奖概率,key 为 tier 数字字符串。
+	// 新配置应为每个阶梯显式写入；旧数据缺失时仍兼容回退 Weight。
 	TierWeights map[string]int
 	Stock       int
 	StockIssued int
@@ -362,8 +433,8 @@ type LotteryPrize struct {
 	SortOrder   int
 }
 
-// EffectiveWeight 返回奖品在指定阶梯下的有效权重:
-// tier_weights 显式配置优先(含 0,表示该阶梯不可中);未配置回退基础 weight。
+// EffectiveWeight 返回奖品在指定阶梯下的有效中奖概率。
+// 新配置要求 tier_weights 显式覆盖每个阶梯；旧数据未配置时兼容回退基础 weight。
 func (p *LotteryPrize) EffectiveWeight(tier int64) int {
 	if w, ok := p.TierWeights[strconv.FormatInt(tier, 10)]; ok {
 		return w
@@ -422,12 +493,13 @@ func (d *LotteryDrawRecord) HasPrize() bool {
 
 // LotteryActivityUpdateInput 管理端活动更新入参(局部更新,nil 表示不改)。
 type LotteryActivityUpdateInput struct {
-	Name           *string
-	Status         *string
-	TierMode       *string
-	TierThresholds *[]int64
-	StartsAt       *time.Time
-	EndsAt         *time.Time
+	Name            *string
+	Status          *string
+	TierMode        *string
+	TierThresholds  *[]int64
+	TierDefinitions *[]LotteryTierDefinition
+	StartsAt        *time.Time
+	EndsAt          *time.Time
 }
 
 // LotteryPrizeUpdateInput 管理端奖品配置更新入参(nil 表示不改)。
@@ -479,6 +551,9 @@ type LotteryUserStatus struct {
 	// TierName 当前阶梯展示名。
 	TierName     string
 	RulesVersion int
+	// PointsExpiresAt 为当前积分有效期；尚无抽奖时为空，成功抽奖刷新24小时。
+	PointsExpiresAt *time.Time
+	ServerTime      time.Time
 
 	// 以下字段仅供服务层判定本次抽奖消耗哪一种资格，不对外暴露。
 	firstRemaining     int64
@@ -503,6 +578,7 @@ type LotteryRepository interface {
 	GetLatestActivity(ctx context.Context) (*LotteryActivity, error)
 	ListActivities(ctx context.Context) ([]LotteryActivity, error)
 	GetActivityByID(ctx context.Context, id int64) (*LotteryActivity, error)
+	GetActivityByIDForUpdate(ctx context.Context, id int64) (*LotteryActivity, error)
 	UpdateActivity(ctx context.Context, id int64, input LotteryActivityUpdateInput) error
 	BumpActivityRulesVersion(ctx context.Context, id int64) (int, error)
 	EnsureDefaultActivity(ctx context.Context) (*LotteryActivity, error)
@@ -533,8 +609,10 @@ type LotteryRepository interface {
 
 	// ---- 抽奖流水 ----
 	CountDraws(ctx context.Context, userID int64) (int, error)
+	// ListDrawTimes 返回真实抽奖时间(升序)，用于划分24小时积分会话。
+	ListDrawTimes(ctx context.Context, userID int64) ([]time.Time, error)
 	// CountDrawsBySource 按次数来源统计流水；since 为 nil 时不限制时间。
-	// 阶梯来源仅统计最近 48 小时，首抽和手动补发长期有效。
+	// 阶梯来源仅统计最近 24 小时，首抽和手动补发长期有效。
 	CountDrawsBySource(ctx context.Context, userID int64, source string, since *time.Time) (int, error)
 	GetDrawByIdempotencyKey(ctx context.Context, userID int64, key string) (*LotteryDrawRecord, error)
 	// CreateDraw 写入抽奖流水;违反 (user_id, idempotency_key) 唯一约束时

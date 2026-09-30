@@ -58,8 +58,8 @@ func TestLotteryTierThresholdCents(t *testing.T) {
 	}
 }
 
-// TestLotteryPrizeTierWeights 有效权重与阶梯可用性:
-// tier_weights 显式配置优先(含 0 不可中),缺失回退基础 weight,min_tier 拦截低阶梯。
+// TestLotteryPrizeTierWeights 验证显式阶梯中奖概率与最低阶梯限制。
+// 历史数据缺少 tier_weights 时仍兼容回退基础 weight。
 func TestLotteryPrizeTierWeights(t *testing.T) {
 	p := LotteryPrize{
 		Weight:  10,
@@ -122,6 +122,54 @@ func TestLotteryThresholdEntitlement(t *testing.T) {
 	}
 }
 
+func TestLotterySpendWindow(t *testing.T) {
+	if LotterySpendWindow != 24*time.Hour {
+		t.Fatalf("LotterySpendWindow = %s, want 24h", LotterySpendWindow)
+	}
+}
+
+func TestLotteryPointsWindow(t *testing.T) {
+	base := timeUtc(2026, 10, 1, 0, 0, 0)
+	cases := []struct {
+		name    string
+		now     time.Duration
+		draws   []time.Duration
+		start   time.Duration
+		expires *time.Duration
+	}{
+		{"no draw", 30 * time.Hour, nil, 6 * time.Hour, nil},
+		{"first draw", 12 * time.Hour, []time.Duration{10 * time.Hour}, 0, durationPtr(34 * time.Hour)},
+		{"successful draw refresh", 35 * time.Hour, []time.Duration{10 * time.Hour, 33 * time.Hour}, 0, durationPtr(57 * time.Hour)},
+		{"exact expiry excludes old spend", 57 * time.Hour, []time.Duration{10 * time.Hour, 33 * time.Hour}, 57 * time.Hour, durationPtr(57 * time.Hour)},
+		{"new session cannot revive old spend", 60 * time.Hour, []time.Duration{10 * time.Hour, 33 * time.Hour, 59 * time.Hour}, 57 * time.Hour, durationPtr(83 * time.Hour)},
+		{"draw exactly at expiry starts new session", 35 * time.Hour, []time.Duration{10 * time.Hour, 34 * time.Hour}, 34 * time.Hour, durationPtr(58 * time.Hour)},
+		{"long expired", 90 * time.Hour, []time.Duration{10 * time.Hour}, 66 * time.Hour, durationPtr(34 * time.Hour)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			times := make([]time.Time, len(tc.draws))
+			for i, at := range tc.draws {
+				times[i] = base.Add(at)
+			}
+			start, expires := lotteryPointsWindow(base.Add(tc.now), base, times)
+			if !start.Equal(base.Add(tc.start)) {
+				t.Fatalf("start = %v, want %v", start, base.Add(tc.start))
+			}
+			if tc.expires == nil {
+				if expires != nil {
+					t.Fatalf("unexpected expires %v", expires)
+				}
+				return
+			}
+			if expires == nil || !expires.Equal(base.Add(*tc.expires)) {
+				t.Fatalf("expires = %v, want %v", expires, base.Add(*tc.expires))
+			}
+		})
+	}
+}
+
+func durationPtr(d time.Duration) *time.Duration { return &d }
+
 func TestLotteryTierConfig(t *testing.T) {
 	fixed := DefaultLotteryTierConfig()
 	if !fixed.IsValid() {
@@ -157,6 +205,33 @@ func TestLotteryTierConfig(t *testing.T) {
 	}
 	if invalid.IsValid() {
 		t.Fatal("non-increasing custom thresholds must be invalid")
+	}
+
+	duplicateNames := LotteryTierConfig{
+		Mode: LotteryTierModeCustom,
+		Definitions: []LotteryTierDefinition{
+			{Name: "青铜", ThresholdCents: 0},
+			{Name: "白银", ThresholdCents: 500},
+			{Name: "白银", ThresholdCents: 1000},
+		},
+	}
+	if duplicateNames.IsValid() {
+		t.Fatal("duplicate custom tier names must be invalid")
+	}
+
+	dynamic := LotteryTierConfig{
+		Mode: LotteryTierModeCustom,
+		Definitions: []LotteryTierDefinition{
+			{Name: "起步", ThresholdCents: 0},
+			{Name: "进阶", ThresholdCents: 100},
+			{Name: "大师", ThresholdCents: 1000},
+		},
+	}
+	if got := dynamic.Entitlement(1000); got != 2 {
+		t.Fatalf("dynamic entitlement = %d, want 2", got)
+	}
+	if got := dynamic.TierName(2); got != "大师" {
+		t.Fatalf("dynamic tier name = %q, want 大师", got)
 	}
 }
 
@@ -222,6 +297,18 @@ func TestClassifyDrawSource(t *testing.T) {
 				t.Fatalf("classifyDrawSource = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestValidateLotteryTierWeightSumsForTierCount(t *testing.T) {
+	prizes := []LotteryPrize{
+		{ID: 1, Enabled: true, MinTier: 0, Weight: 100, TierWeights: map[string]int{"0": 100, "1": 0}},
+	}
+	if err := validateLotteryTierWeightSumsForTierCount(prizes, 2); err == nil {
+		t.Fatal("an explicitly zero-weight second tier must be rejected")
+	}
+	if err := validateLotteryTierWeightSumsForTierCount(prizes, 1); err != nil {
+		t.Fatalf("single-tier configuration should be valid: %v", err)
 	}
 }
 

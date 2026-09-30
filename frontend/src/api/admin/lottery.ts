@@ -49,8 +49,10 @@ export interface AdminLotteryActivity {
   status: 'draft' | 'active' | 'paused' | 'ended'
   rules_version: number
   tier_mode: 'fixed' | 'custom'
-  /** custom 模式下白银至王者的四档门槛，单位为美分。 */
+  /** 旧版 custom 模式门槛，保留用于兼容。 */
   tier_thresholds: number[]
+  /** 完全自定义阶梯，第一档门槛应为0。 */
+  tier_definitions: Array<{ name: string; threshold_cents: number }>
   starts_at: string | null
   ends_at: string | null
   created_at: string
@@ -64,10 +66,11 @@ export interface AdminLotteryPrize {
   name: string
   prize_type: 'none' | 'balance_bonus' | 'quota'
   value: number
+  /** 历史兼容字段；新的概率配置请读取 tier_weights。 */
   weight: number
   /** 可中该奖的最低阶梯: 0 青铜 / 1 白银 / 2 黄金 / 3 钻石 / 4 王者 */
   min_tier: number
-  /** 按阶梯覆盖权重, key 为 "0".."4"; 缺失回退 weight */
+  /** 按动态阶梯保存的显式中奖概率，key 为阶梯序号，值为百分比。 */
   tier_weights: Record<string, number>
   /** 总配额, -1 表示无限 */
   stock: number
@@ -81,8 +84,9 @@ export interface AdminUpdateActivityRequest {
   name?: string
   status?: 'draft' | 'active' | 'paused' | 'ended'
   tier_mode?: 'fixed' | 'custom'
-  /** custom 模式下白银至王者的四档门槛，单位为美分。 */
+  /** 旧版 custom 模式门槛，保留用于兼容。 */
   tier_thresholds?: number[]
+  tier_definitions?: Array<{ name: string; threshold_cents: number }>
   starts_at?: string | null
   ends_at?: string | null
 }
@@ -102,9 +106,9 @@ export interface AdminUpdatePrizeRequest {
 /** 活动内一个奖品的完整概率配置；所有奖品必须一次提交。 */
 export interface AdminLotteryPrizeWeightUpdate {
   id: number
-  /** 默认/青铜权重，整数百分比。 */
+  /** 历史兼容字段；服务端仍接收，但新配置以 tier_weights 为准。 */
   weight: number
-  /** 各阶梯的显式百分比，key 为 "0".."4"。 */
+  /** 每个动态阶梯的显式中奖百分比，key 为阶梯序号。 */
   tier_weights: Record<string, number>
   /** 会影响各阶梯的候选奖池，因此与概率原子保存。 */
   enabled: boolean
