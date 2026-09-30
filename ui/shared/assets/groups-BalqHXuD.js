@@ -1,0 +1,1 @@
+import{g as t}from"./index-BTNOU4q8.js";async function e(){const{data:a}=await t.get("/groups/available");return a}async function r(){const{data:a}=await t.get("/groups/rates");return a||{}}const n={getAvailable:e,getUserGroupRates:r};export{n as u};
