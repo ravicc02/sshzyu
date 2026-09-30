@@ -51,10 +51,11 @@ RUN pnpm run build
 # build (emulated networking here was dropping module fetches with EOF).
 FROM --platform=${BUILDPLATFORM} ${GOLANG_IMAGE} AS backend-builder
 
-# Build arguments for version info. Official releases must pass VERSION and COMMIT explicitly.
+# 本地 compose 默认 source；正式内嵌前端镜像须显式选择 release 并注入版本身份。
+ARG BUILD_TYPE=source
 ARG VERSION=
-ARG COMMIT=unknown
-ARG DATE
+ARG COMMIT=
+ARG DATE=
 ARG GOPROXY
 ARG GOSUMDB
 # Populated by buildx from the --platform target (e.g. linux/amd64).
@@ -86,14 +87,20 @@ COPY --from=frontend-builder /app/backend/internal/web/dist ./internal/web/dist
 # Version precedence: explicit build arg > local VERSION file (never infer from an official tag)
 RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod \
     --mount=type=cache,id=sub2api-gobuild,target=/root/.cache/go-build \
-    VERSION_VALUE="${VERSION}" && \
-    if [ -z "${VERSION_VALUE}" ]; then VERSION_VALUE="$(sh ./scripts/resolve-version.sh)"; fi && \
+    test "${BUILD_TYPE}" = source -o "${BUILD_TYPE}" = release && \
+    VERSION_VALUE="${VERSION:-$(sh ./scripts/resolve-version.sh)}" && \
     test "${VERSION_VALUE}" = "$(sh ./scripts/resolve-version.sh)" && \
     printf '%s' "${VERSION_VALUE}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-r[1-9][0-9]*$' && \
-    DATE_VALUE="${DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
+    if [ "${BUILD_TYPE}" = release ]; then \
+      test -n "${VERSION}" && \
+      printf '%s' "${COMMIT}" | grep -Eq '^[[:xdigit:]]{40}$' && \
+      printf '%s' "${DATE}" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'; \
+    fi && \
+    COMMIT_VALUE="${COMMIT:-unknown}" && \
+    DATE_VALUE="${DATE:-unknown}" && \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build \
     -tags embed \
-    -ldflags="-s -w -X main.Version=${VERSION_VALUE} -X main.Commit=${COMMIT} -X main.Date=${DATE_VALUE} -X main.BuildType=release" \
+    -ldflags="-s -w -X main.Version=${VERSION_VALUE} -X main.Commit=${COMMIT_VALUE} -X main.Date=${DATE_VALUE} -X main.BuildType=${BUILD_TYPE}" \
     -trimpath \
     -o /app/sub2api \
     ./cmd/server

@@ -124,7 +124,7 @@ scp docs/index.html docs/content.md docs/iamge/* root@64.83.2.153:/opt/sshzyu-do
 VERSION="$(tr -d '\r\n' < backend/cmd/server/VERSION)"
 COMMIT="$(git rev-parse HEAD)"
 DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-python scripts/upstream_release_guard.py --validate-clean-build
+python scripts/upstream_release_guard.py --validate-clean-build --build-target backend
 (cd backend && docker build --build-arg VERSION="$VERSION" --build-arg COMMIT="$COMMIT" --build-arg DATE="$DATE" -t "local/sub2api-batch:$VERSION" .)
 
 # 3. 本地验证版本和 Git SHA
@@ -148,7 +148,7 @@ cd /opt/sub2api-deploy && docker compose up -d --no-build --force-recreate sub2a
 ssh us-server 'docker exec sub2api /app/main --version && curl -s http://127.0.0.1:8080/health'
 ```
 
-> **版本号规则**：本地定制版完整版本号由 `backend/cmd/server/VERSION` 决定，格式为 `X.Y.Z-rN`；`resolve-version.sh` 不再从本地/官方 tag 自动推断。`upstream-baseline.json` 必须与版本文件及官方稳定 Release/tag/commit 对齐。根 Dockerfile 是本地内嵌前端镜像入口；`backend/Dockerfile` 是线上纯后端入口。正式发布构建均需显式注入 VERSION、COMMIT，并核验镜像 tag 与二进制输出。
+> **版本号规则**：本地定制版完整版本号由 `backend/cmd/server/VERSION` 决定，格式为 `X.Y.Z-rN`；`resolve-version.sh` 不再从本地/官方 tag 自动推断。`upstream-baseline.json` 必须与版本文件及官方稳定 Release/tag/commit 对齐。根 Dockerfile 默认构建本地 `source` 内嵌前端镜像；发布根镜像需先运行 `python scripts/upstream_release_guard.py --validate-clean-build --build-target root`，然后以 `--build-arg BUILD_TYPE=release` 及 VERSION、COMMIT、DATE 显式构建。`backend/Dockerfile` 只构建线上纯后端 `release` 镜像，发布前应使用 `--build-target backend` 验证。正式发布须核验镜像 tag、二进制输出及管理端 `build_type`。
 > **推送门禁**：每次向 `origin` 推送前运行 `python scripts/upstream_release_guard.py`，在当前机器执行一次 `git config core.hooksPath .githooks` 启用自动 `pre-push`。守卫读取待推送提交中的基线、核对官方最新稳定 Release 及 tag SHA；上游状态未知或有新版本时阻止 push 并向用户汇报，未经确认不得自动合并。钩子是本机机制，可被跳过；团队级强制保护仍需服务端分支保护/必需 CI。完整三方增量合并、migration 和部署边界见 `plan_docs/official-upstream-versioning-workflow.md`。
 > **回滚**：compose 改回旧 tag → `docker compose up -d --force-recreate`。
 

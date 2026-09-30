@@ -147,12 +147,17 @@ def check(refs):
     print("检查通过：当前没有比待推送基线更新的官方稳定 Release；这不代表已完成测试或已获推送授权。")
 
 
-def validate_clean_build():
-    """禁止用脏源码加 HEAD SHA 冒充可追溯的正式发布构建。"""
-    tracked = git("status", "--porcelain", "--untracked-files=no", "--", "backend", "upstream-baseline.json")
-    untracked = git("ls-files", "--others", "--exclude-standard", "--", "backend", "upstream-baseline.json")
+def validate_clean_build(build_target="backend"):
+    """拒绝将未提交的镜像输入标记为 HEAD 的正式发布构建。"""
+    paths = ["backend", "upstream-baseline.json"]
+    if build_target == "root":
+        paths += ["Dockerfile", ".dockerignore", "frontend", "docs/legal", "deploy/docker-entrypoint.sh"]
+    elif build_target != "backend":
+        raise Unknown(f"未知的构建入口：{build_target}")
+    tracked = git("status", "--porcelain", "--untracked-files=no", "--", *paths)
+    untracked = git("ls-files", "--others", "--exclude-standard", "--", *paths)
     if tracked or untracked:
-        raise Unknown("backend 或基线记录含未提交文件；先确认归属并提交，再使用该提交构建发布镜像")
+        raise Unknown(f"{build_target} 镜像输入含未提交文件；先确认归属并提交，再使用该提交构建发布镜像")
     if read_baseline() != read_baseline("HEAD"):
         raise Unknown("HEAD 中的基线记录与工作区不一致")
 
@@ -179,14 +184,15 @@ def pre_push(remote_name, remote_url, stream):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pre-push", nargs=2, metavar=("REMOTE", "URL"))
-    parser.add_argument("--validate-clean-build", action="store_true", help="核实正式构建所用后端源码与 HEAD 提交一致")
+    parser.add_argument("--validate-clean-build", action="store_true", help="核实正式构建所用源码与 HEAD 提交一致")
+    parser.add_argument("--build-target", choices=("backend", "root"), default="backend", help="正式镜像构建入口")
     opts = parser.parse_args()
     try:
         if opts.pre_push:
             pre_push(*opts.pre_push, sys.stdin)
         elif opts.validate_clean_build:
-            validate_clean_build()
-            print("构建输入与 HEAD 中的版本记录一致，后端目录无未提交改动")
+            validate_clean_build(opts.build_target)
+            print(f"{opts.build_target} 镜像输入与 HEAD 中的版本记录一致，所检查路径无未提交改动")
         else:
             print(f"当前分支：{git('branch', '--show-current')}；HEAD：{git('rev-parse', 'HEAD')}")
             print(f"相对 origin/main 待推送提交：{git('rev-list', '--count', 'origin/main..HEAD')}")

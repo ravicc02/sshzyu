@@ -110,6 +110,29 @@ class GuardTests(unittest.TestCase):
         with self.assertRaisesRegex(guard.Unknown, "未提交"):
             guard.validate_clean_build()
 
+    @patch.object(guard, "read_baseline", return_value=BASE)
+    @patch.object(guard, "git")
+    def test_root_build_checks_frontend_and_legal_inputs(self, git, _baseline):
+        git.side_effect = [" M frontend/src/main.ts", ""]
+        with self.assertRaisesRegex(guard.Unknown, "root 镜像输入含未提交"):
+            guard.validate_clean_build("root")
+        self.assertIn("frontend", git.call_args_list[0].args)
+        self.assertIn("docs/legal", git.call_args_list[0].args)
+        self.assertIn("Dockerfile", git.call_args_list[0].args)
+
+        git.reset_mock()
+        git.side_effect = ["", "docs/legal/policy.md"]
+        with self.assertRaisesRegex(guard.Unknown, "root 镜像输入含未提交"):
+            guard.validate_clean_build("root")
+        self.assertIn("docs/legal", git.call_args_list[1].args)
+
+    @patch.object(guard, "read_baseline", return_value=BASE)
+    @patch.object(guard, "git", return_value="")
+    def test_backend_clean_build_keeps_backend_scope(self, git, baseline):
+        guard.validate_clean_build()
+        self.assertNotIn("frontend", git.call_args_list[0].args)
+        self.assertEqual(baseline.call_args_list[-1].args, ("HEAD",))
+
     def test_tag_sha_uses_official_remote_and_peels_annotated_tag(self):
         def fake_git(*args):
             if args[:2] == ("remote", "get-url"):

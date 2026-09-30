@@ -14,14 +14,16 @@ RUN go mod download
 # 复制源代码
 COPY . .
 
-# 构建应用：正式发布需显式传入与 cmd/server/VERSION 一致的完整本地版本及 Git SHA。
+# 纯后端 Dockerfile 仅用于正式发布；缺失或不合法的构建身份直接拒绝。
 ARG VERSION=
-ARG COMMIT=unknown
-ARG DATE=unknown
-RUN VERSION_VALUE="${VERSION:-$(./scripts/resolve-version.sh)}" && \
-    test "${VERSION_VALUE}" = "$(sh ./scripts/resolve-version.sh)" && \
-    printf '%s' "${VERSION_VALUE}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-r[1-9][0-9]*$' && \
-    go build -ldflags="-s -w -X main.Version=${VERSION_VALUE} -X main.Commit=${COMMIT} -X main.Date=${DATE}" -o main ./cmd/server/
+ARG COMMIT=
+ARG DATE=
+RUN test -n "${VERSION}" && \
+    test "${VERSION}" = "$(sh ./scripts/resolve-version.sh)" && \
+    printf '%s' "${VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-r[1-9][0-9]*$' && \
+    printf '%s' "${COMMIT}" | grep -Eq '^[[:xdigit:]]{40}$' && \
+    printf '%s' "${DATE}" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' && \
+    go build -ldflags="-s -w -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.Date=${DATE} -X main.BuildType=release" -o main ./cmd/server/
 
 # 暴露端口
 EXPOSE 8080
