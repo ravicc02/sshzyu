@@ -1319,12 +1319,18 @@ func init() {
 	lotteryactivityDescRulesVersion := lotteryactivityFields[2].Descriptor()
 	// lotteryactivity.DefaultRulesVersion holds the default value on creation for the rules_version field.
 	lotteryactivity.DefaultRulesVersion = lotteryactivityDescRulesVersion.Default.(int)
+	// lotteryactivityDescTierMode is the schema descriptor for tier_mode field.
+	lotteryactivityDescTierMode := lotteryactivityFields[3].Descriptor()
+	// lotteryactivity.DefaultTierMode holds the default value on creation for the tier_mode field.
+	lotteryactivity.DefaultTierMode = lotteryactivityDescTierMode.Default.(string)
+	// lotteryactivity.TierModeValidator is a validator for the "tier_mode" field. It is called by the builders before save.
+	lotteryactivity.TierModeValidator = lotteryactivityDescTierMode.Validators[0].(func(string) error)
 	// lotteryactivityDescCreatedAt is the schema descriptor for created_at field.
-	lotteryactivityDescCreatedAt := lotteryactivityFields[5].Descriptor()
+	lotteryactivityDescCreatedAt := lotteryactivityFields[7].Descriptor()
 	// lotteryactivity.DefaultCreatedAt holds the default value on creation for the created_at field.
 	lotteryactivity.DefaultCreatedAt = lotteryactivityDescCreatedAt.Default.(func() time.Time)
 	// lotteryactivityDescUpdatedAt is the schema descriptor for updated_at field.
-	lotteryactivityDescUpdatedAt := lotteryactivityFields[6].Descriptor()
+	lotteryactivityDescUpdatedAt := lotteryactivityFields[8].Descriptor()
 	// lotteryactivity.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	lotteryactivity.DefaultUpdatedAt = lotteryactivityDescUpdatedAt.Default.(func() time.Time)
 	// lotteryactivity.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

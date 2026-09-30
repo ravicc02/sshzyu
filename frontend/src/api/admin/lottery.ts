@@ -34,7 +34,7 @@ export interface AdminLotteryDraw {
   rules_version: number
   source: string
   balance_spent_at_draw: number
-  fulfillment_status: 'granted' | 'pending' | 'failed'
+  fulfillment_status: 'granted' | 'pending' | 'pending_review' | 'rejected' | 'revoked' | 'failed'
   fulfilled_at: string | null
   fulfillment_error?: string | null
   created_at: string
@@ -48,6 +48,9 @@ export interface AdminLotteryActivity {
   name: string
   status: 'draft' | 'active' | 'paused' | 'ended'
   rules_version: number
+  tier_mode: 'fixed' | 'custom'
+  /** custom 模式下白银至王者的四档门槛，单位为美分。 */
+  tier_thresholds: number[]
   starts_at: string | null
   ends_at: string | null
   created_at: string
@@ -77,6 +80,9 @@ export interface AdminLotteryPrize {
 export interface AdminUpdateActivityRequest {
   name?: string
   status?: 'draft' | 'active' | 'paused' | 'ended'
+  tier_mode?: 'fixed' | 'custom'
+  /** custom 模式下白银至王者的四档门槛，单位为美分。 */
+  tier_thresholds?: number[]
   starts_at?: string | null
   ends_at?: string | null
 }
@@ -91,6 +97,18 @@ export interface AdminUpdatePrizeRequest {
   stock?: number
   enabled?: boolean
   sort_order?: number
+}
+
+/** 活动内一个奖品的完整概率配置；所有奖品必须一次提交。 */
+export interface AdminLotteryPrizeWeightUpdate {
+  id: number
+  /** 默认/青铜权重，整数百分比。 */
+  weight: number
+  /** 各阶梯的显式百分比，key 为 "0".."4"。 */
+  tier_weights: Record<string, number>
+  /** 会影响各阶梯的候选奖池，因此与概率原子保存。 */
+  enabled: boolean
+  min_tier: number
 }
 
 /**
@@ -161,6 +179,18 @@ export async function updatePrize(
   return data
 }
 
+/** 原子保存活动内全部奖品概率；每个可用阶梯权重总和必须等于100。 */
+export async function updatePrizeWeights(
+  activityId: number,
+  prizes: AdminLotteryPrizeWeightUpdate[]
+): Promise<{ updated: boolean }> {
+  const { data } = await apiClient.put<{ updated: boolean }>(
+    `/admin/lottery/activity/${activityId}/prize-weights`,
+    { prizes }
+  )
+  return data
+}
+
 /** 重试失败/待处理的奖品发放(granted 不可重试) */
 export async function retryFulfillment(
   drawId: number
@@ -183,14 +213,50 @@ export async function adjustDraws(
   return data
 }
 
+/** 管理员审核通过中奖发放 */
+export async function approveDraw(
+  drawId: number
+): Promise<{ draw: AdminLotteryDraw }> {
+  const { data } = await apiClient.post<{ draw: AdminLotteryDraw }>(
+    `/admin/lottery/draws/${drawId}/approve`
+  )
+  return data
+}
+
+/** 管理员驳回中奖发放 */
+export async function rejectDraw(
+  drawId: number,
+  reason?: string
+): Promise<{ draw: AdminLotteryDraw }> {
+  const { data } = await apiClient.post<{ draw: AdminLotteryDraw }>(
+    `/admin/lottery/draws/${drawId}/reject`,
+    reason ? { reason } : {}
+  )
+  return data
+}
+
+/** 管理员撤回已发放的余额奖励；不在用户兑换记录新增通知。 */
+export async function reverseGrant(
+  drawId: number
+): Promise<{ draw: AdminLotteryDraw }> {
+  const { data } = await apiClient.post<{ draw: AdminLotteryDraw }>(
+    `/admin/lottery/draws/${drawId}/reverse-grant`
+  )
+  return data
+}
+
 export const adminLotteryAPI = {
   listDraws,
   getActivities,
   getPrizes,
   updateActivity,
   updatePrize,
+  updatePrizeWeights,
   retryFulfillment,
-  adjustDraws
+  adjustDraws,
+  approveDraw,
+  rejectDraw,
+  reverseGrant
 }
 
 export default adminLotteryAPI

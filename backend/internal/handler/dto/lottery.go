@@ -73,14 +73,16 @@ func drawUserRefFromService(summary *service.DrawUserSummary) *LotteryDrawUserRe
 
 // LotteryAdminActivity 管理端活动 DTO(snake_case,与前端类型对齐)。
 type LotteryAdminActivity struct {
-	ID           int64      `json:"id"`
-	Name         string     `json:"name"`
-	Status       string     `json:"status"`
-	RulesVersion int        `json:"rules_version"`
-	StartsAt     *time.Time `json:"starts_at"`
-	EndsAt       *time.Time `json:"ends_at"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	ID             int64      `json:"id"`
+	Name           string     `json:"name"`
+	Status         string     `json:"status"`
+	RulesVersion   int        `json:"rules_version"`
+	TierMode       string     `json:"tier_mode"`
+	TierThresholds []int64    `json:"tier_thresholds"`
+	StartsAt       *time.Time `json:"starts_at"`
+	EndsAt         *time.Time `json:"ends_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 // LotteryAdminActivityFromService 服务层活动转管理端 DTO。
@@ -89,14 +91,16 @@ func LotteryAdminActivityFromService(a *service.LotteryActivity) *LotteryAdminAc
 		return nil
 	}
 	return &LotteryAdminActivity{
-		ID:           a.ID,
-		Name:         a.Name,
-		Status:       a.Status,
-		RulesVersion: a.RulesVersion,
-		StartsAt:     a.StartsAt,
-		EndsAt:       a.EndsAt,
-		CreatedAt:    a.CreatedAt,
-		UpdatedAt:    a.UpdatedAt,
+		ID:             a.ID,
+		Name:           a.Name,
+		Status:         a.Status,
+		RulesVersion:   a.RulesVersion,
+		TierMode:       a.TierConfig().Mode,
+		TierThresholds: append([]int64(nil), a.TierConfig().Thresholds...),
+		StartsAt:       a.StartsAt,
+		EndsAt:         a.EndsAt,
+		CreatedAt:      a.CreatedAt,
+		UpdatedAt:      a.UpdatedAt,
 	}
 }
 

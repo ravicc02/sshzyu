@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"math"
 	"math/big"
+	"strconv"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
@@ -29,10 +30,10 @@ import (
 //     balance_bonus 调 AdjustBalance,失败标记 failed 可由管理端重试,
 //     绝不把失败伪装成成功。
 type LotteryService struct {
-	repo        LotteryRepository
-	userRepo    LotteryUserSource
-	entClient   *dbent.Client
-	nowFunc     func() time.Time
+	repo         LotteryRepository
+	userRepo     LotteryUserSource
+	entClient    *dbent.Client
+	nowFunc      func() time.Time
 	billingCache LotteryBalanceCacheInvalidator // 可为 nil(本地测试)
 }
 
@@ -85,10 +86,10 @@ type LotteryPrizeView struct {
 
 // LotteryTierView 单个阶梯的奖池视图: 该阶梯下各候选奖品的归一化概率。
 type LotteryTierView struct {
-	Tier       int64                     `json:"tier"`
-	Name       string                    `json:"name"`
-	Threshold  float64                   `json:"threshold"` // 进入该阶梯的累计消耗门槛(美元)
-	Prizes     []LotteryTierPrizeChance  `json:"prizes"`
+	Tier      int64                    `json:"tier"`
+	Name      string                   `json:"name"`
+	Threshold float64                  `json:"threshold"` // 进入该阶梯的累计消耗门槛(美元)
+	Prizes    []LotteryTierPrizeChance `json:"prizes"`
 }
 
 // LotteryTierPrizeChance 阶梯内单奖品概率。PrizeID 为 0 表示该阶梯无候选。
@@ -102,7 +103,8 @@ type LotteryTierPrizeChance struct {
 
 // GetUserActivityView 返回当前活动与奖品展示视图。
 func (s *LotteryService) GetUserActivityView(ctx context.Context) (*LotteryActivityView, error) {
-	activity, err := s.repo.GetLatestActivity(ctx)
+	// 与 Draw 使用同一活动选择规则，避免最新草稿/暂停活动覆盖仍在进行的活动。
+	activity, err := s.repo.GetActiveActivity(ctx)
 	if err != nil {
 		if errors.Is(err, ErrLotteryActivityNotFound) {
 			return nil, ErrLotteryNoActiveActivity
@@ -115,10 +117,11 @@ func (s *LotteryService) GetUserActivityView(ctx context.Context) (*LotteryActiv
 	}
 
 	now := s.nowFunc()
+	tierConfig := activity.TierConfig()
 	view := &LotteryActivityView{
 		Activity:     *activity,
 		Prizes:       make([]LotteryPrizeView, 0, len(prizes)),
-		Tiers:        make([]LotteryTierView, 0, int(LotteryMaxTier)+1),
+		Tiers:        make([]LotteryTierView, 0, int(tierConfig.DisplayTierCount())),
 		RulesVersion: activity.RulesVersion,
 		IsOpen:       activity.IsOpen(now),
 		ServerTime:   now,
@@ -152,11 +155,11 @@ func (s *LotteryService) GetUserActivityView(ctx context.Context) (*LotteryActiv
 	}
 	// 阶梯分组概率: 与 pickPrizeWithStock 同口径
 	// (候选 = min_tier 达标 + 有效权重>0 + 有库存,概率按有效权重归一)。
-	for tier := int64(0); tier <= LotteryMaxTier; tier++ {
+	for tier := int64(0); tier < tierConfig.DisplayTierCount(); tier++ {
 		tv := LotteryTierView{
 			Tier:      tier,
 			Name:      LotteryTierName(tier),
-			Threshold: BalanceSpentCentsToFloat(LotteryTierThresholdCents(tier)),
+			Threshold: BalanceSpentCentsToFloat(tierConfig.TierThresholdCents(tier)),
 			Prizes:    make([]LotteryTierPrizeChance, 0, len(prizes)),
 		}
 		tierTotal := 0
@@ -250,11 +253,15 @@ func (s *LotteryService) ensureUserStats(ctx context.Context, userID int64) (*Lo
 
 // computeUserDraws 计算用户的资格与剩余次数。
 //
-//	eligible = first(0/1) + threshold_entitlement + manual
-//	used     = 流水计数
-//	available= max(eligible - used, 0)
-func (s *LotteryService) computeUserDraws(ctx context.Context, userID int64, stats *LotteryUserStats, rulesVersion int) (*LotteryUserStatus, error) {
-	spentF, err := s.repo.SumBalanceSpentSince(ctx, userID, stats.BaselineAt)
+// 首抽和手动补发是长期资格；仅余额消耗解锁的 threshold 资格与其已使用次数
+// 都受同一个 48 小时滚动窗口约束。这样窗口到期后旧消耗和旧阶梯抽奖会同时
+// 退出计算，用户重新消费即可重新解锁，而不会被历史 threshold 流水永久占用。
+func (s *LotteryService) computeUserDraws(ctx context.Context, userID int64, stats *LotteryUserStats, activity *LotteryActivity) (*LotteryUserStatus, error) {
+	windowStart := s.nowFunc().Add(-LotterySpendWindow)
+	if stats.BaselineAt.After(windowStart) {
+		windowStart = stats.BaselineAt
+	}
+	spentF, err := s.repo.SumBalanceSpentSince(ctx, userID, windowStart)
 	if err != nil {
 		return nil, err
 	}
@@ -263,36 +270,56 @@ func (s *LotteryService) computeUserDraws(ctx context.Context, userID int64, sta
 		spentCents = 0
 	}
 
-	used, err := s.repo.CountDraws(ctx, userID)
+	firstUsed, err := s.repo.CountDrawsBySource(ctx, userID, LotteryDrawSourceFirst, nil)
+	if err != nil {
+		return nil, err
+	}
+	thresholdUsed, err := s.repo.CountDrawsBySource(ctx, userID, LotteryDrawSourceThreshold, &windowStart)
+	if err != nil {
+		return nil, err
+	}
+	manualUsed, err := s.repo.CountDrawsBySource(ctx, userID, LotteryDrawSourceManual, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	first := int64(0)
+	firstEntitlement := int64(0)
 	if stats.FirstDrawGranted {
-		first = 1
+		firstEntitlement = 1
 	}
-	entitlement := LotteryThresholdEntitlement(spentCents)
+	tierConfig := activity.TierConfig()
+	entitlement := tierConfig.Entitlement(spentCents)
 	manual := int64(stats.ManualAdjustment)
-	eligible := first + entitlement + manual
-	usedI64 := int64(used)
-	available := eligible - usedI64
+
+	firstRemaining := firstEntitlement - int64(firstUsed)
+	if firstRemaining < 0 {
+		firstRemaining = 0
+	}
+	thresholdRemaining := entitlement - int64(thresholdUsed)
+	if thresholdRemaining < 0 {
+		thresholdRemaining = 0
+	}
+	manualRemaining := manual - int64(manualUsed)
+	available := firstRemaining + thresholdRemaining + manualRemaining
 	if available < 0 {
 		available = 0
 	}
 
-	currentTier := LotteryUserTier(spentCents)
+	currentTier := tierConfig.UserTier(spentCents)
 	return &LotteryUserStatus{
 		AvailableDraws:       available,
-		UsedDraws:            usedI64,
+		UsedDraws:            int64(firstUsed + thresholdUsed + manualUsed),
 		FirstDrawGranted:     stats.FirstDrawGranted,
 		ThresholdEntitlement: entitlement,
 		ManualAdjustment:     manual,
 		BalanceSpentCents:    spentCents,
-		NextThresholdCents:   LotteryNextThresholdCents(entitlement),
+		NextThresholdCents:   tierConfig.NextThresholdCents(spentCents),
 		CurrentTier:          currentTier,
 		TierName:             LotteryTierName(currentTier),
-		RulesVersion:         rulesVersion,
+		RulesVersion:         activity.RulesVersion,
+		firstRemaining:       firstRemaining,
+		thresholdRemaining:   thresholdRemaining,
+		manualRemaining:      manualRemaining,
 	}, nil
 }
 
@@ -302,14 +329,15 @@ func (s *LotteryService) GetUserStatus(ctx context.Context, userID int64) (*Lott
 	if err != nil {
 		return nil, err
 	}
-	activity, err := s.repo.GetLatestActivity(ctx)
+	// 与 Draw 使用同一活动选择规则，避免页面状态与实际抽奖落在不同活动。
+	activity, err := s.repo.GetActiveActivity(ctx)
 	if err != nil {
 		if errors.Is(err, ErrLotteryActivityNotFound) {
 			return nil, ErrLotteryNoActiveActivity
 		}
 		return nil, err
 	}
-	status, err := s.computeUserDraws(ctx, userID, stats, activity.RulesVersion)
+	status, err := s.computeUserDraws(ctx, userID, stats, activity)
 	if err != nil {
 		return nil, err
 	}
@@ -383,7 +411,7 @@ func (s *LotteryService) Draw(ctx context.Context, userID int64, idempotencyKey 
 		return &LotteryDrawOutcome{Record: existing, RemainingDraws: remaining}, nil
 	}
 
-	status, err := s.computeUserDraws(txCtx, userID, stats, activity.RulesVersion)
+	status, err := s.computeUserDraws(txCtx, userID, stats, activity)
 	if err != nil {
 		doRollback()
 		return nil, err
@@ -405,7 +433,7 @@ func (s *LotteryService) Draw(ctx context.Context, userID int64, idempotencyKey 
 		prize = pickGuaranteedFirstPrize(txCtx, s.repo, prizes)
 	}
 	if prize == nil {
-		prize, err = pickPrizeWithStock(txCtx, s.repo, prizes, LotteryUserTier(status.BalanceSpentCents))
+		prize, err = pickPrizeWithStock(txCtx, s.repo, prizes, activity.TierConfig().UserTier(status.BalanceSpentCents))
 		if err != nil {
 			doRollback()
 			return nil, err
@@ -460,7 +488,11 @@ func (s *LotteryService) remainingAfterNoop(ctx context.Context, userID int64) (
 	if err != nil {
 		return 0, err
 	}
-	status, err := s.computeUserDraws(ctx, userID, stats, 0)
+	activity, err := s.repo.GetLatestActivity(ctx)
+	if err != nil {
+		return 0, err
+	}
+	status, err := s.computeUserDraws(ctx, userID, stats, activity)
 	if err != nil {
 		return 0, err
 	}
@@ -468,17 +500,12 @@ func (s *LotteryService) remainingAfterNoop(ctx context.Context, userID int64) (
 }
 
 // classifyDrawSource 判定本次抽奖消耗的次数来源。
-// 名额顺序: 首抽 -> 阶梯 -> 手动补发。
-func classifyDrawSource(status *LotteryUserStatus, firstGranted bool) string {
-	first := int64(0)
-	if firstGranted {
-		first = 1
-	}
-	used := status.UsedDraws
+// 名额顺序: 首抽 -> 当前48小时阶梯 -> 手动补发。
+func classifyDrawSource(status *LotteryUserStatus, _ bool) string {
 	switch {
-	case used < first:
+	case status.firstRemaining > 0:
 		return LotteryDrawSourceFirst
-	case used < first+status.ThresholdEntitlement:
+	case status.thresholdRemaining > 0:
 		return LotteryDrawSourceThreshold
 	default:
 		return LotteryDrawSourceManual
@@ -595,27 +622,151 @@ func validateIdempotencyKey(key string) error {
 
 // fulfillDraw 执行奖品发放并更新流水状态。
 //
-//   - none:      谢谢参与,直接 granted;
-//   - quota:     本地 MVP 记录型发放,直接 granted;
-//   - balance_bonus: 原子调整余额;失败标记 failed 并记录原因,可重试。
+//   - none:                  谢谢参与,直接 granted;
+//   - quota:                本地 MVP 记录型发放,直接 granted;
+//   - balance_bonus:        不自动发放,标记 pending_review 等待管理员审核;
+//     (管理员通过 AdminApproveDraw 批准后发放,
+//     或 AdminRejectDraw 驳回)。
 func (s *LotteryService) fulfillDraw(ctx context.Context, record *LotteryDrawRecord) {
 	switch record.PrizeType {
 	case LotteryPrizeTypeNone, LotteryPrizeTypeQuota:
 		s.markFulfillment(ctx, record, LotteryFulfillmentGranted, nil)
 	case LotteryPrizeTypeBalanceBonus:
-		if _, err := s.userRepo.AdjustBalance(ctx, record.UserID, record.PrizeValue); err != nil {
-			slog.Error("lottery balance fulfillment failed",
-				"draw_id", record.ID, "user_id", record.UserID, "value", record.PrizeValue, "error", err)
-			reason := err.Error()
-			s.markFulfillment(ctx, record, LotteryFulfillmentFailed, &reason)
-			return
-		}
-		s.invalidateBalanceCacheAsync(record.UserID)
-		s.markFulfillment(ctx, record, LotteryFulfillmentGranted, nil)
+		// balance_bonus 不再自动发放,改为待审核状态。
+		s.markFulfillment(ctx, record, LotteryFulfillmentPendingReview, nil)
 	default:
 		reason := fmt.Sprintf("unknown prize type %q", record.PrizeType)
 		s.markFulfillment(ctx, record, LotteryFulfillmentFailed, &reason)
 	}
+}
+
+// AdminApproveDraw 管理员审核通过中奖发放。条件状态迁移、余额增加和兑换
+// 记录必须在一个事务中完成，避免并发审核造成重复发放。
+func (s *LotteryService) AdminApproveDraw(ctx context.Context, drawID int64) (*LotteryDrawRecord, error) {
+	record, err := s.repo.GetDrawByID(ctx, drawID)
+	if err != nil {
+		return nil, err
+	}
+	if record.PrizeType != LotteryPrizeTypeBalanceBonus {
+		return nil, infraerrors.BadRequest("LOTTERY_NOT_BALANCE_BONUS", "only balance_bonus draws require approval")
+	}
+
+	tx, err := s.entClient.Tx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("lottery begin approve tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	txCtx := dbent.NewTxContext(ctx, tx)
+	now := s.nowFunc()
+	updated, err := s.repo.UpdateDrawFulfillmentIfStatus(
+		txCtx, record.ID, LotteryFulfillmentPendingReview, LotteryFulfillmentGranted, &now, nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !updated {
+		return nil, infraerrors.Conflict("LOTTERY_NOT_PENDING_REVIEW", "draw has already been reviewed")
+	}
+	if _, err := s.userRepo.AdjustBalance(txCtx, record.UserID, record.PrizeValue); err != nil {
+		return nil, fmt.Errorf("lottery approve adjust balance: %w", err)
+	}
+	if _, err := tx.Client().RedeemCode.Create().
+		SetCode(fmt.Sprintf("LOTTERY-WIN-%d", record.ID)).
+		SetType(LotteryRedeemTypeWin).
+		SetValue(record.PrizeValue).
+		SetStatus(StatusUsed).
+		SetNillableUsedBy(&record.UserID).
+		SetUsedAt(now).
+		SetNotes(record.PrizeName).
+		SetValidityDays(0).
+		Save(txCtx); err != nil {
+		return nil, fmt.Errorf("lottery create win history: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("lottery commit approve: %w", err)
+	}
+	s.invalidateBalanceCacheAsync(record.UserID)
+	return s.repo.GetDrawByID(ctx, drawID)
+}
+
+// AdminRejectDraw 管理员驳回中奖发放。驳回理由统一固定为
+// "抽奖功能还在内测 暂不完善"，并在兑换记录中通知用户。
+func (s *LotteryService) AdminRejectDraw(ctx context.Context, drawID int64, _ *string) (*LotteryDrawRecord, error) {
+	record, err := s.repo.GetDrawByID(ctx, drawID)
+	if err != nil {
+		return nil, err
+	}
+	defaultReason := "抽奖功能还在内测 暂不完善"
+
+	tx, err := s.entClient.Tx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("lottery begin reject tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	txCtx := dbent.NewTxContext(ctx, tx)
+	updated, err := s.repo.UpdateDrawFulfillmentIfStatus(
+		txCtx, record.ID, LotteryFulfillmentPendingReview, LotteryFulfillmentRejected, nil, &defaultReason,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !updated {
+		return nil, infraerrors.Conflict("LOTTERY_NOT_PENDING_REVIEW", "draw has already been reviewed")
+	}
+	now := s.nowFunc()
+	if _, err := tx.Client().RedeemCode.Create().
+		SetCode(fmt.Sprintf("LOTTERY-REJ-%d", record.ID)).
+		SetType(LotteryRedeemTypeReject).
+		SetValue(0).
+		SetStatus(StatusUsed).
+		SetNillableUsedBy(&record.UserID).
+		SetUsedAt(now).
+		SetNotes(fmt.Sprintf("驳回: %s (%s)", record.PrizeName, defaultReason)).
+		SetValidityDays(0).
+		Save(txCtx); err != nil {
+		return nil, fmt.Errorf("lottery create rejection history: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("lottery commit reject: %w", err)
+	}
+	return s.repo.GetDrawByID(ctx, drawID)
+}
+
+// AdminReverseGrant 管理员撤回已发放的余额奖励。撤回不创建兑换记录，
+// 用户不会收到额外通知；若用户已用掉余额，扣回会失败且状态保持 granted。
+func (s *LotteryService) AdminReverseGrant(ctx context.Context, drawID int64) (*LotteryDrawRecord, error) {
+	record, err := s.repo.GetDrawByID(ctx, drawID)
+	if err != nil {
+		return nil, err
+	}
+	if record.PrizeType != LotteryPrizeTypeBalanceBonus {
+		return nil, infraerrors.BadRequest("LOTTERY_NOT_BALANCE_BONUS", "only granted balance_bonus draws can be reversed")
+	}
+
+	tx, err := s.entClient.Tx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("lottery begin reverse tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	txCtx := dbent.NewTxContext(ctx, tx)
+	reason := "admin reversed"
+	updated, err := s.repo.UpdateDrawFulfillmentIfStatus(
+		txCtx, record.ID, LotteryFulfillmentGranted, LotteryFulfillmentRevoked, nil, &reason,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !updated {
+		return nil, infraerrors.Conflict("LOTTERY_NOT_GRANTED", "draw has already been reversed or is not granted")
+	}
+	if _, err := s.userRepo.AdjustBalance(txCtx, record.UserID, -record.PrizeValue); err != nil {
+		return nil, fmt.Errorf("lottery reverse adjust balance: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("lottery commit reverse: %w", err)
+	}
+	s.invalidateBalanceCacheAsync(record.UserID)
+	return s.repo.GetDrawByID(ctx, drawID)
 }
 
 func (s *LotteryService) markFulfillment(ctx context.Context, record *LotteryDrawRecord, status string, failureReason *string) {
@@ -690,16 +841,169 @@ func (s *LotteryService) AdminUpdateActivity(ctx context.Context, id int64, inpu
 			return infraerrors.BadRequest("LOTTERY_INVALID_STATUS", "invalid activity status")
 		}
 	}
-	return s.repo.UpdateActivity(ctx, id, input)
+
+	activity, err := s.repo.GetActivityByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	config := activity.TierConfig()
+	if input.TierMode != nil {
+		config.Mode = *input.TierMode
+	}
+	if input.TierThresholds != nil {
+		config.Thresholds = append([]int64(nil), (*input.TierThresholds)...)
+	}
+	if input.TierMode != nil || input.TierThresholds != nil {
+		if !config.IsValid() {
+			return infraerrors.BadRequest("LOTTERY_INVALID_TIER_CONFIG", "tier_mode must be fixed or custom; custom thresholds must be strictly increasing positive cents")
+		}
+		mode := config.Normalized().Mode
+		input.TierMode = &mode
+		if mode == LotteryTierModeFixed {
+			empty := []int64{}
+			input.TierThresholds = &empty
+		} else {
+			thresholds := append([]int64(nil), config.Thresholds...)
+			input.TierThresholds = &thresholds
+		}
+	}
+
+	if err := s.repo.UpdateActivity(ctx, id, input); err != nil {
+		return err
+	}
+	if input.TierMode != nil || input.TierThresholds != nil {
+		_, err := s.repo.BumpActivityRulesVersion(ctx, id)
+		return err
+	}
+	return nil
 }
 
-// AdminUpdatePrize 管理端更新奖品配置;任何变更都递增活动 rules_version,
-// 使历史流水可按当时规则解释。
+// AdminUpdatePrize 管理端更新单个奖品的非概率字段。概率必须经
+// AdminUpdatePrizeWeights 活动级批量保存，才能保证每个阶梯始终原子地等于 100%。
 func (s *LotteryService) AdminUpdatePrize(ctx context.Context, prizeID int64, input LotteryPrizeUpdateInput) error {
+	// 概率与奖池参与条件必须一次提交全活动，避免逐条保存使任一阶梯
+	// 在中间状态不再等于 100%。
+	if input.Weight != nil || input.TierWeights != nil || input.Enabled != nil || input.MinTier != nil {
+		return infraerrors.BadRequest("LOTTERY_WEIGHT_BATCH_REQUIRED",
+			"save lottery probabilities, enabled status and min tier through the activity batch endpoint")
+	}
 	prize, err := s.repo.GetPrizeByID(ctx, prizeID)
 	if err != nil {
 		return err
 	}
+	if err := validateLotteryPrizeUpdate(input); err != nil {
+		return err
+	}
+	if err := s.repo.UpdatePrize(ctx, prizeID, input); err != nil {
+		return err
+	}
+	_, err = s.repo.BumpActivityRulesVersion(ctx, prize.ActivityID)
+	return err
+}
+
+// AdminUpdatePrizeWeights 原子保存活动内全部奖品的概率配置。每一档可参与
+// 抽奖的奖品权重总和必须严格等于 100，因此不允许逐条写入造成中间失衡。
+func (s *LotteryService) AdminUpdatePrizeWeights(ctx context.Context, activityID int64, updates []LotteryPrizeWeightUpdate) error {
+	if activityID <= 0 || len(updates) == 0 {
+		return infraerrors.BadRequest("LOTTERY_INVALID_WEIGHT_BATCH", "activity_id and prize weights are required")
+	}
+
+	tx, err := s.entClient.Tx(ctx)
+	if err != nil {
+		return fmt.Errorf("lottery begin weight batch tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	txCtx := dbent.NewTxContext(ctx, tx)
+
+	if _, err := s.repo.GetActivityByID(txCtx, activityID); err != nil {
+		return err
+	}
+	prizes, err := s.repo.ListPrizesByActivity(txCtx, activityID, false)
+	if err != nil {
+		return err
+	}
+	if len(prizes) != len(updates) {
+		return infraerrors.BadRequest("LOTTERY_WEIGHT_BATCH_INCOMPLETE", "submit every prize in the activity together")
+	}
+
+	byID := make(map[int64]LotteryPrizeWeightUpdate, len(updates))
+	for _, update := range updates {
+		if update.ID <= 0 {
+			return infraerrors.BadRequest("LOTTERY_INVALID_WEIGHT_BATCH", "prize id must be positive")
+		}
+		if _, exists := byID[update.ID]; exists {
+			return infraerrors.BadRequest("LOTTERY_INVALID_WEIGHT_BATCH", "duplicate prize id")
+		}
+		weight := update.Weight
+		weights := cloneLotteryTierWeights(update.TierWeights)
+		enabled := update.Enabled
+		minTier := update.MinTier
+		if err := validateLotteryPrizeUpdate(LotteryPrizeUpdateInput{
+			Weight:      &weight,
+			TierWeights: &weights,
+			Enabled:     &enabled,
+			MinTier:     &minTier,
+		}); err != nil {
+			return err
+		}
+		byID[update.ID] = LotteryPrizeWeightUpdate{
+			ID:          update.ID,
+			Weight:      weight,
+			TierWeights: weights,
+			Enabled:     enabled,
+			MinTier:     minTier,
+		}
+	}
+
+	for i := range prizes {
+		update, ok := byID[prizes[i].ID]
+		if !ok {
+			return infraerrors.BadRequest("LOTTERY_WEIGHT_BATCH_INCOMPLETE", "submitted prizes do not match activity")
+		}
+		prizes[i].Weight = update.Weight
+		prizes[i].TierWeights = cloneLotteryTierWeights(update.TierWeights)
+		prizes[i].Enabled = update.Enabled
+		prizes[i].MinTier = update.MinTier
+	}
+	if err := validateLotteryTierWeightSums(prizes); err != nil {
+		return err
+	}
+
+	for _, prize := range prizes {
+		weight := prize.Weight
+		weights := cloneLotteryTierWeights(prize.TierWeights)
+		enabled := prize.Enabled
+		minTier := prize.MinTier
+		if err := s.repo.UpdatePrize(txCtx, prize.ID, LotteryPrizeUpdateInput{
+			Weight:      &weight,
+			TierWeights: &weights,
+			Enabled:     &enabled,
+			MinTier:     &minTier,
+		}); err != nil {
+			return err
+		}
+	}
+	if _, err := s.repo.BumpActivityRulesVersion(txCtx, activityID); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("lottery commit weight batch: %w", err)
+	}
+	return nil
+}
+
+func cloneLotteryTierWeights(source map[string]int) map[string]int {
+	if source == nil {
+		return map[string]int{}
+	}
+	clone := make(map[string]int, len(source))
+	for key, value := range source {
+		clone[key] = value
+	}
+	return clone
+}
+
+func validateLotteryPrizeUpdate(input LotteryPrizeUpdateInput) error {
 	if input.Stock != nil && *input.Stock < -1 {
 		return infraerrors.BadRequest("LOTTERY_INVALID_STOCK", "stock must be >= -1")
 	}
@@ -709,11 +1013,75 @@ func (s *LotteryService) AdminUpdatePrize(ctx context.Context, prizeID int64, in
 	if input.Value != nil && *input.Value < 0 {
 		return infraerrors.BadRequest("LOTTERY_INVALID_VALUE", "value must be >= 0")
 	}
-	if err := s.repo.UpdatePrize(ctx, prizeID, input); err != nil {
-		return err
+	if input.MinTier != nil && (*input.MinTier < 0 || *input.MinTier > int(LotteryMaxTier)) {
+		return infraerrors.BadRequest("LOTTERY_INVALID_MIN_TIER", "min_tier must be between 0 and 4")
 	}
-	if _, err := s.repo.BumpActivityRulesVersion(ctx, prize.ActivityID); err != nil {
-		return err
+	if input.PrizeType != nil && *input.PrizeType != LotteryPrizeTypeNone &&
+		*input.PrizeType != LotteryPrizeTypeBalanceBonus && *input.PrizeType != LotteryPrizeTypeQuota {
+		return infraerrors.BadRequest("LOTTERY_INVALID_PRIZE_TYPE", "invalid prize_type")
+	}
+	if input.TierWeights != nil {
+		for key, weight := range *input.TierWeights {
+			tier, err := strconv.ParseInt(key, 10, 64)
+			if err != nil || tier < 0 || tier > LotteryMaxTier {
+				return infraerrors.BadRequest("LOTTERY_INVALID_TIER_WEIGHT", "tier_weights keys must be between 0 and 4")
+			}
+			if weight < 0 {
+				return infraerrors.BadRequest("LOTTERY_INVALID_TIER_WEIGHT", "tier_weights values must be >= 0")
+			}
+		}
+	}
+	return nil
+}
+
+func applyLotteryPrizeUpdate(prize *LotteryPrize, input LotteryPrizeUpdateInput) {
+	if input.Name != nil {
+		prize.Name = *input.Name
+	}
+	if input.PrizeType != nil {
+		prize.PrizeType = *input.PrizeType
+	}
+	if input.Value != nil {
+		prize.Value = *input.Value
+	}
+	if input.Weight != nil {
+		prize.Weight = *input.Weight
+	}
+	if input.MinTier != nil {
+		prize.MinTier = *input.MinTier
+	}
+	if input.TierWeights != nil {
+		prize.TierWeights = make(map[string]int, len(*input.TierWeights))
+		for key, weight := range *input.TierWeights {
+			prize.TierWeights[key] = weight
+		}
+	}
+	if input.Stock != nil {
+		prize.Stock = *input.Stock
+	}
+	if input.Enabled != nil {
+		prize.Enabled = *input.Enabled
+	}
+	if input.SortOrder != nil {
+		prize.SortOrder = *input.SortOrder
+	}
+}
+
+func validateLotteryTierWeightSums(prizes []LotteryPrize) error {
+	for tier := int64(0); tier <= LotteryMaxTier; tier++ {
+		total := 0
+		for i := range prizes {
+			prize := &prizes[i]
+			// 库存是运行态，不影响配置合法性；库存售罄时运行时会自动
+			// 在候选池剔除并重抽，不能导致保存概率配置时总和失效。
+			if prize.Enabled && prize.AvailableAtTier(tier) {
+				total += prize.EffectiveWeight(tier)
+			}
+		}
+		if total != 100 {
+			return infraerrors.BadRequest("LOTTERY_WEIGHT_SUM_INVALID",
+				fmt.Sprintf("tier %d enabled eligible prize weights must total 100; got %d", tier, total))
+		}
 	}
 	return nil
 }
@@ -753,7 +1121,7 @@ func (s *LotteryService) AdminRetryFulfillment(ctx context.Context, drawID int64
 	if err != nil {
 		return nil, err
 	}
-	if record.FulfillmentStatus == LotteryFulfillmentGranted {
+	if record.FulfillmentStatus != LotteryFulfillmentPending && record.FulfillmentStatus != LotteryFulfillmentFailed {
 		return nil, ErrLotteryFulfillmentNotRetryable
 	}
 	s.fulfillDraw(ctx, record)

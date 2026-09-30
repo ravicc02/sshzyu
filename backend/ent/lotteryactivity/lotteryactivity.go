@@ -20,6 +20,10 @@ const (
 	FieldStatus = "status"
 	// FieldRulesVersion holds the string denoting the rules_version field in the database.
 	FieldRulesVersion = "rules_version"
+	// FieldTierMode holds the string denoting the tier_mode field in the database.
+	FieldTierMode = "tier_mode"
+	// FieldTierThresholds holds the string denoting the tier_thresholds field in the database.
+	FieldTierThresholds = "tier_thresholds"
 	// FieldStartsAt holds the string denoting the starts_at field in the database.
 	FieldStartsAt = "starts_at"
 	// FieldEndsAt holds the string denoting the ends_at field in the database.
@@ -47,6 +51,8 @@ var Columns = []string{
 	FieldName,
 	FieldStatus,
 	FieldRulesVersion,
+	FieldTierMode,
+	FieldTierThresholds,
 	FieldStartsAt,
 	FieldEndsAt,
 	FieldCreatedAt,
@@ -72,6 +78,10 @@ var (
 	StatusValidator func(string) error
 	// DefaultRulesVersion holds the default value on creation for the "rules_version" field.
 	DefaultRulesVersion int
+	// DefaultTierMode holds the default value on creation for the "tier_mode" field.
+	DefaultTierMode string
+	// TierModeValidator is a validator for the "tier_mode" field. It is called by the builders before save.
+	TierModeValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -101,6 +111,11 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByRulesVersion orders the results by the rules_version field.
 func ByRulesVersion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRulesVersion, opts...).ToFunc()
+}
+
+// ByTierMode orders the results by the tier_mode field.
+func ByTierMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTierMode, opts...).ToFunc()
 }
 
 // ByStartsAt orders the results by the starts_at field.

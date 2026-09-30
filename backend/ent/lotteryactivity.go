@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -23,6 +24,10 @@ type LotteryActivity struct {
 	Status string `json:"status,omitempty"`
 	// 抽奖规则版本号，随规则修改递增
 	RulesVersion int `json:"rules_version,omitempty"`
+	// Tier mode: fixed or custom
+	TierMode string `json:"tier_mode,omitempty"`
+	// Custom tier thresholds in cents for custom mode
+	TierThresholds []int64 `json:"tier_thresholds,omitempty"`
 	// 活动开始时间，null 表示立即开始
 	StartsAt *time.Time `json:"starts_at,omitempty"`
 	// 活动结束时间，null 表示不自动结束
@@ -60,9 +65,11 @@ func (*LotteryActivity) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case lotteryactivity.FieldTierThresholds:
+			values[i] = new([]byte)
 		case lotteryactivity.FieldID, lotteryactivity.FieldRulesVersion:
 			values[i] = new(sql.NullInt64)
-		case lotteryactivity.FieldName, lotteryactivity.FieldStatus:
+		case lotteryactivity.FieldName, lotteryactivity.FieldStatus, lotteryactivity.FieldTierMode:
 			values[i] = new(sql.NullString)
 		case lotteryactivity.FieldStartsAt, lotteryactivity.FieldEndsAt, lotteryactivity.FieldCreatedAt, lotteryactivity.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -104,6 +111,20 @@ func (_m *LotteryActivity) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field rules_version", values[i])
 			} else if value.Valid {
 				_m.RulesVersion = int(value.Int64)
+			}
+		case lotteryactivity.FieldTierMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field tier_mode", values[i])
+			} else if value.Valid {
+				_m.TierMode = value.String
+			}
+		case lotteryactivity.FieldTierThresholds:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field tier_thresholds", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.TierThresholds); err != nil {
+					return fmt.Errorf("unmarshal field tier_thresholds: %w", err)
+				}
 			}
 		case lotteryactivity.FieldStartsAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -180,6 +201,12 @@ func (_m *LotteryActivity) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("rules_version=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RulesVersion))
+	builder.WriteString(", ")
+	builder.WriteString("tier_mode=")
+	builder.WriteString(_m.TierMode)
+	builder.WriteString(", ")
+	builder.WriteString("tier_thresholds=")
+	builder.WriteString(fmt.Sprintf("%v", _m.TierThresholds))
 	builder.WriteString(", ")
 	if v := _m.StartsAt; v != nil {
 		builder.WriteString("starts_at=")

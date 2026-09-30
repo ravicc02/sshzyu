@@ -57,6 +57,26 @@ func (_c *LotteryActivityCreate) SetNillableRulesVersion(v *int) *LotteryActivit
 	return _c
 }
 
+// SetTierMode sets the "tier_mode" field.
+func (_c *LotteryActivityCreate) SetTierMode(v string) *LotteryActivityCreate {
+	_c.mutation.SetTierMode(v)
+	return _c
+}
+
+// SetNillableTierMode sets the "tier_mode" field if the given value is not nil.
+func (_c *LotteryActivityCreate) SetNillableTierMode(v *string) *LotteryActivityCreate {
+	if v != nil {
+		_c.SetTierMode(*v)
+	}
+	return _c
+}
+
+// SetTierThresholds sets the "tier_thresholds" field.
+func (_c *LotteryActivityCreate) SetTierThresholds(v []int64) *LotteryActivityCreate {
+	_c.mutation.SetTierThresholds(v)
+	return _c
+}
+
 // SetStartsAt sets the "starts_at" field.
 func (_c *LotteryActivityCreate) SetStartsAt(v time.Time) *LotteryActivityCreate {
 	_c.mutation.SetStartsAt(v)
@@ -171,6 +191,10 @@ func (_c *LotteryActivityCreate) defaults() {
 		v := lotteryactivity.DefaultRulesVersion
 		_c.mutation.SetRulesVersion(v)
 	}
+	if _, ok := _c.mutation.TierMode(); !ok {
+		v := lotteryactivity.DefaultTierMode
+		_c.mutation.SetTierMode(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := lotteryactivity.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -201,6 +225,14 @@ func (_c *LotteryActivityCreate) check() error {
 	}
 	if _, ok := _c.mutation.RulesVersion(); !ok {
 		return &ValidationError{Name: "rules_version", err: errors.New(`ent: missing required field "LotteryActivity.rules_version"`)}
+	}
+	if _, ok := _c.mutation.TierMode(); !ok {
+		return &ValidationError{Name: "tier_mode", err: errors.New(`ent: missing required field "LotteryActivity.tier_mode"`)}
+	}
+	if v, ok := _c.mutation.TierMode(); ok {
+		if err := lotteryactivity.TierModeValidator(v); err != nil {
+			return &ValidationError{Name: "tier_mode", err: fmt.Errorf(`ent: validator failed for field "LotteryActivity.tier_mode": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "LotteryActivity.created_at"`)}
@@ -246,6 +278,14 @@ func (_c *LotteryActivityCreate) createSpec() (*LotteryActivity, *sqlgraph.Creat
 	if value, ok := _c.mutation.RulesVersion(); ok {
 		_spec.SetField(lotteryactivity.FieldRulesVersion, field.TypeInt, value)
 		_node.RulesVersion = value
+	}
+	if value, ok := _c.mutation.TierMode(); ok {
+		_spec.SetField(lotteryactivity.FieldTierMode, field.TypeString, value)
+		_node.TierMode = value
+	}
+	if value, ok := _c.mutation.TierThresholds(); ok {
+		_spec.SetField(lotteryactivity.FieldTierThresholds, field.TypeJSON, value)
+		_node.TierThresholds = value
 	}
 	if value, ok := _c.mutation.StartsAt(); ok {
 		_spec.SetField(lotteryactivity.FieldStartsAt, field.TypeTime, value)
@@ -370,6 +410,36 @@ func (u *LotteryActivityUpsert) UpdateRulesVersion() *LotteryActivityUpsert {
 // AddRulesVersion adds v to the "rules_version" field.
 func (u *LotteryActivityUpsert) AddRulesVersion(v int) *LotteryActivityUpsert {
 	u.Add(lotteryactivity.FieldRulesVersion, v)
+	return u
+}
+
+// SetTierMode sets the "tier_mode" field.
+func (u *LotteryActivityUpsert) SetTierMode(v string) *LotteryActivityUpsert {
+	u.Set(lotteryactivity.FieldTierMode, v)
+	return u
+}
+
+// UpdateTierMode sets the "tier_mode" field to the value that was provided on create.
+func (u *LotteryActivityUpsert) UpdateTierMode() *LotteryActivityUpsert {
+	u.SetExcluded(lotteryactivity.FieldTierMode)
+	return u
+}
+
+// SetTierThresholds sets the "tier_thresholds" field.
+func (u *LotteryActivityUpsert) SetTierThresholds(v []int64) *LotteryActivityUpsert {
+	u.Set(lotteryactivity.FieldTierThresholds, v)
+	return u
+}
+
+// UpdateTierThresholds sets the "tier_thresholds" field to the value that was provided on create.
+func (u *LotteryActivityUpsert) UpdateTierThresholds() *LotteryActivityUpsert {
+	u.SetExcluded(lotteryactivity.FieldTierThresholds)
+	return u
+}
+
+// ClearTierThresholds clears the value of the "tier_thresholds" field.
+func (u *LotteryActivityUpsert) ClearTierThresholds() *LotteryActivityUpsert {
+	u.SetNull(lotteryactivity.FieldTierThresholds)
 	return u
 }
 
@@ -512,6 +582,41 @@ func (u *LotteryActivityUpsertOne) AddRulesVersion(v int) *LotteryActivityUpsert
 func (u *LotteryActivityUpsertOne) UpdateRulesVersion() *LotteryActivityUpsertOne {
 	return u.Update(func(s *LotteryActivityUpsert) {
 		s.UpdateRulesVersion()
+	})
+}
+
+// SetTierMode sets the "tier_mode" field.
+func (u *LotteryActivityUpsertOne) SetTierMode(v string) *LotteryActivityUpsertOne {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.SetTierMode(v)
+	})
+}
+
+// UpdateTierMode sets the "tier_mode" field to the value that was provided on create.
+func (u *LotteryActivityUpsertOne) UpdateTierMode() *LotteryActivityUpsertOne {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.UpdateTierMode()
+	})
+}
+
+// SetTierThresholds sets the "tier_thresholds" field.
+func (u *LotteryActivityUpsertOne) SetTierThresholds(v []int64) *LotteryActivityUpsertOne {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.SetTierThresholds(v)
+	})
+}
+
+// UpdateTierThresholds sets the "tier_thresholds" field to the value that was provided on create.
+func (u *LotteryActivityUpsertOne) UpdateTierThresholds() *LotteryActivityUpsertOne {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.UpdateTierThresholds()
+	})
+}
+
+// ClearTierThresholds clears the value of the "tier_thresholds" field.
+func (u *LotteryActivityUpsertOne) ClearTierThresholds() *LotteryActivityUpsertOne {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.ClearTierThresholds()
 	})
 }
 
@@ -828,6 +933,41 @@ func (u *LotteryActivityUpsertBulk) AddRulesVersion(v int) *LotteryActivityUpser
 func (u *LotteryActivityUpsertBulk) UpdateRulesVersion() *LotteryActivityUpsertBulk {
 	return u.Update(func(s *LotteryActivityUpsert) {
 		s.UpdateRulesVersion()
+	})
+}
+
+// SetTierMode sets the "tier_mode" field.
+func (u *LotteryActivityUpsertBulk) SetTierMode(v string) *LotteryActivityUpsertBulk {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.SetTierMode(v)
+	})
+}
+
+// UpdateTierMode sets the "tier_mode" field to the value that was provided on create.
+func (u *LotteryActivityUpsertBulk) UpdateTierMode() *LotteryActivityUpsertBulk {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.UpdateTierMode()
+	})
+}
+
+// SetTierThresholds sets the "tier_thresholds" field.
+func (u *LotteryActivityUpsertBulk) SetTierThresholds(v []int64) *LotteryActivityUpsertBulk {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.SetTierThresholds(v)
+	})
+}
+
+// UpdateTierThresholds sets the "tier_thresholds" field to the value that was provided on create.
+func (u *LotteryActivityUpsertBulk) UpdateTierThresholds() *LotteryActivityUpsertBulk {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.UpdateTierThresholds()
+	})
+}
+
+// ClearTierThresholds clears the value of the "tier_thresholds" field.
+func (u *LotteryActivityUpsertBulk) ClearTierThresholds() *LotteryActivityUpsertBulk {
+	return u.Update(func(s *LotteryActivityUpsert) {
+		s.ClearTierThresholds()
 	})
 }
 

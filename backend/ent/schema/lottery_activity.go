@@ -42,6 +42,13 @@ func (LotteryActivity) Fields() []ent.Field {
 		field.Int("rules_version").
 			Default(1).
 			Comment("抽奖规则版本号，随规则修改递增"),
+		field.String("tier_mode").
+			MaxLen(20).
+			Default("fixed").
+			Comment("Tier mode: fixed or custom"),
+		field.JSON("tier_thresholds", []int64{}).
+			Optional().
+			Comment("Custom tier thresholds in cents for custom mode"),
 		field.Time("starts_at").
 			Optional().
 			Nillable().

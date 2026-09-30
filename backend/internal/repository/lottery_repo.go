@@ -38,14 +38,16 @@ func NewLotteryRepository(client *dbent.Client) service.LotteryRepository {
 
 func lotteryActivityToService(m *dbent.LotteryActivity) *service.LotteryActivity {
 	return &service.LotteryActivity{
-		ID:           m.ID,
-		Name:         m.Name,
-		Status:       m.Status,
-		RulesVersion: m.RulesVersion,
-		StartsAt:     m.StartsAt,
-		EndsAt:       m.EndsAt,
-		CreatedAt:    m.CreatedAt,
-		UpdatedAt:    m.UpdatedAt,
+		ID:             m.ID,
+		Name:           m.Name,
+		Status:         m.Status,
+		RulesVersion:   m.RulesVersion,
+		TierMode:       m.TierMode,
+		TierThresholds: append([]int64(nil), m.TierThresholds...),
+		StartsAt:       m.StartsAt,
+		EndsAt:         m.EndsAt,
+		CreatedAt:      m.CreatedAt,
+		UpdatedAt:      m.UpdatedAt,
 	}
 }
 
@@ -189,6 +191,12 @@ func (r *lotteryRepository) UpdateActivity(ctx context.Context, id int64, input 
 	}
 	if input.Status != nil {
 		builder.SetStatus(*input.Status)
+	}
+	if input.TierMode != nil {
+		builder.SetTierMode(*input.TierMode)
+	}
+	if input.TierThresholds != nil {
+		builder.SetTierThresholds(*input.TierThresholds)
 	}
 	if input.StartsAt != nil {
 		builder.SetStartsAt(*input.StartsAt)
@@ -438,8 +446,9 @@ func (r *lotteryRepository) DeleteUserStats(ctx context.Context, userID int64) e
 // 余额消耗统计
 // ---------------------------------------------------------------
 
-// SumBalanceSpentSince 汇总用户自 since 起的余额计费实际扣费
-// (usage_logs.actual_cost, billing_type = 0 钱包余额)。
+// SumBalanceSpentSince 汇总用户自 effective window 起的余额计费实际扣费
+// (usage_logs.actual_cost, billing_type = 0 钱包余额)。调用方传入
+// max(baseline_at, now-48h)，从而保证功能启用前消耗不追溯且窗口滚动重置。
 func (r *lotteryRepository) SumBalanceSpentSince(ctx context.Context, userID int64, since time.Time) (float64, error) {
 	client := clientFromContext(ctx, r.client)
 	const sumSQL = `
@@ -470,6 +479,20 @@ func (r *lotteryRepository) CountDraws(ctx context.Context, userID int64) (int, 
 	return client.LotteryDraw.Query().
 		Where(lotterydraw.UserIDEQ(userID)).
 		Count(ctx)
+}
+
+// CountDrawsBySource 统计指定来源的抽奖流水。threshold 来源会传入滚动窗口起点；
+// first/manual 传 nil，保持长期资格口径。
+func (r *lotteryRepository) CountDrawsBySource(ctx context.Context, userID int64, source string, since *time.Time) (int, error) {
+	client := clientFromContext(ctx, r.client)
+	q := client.LotteryDraw.Query().Where(
+		lotterydraw.UserIDEQ(userID),
+		lotterydraw.SourceEQ(source),
+	)
+	if since != nil {
+		q = q.Where(lotterydraw.CreatedAtGT(*since))
+	}
+	return q.Count(ctx)
 }
 
 func (r *lotteryRepository) GetDrawByIdempotencyKey(ctx context.Context, userID int64, key string) (*service.LotteryDrawRecord, error) {
@@ -537,6 +560,26 @@ func (r *lotteryRepository) UpdateDrawFulfillment(ctx context.Context, id int64,
 	}
 	_, err := builder.Save(ctx)
 	return translatePersistenceError(err, service.ErrLotteryDrawNotFound, nil)
+}
+
+// UpdateDrawFulfillmentIfStatus 条件更新抽奖发放状态。用于管理员审核和撤回：
+// 只有状态仍为 expectedStatus 才变更，避免并发操作重复增减用户余额。
+func (r *lotteryRepository) UpdateDrawFulfillmentIfStatus(ctx context.Context, id int64, expectedStatus, status string, fulfilledAt *time.Time, failureReason *string) (bool, error) {
+	client := clientFromContext(ctx, r.client)
+	builder := client.LotteryDraw.Update().
+		Where(lotterydraw.IDEQ(id), lotterydraw.FulfillmentStatusEQ(expectedStatus)).
+		SetFulfillmentStatus(status)
+	if fulfilledAt != nil {
+		builder.SetFulfilledAt(*fulfilledAt)
+	}
+	if failureReason != nil {
+		builder.SetFulfillmentError(*failureReason)
+	}
+	affected, err := builder.Save(ctx)
+	if err != nil {
+		return false, err
+	}
+	return affected == 1, nil
 }
 
 func lotteryDrawListOrder(params pagination.PaginationParams) []func(*entsql.Selector) {

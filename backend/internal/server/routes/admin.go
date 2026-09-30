@@ -565,12 +565,15 @@ func registerLotteryRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		lottery.GET("/activities", h.Admin.Lottery.AdminGetActivities)
 		lottery.GET("/prizes", h.Admin.Lottery.AdminGetPrizes)
 		lottery.PUT("/activity/:id", h.Admin.Lottery.AdminUpdateActivity)
+		lottery.PUT("/activity/:id/prize-weights", h.Admin.Lottery.AdminUpdatePrizeWeights)
 		lottery.PUT("/prizes/:id", h.Admin.Lottery.AdminUpdatePrize)
 		lottery.GET("/draws", h.Admin.Lottery.AdminListDraws)
 		lottery.POST("/draws/:id/retry-fulfillment", h.Admin.Lottery.AdminRetryFulfillment)
+		lottery.POST("/draws/:id/approve", h.Admin.Lottery.AdminApproveDraw)
+		lottery.POST("/draws/:id/reject", h.Admin.Lottery.AdminRejectDraw)
+		lottery.POST("/draws/:id/reverse-grant", h.Admin.Lottery.AdminReverseGrant)
 		lottery.POST("/users/:id/adjust", h.Admin.Lottery.AdminAdjustDraws)
 		lottery.POST("/users/:id/spend-offset", h.Admin.Lottery.AdminSetSpendOffset)
-		lottery.POST("/users/:id/reset", h.Admin.Lottery.AdminResetUser)
 	}
 }
 

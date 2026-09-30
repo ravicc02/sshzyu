@@ -10,7 +10,7 @@ func timeUtc(year int, month time.Month, day, hour, min, sec int) time.Time {
 	return time.Date(year, month, day, hour, min, sec, 0, time.UTC)
 }
 
-// TestLotteryUserTier 阶梯边界: 与次数解锁阈值一致($5/$15/$25/$35),封顶王者。
+// TestLotteryUserTier 阶梯边界: 与次数解锁阈值一致($5/$55/$105/$155),封顶王者。
 func TestLotteryUserTier(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -20,13 +20,14 @@ func TestLotteryUserTier(t *testing.T) {
 		{"zero spent bronze", 0, 0},
 		{"just below $5 bronze", 499, 0},
 		{"exactly $5 silver", 500, 1},
-		{"just below $15 silver", 1499, 1},
-		{"exactly $15 gold", 1500, 2},
-		{"just below $25 gold", 2499, 2},
-		{"exactly $25 diamond", 2500, 3},
-		{"exactly $35 king", 3500, 4},
-		{"beyond $45 capped king", 4500, 4},
-		{"large amount capped king", 10000, 4},
+		{"just below $55 silver", 5499, 1},
+		{"exactly $55 gold", 5500, 2},
+		{"just below $105 gold", 10499, 2},
+		{"exactly $105 diamond", 10500, 3},
+		{"just below $155 diamond", 15499, 3},
+		{"exactly $155 king", 15500, 4},
+		{"beyond $205 capped king", 20500, 4},
+		{"large amount capped king", 100000, 4},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -45,9 +46,9 @@ func TestLotteryTierThresholdCents(t *testing.T) {
 	}{
 		{0, 0},
 		{1, 500},
-		{2, 1500},
-		{3, 2500},
-		{4, 3500},
+		{2, 5500},
+		{3, 10500},
+		{4, 15500},
 		{5, -1}, // 超出最大阶梯
 	}
 	for _, tc := range cases {
@@ -92,8 +93,8 @@ func TestLotteryPrizeTierWeights(t *testing.T) {
 	}
 }
 
-// TestLotteryThresholdEntitlement 阈值边界: $5 解锁第 2 抽,此后每 $10 一次。
-// 验收口径: $4.99 不解锁, $5 解锁, $14.99 不解锁第 3 抽, $15 解锁, $25 解锁第 4 抽。
+// TestLotteryThresholdEntitlement 阈值边界: $5 解锁第 2 抽,此后每 $50 一次。
+// 验收口径: $4.99 不解锁, $5 解锁, $54.99 不解锁第 3 抽, $55 解锁, $105 解锁第 4 抽。
 func TestLotteryThresholdEntitlement(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -104,12 +105,13 @@ func TestLotteryThresholdEntitlement(t *testing.T) {
 		{"just below $5", 499, 0},
 		{"exactly $5", 500, 1},
 		{"mid range $10", 1000, 1},
-		{"just below $15", 1499, 1},
-		{"exactly $15", 1500, 2},
-		{"just below $25", 2499, 2},
-		{"exactly $25", 2500, 3},
-		{"exactly $35", 3500, 4},
-		{"large amount $100", 10000, 10},
+		{"just below $55", 5499, 1},
+		{"exactly $55", 5500, 2},
+		{"just below $105", 10499, 2},
+		{"exactly $105", 10500, 3},
+		{"exactly $155", 15500, 4},
+		{"exactly $205", 20500, 5},
+		{"large amount $1000", 100000, 20},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -120,14 +122,53 @@ func TestLotteryThresholdEntitlement(t *testing.T) {
 	}
 }
 
+func TestLotteryTierConfig(t *testing.T) {
+	fixed := DefaultLotteryTierConfig()
+	if !fixed.IsValid() {
+		t.Fatal("default fixed tier config should be valid")
+	}
+	if got := fixed.Entitlement(15500); got != 4 {
+		t.Fatalf("fixed entitlement at $155 = %d, want 4", got)
+	}
+	if got := fixed.UserTier(20500); got != LotteryTierKing {
+		t.Fatalf("fixed tier at $205 = %d, want king", got)
+	}
+
+	custom := LotteryTierConfig{
+		Mode:       LotteryTierModeCustom,
+		Thresholds: []int64{500, 5500, 10500, 15500},
+	}
+	if !custom.IsValid() {
+		t.Fatal("strictly increasing custom tier config should be valid")
+	}
+	if got := custom.Entitlement(10499); got != 2 {
+		t.Fatalf("custom entitlement below $105 = %d, want 2", got)
+	}
+	if got := custom.Entitlement(15500); got != 4 {
+		t.Fatalf("custom entitlement at $155 = %d, want 4", got)
+	}
+	if got := custom.NextThresholdCents(15500); got != -1 {
+		t.Fatalf("custom max threshold next = %d, want -1", got)
+	}
+
+	invalid := LotteryTierConfig{
+		Mode:       LotteryTierModeCustom,
+		Thresholds: []int64{500, 500, 10500, 15500},
+	}
+	if invalid.IsValid() {
+		t.Fatal("non-increasing custom thresholds must be invalid")
+	}
+}
+
 func TestLotteryNextThresholdCents(t *testing.T) {
 	cases := []struct {
 		entitlement int64
 		want        int64
 	}{
-		{0, 500},  // 未解锁 -> 下一门槛 $5
-		{1, 1500}, // 已解锁 1 -> 下一门槛 $15
-		{2, 2500}, // 已解锁 2 -> 下一门槛 $25
+		{0, 500},   // 未解锁 -> 下一门槛 $5
+		{1, 5500},  // 已解锁 1 -> 下一门槛 $55
+		{2, 10500}, // 已解锁 2 -> 下一门槛 $105
+		{4, 20500}, // 已解锁 4 -> 下一门槛 $205
 	}
 	for _, tc := range cases {
 		if got := LotteryNextThresholdCents(tc.entitlement); got != tc.want {
@@ -147,8 +188,8 @@ func TestBalanceSpentFloatToCents(t *testing.T) {
 		{5.0, 500},
 		{14.99, 1499},
 		{15.0, 1500},
-		{0.005, 1},   // 四舍五入
-		{-1.5, 0},    // 负值钳制为 0
+		{0.005, 1}, // 四舍五入
+		{-1.5, 0},  // 负值钳制为 0
 	}
 	for _, tc := range cases {
 		if got := BalanceSpentFloatToCents(tc.spent); got != tc.want {
@@ -158,30 +199,53 @@ func TestBalanceSpentFloatToCents(t *testing.T) {
 }
 
 func TestClassifyDrawSource(t *testing.T) {
-	status := func(used, threshold, manual int64) *LotteryUserStatus {
+	status := func(firstRemaining, thresholdRemaining, manualRemaining int64) *LotteryUserStatus {
 		return &LotteryUserStatus{
-			UsedDraws:            used,
-			ThresholdEntitlement: threshold,
-			ManualAdjustment:     manual,
+			firstRemaining:     firstRemaining,
+			thresholdRemaining: thresholdRemaining,
+			manualRemaining:    manualRemaining,
 		}
 	}
 	cases := []struct {
-		name         string
-		status       *LotteryUserStatus
-		firstGranted bool
-		want         string
+		name   string
+		status *LotteryUserStatus
+		want   string
 	}{
-		{"first draw consumed", status(0, 0, 0), true, LotteryDrawSourceFirst},
-		{"threshold draw", status(1, 1, 0), true, LotteryDrawSourceThreshold},
-		{"manual draw", status(2, 1, 1), true, LotteryDrawSourceManual},
-		{"no first grant uses threshold directly", status(0, 1, 0), false, LotteryDrawSourceThreshold},
+		{"first draw has priority", status(1, 3, 2), LotteryDrawSourceFirst},
+		{"current window threshold draw", status(0, 1, 2), LotteryDrawSourceThreshold},
+		{"manual draw after other pools exhausted", status(0, 0, 1), LotteryDrawSourceManual},
+		{"expired threshold uses manual pool", status(0, 0, 1), LotteryDrawSourceManual},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := classifyDrawSource(tc.status, tc.firstGranted); got != tc.want {
+			if got := classifyDrawSource(tc.status, false); got != tc.want {
 				t.Fatalf("classifyDrawSource = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestValidateLotteryTierWeightSums(t *testing.T) {
+	valid := []LotteryPrize{
+		{ID: 1, Enabled: true, MinTier: 0, Weight: 70, TierWeights: map[string]int{"0": 70, "1": 50, "2": 30, "3": 15, "4": 5}},
+		{ID: 2, Enabled: true, MinTier: 0, Weight: 25, TierWeights: map[string]int{"0": 25, "1": 20, "2": 10, "3": 0, "4": 0}},
+		{ID: 3, Enabled: true, MinTier: 0, Weight: 5, TierWeights: map[string]int{"0": 5, "1": 30, "2": 60, "3": 85, "4": 95}},
+	}
+	if err := validateLotteryTierWeightSums(valid); err != nil {
+		t.Fatalf("valid 100%% tier weights rejected: %v", err)
+	}
+
+	invalid := append([]LotteryPrize(nil), valid...)
+	invalid[2].TierWeights = cloneLotteryTierWeights(valid[2].TierWeights)
+	invalid[2].TierWeights["2"] = 59
+	if err := validateLotteryTierWeightSums(invalid); err == nil {
+		t.Fatal("tier total of 99 must be rejected")
+	}
+
+	// 售罄奖品仍是配置的一部分；不能导致保存既有100%配置时失败。
+	valid[1].Stock = 0
+	if err := validateLotteryTierWeightSums(valid); err != nil {
+		t.Fatalf("sold-out prize must remain part of configuration total: %v", err)
 	}
 }
 

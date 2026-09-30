@@ -83,6 +83,12 @@ const (
 	AdjustmentTypeAdminConcurrency = "admin_concurrency" // 管理员调整并发数
 )
 
+// Lottery redeem type constants (appear in user's redeem history)
+const (
+	RedeemTypeLotteryWin    = "lottery_win"    // 抽奖获得（审核通过）
+	RedeemTypeLotteryReject = "lottery_reject" // 抽奖驳回（审核不通过）
+)
+
 // Group subscription type constants
 const (
 	SubscriptionTypeStandard     = "standard"     // 标准计费模式（按余额扣费）

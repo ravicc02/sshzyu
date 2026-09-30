@@ -73,7 +73,7 @@ export interface LotteryDrawRecord {
   rules_version: number
   source: 'first' | 'threshold' | 'manual'
   balance_spent_at_draw: number
-  fulfillment_status: 'pending' | 'granted' | 'failed'
+  fulfillment_status: 'pending' | 'pending_review' | 'granted' | 'rejected' | 'revoked' | 'failed'
   fulfilled_at: string | null
   fulfillment_error?: string
   created_at: string

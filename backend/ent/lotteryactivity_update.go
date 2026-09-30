@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/lotteryactivity"
 	"github.com/Wei-Shaw/sub2api/ent/lotteryprize"
@@ -75,6 +76,38 @@ func (_u *LotteryActivityUpdate) SetNillableRulesVersion(v *int) *LotteryActivit
 // AddRulesVersion adds value to the "rules_version" field.
 func (_u *LotteryActivityUpdate) AddRulesVersion(v int) *LotteryActivityUpdate {
 	_u.mutation.AddRulesVersion(v)
+	return _u
+}
+
+// SetTierMode sets the "tier_mode" field.
+func (_u *LotteryActivityUpdate) SetTierMode(v string) *LotteryActivityUpdate {
+	_u.mutation.SetTierMode(v)
+	return _u
+}
+
+// SetNillableTierMode sets the "tier_mode" field if the given value is not nil.
+func (_u *LotteryActivityUpdate) SetNillableTierMode(v *string) *LotteryActivityUpdate {
+	if v != nil {
+		_u.SetTierMode(*v)
+	}
+	return _u
+}
+
+// SetTierThresholds sets the "tier_thresholds" field.
+func (_u *LotteryActivityUpdate) SetTierThresholds(v []int64) *LotteryActivityUpdate {
+	_u.mutation.SetTierThresholds(v)
+	return _u
+}
+
+// AppendTierThresholds appends value to the "tier_thresholds" field.
+func (_u *LotteryActivityUpdate) AppendTierThresholds(v []int64) *LotteryActivityUpdate {
+	_u.mutation.AppendTierThresholds(v)
+	return _u
+}
+
+// ClearTierThresholds clears the value of the "tier_thresholds" field.
+func (_u *LotteryActivityUpdate) ClearTierThresholds() *LotteryActivityUpdate {
+	_u.mutation.ClearTierThresholds()
 	return _u
 }
 
@@ -213,6 +246,11 @@ func (_u *LotteryActivityUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "LotteryActivity.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TierMode(); ok {
+		if err := lotteryactivity.TierModeValidator(v); err != nil {
+			return &ValidationError{Name: "tier_mode", err: fmt.Errorf(`ent: validator failed for field "LotteryActivity.tier_mode": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -239,6 +277,20 @@ func (_u *LotteryActivityUpdate) sqlSave(ctx context.Context) (_node int, err er
 	}
 	if value, ok := _u.mutation.AddedRulesVersion(); ok {
 		_spec.AddField(lotteryactivity.FieldRulesVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.TierMode(); ok {
+		_spec.SetField(lotteryactivity.FieldTierMode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.TierThresholds(); ok {
+		_spec.SetField(lotteryactivity.FieldTierThresholds, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedTierThresholds(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, lotteryactivity.FieldTierThresholds, value)
+		})
+	}
+	if _u.mutation.TierThresholdsCleared() {
+		_spec.ClearField(lotteryactivity.FieldTierThresholds, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.StartsAt(); ok {
 		_spec.SetField(lotteryactivity.FieldStartsAt, field.TypeTime, value)
@@ -366,6 +418,38 @@ func (_u *LotteryActivityUpdateOne) SetNillableRulesVersion(v *int) *LotteryActi
 // AddRulesVersion adds value to the "rules_version" field.
 func (_u *LotteryActivityUpdateOne) AddRulesVersion(v int) *LotteryActivityUpdateOne {
 	_u.mutation.AddRulesVersion(v)
+	return _u
+}
+
+// SetTierMode sets the "tier_mode" field.
+func (_u *LotteryActivityUpdateOne) SetTierMode(v string) *LotteryActivityUpdateOne {
+	_u.mutation.SetTierMode(v)
+	return _u
+}
+
+// SetNillableTierMode sets the "tier_mode" field if the given value is not nil.
+func (_u *LotteryActivityUpdateOne) SetNillableTierMode(v *string) *LotteryActivityUpdateOne {
+	if v != nil {
+		_u.SetTierMode(*v)
+	}
+	return _u
+}
+
+// SetTierThresholds sets the "tier_thresholds" field.
+func (_u *LotteryActivityUpdateOne) SetTierThresholds(v []int64) *LotteryActivityUpdateOne {
+	_u.mutation.SetTierThresholds(v)
+	return _u
+}
+
+// AppendTierThresholds appends value to the "tier_thresholds" field.
+func (_u *LotteryActivityUpdateOne) AppendTierThresholds(v []int64) *LotteryActivityUpdateOne {
+	_u.mutation.AppendTierThresholds(v)
+	return _u
+}
+
+// ClearTierThresholds clears the value of the "tier_thresholds" field.
+func (_u *LotteryActivityUpdateOne) ClearTierThresholds() *LotteryActivityUpdateOne {
+	_u.mutation.ClearTierThresholds()
 	return _u
 }
 
@@ -517,6 +601,11 @@ func (_u *LotteryActivityUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "LotteryActivity.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TierMode(); ok {
+		if err := lotteryactivity.TierModeValidator(v); err != nil {
+			return &ValidationError{Name: "tier_mode", err: fmt.Errorf(`ent: validator failed for field "LotteryActivity.tier_mode": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -560,6 +649,20 @@ func (_u *LotteryActivityUpdateOne) sqlSave(ctx context.Context) (_node *Lottery
 	}
 	if value, ok := _u.mutation.AddedRulesVersion(); ok {
 		_spec.AddField(lotteryactivity.FieldRulesVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.TierMode(); ok {
+		_spec.SetField(lotteryactivity.FieldTierMode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.TierThresholds(); ok {
+		_spec.SetField(lotteryactivity.FieldTierThresholds, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedTierThresholds(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, lotteryactivity.FieldTierThresholds, value)
+		})
+	}
+	if _u.mutation.TierThresholdsCleared() {
+		_spec.ClearField(lotteryactivity.FieldTierThresholds, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.StartsAt(); ok {
 		_spec.SetField(lotteryactivity.FieldStartsAt, field.TypeTime, value)

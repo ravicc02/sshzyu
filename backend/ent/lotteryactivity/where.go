@@ -70,6 +70,11 @@ func RulesVersion(v int) predicate.LotteryActivity {
 	return predicate.LotteryActivity(sql.FieldEQ(FieldRulesVersion, v))
 }
 
+// TierMode applies equality check predicate on the "tier_mode" field. It's identical to TierModeEQ.
+func TierMode(v string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldEQ(FieldTierMode, v))
+}
+
 // StartsAt applies equality check predicate on the "starts_at" field. It's identical to StartsAtEQ.
 func StartsAt(v time.Time) predicate.LotteryActivity {
 	return predicate.LotteryActivity(sql.FieldEQ(FieldStartsAt, v))
@@ -258,6 +263,81 @@ func RulesVersionLT(v int) predicate.LotteryActivity {
 // RulesVersionLTE applies the LTE predicate on the "rules_version" field.
 func RulesVersionLTE(v int) predicate.LotteryActivity {
 	return predicate.LotteryActivity(sql.FieldLTE(FieldRulesVersion, v))
+}
+
+// TierModeEQ applies the EQ predicate on the "tier_mode" field.
+func TierModeEQ(v string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldEQ(FieldTierMode, v))
+}
+
+// TierModeNEQ applies the NEQ predicate on the "tier_mode" field.
+func TierModeNEQ(v string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldNEQ(FieldTierMode, v))
+}
+
+// TierModeIn applies the In predicate on the "tier_mode" field.
+func TierModeIn(vs ...string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldIn(FieldTierMode, vs...))
+}
+
+// TierModeNotIn applies the NotIn predicate on the "tier_mode" field.
+func TierModeNotIn(vs ...string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldNotIn(FieldTierMode, vs...))
+}
+
+// TierModeGT applies the GT predicate on the "tier_mode" field.
+func TierModeGT(v string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldGT(FieldTierMode, v))
+}
+
+// TierModeGTE applies the GTE predicate on the "tier_mode" field.
+func TierModeGTE(v string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldGTE(FieldTierMode, v))
+}
+
+// TierModeLT applies the LT predicate on the "tier_mode" field.
+func TierModeLT(v string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldLT(FieldTierMode, v))
+}
+
+// TierModeLTE applies the LTE predicate on the "tier_mode" field.
+func TierModeLTE(v string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldLTE(FieldTierMode, v))
+}
+
+// TierModeContains applies the Contains predicate on the "tier_mode" field.
+func TierModeContains(v string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldContains(FieldTierMode, v))
+}
+
+// TierModeHasPrefix applies the HasPrefix predicate on the "tier_mode" field.
+func TierModeHasPrefix(v string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldHasPrefix(FieldTierMode, v))
+}
+
+// TierModeHasSuffix applies the HasSuffix predicate on the "tier_mode" field.
+func TierModeHasSuffix(v string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldHasSuffix(FieldTierMode, v))
+}
+
+// TierModeEqualFold applies the EqualFold predicate on the "tier_mode" field.
+func TierModeEqualFold(v string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldEqualFold(FieldTierMode, v))
+}
+
+// TierModeContainsFold applies the ContainsFold predicate on the "tier_mode" field.
+func TierModeContainsFold(v string) predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldContainsFold(FieldTierMode, v))
+}
+
+// TierThresholdsIsNil applies the IsNil predicate on the "tier_thresholds" field.
+func TierThresholdsIsNil() predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldIsNull(FieldTierThresholds))
+}
+
+// TierThresholdsNotNil applies the NotNil predicate on the "tier_thresholds" field.
+func TierThresholdsNotNil() predicate.LotteryActivity {
+	return predicate.LotteryActivity(sql.FieldNotNull(FieldTierThresholds))
 }
 
 // StartsAtEQ applies the EQ predicate on the "starts_at" field.

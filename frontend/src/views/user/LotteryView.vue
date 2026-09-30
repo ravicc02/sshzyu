@@ -294,23 +294,33 @@ function prizeInStock(prize: LotteryPrize): boolean {
   return prize.stock < 0 || prize.stock_issued < prize.stock
 }
 
-function fulfillmentLabel(statusValue: string): string {
+function fulfillmentLabel(statusValue: LotteryDrawRecord['fulfillment_status']): string {
   switch (statusValue) {
     case 'granted':
       return t('lottery.fulfillmentGranted')
     case 'pending':
       return t('lottery.fulfillmentPending')
+    case 'pending_review':
+      return t('lottery.fulfillmentPendingReview')
+    case 'rejected':
+      return t('lottery.fulfillmentRejected')
+    case 'revoked':
+      return t('lottery.fulfillmentRevoked')
     default:
       return t('lottery.fulfillmentFailed')
   }
 }
 
-function fulfillmentClass(statusValue: string): string {
+function fulfillmentClass(statusValue: LotteryDrawRecord['fulfillment_status']): string {
   switch (statusValue) {
     case 'granted':
       return 'text-green-600 dark:text-green-400'
     case 'pending':
+    case 'pending_review':
       return 'text-amber-600 dark:text-amber-400'
+    case 'rejected':
+    case 'revoked':
+      return 'text-gray-500 dark:text-gray-400'
     default:
       return 'text-red-600 dark:text-red-400'
   }

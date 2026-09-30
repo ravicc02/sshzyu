@@ -27,10 +27,12 @@ func NewAdminLotteryHandler(lotteryService *service.LotteryService) *AdminLotter
 
 // AdminUpdateActivityRequest PUT /admin/lottery/activity/:id 请求体(局部更新,nil 不改)。
 type AdminUpdateActivityRequest struct {
-	Name     *string `json:"name"`
-	Status   *string `json:"status"`
-	StartsAt *string `json:"starts_at"`
-	EndsAt   *string `json:"ends_at"`
+	Name           *string  `json:"name"`
+	Status         *string  `json:"status"`
+	TierMode       *string  `json:"tier_mode"`
+	TierThresholds *[]int64 `json:"tier_thresholds"`
+	StartsAt       *string  `json:"starts_at"`
+	EndsAt         *string  `json:"ends_at"`
 }
 
 // AdminUpdatePrizeRequest PUT /admin/lottery/prizes/:id 请求体(局部更新,nil 不改)。
@@ -46,6 +48,21 @@ type AdminUpdatePrizeRequest struct {
 	Stock       *int            `json:"stock"`
 	Enabled     *bool           `json:"enabled"`
 	SortOrder   *int            `json:"sort_order"`
+}
+
+// AdminBatchPrizeWeightItem 是活动级概率保存的单个奖品。
+type AdminBatchPrizeWeightItem struct {
+	ID          int64          `json:"id" binding:"required"`
+	Weight      int            `json:"weight"`
+	TierWeights map[string]int `json:"tier_weights"`
+	Enabled     bool           `json:"enabled"`
+	MinTier     int            `json:"min_tier"`
+}
+
+// AdminBatchUpdatePrizeWeightsRequest PUT /admin/lottery/activity/:id/prize-weights。
+// 必须一次提交当前活动所有奖品，后端在同一事务中校验每档总和均为 100。
+type AdminBatchUpdatePrizeWeightsRequest struct {
+	Prizes []AdminBatchPrizeWeightItem `json:"prizes" binding:"required,min=1"`
 }
 
 // AdminAdjustDrawsRequest POST /admin/lottery/users/:id/adjust 请求体。
@@ -135,7 +152,12 @@ func (h *AdminLotteryHandler) AdminUpdateActivity(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	input := service.LotteryActivityUpdateInput{Name: req.Name, Status: req.Status}
+	input := service.LotteryActivityUpdateInput{
+		Name:           req.Name,
+		Status:         req.Status,
+		TierMode:       req.TierMode,
+		TierThresholds: req.TierThresholds,
+	}
 	if req.StartsAt != nil {
 		t, perr := parseLotteryTimeParam(*req.StartsAt)
 		if perr != nil {
@@ -153,6 +175,36 @@ func (h *AdminLotteryHandler) AdminUpdateActivity(c *gin.Context) {
 		input.EndsAt = t
 	}
 	if err := h.lotteryService.AdminUpdateActivity(c.Request.Context(), id, input); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"updated": true})
+}
+
+// AdminUpdatePrizeWeights PUT /admin/lottery/activity/:id/prize-weights
+// 原子保存一个活动全部奖品的阶梯概率。
+func (h *AdminLotteryHandler) AdminUpdatePrizeWeights(c *gin.Context) {
+	activityID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || activityID <= 0 {
+		response.BadRequest(c, "Invalid activity id")
+		return
+	}
+	var req AdminBatchUpdatePrizeWeightsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	updates := make([]service.LotteryPrizeWeightUpdate, 0, len(req.Prizes))
+	for _, item := range req.Prizes {
+		updates = append(updates, service.LotteryPrizeWeightUpdate{
+			ID:          item.ID,
+			Weight:      item.Weight,
+			TierWeights: item.TierWeights,
+			Enabled:     item.Enabled,
+			MinTier:     item.MinTier,
+		})
+	}
+	if err := h.lotteryService.AdminUpdatePrizeWeights(c.Request.Context(), activityID, updates); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -229,6 +281,48 @@ func (h *AdminLotteryHandler) AdminSetSpendOffset(c *gin.Context) {
 	response.Success(c, gin.H{"updated": true})
 }
 
+// AdminApproveDraw POST /admin/lottery/draws/:id/approve
+// 管理员审核通过中奖发放: 原子调整余额并标记 granted。
+func (h *AdminLotteryHandler) AdminApproveDraw(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		response.BadRequest(c, "Invalid draw id")
+		return
+	}
+	record, err := h.lotteryService.AdminApproveDraw(c.Request.Context(), id)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"draw": dto.LotteryDrawFromService(record)})
+}
+
+// AdminRejectDrawRequest POST /admin/lottery/draws/:id/reject 请求体。
+type AdminRejectDrawRequest struct {
+	Reason *string `json:"reason"`
+}
+
+// AdminRejectDraw POST /admin/lottery/draws/:id/reject
+// 管理员驳回中奖发放: 标记 rejected 并记录驳回理由。
+func (h *AdminLotteryHandler) AdminRejectDraw(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		response.BadRequest(c, "Invalid draw id")
+		return
+	}
+	var req AdminRejectDrawRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	record, err := h.lotteryService.AdminRejectDraw(c.Request.Context(), id, req.Reason)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"draw": dto.LotteryDrawFromService(record)})
+}
+
 // AdminRetryFulfillment POST /admin/lottery/draws/:id/retry-fulfillment
 // 重试失败/待处理的奖品发放。
 func (h *AdminLotteryHandler) AdminRetryFulfillment(c *gin.Context) {
@@ -238,6 +332,22 @@ func (h *AdminLotteryHandler) AdminRetryFulfillment(c *gin.Context) {
 		return
 	}
 	record, err := h.lotteryService.AdminRetryFulfillment(c.Request.Context(), id)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"draw": dto.LotteryDrawFromService(record)})
+}
+
+// AdminReverseGrant POST /admin/lottery/draws/:id/reverse-grant
+// 管理员撤回已发放的余额奖励(用户无任何通知变动)。
+func (h *AdminLotteryHandler) AdminReverseGrant(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		response.BadRequest(c, "Invalid draw id")
+		return
+	}
+	record, err := h.lotteryService.AdminReverseGrant(c.Request.Context(), id)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

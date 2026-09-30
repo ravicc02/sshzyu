@@ -1103,6 +1103,8 @@ var (
 		{Name: "name", Type: field.TypeString, Size: 100},
 		{Name: "status", Type: field.TypeString, Size: 20, Default: "draft"},
 		{Name: "rules_version", Type: field.TypeInt, Default: 1},
+		{Name: "tier_mode", Type: field.TypeString, Size: 20, Default: "fixed"},
+		{Name: "tier_thresholds", Type: field.TypeJSON, Nullable: true},
 		{Name: "starts_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "ends_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},

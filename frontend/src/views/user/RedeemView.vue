@@ -304,7 +304,7 @@
                   {{ formatHistoryValue(item) }}
                 </p>
                 <p
-                  v-if="!isAdminAdjustment(item.type)"
+                  v-if="!isAdminAdjustment(item.type) && !isLotteryHistoryType(item.type)"
                   class="font-mono text-xs text-gray-400 dark:text-dark-500"
                 >
                   {{ item.code.slice(0, 8) }}...
@@ -379,7 +379,11 @@ const contactInfo = ref('')
 
 // Helper functions for history display
 const isBalanceType = (type: string) => {
-  return type === 'balance' || type === 'admin_balance'
+  return type === 'balance' || type === 'admin_balance' || type === 'lottery_win' || type === 'lottery_reject'
+}
+
+const isLotteryHistoryType = (type: string) => {
+  return type === 'lottery_win' || type === 'lottery_reject'
 }
 
 const isSubscriptionType = (type: string) => {
@@ -395,6 +399,10 @@ const getHistoryItemTitle = (item: RedeemHistoryItem) => {
     return t('redeem.balanceAddedRedeem')
   } else if (item.type === 'admin_balance') {
     return item.value >= 0 ? t('redeem.balanceAddedAdmin') : t('redeem.balanceDeductedAdmin')
+  } else if (item.type === 'lottery_win') {
+    return t('redeem.lotteryWin')
+  } else if (item.type === 'lottery_reject') {
+    return t('redeem.lotteryReject')
   } else if (item.type === 'concurrency') {
     return t('redeem.concurrencyAddedRedeem')
   } else if (item.type === 'admin_concurrency') {
@@ -406,6 +414,9 @@ const getHistoryItemTitle = (item: RedeemHistoryItem) => {
 }
 
 const formatHistoryValue = (item: RedeemHistoryItem) => {
+  if (item.type === 'lottery_reject') {
+    return t('redeem.lotteryRejectNoBalanceChange')
+  }
   if (isBalanceType(item.type)) {
     const sign = item.value >= 0 ? '+' : ''
     return `${sign}$${item.value.toFixed(2)}`
