@@ -1,0 +1,11 @@
+{
+  "upstream_repository": "Wei-Shaw/sub2api",
+  "upstream_release": "v0.2.11",
+  "upstream_commit": "96f4c115c9749078f90cbf210a01d39baf3f53b6",
+  "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.11",
+  "local_build_version": "0.2.11-r6",
+  "integration_commit": "a7913dd896338d9f56562c93fba86ab766a41d11",
+  "integrated_at": "2026-09-30",
+  "verified_at": "2026-10-01",
+  "note": "集成提交声明合并了 v0.2.11；记录标签来源，不表示已完成线上迁移或部署验收。"
+}

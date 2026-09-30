@@ -26,5 +26,10 @@ Thumbs.db
 # ---- 构建中间产物（Docker 多阶段构建自行编译，不入库） ----
 backend/internal/web/dist/
 
+# ---- 临时代理工作树和 Python 缓存（不入版本库） ----
+.claude/worktrees/
+__pycache__/
+*.py[cod]
+
 # ---- 运营记录（不属于统一仓库版本管理） ----
 records/

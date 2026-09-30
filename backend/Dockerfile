@@ -14,9 +14,14 @@ RUN go mod download
 # 复制源代码
 COPY . .
 
-# 构建应用
-RUN VERSION_VALUE="$(./scripts/resolve-version.sh)" && \
-    go build -ldflags="-s -w -X main.Version=${VERSION_VALUE}" -o main ./cmd/server/
+# 构建应用：正式发布需显式传入与 cmd/server/VERSION 一致的完整本地版本及 Git SHA。
+ARG VERSION=
+ARG COMMIT=unknown
+ARG DATE=unknown
+RUN VERSION_VALUE="${VERSION:-$(./scripts/resolve-version.sh)}" && \
+    test "${VERSION_VALUE}" = "$(sh ./scripts/resolve-version.sh)" && \
+    printf '%s' "${VERSION_VALUE}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-r[1-9][0-9]*$' && \
+    go build -ldflags="-s -w -X main.Version=${VERSION_VALUE} -X main.Commit=${COMMIT} -X main.Date=${DATE}" -o main ./cmd/server/
 
 # 暴露端口
 EXPOSE 8080

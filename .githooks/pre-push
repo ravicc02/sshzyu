@@ -1,0 +1,15 @@
+#!/bin/sh
+# 官方 Release 状态不明或有更新时拒绝向 origin 推送。
+set -eu
+
+ROOT="$(git rev-parse --show-toplevel)"
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON=python3
+elif command -v python >/dev/null 2>&1; then
+  PYTHON=python
+else
+  printf '%s\n' '上游检查结果：未知，缺少 Python 3，拒绝推送。' >&2
+  exit 1
+fi
+
+exec "$PYTHON" "$ROOT/scripts/upstream_release_guard.py" --pre-push "$1" "$2"

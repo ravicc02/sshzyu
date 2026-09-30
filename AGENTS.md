@@ -117,14 +117,19 @@ scp docs/index.html docs/content.md docs/iamge/* root@64.83.2.153:/opt/sshzyu-do
 
 ```bash
 # 1.（可选）更新后端版本号（决定二进制内嵌的 --version / UI 版本标签）
-#    backend/cmd/server/VERSION  →  版本号经 resolve-version.sh 在构建时注入
-#    无 git tag 时回退读该文件。
+#    backend/cmd/server/VERSION 是完整本地构建号（X.Y.Z-rN）。
+#    必须与仓库根 upstream-baseline.json 的 local_build_version 一致。
 
-# 2. 构建后端镜像（在 backend/ 目录，用 backend/Dockerfile 纯 Go 构建）
-cd backend && docker build -t local/sub2api-batch:<tag> .
+# 2. 正式发布镜像（线上纯后端，须显式注入构建版本和提交 SHA）
+VERSION="$(tr -d '\r\n' < backend/cmd/server/VERSION)"
+COMMIT="$(git rev-parse HEAD)"
+DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+python scripts/upstream_release_guard.py --validate-clean-build
+(cd backend && docker build --build-arg VERSION="$VERSION" --build-arg COMMIT="$COMMIT" --build-arg DATE="$DATE" -t "local/sub2api-batch:$VERSION" .)
 
-# 3. 本地验证二进制版本与功能
-docker run --rm local/sub2api-batch:<tag> /app/main --version   # 应报 <tag>
+# 3. 本地验证版本和 Git SHA
+# docker run --rm "local/sub2api-batch:$VERSION" /app/main --version
+# 输出必须含完整本地版本号及预期提交 SHA；推送/部署之前还须核对业务测试和线上变更流程。
 
 # 4. 导出镜像 tar（若服务器无法直接访问本地 Docker）
 docker save local/sub2api-batch:<tag> | gzip -6 > /tmp/sub2api-<tag>.tar.gz
@@ -143,7 +148,8 @@ cd /opt/sub2api-deploy && docker compose up -d --no-build --force-recreate sub2a
 ssh us-server 'docker exec sub2api /app/main --version && curl -s http://127.0.0.1:8080/health'
 ```
 
-> **版本号规则**：`resolve-version.sh`（`backend/scripts/`）优先取精确 git tag（`v*`），否则读 `cmd/server/VERSION`。改后端版本 = 改该文件或打 tag。
+> **版本号规则**：本地定制版完整版本号由 `backend/cmd/server/VERSION` 决定，格式为 `X.Y.Z-rN`；`resolve-version.sh` 不再从本地/官方 tag 自动推断。`upstream-baseline.json` 必须与版本文件及官方稳定 Release/tag/commit 对齐。根 Dockerfile 是本地内嵌前端镜像入口；`backend/Dockerfile` 是线上纯后端入口。正式发布构建均需显式注入 VERSION、COMMIT，并核验镜像 tag 与二进制输出。
+> **推送门禁**：每次向 `origin` 推送前运行 `python scripts/upstream_release_guard.py`，在当前机器执行一次 `git config core.hooksPath .githooks` 启用自动 `pre-push`。守卫读取待推送提交中的基线、核对官方最新稳定 Release 及 tag SHA；上游状态未知或有新版本时阻止 push 并向用户汇报，未经确认不得自动合并。钩子是本机机制，可被跳过；团队级强制保护仍需服务端分支保护/必需 CI。完整三方增量合并、migration 和部署边界见 `plan_docs/official-upstream-versioning-workflow.md`。
 > **回滚**：compose 改回旧 tag → `docker compose up -d --force-recreate`。
 
 ---
