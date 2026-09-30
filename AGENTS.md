@@ -30,8 +30,7 @@
 
 本工作区只服务一台服务器：**us-server**（`64.83.2.153`，hostname `RainYun-LFS4goAS`）。
 
-- SSH 别名：`us-server`（本机 `~/.ssh/config` 已配，免密登录）。
-- 连接：`ssh us-server`。
+- **SSH 连接：使用你本地的 SSH 配置**。本仓库为多人协作，主机别名（`us-server`）、密钥等连接凭据由各人按自己本机 `~/.ssh/config` 维护，本文件不写死具体的密钥路径或本机专属配置。
 - 服务器上**没有源码、没有 git 仓库**，sub2api 使用本地构建镜像 + `docker save/load` 部署。
 
 > ❌ **边界声明**：其它任何服务器（尤其 `Ravi-server` `199.68.217.212`）不在本工作区职责范围，不对其做任何操作。
@@ -130,8 +129,8 @@ docker run --rm local/sub2api-batch:<tag> /app/main --version   # 应报 <tag>
 # 4. 导出镜像 tar（若服务器无法直接访问本地 Docker）
 docker save local/sub2api-batch:<tag> | gzip -6 > /tmp/sub2api-<tag>.tar.gz
 
-# 5. 上传（WSL 内含 rsync，比 scp 快）
-wsl.exe -d Ubuntu bash -l -c 'rsync -e "ssh -i ~/.ssh/new-server_ed25519 -o StrictHostKeyChecking=no" -avP /mnt/c/Users/ASUS/AppData/Local/Temp/deploy/sub2api-<tag>.tar.gz root@64.83.2.153:/tmp/'
+# 5. 上传（用你本地的 scp/rsync，连接方式按本机 SSH 配置）
+scp /tmp/sub2api-<tag>.tar.gz root@64.83.2.153:/tmp/
 
 # 6. 服务器：加载镜像 + 更新 compose tag + 重建容器
 ssh us-server '
@@ -196,7 +195,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/health
 ### 🔒 安全红线
 
 - **绝不把** sub2api 的 `.env`、`config.yaml`、凭证文件内容**打印到对话或写进工作区文件**；只引用路径，用值时在服务器上看。
-- 私钥 `new-server_ed25519` 泄漏 = 服务器失守，本机私钥只读权限不得放宽。
+- SSH 私钥泄漏 = 服务器失守；各人保护好自己本地的 SSH 私钥，只读权限不得放宽。
 - 命令输出含敏感值先脱敏再展示。
 
 ---
@@ -204,7 +203,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/health
 ## 6. 常用速查
 
 ```bash
-# 进服务器
+# 进服务器（us-server 别名在你的本地 SSH 配置中定义）
 ssh us-server
 
 # sub2api 后端
