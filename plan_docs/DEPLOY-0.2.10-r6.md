@@ -1,5 +1,7 @@
 # 线上部署文档 · sub2api 0.2.10-r6（官方 v0.2.10 + 本地定制）
 
+> **历史归档，禁止按本文直接部署当前版本。** 本文记录当时的 `0.2.10-r6` 迁移前提及步骤，不适用于当前 `0.2.11-r6`；迁移记录、版本身份和线上状态须按当前方案重新核实。本文不是部署授权。
+
 > 目标服务器：**us-server**（`64.83.2.153`）
 > 交付物：后端镜像 `local/sub2api-batch:0.2.10-r6` + 前端 UI
 > 说明：本文档是把「本地已合并并验证通过（本地 docker 栈 + 全量 293 个 migration 全新迁移成功）」的版本，部署到线上 us-server 的完整操作手册。**支持无损升级（不丢线上数据）。**
@@ -87,7 +89,8 @@ ssh us-server 'docker exec sub2api-postgres psql -U sub2api -d sub2api -c "SELEC
 
 ```bash
 cd /f/中转站运营/sshzy/backend
-docker build -t local/sub2api-batch:0.2.10-r6 .
+# 归档示例（不应照此构建当前版本）：正式构建须按当前 AGENTS.md 提供 VERSION、COMMIT、DATE，并先校验洁净输入。
+# docker build -t local/sub2api-batch:0.2.10-r6 .  # 历史命令；当前 Dockerfile 会拒绝缺失身份参数的正式构建
 # 验证版本注入（走 resolve-version.sh 读 cmd/server/VERSION = 0.2.10-r6）
 docker run --rm local/sub2api-batch:0.2.10-r6 /app/main --version   # 应报 Sub2API 0.2.10-r6
 ```
@@ -99,7 +102,8 @@ cd /f/中转站运营/sshzy
 docker save local/sub2api-batch:0.2.10-r6 | gzip -6 > /tmp/sub2api-0.2.10-r6.tar.gz
 
 # 上传（WSL 内含 rsync；服务器无法访问本地 docker registry）
-wsl.exe -d Ubuntu bash -l -c 'rsync -e "ssh -i ~/.ssh/new-server_ed25519 -o StrictHostKeyChecking=no" -avP /mnt/c/Users/ASUS/AppData/Local/Temp/deploy/sub2api-0.2.10-r6.tar.gz root@64.83.2.153:/tmp/'
+# 历史上传示例已停用：必须使用经本机 SSH 配置校验的 us-server 主机身份，不得关闭 StrictHostKeyChecking。
+# rsync -e ssh -avP /tmp/sub2api-0.2.10-r6.tar.gz us-server:/tmp/
 # 若无 rsync，用 scp
 # scp /tmp/sub2api-0.2.10-r6.tar.gz root@64.83.2.153:/tmp/
 
