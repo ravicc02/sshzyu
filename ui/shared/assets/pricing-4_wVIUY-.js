@@ -1,0 +1,1 @@
+function o(n,l,t=0){if(n==null)return"-";let e=(n*l).toPrecision(10).replace(/\.?0+$/,"");if(t>0&&!e.includes("e")){const f=e.indexOf("."),r=f===-1?0:e.length-f-1;r<t&&(e=(f===-1?`${e}.`:e)+"0".repeat(t-r))}return`$${e}`}export{o as f};

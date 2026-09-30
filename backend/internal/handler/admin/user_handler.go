@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/handler/quotaview"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -123,8 +122,6 @@ type BindUserAuthIdentityChannelRequest struct {
 //   - attr[{id}]: filter by custom attribute value, e.g. attr[1]=company
 //   - group_name: fuzzy filter by allowed group name
 //   - api_key_group_id: filter by the exact group bound to the user's API keys
-//   - api_key_provider: filter by provider bucket of the platform of the group
-//     bound to the user's API keys (anthropic/openai/domestic/other)
 func (h *UserHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
 
@@ -145,15 +142,6 @@ func (h *UserHandler) List(c *gin.Context) {
 	if raw := strings.TrimSpace(c.Query("api_key_group_id")); raw != "" {
 		if id, parseErr := strconv.ParseInt(raw, 10, 64); parseErr == nil && id > 0 {
 			filters.APIKeyGroupID = id
-		}
-	}
-	// api_key_provider: provider bucket of the platform of the group bound to the
-	// user's API keys (anthropic/openai/domestic/other). Unknown values are
-	// ignored (no filter) to keep the endpoint tolerant, consistent with
-	// api_key_group_id ignoring non-numeric input.
-	if raw := strings.TrimSpace(c.Query("api_key_provider")); raw != "" {
-		if _, _, ok := domain.KeyGroupProviderPlatforms(raw); ok {
-			filters.APIKeyProvider = raw
 		}
 	}
 	sortBy := c.DefaultQuery("sort_by", "created_at")

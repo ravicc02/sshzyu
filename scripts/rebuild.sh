@@ -24,6 +24,9 @@ echo "== 4/4 装配到 ui/ =="
 mkdir -p "$ROOT/ui/current/assets" "$ROOT/ui/shared/assets"
 cp "$DIST/index.html" "$DIST/logo.svg" "$ROOT/ui/current/"
 cp "$DIST/assets/"* "$ROOT/ui/current/assets/"
+# fw-cachebust.js 使用固定文件名，但 Nginx 从 shared/assets 提供它；必须每次覆盖，
+# 否则入口仍会加载上一版 immutable chunk，导致新页面逻辑或 i18n 未生效。
+cp "$DIST/assets/fw-cachebust.js" "$ROOT/ui/shared/assets/fw-cachebust.js"
 # shared 累积所有版本（保持与线上部署的版本命名习惯一致）
 for f in "$DIST/assets/"*; do
   name="$(basename "$f")"

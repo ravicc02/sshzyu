@@ -247,7 +247,7 @@ func (r *lotteryRepository) EnsureDefaultActivity(ctx context.Context) (*service
 		sort        int
 	}
 	// 阶梯: 0 青铜(<$5) / 1 白银(>=$5) / 2 黄金(>=$15) / 3 钻石(>=$25) / 4 王者(>=$35)。
-	// 与 migrations/240_lottery_tier.sql 的 seed 配置保持一致。
+	// 与 migrations/243_lottery_tier.sql 的 seed 配置保持一致。
 	seeds := []prizeSeed{
 		{"谢谢参与", service.LotteryPrizeTypeNone, 0, 70, 0, map[string]int{"0": 70, "1": 50, "2": 30, "3": 15, "4": 5}, -1, 1},
 		{"$0.1 余额", service.LotteryPrizeTypeBalanceBonus, 0.1, 25, 0, map[string]int{"0": 25, "1": 20, "2": 10, "3": 0, "4": 0}, 100, 2},

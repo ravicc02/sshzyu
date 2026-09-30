@@ -9,6 +9,18 @@ const SITE = path.resolve(fileURLToPath(new URL('../ui/shared/assets', import.me
 const curFiles = new Set(fs.readdirSync(CUR));
 const siteFiles = fs.readdirSync(SITE).filter((f) => f.endsWith('.js'));
 
+// 固定文件名的 fw-cachebust.js 由 Nginx 从 shared/assets 服务。
+// 它必须与 current 构建产物完全一致，否则 index.html 会加载错误的入口 chunk。
+const currentCacheBust = path.join(CUR, 'fw-cachebust.js');
+const sharedCacheBust = path.join(SITE, 'fw-cachebust.js');
+if (!fs.existsSync(currentCacheBust) || !fs.existsSync(sharedCacheBust)) {
+  throw new Error('fw-cachebust.js 缺失于 current/assets 或 shared/assets');
+}
+if (fs.readFileSync(currentCacheBust, 'utf8') !== fs.readFileSync(sharedCacheBust, 'utf8')) {
+  throw new Error('fw-cachebust.js 与 current 构建产物不一致');
+}
+console.log('fw-cachebust.js: current/shared 一致');
+
 let refs = 0, missing = [], missingInCurrent = 0;
 const re = /["']\.\/([A-Za-z0-9_.\-]+\.(?:js|css|svg|png|woff2?))["']/g;
 

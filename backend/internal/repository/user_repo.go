@@ -20,7 +20,6 @@ import (
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
-	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
@@ -565,26 +564,6 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 			apikey.GroupIDEQ(filters.APIKeyGroupID),
 			apikey.DeletedAtIsNil(),
 		))
-	}
-
-	if filters.APIKeyProvider != "" {
-		// 按"API Key 绑定分组的平台所属厂商桶"过滤（EXISTS 语义，软删除处理同上）。
-		// 与 APIKeyGroupID 一致：只排除软删除的 key，不限制分组状态——分组下线
-		// （disabled/软删）不影响"用户绑过该厂商渠道"这一事实，管理员仍能筛到他们。
-		// "other" 用排除法定义：平台不在任何显式厂商桶中即视为 other，
-		// 与前端 keyGroupProviders.ts 的 fallback 行为保持一致。
-		if include, excludeAllKnown, ok := domain.KeyGroupProviderPlatforms(filters.APIKeyProvider); ok {
-			keyPreds := []predicate.APIKey{apikey.DeletedAtIsNil()}
-			switch {
-			case len(include) > 0:
-				keyPreds = append(keyPreds, apikey.HasGroupWith(dbgroup.PlatformIn(include...)))
-			case excludeAllKnown:
-				keyPreds = append(keyPreds, apikey.HasGroupWith(
-					dbgroup.Not(dbgroup.PlatformIn(domain.KeyGroupProviderExcludePlatforms()...)),
-				))
-			}
-			q = q.Where(dbuser.HasAPIKeysWith(keyPreds...))
-		}
 	}
 
 	// If attribute filters are specified, we need to filter by user IDs first

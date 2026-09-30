@@ -126,16 +126,6 @@ func RegisterUserRoutes(
 			redeem.GET("/history", h.Redeem.GetHistory)
 		}
 
-		// 抽奖(个人中心活动入口)
-		lottery := authenticated.Group("/lottery")
-		{
-			lottery.GET("/activity", h.Lottery.GetActivity)
-			lottery.GET("/status", h.Lottery.GetStatus)
-			lottery.POST("/draw", h.Lottery.Draw)
-			lottery.GET("/records", h.Lottery.GetRecords)
-			lottery.GET("/rewards", h.Lottery.GetRewards)
-		}
-
 		// 用户订阅
 		subscriptions := authenticated.Group("/subscriptions")
 		{
@@ -143,6 +133,16 @@ func RegisterUserRoutes(
 			subscriptions.GET("/active", h.Subscription.GetActive)
 			subscriptions.GET("/progress", h.Subscription.GetProgress)
 			subscriptions.GET("/summary", h.Subscription.GetSummary)
+		}
+
+		// 用户抽奖
+		lottery := authenticated.Group("/lottery")
+		{
+			lottery.GET("/activity", h.Lottery.GetActivity)
+			lottery.GET("/status", h.Lottery.GetStatus)
+			lottery.POST("/draw", h.Lottery.Draw)
+			lottery.GET("/records", h.Lottery.GetRecords)
+			lottery.GET("/rewards", h.Lottery.GetRewards)
 		}
 
 		// 渠道监控（用户只读）

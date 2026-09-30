@@ -368,6 +368,9 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 		accounts.GET("/ollama-cloud-usage/settings", h.Admin.Account.GetOllamaCloudUsageSettings)
 		accounts.PUT("/ollama-cloud-usage/settings", h.Admin.Account.UpdateOllamaCloudUsageSettings)
 		accounts.GET("/:id", h.Admin.Account.GetByID)
+		accounts.GET("/:id/claude/reset-credits", h.Admin.Account.ClaudeResetCredits)
+		// Same protection as the Codex reset-quota route (admin auth, audit, compliance guard).
+		accounts.POST("/:id/claude/reset-credits/redeem", h.Admin.Account.RedeemClaudeResetCredit)
 		accounts.POST("", h.Admin.Account.Create)
 		accounts.POST("/:id/duplicate", h.Admin.Account.Duplicate)
 		accounts.POST("/check-mixed-channel", h.Admin.Account.CheckMixedChannel)
@@ -574,6 +577,7 @@ func registerLotteryRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		lottery.POST("/draws/:id/reverse-grant", h.Admin.Lottery.AdminReverseGrant)
 		lottery.POST("/users/:id/adjust", h.Admin.Lottery.AdminAdjustDraws)
 		lottery.POST("/users/:id/spend-offset", h.Admin.Lottery.AdminSetSpendOffset)
+		lottery.POST("/users/:id/reset", h.Admin.Lottery.AdminResetUser)
 	}
 }
 
