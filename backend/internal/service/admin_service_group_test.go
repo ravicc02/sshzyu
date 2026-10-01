@@ -611,33 +611,58 @@ func TestAdminService_CreateGroup_PreservesNonGrokImageGenerationDisabled(t *tes
 }
 
 func TestAdminService_CreateGroup_DisablesBatchImageWhenImageGenerationDisabled(t *testing.T) {
-	repo := &groupRepoStubForAdmin{}
-	svc := &adminServiceImpl{groupRepo: repo}
+	for _, platform := range []string{PlatformGemini, PlatformOpenAI} {
+		t.Run(platform, func(t *testing.T) {
+			repo := &groupRepoStubForAdmin{}
+			svc := &adminServiceImpl{groupRepo: repo}
 
-	group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
-		Name:                      "gemini-no-image",
-		Description:               "Gemini group without image generation",
-		Platform:                  PlatformGemini,
-		RateMultiplier:            1.0,
-		AllowImageGeneration:      false,
-		AllowBatchImageGeneration: true,
-	})
-	require.NoError(t, err)
-	require.NotNil(t, group)
-	require.NotNil(t, repo.created)
-	require.False(t, repo.created.AllowImageGeneration)
-	require.False(t, repo.created.AllowBatchImageGeneration)
-	require.False(t, group.AllowBatchImageGeneration)
+			group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
+				Name:                      "no-image",
+				Platform:                  platform,
+				RateMultiplier:            1.0,
+				AllowImageGeneration:      false,
+				AllowBatchImageGeneration: true,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, group)
+			require.NotNil(t, repo.created)
+			require.False(t, repo.created.AllowImageGeneration)
+			require.False(t, repo.created.AllowBatchImageGeneration)
+			require.False(t, group.AllowBatchImageGeneration)
+		})
+	}
 }
 
-func TestAdminService_CreateGroup_DisablesBatchImageForNonGeminiPlatform(t *testing.T) {
+func TestAdminService_CreateGroup_PreservesBatchImageForSupportedPlatforms(t *testing.T) {
+	for _, platform := range []string{PlatformGemini, PlatformOpenAI} {
+		t.Run(platform, func(t *testing.T) {
+			repo := &groupRepoStubForAdmin{}
+			svc := &adminServiceImpl{groupRepo: repo}
+
+			group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
+				Name:                      "image-group",
+				Platform:                  platform,
+				RateMultiplier:            1.0,
+				AllowImageGeneration:      true,
+				AllowBatchImageGeneration: true,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, group)
+			require.NotNil(t, repo.created)
+			require.True(t, repo.created.AllowImageGeneration)
+			require.True(t, repo.created.AllowBatchImageGeneration)
+			require.True(t, group.AllowBatchImageGeneration)
+		})
+	}
+}
+
+func TestAdminService_CreateGroup_DisablesBatchImageForUnsupportedPlatform(t *testing.T) {
 	repo := &groupRepoStubForAdmin{}
 	svc := &adminServiceImpl{groupRepo: repo}
 
 	group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
-		Name:                      "openai-image",
-		Description:               "OpenAI image group",
-		Platform:                  PlatformOpenAI,
+		Name:                      "anthropic-image",
+		Platform:                  PlatformAnthropic,
 		RateMultiplier:            1.0,
 		AllowImageGeneration:      true,
 		AllowBatchImageGeneration: true,
@@ -840,7 +865,7 @@ func TestAdminService_UpdateGroup_DisablesBatchImageWhenImageGenerationDisabled(
 	require.False(t, group.AllowBatchImageGeneration)
 }
 
-func TestAdminService_UpdateGroup_DisablesBatchImageWhenPlatformChangesFromGemini(t *testing.T) {
+func TestAdminService_UpdateGroup_PreservesBatchImageWhenPlatformChangesToOpenAI(t *testing.T) {
 	existingGroup := &Group{
 		ID:                        1,
 		Name:                      "existing-gemini",
@@ -859,6 +884,29 @@ func TestAdminService_UpdateGroup_DisablesBatchImageWhenPlatformChangesFromGemin
 	require.NotNil(t, group)
 	require.NotNil(t, repo.updated)
 	require.Equal(t, PlatformOpenAI, repo.updated.Platform)
+	require.True(t, repo.updated.AllowBatchImageGeneration)
+	require.True(t, group.AllowBatchImageGeneration)
+}
+
+func TestAdminService_UpdateGroup_DisablesBatchImageForUnsupportedPlatform(t *testing.T) {
+	existingGroup := &Group{
+		ID:                        1,
+		Name:                      "existing-openai",
+		Platform:                  PlatformOpenAI,
+		Status:                    StatusActive,
+		AllowImageGeneration:      true,
+		AllowBatchImageGeneration: true,
+	}
+	repo := &groupRepoStubForAdmin{getByID: existingGroup}
+	svc := &adminServiceImpl{groupRepo: repo}
+
+	group, err := svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{
+		Platform: PlatformAnthropic,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, group)
+	require.NotNil(t, repo.updated)
+	require.Equal(t, PlatformAnthropic, repo.updated.Platform)
 	require.False(t, repo.updated.AllowBatchImageGeneration)
 	require.False(t, group.AllowBatchImageGeneration)
 }
