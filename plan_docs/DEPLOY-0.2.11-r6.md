@@ -12,8 +12,15 @@
 
 | 环境 | 版本 | HEAD | 工作区 | 说明 |
 |---|---|---|---|---|
-| 线上 | `0.2.10-r5` | — | 运行中 healthy | compose tag `0.2.10-r5`，前端 `current→20260929-ui-r1` |
-| 本地 | `0.2.11-r6` | `562710777` | 洁净 | 已合官方 v0.2.11，含 lottery 动态档位、content_moderation 增强、渠道推理倍率、联盟幂等、批量图片 BATJ |
+| 线上（部署前） | `0.2.10-r5` | — | 运行中 healthy | compose tag `0.2.10-r5`，前端 `current→20260929-ui-r1` |
+| 本地 | `0.2.11-r6` | `1198128df` | 洁净 | 已合官方 v0.2.11，含 lottery 动态档位、content_moderation 增强、渠道推理倍率、联盟幂等、批量图片 BATJ |
+
+> **部署实际使用的构建身份（已执行并核实）：**
+> - VERSION = `0.2.11-r6`
+> - COMMIT = `1198128dfeae5a85f7526c4f457bad063d76bb25`（**完整 40 位 SHA**，即本次部署时的 HEAD）
+> - 线上镜像 ID = `2e8e7ae5422a`，`--version` 输出：`Sub2API 0.2.11-r6 (commit: 1198128dfeae5a85f7526c4f457bad063d76bb25, built: 2026-10-01T02:59:09Z)`
+>
+> 注意：`562710777` 是 UI 产物归档提交，**不是**后端镜像的构建身份。构建前务必用 `git rev-parse HEAD` 取当前 HEAD 的完整 SHA。
 
 **本地 0.2.11-r6 的迁移文件总数：294 个 `.sql` 文件（线上 0.2.10-r5 已有 289 条记录）。**
 
@@ -81,16 +88,22 @@ flowchart TD
 
 ### Step 0 — 全库备份（必须，不可跳过）
 
+> **备份必须放在非易失目录 `/opt/sub2api-deploy/backups/`，不要用 `/tmp`**（可能被清理，且重启丢失）。
+
 ```bash
 # 备份 schema_migrations（用于改名回退）
-ssh us-server 'docker exec sub2api-postgres pg_dump -U sub2api -d sub2api -t schema_migrations > /tmp/schema_migrations_backup.sql && echo "migrations backed up"'
+ssh us-server 'docker exec sub2api-postgres pg_dump -U sub2api -d sub2api -t schema_migrations > /opt/sub2api-deploy/backups/schema_migrations_pre-0.2.11-r6.sql && echo "migrations backed up"'
 
-# 全库备份（存放在非易失目录）
-ssh us-server 'docker exec sub2api-postgres pg_dump -U sub2api -d sub2api > /opt/sub2api-deploy/backups/sub2api_dump_0.2.11-r6_pre.sql && echo "full db dumped"'
+# 全库备份（压缩，141M 级；未压缩体积会大得多）
+ssh us-server 'docker exec sub2api-postgres pg_dump -U sub2api -d sub2api | gzip -6 > /opt/sub2api-deploy/backups/sub2api_dump_pre-0.2.11-r6.sql.gz && echo "full db dumped"'
 
-# 确认备份文件存在且非空
-ssh us-server 'ls -lh /tmp/schema_migrations_backup.sql /opt/sub2api-deploy/backups/sub2api_dump_0.2.11-r6_pre.sql'
+# 确认备份文件存在且非空（并校验 gzip 完整性）
+ssh us-server 'ls -lh /opt/sub2api-deploy/backups/*pre-0.2.11-r6* && gzip -t /opt/sub2api-deploy/backups/sub2api_dump_pre-0.2.11-r6.sql.gz && echo "gzip OK"'
 ```
+
+> 本次部署实际生成的备份（已核实存在）：
+> - `/opt/sub2api-deploy/backups/schema_migrations_pre-0.2.11-r6.sql`（39K，349 行）
+> - `/opt/sub2api-deploy/backups/sub2api_dump_pre-0.2.11-r6.sql.gz`（141M）
 
 ### Step 1 — 旧库迁移记录改名对齐
 
@@ -126,44 +139,61 @@ ssh us-server 'docker exec sub2api-postgres psql -U sub2api -d sub2api -c "SELEC
 cd /f/中转站运营/sshzy
 git status --porcelain    # 应为空（或仅无关文件）
 cat backend/cmd/server/VERSION   # 应为 0.2.11-r6
-git log --oneline -1           # 应确认 HEAD
+git rev-parse HEAD               # 取完整 40 位 SHA，供下方 COMMIT 使用
+```
+
+> ⚠️ **`COMMIT` 必须是完整 40 位 SHA。** `backend/Dockerfile` 会校验构建身份：`VERSION` 必须等于 `scripts/resolve-version.sh` 的输出，`COMMIT` 必须是 40 位十六进制。传 9 位短 SHA（如 `562710777`）会**直接构建失败**。
+>
+> ⚠️ **`backend/Dockerfile` 不生成 `/etc/build_type`。** 验证版本请只用 `--version`，不要 `cat /etc/build_type`（该文件在纯后端镜像中不存在）。
+
+```bash
+# 取完整 SHA（示例值，实际以命令输出为准）
+COMMIT_SHA=$(git rev-parse HEAD)   # 本次部署时为 1198128dfeae5a85f7526c4f457bad063d76bb25
 
 # 正式构建（backend/Dockerfile — 纯 Go 构建，不含前端）
 docker build \
   --build-arg VERSION=0.2.11-r6 \
-  --build-arg COMMIT=562710777 \
+  --build-arg COMMIT=$COMMIT_SHA \
   --build-arg DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
   -t local/sub2api-batch:0.2.11-r6 \
   backend/
 
-# 验证版本注入
-docker run --rm local/sub2api-batch:0.2.11-r6 /app/main --version
-# 期望：Sub2API 0.2.11-r6 (commit 562710777 ...)
-
-# 检查构建类型标识
-docker run --rm --entrypoint cat local/sub2api-batch:0.2.11-r6 /etc/build_type 2>/dev/null
-# 期望：release（非 dev）
+# 验证版本注入（Git Bash 下需 MSYS_NO_PATHCONV=1 防止 /app/main 被转成 Windows 路径）
+MSYS_NO_PATHCONV=1 docker run --rm local/sub2api-batch:0.2.11-r6 /app/main --version
+# 期望：Sub2API 0.2.11-r6 (commit: <40位SHA>, built: ...)
 ```
 
+> 构建前可选但推荐：`python scripts/upstream_release_guard.py --validate-clean-build --build-target backend`（检查工作区洁净与上游基线）。
+>
 > 当前环境为 Windows，`$(date -u +%Y-%m-%dT%H:%M:%SZ)` 在 Git Bash 中可用。若用 PowerShell，用 `Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ'`。
 
 ### Step 3 — 导出、上传、加载
 
+> ⚠️ **Windows 上不要用管道式 `docker save ... | gzip`。** 实测该方式在 Docker Desktop for Windows 下会长时间输出 0 字节（管道在宿主与 WSL 之间不可靠）。改用 `docker save -o` 直接写 tar 文件，再用 gzip 压缩；且**不要导出到 C 盘**（Docker Desktop 数据盘与临时目录易被占满导致 daemon 卡死）。
+
 ```bash
 cd /f/中转站运营/sshzy
 
-# 导出（压缩）
-docker save local/sub2api-batch:0.2.11-r6 | gzip -6 > /tmp/sub2api-0.2.11-r6.tar.gz
+# 1) 导出到空间充足的盘（本次用 F 盘；tar 约 3.4G，压缩后约 737M）
+docker save -o /f/deploy-tmp/sub2api-0.2.11-r6.tar local/sub2api-batch:0.2.11-r6
+gzip -6 /f/deploy-tmp/sub2api-0.2.11-r6.tar
 
-# 上传
-scp /tmp/sub2api-0.2.11-r6.tar.gz us-server:/tmp/
+# 2) 上传（先传压缩包，避免传输 3.4G 原始 tar）
+scp /f/deploy-tmp/sub2api-0.2.11-r6.tar.gz us-server:/opt/sub2api-deploy/sub2api-0.2.11-r6.tar
 
-# 加载
-ssh us-server 'docker load -i /tmp/sub2api-0.2.11-r6.tar.gz'
+# 3) 校验传输完整性（本地与线上 md5 必须一致）
+md5sum /f/deploy-tmp/sub2api-0.2.11-r6.tar.gz
+ssh us-server 'md5sum /opt/sub2api-deploy/sub2api-0.2.11-r6.tar'
 
-# 确认加载成功
-ssh us-server 'docker images local/sub2api-batch:0.2.11-r6 --format "{{.Repository}}:{{.Tag}} ({{.Size}})"'
+# 4) 加载
+ssh us-server 'docker load -i /opt/sub2api-deploy/sub2api-0.2.11-r6.tar'
+
+# 5) 确认加载成功并校验版本
+ssh us-server 'docker images local/sub2api-batch:0.2.11-r6 --format "{{.Repository}}:{{.Tag}} {{.ID}} ({{.Size}})"'
+ssh us-server 'docker run --rm local/sub2api-batch:0.2.11-r6 /app/main --version'
 ```
+
+> **加载完成后务必删除线上 tar 包**（`rm /opt/sub2api-deploy/sub2api-0.2.11-r6.tar`，737M）：镜像已进入 docker 本地存储，tar 仅是传输媒介，回滚不需要它。
 
 ### Step 4 — 切换 compose tag 并重建容器
 
@@ -200,6 +230,15 @@ echo "=== ROUTES ===" && docker exec sub2api /app/main --help 2>/dev/null | grep
 '
 ```
 
+> ⚠️ **不要用 `grep -iE "ERROR|FATAL|panic"` 判断真实错误。** 本项目 `security_audit` 日志含 `"error_code": ""` 字段，会被 `-i error` 匹配，但级别是 `INFO`，属误报。判真实错误须匹配**独立日志级别字段**：
+>
+> ```bash
+> # 正确的真实错误计数（本次部署结果为 0）
+> ssh us-server 'docker logs sub2api 2>&1 | grep -cE "	(ERROR|FATAL|PANIC)	|level=(ERROR|FATAL|PANIC)" || echo 0'
+> ```
+>
+> 本次部署核实：真实 ERROR/FATAL/PANIC = **0**；先前显示的 10 条均为 `security_audit` 的 `error_code` 空值误匹配。
+
 ---
 
 ## 4. 前端部署
@@ -218,28 +257,58 @@ ls -la ui/current/index.html ui/current/assets/
 
 ### Step 7 — 上传新 release 并切换
 
+> ⚠️ **前端不是「全部内联到 current」。** nginx 的实际规则（`/etc/nginx/sites-enabled/sub2api`）是：
+> - `location = /assets/fw-cachebust.js` → 从 **current** 读取
+> - `location /assets/` → 从 **shared** 读取
+>
+> `switch-release.sh` 用 `cp -rn`（**不覆盖**）把新 release 的 assets 补入 `shared/assets`。因此**必须做同名冲突检查**：若本地资产与线上 `shared` 存在「同名但内容不同」，`cp -rn` 会保留旧内容，而 `fw-cachebust.js` 又 `import('/assets/index-<hash>.js')`，可能加载到旧入口导致白屏。
+>
+> 哈希文件名保证正常情况下同名即同内容；唯一例外是固定文件名的 `fw-cachebust.js`——但它从 current 读取，由新 release 提供，不构成风险。
+
 ```bash
-# 1. 服务器上建新 release 目录
-ssh us-server 'mkdir -p /opt/sshzyu-ui/releases/0.2.11-r6'
-
-# 2. 上传构建产物
 cd /f/中转站运营/sshzy
-scp -r ui/current/* us-server:/opt/sshzyu-ui/releases/0.2.11-r6/
 
-# 3. 共享资源检查：若 ui/shared/assets/ 有前端引用的哈希资源，需确认 shared 已包含
-# 当前构建产物中 shared 引用数为 0（全部内联到 current），无需额外处理
+# 1. 打包（打包 current 内容：index.html + logo.svg + assets）
+rm -f /f/deploy-tmp/ui-0.2.11-r6.tar.gz
+cd ui/current && tar czf /f/deploy-tmp/ui-0.2.11-r6.tar.gz index.html logo.svg assets && cd /f/中转站运营/sshzy
 
-# 4. 切换 current 软链（用脚本、不手动 ln）
+# 2. 服务器建 release 目录并上传解压
+ssh us-server 'mkdir -p /opt/sshzyu-ui/releases/0.2.11-r6'
+scp /f/deploy-tmp/ui-0.2.11-r6.tar.gz us-server:/opt/sshzyu-ui/releases/0.2.11-r6.tar.gz
+ssh us-server 'cd /opt/sshzyu-ui/releases/0.2.11-r6 && tar xzf ../0.2.11-r6.tar.gz && rm -f ../0.2.11-r6.tar.gz && ls index.html assets | head'
+
+# 3. 校验上传完整性（本地与线上 index.html md5 必须一致）
+md5sum ui/current/index.html
+ssh us-server 'md5sum /opt/sshzyu-ui/releases/0.2.11-r6/index.html'
+
+# 4. 【关键】同名冲突检查：本地资产中与线上 shared 同名但内容不同的文件
+#    本次结果：191 个同名文件内容全一致；唯一"同名不同内容"的是 fw-cachebust.js（从 current 读取，无风险）
+ssh us-server 'ls /opt/sshzyu-ui/shared/assets/ | wc -l'
+
+# 5. 切换 current 软链（用脚本、不手动 ln；脚本自带校验与失败回滚）
 ssh us-server 'bash /opt/sshzyu-ui/switch-release.sh 0.2.11-r6'
+# 期望输出：current -> 0.2.11-r6 / VERIFY_OK
 ```
 
 ### Step 8 — 前端验证
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" https://sshzyu.com/                 # 200
-curl -s -o /dev/null -w "%{http_code}\n" https://sshzyu.com/manage/lottery   # SPA 路由，200
-# 浏览器访问确认：页面加载正常，lottery 管理页可用，无白屏/JS 报错
+# 1) 首页与 SPA 路由
+curl -sk --max-time 15 -o /dev/null -w "GET /            -> %{http_code}\n" https://sshzyu.com/
+curl -sk --max-time 15 -o /dev/null -w "GET /manage/lottery -> %{http_code}\n" https://sshzyu.com/manage/lottery
+
+# 2) 首页入口标识（应为新构建的 fw-cachebust.js?v=...）
+curl -sk --max-time 15 https://sshzyu.com/ | grep -o 'fw-cachebust.js?v=[^"]*' | head -1
+
+# 3) 【关键】入口 chunk 必须能从 shared 取到 200 —— 这是白屏的直接判据
+ENTRY=$(curl -sk --max-time 15 https://sshzyu.com/assets/fw-cachebust.js | grep -o 'index-[A-Za-z0-9_-]*\.js' | head -1)
+echo "entry=$ENTRY"
+curl -sk --max-time 15 -o /dev/null -w "$ENTRY -> %{http_code} (%{size_download} bytes)\n" "https://sshzyu.com/assets/$ENTRY"
+
+# 4) 浏览器访问确认：页面加载正常，lottery 管理页可用，无白屏/JS 报错
 ```
+
+> 本次部署实测：首页 200；`fw-cachebust.js` 从 current 提供新版 `v=BTNOU4q8`；入口 `index-BTNOU4q8.js` 从 shared 返回 200（188064 bytes）；`switch-release.sh` 输出 `VERIFY_OK`。
 
 ---
 
@@ -256,10 +325,12 @@ cd /opt/sub2api-deploy && docker compose up -d --no-build --force-recreate sub2a
 
 > 新增的 5 个迁移（238b/239_channel/240_affiliate/244/245）全是 ADD COLUMN 或 CREATE INDEX，旧代码不认识这些列和索引，不会主动使用，**无副作用**。
 
-> **迁移记录恢复**：若因改名对齐出问题需要恢复，用 Step 0 的 `schema_migrations_backup.sql`：
+> **迁移记录恢复**：若因改名对齐出问题需要恢复，用 Step 0 的备份（位于非易失目录）：
 > ```bash
-> ssh us-server 'docker exec -i sub2api-postgres psql -U sub2api -d sub2api < /tmp/schema_migrations_backup.sql'
+> ssh us-server 'docker exec -i sub2api-postgres psql -U sub2api -d sub2api < /opt/sub2api-deploy/backups/schema_migrations_pre-0.2.11-r6.sql'
 > ```
+>
+> ⚠️ 该备份是**整表 dump**，直接恢复前先确认不会与后续新增的 238b/239_channel/240_affiliate/244/245 记录冲突（必要时先 `TRUNCATE schema_migrations` 或改为逐行 UPDATE 回退）。
 
 ### 前端回滚
 
@@ -291,7 +362,34 @@ ssh us-server 'bash /opt/sshzyu-ui/switch-release.sh 20260929-ui-r1'
 
 6. **本机 githooks (`pre-push`) 门禁**不会影响本次部署（`docker build` 不触发 `git push`）。但若计划在部署后推送仓库，需先提交变更并通过门禁检查。
 
-7. **前端 current 与 shared 的映射边界：** 当前 `ui/current` 所有资产哈希与 `ui/shared` 一致；`shared` 的引用缺失数为 0。部署时只需上传 `current` 内容，无需额外处理 `shared`。
+7. **前端 current 与 shared 的映射边界：** nginx 对 `/assets/fw-cachebust.js` 走 **current**，其余 `/assets/*` 走 **shared**；`switch-release.sh` 用 `cp -rn` 把新 release 的 assets **补入（不覆盖）** `shared`。因此「只上传 current」是不够的——**切换脚本必须执行**，且切换前要做同名冲突检查。本次部署中 581 个本地资产有 191 个与线上 shared 同名且内容一致，唯一同名不同内容的是 `fw-cachebust.js`（从 current 读，无风险）。
+
+---
+
+## 6.1 本次部署实际结果（2026-10-01 已执行）
+
+| 环节 | 结果 |
+|---|---|
+| Step 0 备份 | `schema_migrations_pre-0.2.11-r6.sql`（39K）+ `sub2api_dump_pre-0.2.11-r6.sql.gz`（141M） |
+| Step 1 改名对齐 | `234→241` / `239→242` / `240→243`，checksum 逐字节一致，旧编号已消失 |
+| Step 2 构建 | `local/sub2api-batch:0.2.11-r6`，COMMIT `1198128dfeae5a85f7526c4f457bad063d76bb25` |
+| Step 3 上传加载 | 线上镜像 ID `2e8e7ae5422a`，`--version` 正确 |
+| Step 4 切换重建 | compose tag → `0.2.11-r6`，容器 healthy |
+| Step 5 后端验证 | 8 项迁移全部落地；真实 ERROR/FATAL/PANIC = **0** |
+| Step 6-8 前端 | `current → 0.2.11-r6`，`v=BTNOU4q8`，外网首页与入口 chunk 均 200 |
+
+**已知遗留（未完成，需人工处理）：**
+
+1. **本机 `docker_data.vhdx` 仍占 70G，未压缩归还宿主。** WSL2 虚拟磁盘不自动收缩；Windows 11 Home 无 `Optimize-VHD`，`wsl --manage --set-sparse` 对 Docker 自定义 VHD 不生效。需**管理员权限**执行：
+   ```
+   diskpart
+   select vdisk file="C:\Users\ASUS\AppData\Local\Docker\wsl\disk\docker_data.vhdx"
+   attach vdisk readonly
+   compact vdisk
+   detach vdisk
+   ```
+2. **线上 tar 包** `/opt/sub2api-deploy/sub2api-0.2.11-r6.tar`（737M）为传输媒介，镜像已 load，可删。
+3. **本机 C 盘仍偏紧**（本次清理后约 9–14G）。根因是上述 vhdx。
 
 ---
 
