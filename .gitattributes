@@ -2,6 +2,7 @@
 /.githooks/pre-push text eol=lf
 /backend/scripts/resolve-version.sh text eol=lf
 /backend/migrations/*.sql text eol=lf
+/backend/**/*.go text eol=lf
 /scripts/rebuild.sh text eol=lf
 /backend/migrations/241_batch_image_idempotency_unique.sql text eol=lf
 /backend/migrations/242_lottery.sql text eol=lf
