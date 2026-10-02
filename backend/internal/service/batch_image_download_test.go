@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -125,6 +126,82 @@ func TestBatchImageDownloadService_StreamZip(t *testing.T) {
 		require.Equal(t, "SAFETY_BLOCKED", errorsJSON[0]["code"])
 	})
 
+	t.Run("exports all 150 success items with a configured limit of 500", func(t *testing.T) {
+		svc, repo, _ := newTestBatchImageDownloadService()
+		job := repo.jobs["imgbatch_download"]
+		job.ItemCount, job.SuccessCount, job.FailCount = 150, 150, 0
+		svc.Config.BatchImage.MaxDownloadItemsZip = 500
+		repo.items[job.BatchID] = nil
+		var lines strings.Builder
+		for i := 0; i < 150; i++ {
+			id := fmt.Sprintf("image_%03d", i)
+			repo.items[job.BatchID] = append(repo.items[job.BatchID], CreateBatchImageItemParams{CustomID: id, Status: BatchImageItemStatusSuccess})
+			fmt.Fprintf(&lines, "{\"key\":%q,\"response\":{\"candidates\":[{\"content\":{\"parts\":[{\"inlineData\":{\"mimeType\":\"image/png\",\"data\":\"Zmlyc3Q=\"}}]}}]}}\n", id)
+		}
+		provider, _ := svc.ProviderRegistry.Get(BatchImageProviderGeminiAPI)
+		provider.(*publicBatchImageProvider).result = lines.String()
+		var buf bytes.Buffer
+		result, err := svc.StreamZip(ctx, testBatchImageOwner(), job.BatchID, BatchImageZipOptions{}, &buf)
+		require.NoError(t, err)
+		require.Equal(t, 150, result.FileCount)
+		require.Len(t, readZipFiles(t, buf.Bytes()), 152)
+		require.Equal(t, "[]", strings.TrimSpace(string(readZipFiles(t, buf.Bytes())["errors.json"])))
+	})
+
+	for _, scenario := range []string{"missing", "undecodable"} {
+		t.Run("zero-image manifest is an array: "+scenario, func(t *testing.T) {
+			svc, repo, _ := newTestBatchImageDownloadService()
+			job := repo.jobs["imgbatch_download"]
+			job.ItemCount, job.SuccessCount, job.FailCount = 1, 1, 0
+			repo.items[job.BatchID] = []CreateBatchImageItemParams{{CustomID: "image", Status: BatchImageItemStatusSuccess}}
+			provider, _ := svc.ProviderRegistry.Get(BatchImageProviderGeminiAPI)
+			provider.(*publicBatchImageProvider).result = ""
+			wantCode := "RESULT_MISSING"
+			if scenario == "undecodable" {
+				provider.(*publicBatchImageProvider).result = `{"key":"image","response":{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"!!bad!!"}}]}}]}}`
+				wantCode = "IMAGE_DECODE_FAILED"
+			}
+			var buf bytes.Buffer
+			result, err := svc.StreamZip(ctx, testBatchImageOwner(), job.BatchID, BatchImageZipOptions{}, &buf)
+			require.NoError(t, err)
+			require.Zero(t, result.FileCount)
+			files := readZipFiles(t, buf.Bytes())
+			var manifest map[string]any
+			require.NoError(t, json.Unmarshal(files["manifest.json"], &manifest))
+			require.Equal(t, []any{}, manifest["files"])
+			var failures []batchImageZipError
+			require.NoError(t, json.Unmarshal(files["errors.json"], &failures))
+			require.Len(t, failures, 1)
+			require.Equal(t, wantCode, failures[0].Code)
+		})
+	}
+
+	t.Run("timeout cancels result opening and releases permit", func(t *testing.T) {
+		svc, _, limiter := newTestBatchImageDownloadService()
+		svc.Config.BatchImage.MaxDownloadDurationSeconds = 1
+		provider := &blockingBatchImageDownloadProvider{publicBatchImageProvider: publicBatchImageProvider{name: BatchImageProviderGeminiAPI}, blockOpen: true}
+		svc.ProviderRegistry = NewBatchImageProviderRegistry(provider)
+		started := time.Now()
+		_, err := svc.StreamZip(ctx, testBatchImageOwner(), "imgbatch_download", BatchImageZipOptions{}, io.Discard)
+		require.Error(t, err)
+		require.Less(t, time.Since(started), 3*time.Second)
+		require.Equal(t, 1, limiter.releaseCount)
+	})
+
+	t.Run("timeout closes a blocked result scan and releases permit", func(t *testing.T) {
+		svc, _, limiter := newTestBatchImageDownloadService()
+		svc.Config.BatchImage.MaxDownloadDurationSeconds = 1
+		reader, writer := io.Pipe()
+		defer writer.Close()
+		provider := &blockingBatchImageDownloadProvider{publicBatchImageProvider: publicBatchImageProvider{name: BatchImageProviderGeminiAPI}, reader: reader}
+		svc.ProviderRegistry = NewBatchImageProviderRegistry(provider)
+		started := time.Now()
+		_, err := svc.StreamZip(ctx, testBatchImageOwner(), "imgbatch_download", BatchImageZipOptions{}, io.Discard)
+		require.ErrorIs(t, err, ErrBatchImageDownloadFailed)
+		require.Less(t, time.Since(started), 3*time.Second)
+		require.Equal(t, 1, limiter.releaseCount)
+	})
+
 	t.Run("limiter denial returns public limit error", func(t *testing.T) {
 		svc, _, limiter := newTestBatchImageDownloadService()
 		limiter.deny = true
@@ -146,6 +223,74 @@ func TestBatchImageDownloadService_StreamZip(t *testing.T) {
 		require.Nil(t, result)
 		require.ErrorIs(t, err, ErrBatchImageZipTooManyItems)
 		require.Empty(t, buf.Bytes())
+	})
+
+	t.Run("rejects incomplete failed-item export before opening output", func(t *testing.T) {
+		svc, repo, _ := newTestBatchImageDownloadService()
+		repo.jobs["imgbatch_download"].FailCount = 2
+		var buf bytes.Buffer
+		result, err := svc.StreamZip(ctx, testBatchImageOwner(), "imgbatch_download", BatchImageZipOptions{}, &buf)
+		require.Nil(t, result)
+		require.ErrorIs(t, err, ErrBatchImageZipTooManyItems)
+		require.Empty(t, buf.Bytes())
+
+		repo.jobs["imgbatch_download"].FailCount = 11
+		result, err = svc.StreamZip(ctx, testBatchImageOwner(), "imgbatch_download", BatchImageZipOptions{}, &buf)
+		require.Nil(t, result)
+		require.ErrorIs(t, err, ErrBatchImageZipTooManyItems)
+		require.Empty(t, buf.Bytes())
+	})
+
+	t.Run("uses unique filenames for colliding identifiers", func(t *testing.T) {
+		svc, repo, _ := newTestBatchImageDownloadService()
+		mime := "image/png"
+		repo.jobs["imgbatch_download"].ItemCount = 2
+		repo.jobs["imgbatch_download"].FailCount = 0
+		repo.items["imgbatch_download"] = []CreateBatchImageItemParams{
+			{JobID: "imgbatch_download", CustomID: "a/b", Status: BatchImageItemStatusSuccess, MimeType: &mime, ImageCount: 1},
+			{JobID: "imgbatch_download", CustomID: `a\b`, Status: BatchImageItemStatusSuccess, MimeType: &mime, ImageCount: 1},
+		}
+		provider, ok := svc.ProviderRegistry.Get(BatchImageProviderGeminiAPI)
+		require.True(t, ok)
+		provider.(*publicBatchImageProvider).result = "{\"key\":\"a/b\",\"response\":{\"candidates\":[{\"content\":{\"parts\":[{\"inlineData\":{\"mimeType\":\"image/png\",\"data\":\"Zmlyc3Q=\"}}]}}]}}\n" +
+			"{\"key\":\"a\\\\b\",\"response\":{\"candidates\":[{\"content\":{\"parts\":[{\"inlineData\":{\"mimeType\":\"image/png\",\"data\":\"c2Vjb25k\"}}]}}]}}\n"
+		var buf bytes.Buffer
+		result, err := svc.StreamZip(ctx, testBatchImageOwner(), "imgbatch_download", BatchImageZipOptions{}, &buf)
+		require.NoError(t, err)
+		require.Equal(t, 2, result.FileCount)
+		reader, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+		require.NoError(t, err)
+		names := make(map[string]struct{})
+		for _, file := range reader.File {
+			_, duplicate := names[file.Name]
+			require.False(t, duplicate, "ZIP filename must be unique: %s", file.Name)
+			names[file.Name] = struct{}{}
+		}
+		require.Contains(t, names, "images/a_b.png")
+		require.Contains(t, names, "images/a_b__2.png")
+		var manifest batchImageZipManifest
+		require.NoError(t, json.Unmarshal(readZipFiles(t, buf.Bytes())["manifest.json"], &manifest))
+		require.Equal(t, "images/a_b.png", manifest.Files[0].Filename)
+		require.Equal(t, "images/a_b__2.png", manifest.Files[1].Filename)
+	})
+
+	t.Run("omits undecodable images instead of writing unlisted ZIP entries", func(t *testing.T) {
+		svc, _, _ := newTestBatchImageDownloadService()
+		provider, ok := svc.ProviderRegistry.Get(BatchImageProviderGeminiAPI)
+		require.True(t, ok)
+		provider.(*publicBatchImageProvider).result = strings.Replace(batchImageDownloadResultJSONL(), "c2Vjb25k", "!!bad!!", 1)
+		var buf bytes.Buffer
+		result, err := svc.StreamZip(ctx, testBatchImageOwner(), "imgbatch_download", BatchImageZipOptions{}, &buf)
+		require.NoError(t, err)
+		require.Equal(t, 2, result.FileCount)
+		files := readZipFiles(t, buf.Bytes())
+		require.NotContains(t, files, "images/cover___001_2.jpg")
+		var manifest batchImageZipManifest
+		require.NoError(t, json.Unmarshal(files["manifest.json"], &manifest))
+		require.Len(t, manifest.Files, 2)
+		var errorsJSON []batchImageZipError
+		require.NoError(t, json.Unmarshal(files["errors.json"], &errorsJSON))
+		require.Contains(t, errorsJSON, batchImageZipError{CustomID: "cover/../001", Code: "IMAGE_DECODE_FAILED", Message: "image data could not be decoded"})
 	})
 }
 
@@ -229,6 +374,20 @@ func newTestBatchImageDownloadService() (*BatchImageDownloadService, *fakeBatchI
 		Config:           &config.Config{BatchImage: config.BatchImageConfig{MaxDownloadItemsZip: 10, MaxDownloadDurationSeconds: 60}},
 	}
 	return svc, repo, limiter
+}
+
+type blockingBatchImageDownloadProvider struct {
+	publicBatchImageProvider
+	blockOpen bool
+	reader    io.ReadCloser
+}
+
+func (p *blockingBatchImageDownloadProvider) OpenResult(ctx context.Context, _ *BatchImageJob, _ *Account) (io.ReadCloser, string, error) {
+	if p.blockOpen {
+		<-ctx.Done()
+		return nil, "", ctx.Err()
+	}
+	return p.reader, "application/jsonl", nil
 }
 
 const batchImageDownloadTestBase64 = "Zmlyc3Q="

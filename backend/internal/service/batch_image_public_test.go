@@ -47,6 +47,64 @@ func TestBatchImagePublicService_SelectAccountPriority(t *testing.T) {
 	}
 }
 
+func TestBatchImageCollectionIDValidationAndPublicResponse(t *testing.T) {
+	svc, _, _, _, _ := newTestBatchImagePublicService(true)
+	req := BatchImageSubmitRequest{
+		Model:        "gpt-image-2",
+		CollectionID: " imgcol_shared_task ",
+		Items:        []BatchImageSubmitItem{{CustomID: "one", Prompt: "draw"}},
+	}
+	normalized, err := svc.validateSubmitRequest(req)
+	require.NoError(t, err)
+	require.Equal(t, "imgcol_shared_task", normalized.CollectionID)
+
+	tooLong := req
+	tooLong.CollectionID = strings.Repeat("x", 65)
+	_, err = svc.validateSubmitRequest(tooLong)
+	require.ErrorIs(t, err, ErrBatchImageInvalidItems)
+	invalid := req
+	invalid.CollectionID = "collection/invalid"
+	_, err = svc.validateSubmitRequest(invalid)
+	require.ErrorIs(t, err, ErrBatchImageInvalidItems)
+
+	collectionID := normalized.CollectionID
+	public := BatchImageJobToPublic(&BatchImageJob{
+		BatchID: "imgbatch_one", TaskName: "task", CollectionID: &collectionID,
+		ImageSize: "2K", AspectRatio: "16:9", ResponseMimeType: "image/webp",
+		Provider: BatchImageProviderOpenAI, Model: "gpt-image-2", Status: BatchImageJobStatusCompleted,
+		CreatedAt: time.Unix(1, 0),
+	})
+	require.Equal(t, collectionID, public.CollectionID)
+	require.Equal(t, "2K", public.ImageSize)
+	require.Equal(t, "16:9", public.AspectRatio)
+	require.Equal(t, "image/webp", public.ResponseMimeType)
+}
+
+func TestBatchImagePublicService_RetryInputOverOnePage(t *testing.T) {
+	svc, repo, _, _, _ := newTestBatchImagePublicService(true)
+	provider := NewOpenAIBatchImageProvider(OpenAIBatchImageProviderOptions{DataDir: t.TempDir()})
+	svc.ProviderRegistry = NewBatchImageProviderRegistry(provider)
+	owner := testBatchImageOwner()
+	job := &BatchImageJob{BatchID: "imgbatch_retry_many", UserID: owner.UserID, APIKeyID: &owner.APIKeyID, Provider: BatchImageProviderOpenAI, Model: "gpt-image-2", Status: BatchImageJobStatusFailed, FailCount: 501, UpdatedAt: time.Now()}
+	input := BatchImageInput{BatchID: job.BatchID, Model: job.Model, ImageSize: "1K", AspectRatio: "1:1"}
+	for i := 0; i < 501; i++ {
+		id := fmt.Sprintf("failed_%03d", i)
+		input.Items = append(input.Items, BatchImageInputItem{CustomID: id, Prompt: "original " + id})
+		repo.items[job.BatchID] = append(repo.items[job.BatchID], CreateBatchImageItemParams{CustomID: id, Status: BatchImageItemStatusFailed})
+	}
+	ref, err := provider.writeInput(input)
+	require.NoError(t, err)
+	job.ProviderInputRef = &ref
+	repo.jobs[job.BatchID] = job
+	got, err := svc.ListItems(context.Background(), owner, job.BatchID, BatchImageItemsQuery{RetryInput: true})
+	require.NoError(t, err)
+	require.Len(t, got.RetryRequest.Items, 501)
+	require.Equal(t, "original failed_500", got.RetryRequest.Items[500].Prompt)
+	repo.items[job.BatchID] = repo.items[job.BatchID][:500]
+	_, err = svc.ListItems(context.Background(), owner, job.BatchID, BatchImageItemsQuery{RetryInput: true})
+	require.Error(t, err)
+}
+
 func TestBatchImagePublicService_RetryInput(t *testing.T) {
 	for _, scenario := range []string{"edits", "generations", "wrong user", "wrong key", "expired", "cleaned", "deleted", "missing", "cross task ref", "cross task payload", "unsupported", "missing item", "running"} {
 		t.Run(scenario, func(t *testing.T) {
@@ -55,7 +113,7 @@ func TestBatchImagePublicService_RetryInput(t *testing.T) {
 			svc.ProviderRegistry = NewBatchImageProviderRegistry(provider)
 			owner := testBatchImageOwner()
 			now := time.Now()
-			job := &BatchImageJob{BatchID: "imgbatch_retry", UserID: owner.UserID, APIKeyID: &owner.APIKeyID, Provider: BatchImageProviderOpenAI, Model: "gpt-image-2", Status: BatchImageJobStatusFailed, UpdatedAt: now}
+			job := &BatchImageJob{BatchID: "imgbatch_retry", UserID: owner.UserID, APIKeyID: &owner.APIKeyID, Provider: BatchImageProviderOpenAI, Model: "gpt-image-2", Status: BatchImageJobStatusFailed, FailCount: 1, UpdatedAt: now}
 			input := BatchImageInput{BatchID: job.BatchID, Model: job.Model, ImageSize: "4K", AspectRatio: "16:9", ResponseMimeType: "image/webp", Items: []BatchImageInputItem{{CustomID: "failed", Prompt: "full original prompt", ReferenceImages: []BatchImageReference{{MimeType: "image/png", Data: []byte("original image")}}}, {CustomID: "success", Prompt: "do not repeat"}}}
 			if scenario == "generations" {
 				input.Items[0].ReferenceImages = nil
@@ -460,6 +518,72 @@ func TestBatchImagePublicService_Submit(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("rejects OpenAI file_uri before balance hold", func(t *testing.T) {
+		svc, repo, _, _, _ := newTestBatchImagePublicService(true)
+		groupID := int64(16)
+		price := 0.05
+		svc.GroupRepo = &publicBatchImageGroupRepo{groups: map[int64]*Group{
+			groupID: {
+				ID:                           groupID,
+				Platform:                     PlatformOpenAI,
+				AllowImageGeneration:         true,
+				AllowBatchImageGeneration:    true,
+				ImagePrice1K:                 &price,
+				BatchImageDiscountMultiplier: 1,
+				BatchImageHoldMultiplier:     1,
+			},
+		}}
+		account := testBatchImageMappedAccount(404, AccountTypeAPIKey, map[string]any{"alias": "gpt-image-2"})
+		account.Platform = PlatformOpenAI
+		svc.AccountRepo = &publicBatchImageAccountRepo{accounts: []Account{account}}
+		svc.ProviderRegistry = NewBatchImageProviderRegistry(&publicBatchImageProvider{name: BatchImageProviderOpenAI})
+		req := validBatchImageSubmitRequest()
+		req.Provider, req.Model = BatchImageProviderOpenAI, "alias"
+		req.Items[0].ReferenceImages = []BatchImageReferenceInput{{MimeType: "image/png", FileURI: "gs://bucket/reference.png"}}
+		owner := testBatchImageOwner()
+		owner.GroupID = &groupID
+
+		_, err := svc.Submit(context.Background(), owner, req, "")
+		require.ErrorIs(t, err, ErrBatchImageInvalidReferenceImage)
+		require.Empty(t, repo.jobs)
+		require.Empty(t, svc.BillingRepo.(*fakeBatchImageBillingRepo).reserves)
+	})
+
+	t.Run("uses mapped model capability for reference image limit", func(t *testing.T) {
+		svc, _, _, _, _ := newTestBatchImagePublicService(true)
+		groupID := int64(16)
+		price := 0.05
+		svc.GroupRepo = &publicBatchImageGroupRepo{groups: map[int64]*Group{
+			groupID: {
+				ID:                           groupID,
+				Platform:                     PlatformOpenAI,
+				AllowImageGeneration:         true,
+				AllowBatchImageGeneration:    true,
+				ImagePrice1K:                 &price,
+				BatchImageDiscountMultiplier: 1,
+				BatchImageHoldMultiplier:     1,
+			},
+		}}
+		account := testBatchImageMappedAccount(404, AccountTypeAPIKey, map[string]any{"alias": "gpt-image-2"})
+		account.Platform = PlatformOpenAI
+		svc.AccountRepo = &publicBatchImageAccountRepo{accounts: []Account{account}}
+		provider := &publicBatchImageProvider{name: BatchImageProviderOpenAI}
+		svc.ProviderRegistry = NewBatchImageProviderRegistry(provider)
+		req := validBatchImageSubmitRequest()
+		req.Provider, req.Model = BatchImageProviderOpenAI, "alias"
+		req.Items[0].ReferenceImages = make([]BatchImageReferenceInput, 4)
+		for i := range req.Items[0].ReferenceImages {
+			req.Items[0].ReferenceImages[i] = BatchImageReferenceInput{MimeType: "image/png", Data: []byte{byte(i + 1)}}
+		}
+		owner := testBatchImageOwner()
+		owner.GroupID = &groupID
+
+		_, err := svc.Submit(context.Background(), owner, req, "")
+		require.NoError(t, err)
+		require.Len(t, provider.submits, 1)
+		require.Len(t, provider.submits[0].Items[0].ReferenceImages, 4)
+	})
+
 	t.Run("rejects too many reference images across request", func(t *testing.T) {
 		svc, _, _, _, _ := newTestBatchImagePublicService(true)
 		svc.Config.BatchImage.MaxReferenceImagesPerJob = 3
@@ -592,6 +716,50 @@ func TestBatchImagePublicService_Submit(t *testing.T) {
 		require.Equal(t, "original-session", batchImageDerefString(repo.jobs[first.ID].SessionID))
 		require.Len(t, gemini.submits, 1)
 		require.Equal(t, []string{first.ID}, queue.enqueued)
+	})
+
+	t.Run("default task name replays across seconds without another hold", func(t *testing.T) {
+		svc, repo, _, gemini, _ := newTestBatchImagePublicService(true)
+		req := validBatchImageSubmitRequest()
+		req.TaskName = ""
+		first, err := svc.Submit(ctx, testBatchImageOwner(), req, "delayed-name")
+		require.NoError(t, err)
+		job := repo.jobs[first.ID]
+		// 固定首次生成名为过去时间，确定性覆盖跨秒恢复，无需等待时钟。
+		normalized, err := svc.validateSubmitRequest(req)
+		require.NoError(t, err)
+		normalized.TaskName = defaultBatchImageTaskName(time.Unix(1, 0))
+		job.TaskName = normalized.TaskName
+		job.RequestHash = batchImageStringPtr(HashBatchImageSubmitRequest(normalized))
+		second, err := svc.Submit(ctx, testBatchImageOwner(), req, "delayed-name")
+		require.NoError(t, err)
+		require.Equal(t, first.ID, second.ID)
+		require.Len(t, gemini.submits, 1)
+		require.Len(t, svc.BillingRepo.(*fakeBatchImageBillingRepo).reserves, 1)
+	})
+
+	t.Run("insufficient balance replay remains an error without upstream submit", func(t *testing.T) {
+		svc, repo, queue, gemini, _ := newTestBatchImagePublicService(true)
+		billing := svc.BillingRepo.(*fakeBatchImageBillingRepo)
+		billing.reserveErr = ErrBatchImageInsufficientBalance
+		req := validBatchImageSubmitRequest()
+		req.TaskName = ""
+		_, err := svc.Submit(ctx, testBatchImageOwner(), req, "balance-replay")
+		require.ErrorIs(t, err, ErrBatchImageInsufficientBalance)
+		normalized, err := svc.validateSubmitRequest(req)
+		require.NoError(t, err)
+		normalized.TaskName = defaultBatchImageTaskName(time.Unix(1, 0))
+		for _, job := range repo.jobs {
+			job.TaskName = normalized.TaskName
+			job.RequestHash = batchImageStringPtr(HashBatchImageSubmitRequest(normalized))
+		}
+		billing.reserveErr = nil
+		got, err := svc.Submit(ctx, testBatchImageOwner(), req, "balance-replay")
+		require.Nil(t, got)
+		require.ErrorIs(t, err, ErrBatchImageInsufficientBalance)
+		require.Len(t, billing.reserves, 1)
+		require.Empty(t, gemini.submits)
+		require.Empty(t, queue.enqueued)
 	})
 
 	t.Run("idempotency conflict rejects changed request", func(t *testing.T) {

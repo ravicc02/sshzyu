@@ -78,6 +78,18 @@ type BatchImageDownloadService struct {
 	Config           *config.Config
 }
 
+type batchImageContextWriter struct {
+	ctx context.Context
+	w   io.Writer
+}
+
+func (w *batchImageContextWriter) Write(p []byte) (int, error) {
+	if err := w.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return w.w.Write(p)
+}
+
 type batchImageDownloadLimitWriter struct {
 	w       io.Writer
 	limit   int64
@@ -188,19 +200,23 @@ func (s *BatchImageDownloadService) StreamZip(ctx context.Context, owner BatchIm
 		// 客户端传入的 max_items 不得放大管理员配置的 ZIP 上限。
 		maxItems = cap
 	}
-	if job.SuccessCount > maxItems {
+	if job.SuccessCount > maxItems || job.FailCount > maxItems {
 		return nil, ErrBatchImageZipTooManyItems
 	}
 	successItems, err := s.Repo.ListBatchImageItemsForDownload(ctx, job.BatchID, BatchImageItemStatusSuccess, maxItems+1)
 	if err != nil {
 		return nil, err
 	}
-	if len(successItems) > maxItems {
+	if len(successItems) > maxItems || len(successItems) != job.SuccessCount {
 		return nil, ErrBatchImageZipTooManyItems
 	}
-	failedItems, err := s.Repo.ListBatchImageItemsForDownload(ctx, job.BatchID, BatchImageItemStatusFailed, maxItems)
+	failedItems, err := s.Repo.ListBatchImageItemsForDownload(ctx, job.BatchID, BatchImageItemStatusFailed, maxItems+1)
 	if err != nil {
 		return nil, err
+	}
+	if len(failedItems) > maxItems || len(failedItems) != job.FailCount {
+		// Do not export a partial failure list while advertising the full count.
+		return nil, ErrBatchImageZipTooManyItems
 	}
 
 	permit, err := s.acquirePermit(ctx, owner.UserID, "zip")
@@ -215,20 +231,20 @@ func (s *BatchImageDownloadService) StreamZip(ctx context.Context, owner BatchIm
 	if err != nil {
 		return nil, err
 	}
-	r, _, err := provider.OpenResult(ctx, job, account)
+	streamCtx, cancel := context.WithTimeout(ctx, s.maxDownloadDuration())
+	defer cancel()
+	r, _, err := provider.OpenResult(streamCtx, job, account)
 	if err != nil {
 		return nil, ErrBatchImageResultMissing.WithCause(err)
 	}
-	defer func() { _ = r.Close() }()
+	// 取消时关闭结果流，解除阻塞的 Scan；底层 HTTP 请求也使用同一截止时间。
+	var closeOnce sync.Once
+	closeResult := func() { closeOnce.Do(func() { _ = r.Close() }) }
+	stopClose := context.AfterFunc(streamCtx, closeResult)
+	defer stopClose()
+	defer closeResult()
 
-	streamCtx := ctx
-	cancel := func() {}
-	if d := s.maxDownloadDuration(); d > 0 {
-		streamCtx, cancel = context.WithTimeout(ctx, d)
-	}
-	defer cancel()
-
-	limitedWriter := &batchImageDownloadLimitWriter{w: w, limit: s.maxDownloadBytes()}
+	limitedWriter := &batchImageDownloadLimitWriter{w: &batchImageContextWriter{ctx: streamCtx, w: w}, limit: s.maxDownloadBytes()}
 	zipWriter := zip.NewWriter(limitedWriter)
 	result, manifestFiles, zipErrors, err := s.writeZipImages(streamCtx, zipWriter, r, successItems)
 	if err != nil {
@@ -284,8 +300,9 @@ func (s *BatchImageDownloadService) writeZipImages(ctx context.Context, zipWrite
 	scanner.Buffer(make([]byte, 0, 64*1024), batchImageDownloadScannerMaxLineBytes)
 
 	result := &BatchImageZipResult{}
-	var manifestFiles []batchImageZipManifestFile
-	var zipErrors []batchImageZipError
+	manifestFiles := make([]batchImageZipManifestFile, 0)
+	zipErrors := make([]batchImageZipError, 0)
+	usedFilenames := make(map[string]struct{})
 	for scanner.Scan() {
 		if err := ctx.Err(); err != nil {
 			return result, manifestFiles, zipErrors, err
@@ -308,19 +325,28 @@ func (s *BatchImageDownloadService) writeZipImages(ctx context.Context, zipWrite
 			continue
 		}
 		for idx, image := range images.Images {
+			if err := ctx.Err(); err != nil {
+				return result, manifestFiles, zipErrors, err
+			}
 			extension := image.Extension
 			if extension == "" {
 				extension = "bin"
 			}
 			filename := batchImageZipImageFilename(item.CustomID, idx, extension)
+			// Validate before creating a ZIP entry: a failed decoder must not leave an
+			// unlisted, partially written image in an otherwise downloadable archive.
+			if _, err := io.Copy(io.Discard, base64.NewDecoder(base64.StdEncoding, strings.NewReader(image.Base64Data))); err != nil {
+				zipErrors = append(zipErrors, batchImageZipError{CustomID: item.CustomID, Code: "IMAGE_DECODE_FAILED", Message: "image data could not be decoded"})
+				continue
+			}
+			filename = uniqueBatchImageZipFilename(filename, usedFilenames)
 			entry, err := zipWriter.CreateHeader(&zip.FileHeader{Name: filename, Method: zip.Deflate})
 			if err != nil {
 				return result, manifestFiles, zipErrors, err
 			}
 			decoder := base64.NewDecoder(base64.StdEncoding, strings.NewReader(image.Base64Data))
 			if _, err := io.Copy(entry, decoder); err != nil {
-				zipErrors = append(zipErrors, batchImageZipError{CustomID: item.CustomID, Code: "IMAGE_DECODE_FAILED", Message: "image data could not be decoded"})
-				continue
+				return result, manifestFiles, zipErrors, err
 			}
 			result.FileCount++
 			manifestFiles = append(manifestFiles, batchImageZipManifestFile{
@@ -330,6 +356,9 @@ func (s *BatchImageDownloadService) writeZipImages(ctx context.Context, zipWrite
 				ImageIndex: idx,
 			})
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return result, manifestFiles, zipErrors, err
 	}
 	if err := scanner.Err(); err != nil {
 		return result, manifestFiles, zipErrors, err
@@ -602,6 +631,22 @@ func batchImageZipImageFilename(customID string, imageIndex int, extension strin
 		base = fmt.Sprintf("%s_%d", base, imageIndex+1)
 	}
 	return "images/" + BatchImageSafeDownloadFilename(base, extension)
+}
+
+func uniqueBatchImageZipFilename(filename string, used map[string]struct{}) string {
+	if _, exists := used[filename]; !exists {
+		used[filename] = struct{}{}
+		return filename
+	}
+	extension := filepath.Ext(filename)
+	base := strings.TrimSuffix(filename, extension)
+	for suffix := 2; ; suffix++ {
+		candidate := fmt.Sprintf("%s__%d%s", base, suffix, extension)
+		if _, exists := used[candidate]; !exists {
+			used[candidate] = struct{}{}
+			return candidate
+		}
+	}
 }
 
 func writeBatchImageZipJSON(zipWriter *zip.Writer, name string, value any) error {
