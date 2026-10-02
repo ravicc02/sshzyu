@@ -9,6 +9,7 @@ const {
   listGroups,
   duplicateGroup,
   updateGroup,
+  createGroup,
   getModelsListCandidates,
   getUsageSummary,
   getCapacitySummary,
@@ -19,6 +20,7 @@ const {
   listGroups: vi.fn(),
   duplicateGroup: vi.fn(),
   updateGroup: vi.fn(),
+  createGroup: vi.fn(),
   getModelsListCandidates: vi.fn(),
   getUsageSummary: vi.fn(),
   getCapacitySummary: vi.fn(),
@@ -37,7 +39,7 @@ vi.mock('@/api/admin', () => ({
       getCapacitySummary,
       getLiveCapability,
       getAll: vi.fn(),
-      create: vi.fn(),
+      create: createGroup,
       update: updateGroup,
       delete: vi.fn(),
       updateSortOrder: vi.fn()
@@ -176,6 +178,7 @@ describe('GroupsView duplicate action', () => {
       listGroups,
       duplicateGroup,
       updateGroup,
+      createGroup,
       getModelsListCandidates,
       getUsageSummary,
       getCapacitySummary,
@@ -281,30 +284,92 @@ describe('GroupsView duplicate action', () => {
     wrapper.unmount()
   })
 
-  it.each(['openai', 'gemini'] as const)('preserves enabled batch image pricing when editing %s', async (platform) => {
-    listGroups.mockResolvedValueOnce({
-      items: [{ ...sourceGroup, platform, allow_image_generation: true,
-        allow_batch_image_generation: true, batch_image_discount_multiplier: 0.7,
-        batch_image_hold_multiplier: 0.8 }],
-      total: 1, page: 1, page_size: 20, pages: 1
-    })
-    updateGroup.mockResolvedValueOnce(sourceGroup)
-    const wrapper = mountView()
-    await flushPromises()
-    await wrapper.findAll('button').find(button => button.text() === 'common.edit')!.trigger('click')
-    await flushPromises()
-    const form = wrapper.get('#edit-group-form')
-    expect(form.text()).toContain('admin.groups.imagePricing.allowBatchImageGeneration')
-    expect(form.text()).not.toContain('admin.groups.imagePricing.batchSupportedPlatformsHint')
-    await form.trigger('submit')
-    await flushPromises()
-    expect(updateGroup).toHaveBeenCalledWith(42, expect.objectContaining({
-      allow_batch_image_generation: true,
-      batch_image_discount_multiplier: 0.7,
-      batch_image_hold_multiplier: 0.8
-    }))
-    wrapper.unmount()
-  })
+  it.each(['openai', 'gemini'] as const)(
+    'shows and submits batch image permission when creating %s groups',
+    async (platform) => {
+      createGroup.mockResolvedValueOnce({ ...sourceGroup, platform })
+      const wrapper = mountView()
+      await flushPromises()
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'admin.groups.createGroup')!
+        .trigger('click')
+      const vm = wrapper.vm as any
+      vm.createForm.platform = platform
+      vm.createForm.name = `${platform} images`
+      vm.createForm.allow_image_generation = true
+      vm.createForm.allow_batch_image_generation = true
+      vm.createForm.batch_image_discount_multiplier = 0.7
+      vm.createForm.batch_image_hold_multiplier = 0.8
+      await wrapper.vm.$nextTick()
+
+      const form = wrapper.get('#create-group-form')
+      expect(form.text()).toContain(
+        'admin.groups.imagePricing.allowBatchImageGeneration'
+      )
+      await form.trigger('submit')
+      await flushPromises()
+
+      expect(createGroup).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platform,
+          allow_image_generation: true,
+          allow_batch_image_generation: true,
+          batch_image_discount_multiplier: 0.7,
+          batch_image_hold_multiplier: 0.8
+        })
+      )
+      wrapper.unmount()
+    }
+  )
+
+  it.each(['openai', 'gemini'] as const)(
+    'preserves enabled batch image pricing when editing %s',
+    async (platform) => {
+      listGroups.mockResolvedValueOnce({
+        items: [
+          {
+            ...sourceGroup,
+            platform,
+            allow_image_generation: true,
+            allow_batch_image_generation: true,
+            batch_image_discount_multiplier: 0.7,
+            batch_image_hold_multiplier: 0.8
+          }
+        ],
+        total: 1,
+        page: 1,
+        page_size: 20,
+        pages: 1
+      })
+      updateGroup.mockResolvedValueOnce(sourceGroup)
+      const wrapper = mountView()
+      await flushPromises()
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'common.edit')!
+        .trigger('click')
+      await flushPromises()
+      const form = wrapper.get('#edit-group-form')
+      expect(form.text()).toContain(
+        'admin.groups.imagePricing.allowBatchImageGeneration'
+      )
+      expect(form.text()).not.toContain(
+        'admin.groups.imagePricing.batchSupportedPlatformsHint'
+      )
+      await form.trigger('submit')
+      await flushPromises()
+      expect(updateGroup).toHaveBeenCalledWith(
+        42,
+        expect.objectContaining({
+          allow_batch_image_generation: true,
+          batch_image_discount_multiplier: 0.7,
+          batch_image_hold_multiplier: 0.8
+        })
+      )
+      wrapper.unmount()
+    }
+  )
 
   it('shows the standardized API message when updating a group fails', async () => {
     updateGroup.mockRejectedValueOnce({

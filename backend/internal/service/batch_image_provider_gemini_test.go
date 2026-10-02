@@ -89,7 +89,7 @@ func TestBuildGeminiBatchJSONL_WritesImageConfigForTierAndAspect(t *testing.T) {
 	require.NoError(t, err)
 
 	var got map[string]any
-	require.NoError(t, json.Unmarshal(strings.Split(strings.TrimSpace(string(jsonl)), "\n")[0], &got))
+	require.NoError(t, json.Unmarshal([]byte(strings.Split(strings.TrimSpace(string(jsonl)), "\n")[0]), &got))
 	config := got["request"].(map[string]any)["generationConfig"].(map[string]any)
 	require.Equal(t, map[string]any{"aspectRatio": "16:9", "imageSize": "2K"}, config["imageConfig"])
 }
@@ -103,7 +103,7 @@ func TestBuildGeminiBatchJSONL_EmptyAspectKeepsModelCompositionChoice(t *testing
 	require.NoError(t, err)
 
 	var got map[string]any
-	require.NoError(t, json.Unmarshal(strings.Split(strings.TrimSpace(string(jsonl)), "\n")[0], &got))
+	require.NoError(t, json.Unmarshal([]byte(strings.Split(strings.TrimSpace(string(jsonl)), "\n")[0]), &got))
 	config := got["request"].(map[string]any)["generationConfig"].(map[string]any)
 	require.Equal(t, map[string]any{"imageSize": "1K"}, config["imageConfig"])
 }

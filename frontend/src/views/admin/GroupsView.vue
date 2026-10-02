@@ -987,7 +987,13 @@
               </div>
             </div>
           </div>
-          <div v-if="createForm.platform === 'gemini' && createForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
+          <div
+            v-if="
+              supportsBatchImageGenerationPlatform(createForm.platform) &&
+              createForm.allow_image_generation
+            "
+            class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700"
+          >
             <label
               class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
             >
@@ -1034,10 +1040,10 @@
             </div>
           </div>
           <p
-            v-else-if="createForm.platform !== 'gemini'"
+            v-else-if="!supportsBatchImageGenerationPlatform(createForm.platform)"
             class="mt-4 border-t border-dashed border-gray-200 pt-4 text-xs text-gray-500 dark:border-dark-700 dark:text-gray-400"
           >
-            {{ t("admin.groups.imagePricing.batchGeminiOnlyHint") }}
+            {{ t("admin.groups.imagePricing.batchSupportedPlatformsHint") }}
           </p>
         </div>
 
@@ -2627,7 +2633,13 @@
               </div>
             </div>
           </div>
-          <div v-if="editForm.platform === 'gemini' && editForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
+          <div
+            v-if="
+              supportsBatchImageGenerationPlatform(editForm.platform) &&
+              editForm.allow_image_generation
+            "
+            class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700"
+          >
             <label
               class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
             >
@@ -2674,10 +2686,10 @@
             </div>
           </div>
           <p
-            v-else-if="editForm.platform !== 'gemini'"
+            v-else-if="!supportsBatchImageGenerationPlatform(editForm.platform)"
             class="mt-4 border-t border-dashed border-gray-200 pt-4 text-xs text-gray-500 dark:border-dark-700 dark:text-gray-400"
           >
-            {{ t("admin.groups.imagePricing.batchGeminiOnlyHint") }}
+            {{ t("admin.groups.imagePricing.batchSupportedPlatformsHint") }}
           </p>
         </div>
 
@@ -5525,13 +5537,19 @@ const editWebSearchFinalPricePreview = computed(() =>
   buildWebSearchFinalPricePreview(editForm),
 );
 
+const supportsBatchImageGenerationPlatform = (platform: string) =>
+  platform === "openai" || platform === "gemini";
+
 const resetDisabledBatchImagePricing = (
   form: Pick<
     ImagePricingFormState,
     "platform" | "allow_image_generation" | "allow_batch_image_generation" | "batch_image_discount_multiplier" | "batch_image_hold_multiplier"
   >,
 ) => {
-  if (form.platform !== "gemini" || !form.allow_image_generation) {
+  if (
+    !supportsBatchImageGenerationPlatform(form.platform) ||
+    !form.allow_image_generation
+  ) {
     form.allow_batch_image_generation = false;
   }
   if (!form.allow_batch_image_generation) {

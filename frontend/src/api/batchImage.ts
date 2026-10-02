@@ -30,6 +30,7 @@ export interface BatchImageReferenceImage {
 export interface BatchImageSubmitRequest {
   model: string
   task_name?: string
+  collection_id?: string
   parent_batch_id?: string
   provider?: '' | 'gemini_api' | 'vertex' | string
   image_size?: '1K' | '2K' | '4K' | string
@@ -43,6 +44,7 @@ export interface BatchImageJob {
   id: string
   object: string
   task_name: string
+  collection_id?: string
   parent_batch_id?: string | null
   status: BatchImageStatus
   model: string
@@ -230,12 +232,40 @@ export async function cancelBatchImageJob(apiKey: string, batchId: string): Prom
   return response.json()
 }
 
-export async function downloadBatchImageZip(apiKey: string, batchId: string): Promise<Blob> {
+export async function downloadBatchImageZip(apiKey: string, batchId: string, maxBytes?: number): Promise<Blob> {
+  if (maxBytes !== undefined && (!Number.isSafeInteger(maxBytes) || maxBytes <= 0)) throw new Error('ZIP 下载大小限制无效。')
+  const controller = new AbortController()
   const response = await fetch(buildGatewayUrl(`/v1/images/batches/${encodeURIComponent(batchId)}/download`), {
-    headers: authHeaders(apiKey),
+    headers: authHeaders(apiKey), signal: controller.signal,
   })
   if (!response.ok) throw await parseBatchImageError(response)
-  return response.blob()
+  if (maxBytes === undefined) return response.blob()
+  const tooLarge = () => {
+    controller.abort()
+    return new Error('ZIP 超过合并下载大小限制，请分开下载或减少选择的任务。')
+  }
+  const length = Number(response.headers.get('Content-Length'))
+  if (Number.isFinite(length) && length > maxBytes) throw tooLarge()
+  if (!response.body) throw new Error('浏览器不支持受限流式下载，请使用最新版本浏览器。')
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      size += value.byteLength
+      if (size > maxBytes) throw tooLarge()
+      chunks.push(value)
+    }
+    return new Blob(chunks as BlobPart[], { type: 'application/zip' })
+  } catch (error) {
+    controller.abort()
+    await reader.cancel().catch(() => {})
+    throw error
+  } finally {
+    reader.releaseLock()
+  }
 }
 
 export async function getBatchImageItemContent(apiKey: string, batchId: string, customId: string, imageIndex = 0): Promise<Blob> {
@@ -262,5 +292,5 @@ export function saveBlob(blob: Blob, filename: string) {
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  window.setTimeout(() => URL.revokeObjectURL(url), 40_000)
 }

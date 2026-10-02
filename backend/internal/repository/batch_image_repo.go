@@ -594,7 +594,22 @@ func (r *batchImageRepository) GetBatchImageItemForDownload(ctx context.Context,
 }
 
 func (r *batchImageRepository) ListBatchImageItemsForDownload(ctx context.Context, batchID string, status string, limit int) ([]*service.BatchImageItem, error) {
-	return r.ListBatchImageItems(ctx, batchID, service.BatchImageItemFilter{Status: status, Limit: limit})
+	if limit <= 0 {
+		limit = 100
+	}
+	items := make([]*service.BatchImageItem, 0)
+	for len(items) < limit {
+		pageSize := min(500, limit-len(items))
+		page, err := r.ListBatchImageItems(ctx, batchID, service.BatchImageItemFilter{Status: status, Limit: pageSize, Offset: len(items)})
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, page...)
+		if len(page) < pageSize {
+			break
+		}
+	}
+	return items, nil
 }
 
 func (r *batchImageRepository) ListBatchImageJobsDueForInputCleanup(ctx context.Context, cutoff time.Time, limit int) ([]*service.BatchImageJob, error) {
@@ -772,7 +787,7 @@ func (r *batchImageRepository) AppendBatchImageEvent(ctx context.Context, batchI
 func createBatchImageJobWithSQL(ctx context.Context, sqlq batchImageSQLExecutor, params service.CreateBatchImageJobParams) (*service.BatchImageJob, error) {
 	return scanBatchImageJob(sqlq.QueryRowContext(ctx, `
 INSERT INTO batch_image_jobs (
-    batch_id, user_id, api_key_id, account_id, provider, model, task_name, parent_batch_id, status,
+    batch_id, user_id, api_key_id, account_id, provider, model, task_name, collection_id, image_size, aspect_ratio, response_mime_type, parent_batch_id, status,
     provider_job_name, provider_input_ref, provider_output_ref, gcs_input_uri, gcs_output_uri,
     item_count, success_count, fail_count, cancelled_count,
     estimated_cost, hold_amount, actual_cost,
@@ -782,18 +797,18 @@ INSERT INTO batch_image_jobs (
     currency, hold_id,
     idempotency_key, request_hash, manifest_hash, retry_count, session_id, output_expires_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9,
-    $10, $11, $12, $13, $14,
-    $15, $16, $17, $18,
-    $19, $20, $21,
-    $22, $23, $24,
-    $25, $26, $27, $28,
-    $29,
-    $30, $31,
-    $32, $33, $34, $35, $36, $37
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+    $14, $15, $16, $17, $18,
+    $19, $20, $21, $22,
+    $23, $24, $25,
+    $26, $27, $28,
+    $29, $30, $31, $32,
+    $33,
+    $34, $35,
+    $36, $37, $38, $39, $40, $41
 )
 RETURNING `+batchImageJobColumns,
-		params.BatchID, params.UserID, params.APIKeyID, params.AccountID, params.Provider, params.Model, params.TaskName, params.ParentBatchID, params.Status,
+		params.BatchID, params.UserID, params.APIKeyID, params.AccountID, params.Provider, params.Model, params.TaskName, params.CollectionID, params.ImageSize, params.AspectRatio, params.ResponseMimeType, params.ParentBatchID, params.Status,
 		params.ProviderJobName, params.ProviderInputRef, params.ProviderOutputRef, params.GCSInputURI, params.GCSOutputURI,
 		params.ItemCount, params.SuccessCount, params.FailCount, params.CancelledCount,
 		params.EstimatedCost, params.HoldAmount, params.ActualCost,
@@ -846,7 +861,7 @@ type rowScanner interface {
 }
 
 const batchImageJobColumns = `
-id, batch_id, user_id, api_key_id, account_id, provider, model, task_name, parent_batch_id, status,
+id, batch_id, user_id, api_key_id, account_id, provider, model, task_name, collection_id, image_size, aspect_ratio, response_mime_type, parent_batch_id, status,
 provider_job_name, provider_input_ref, provider_output_ref, gcs_input_uri, gcs_output_uri,
 item_count, success_count, fail_count, cancelled_count,
 estimated_cost, hold_amount, actual_cost,
@@ -865,7 +880,7 @@ func scanBatchImageJob(row rowScanner) (*service.BatchImageJob, error) {
 	var job service.BatchImageJob
 	var apiKeyID, accountID sql.NullInt64
 	var providerJobName, providerInputRef, providerOutputRef, gcsInputURI, gcsOutputURI sql.NullString
-	var parentBatchID sql.NullString
+	var collectionID, parentBatchID sql.NullString
 	var holdAmount, actualCost sql.NullFloat64
 	var holdID, idempotencyKey, requestHash, manifestHash sql.NullString
 	var sessionID sql.NullString
@@ -874,7 +889,7 @@ func scanBatchImageJob(row rowScanner) (*service.BatchImageJob, error) {
 	var submittedAt, startedAt, finishedAt, settledAt sql.NullTime
 
 	err := row.Scan(
-		&job.ID, &job.BatchID, &job.UserID, &apiKeyID, &accountID, &job.Provider, &job.Model, &job.TaskName, &parentBatchID, &job.Status,
+		&job.ID, &job.BatchID, &job.UserID, &apiKeyID, &accountID, &job.Provider, &job.Model, &job.TaskName, &collectionID, &job.ImageSize, &job.AspectRatio, &job.ResponseMimeType, &parentBatchID, &job.Status,
 		&providerJobName, &providerInputRef, &providerOutputRef, &gcsInputURI, &gcsOutputURI,
 		&job.ItemCount, &job.SuccessCount, &job.FailCount, &job.CancelledCount,
 		&job.EstimatedCost, &holdAmount, &actualCost,
@@ -896,6 +911,7 @@ func scanBatchImageJob(row rowScanner) (*service.BatchImageJob, error) {
 	job.ProviderJobName = batchImageNullStringPtr(providerJobName)
 	job.ProviderInputRef = batchImageNullStringPtr(providerInputRef)
 	job.ProviderOutputRef = batchImageNullStringPtr(providerOutputRef)
+	job.CollectionID = batchImageNullStringPtr(collectionID)
 	job.ParentBatchID = batchImageNullStringPtr(parentBatchID)
 	job.GCSInputURI = batchImageNullStringPtr(gcsInputURI)
 	job.GCSOutputURI = batchImageNullStringPtr(gcsOutputURI)

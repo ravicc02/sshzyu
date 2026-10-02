@@ -27,11 +27,11 @@ type LotteryPrize struct {
 	PrizeType string `json:"prize_type,omitempty"`
 	// 奖品数值: balance_bonus 为金额，quota 为额度，none 为 0
 	Value float64 `json:"value,omitempty"`
-	// 中奖权重(基础)，0 表示不参与随机；tier_weights 未覆盖的 tier 使用该值
+	// 历史兼容字段；新的中奖概率配置统一存储在 tier_weights
 	Weight int `json:"weight,omitempty"`
 	// 可中该奖品的最低用户阶梯(0 青铜/1 白银/2 黄金/3 钻石/4 王者)，低于该阶梯的奖品不参与随机
 	MinTier int `json:"min_tier,omitempty"`
-	// 按阶梯覆盖权重: key 为 tier 数字字符串，如 {"0":70,"1":50}；缺失的 tier 回退 weight，显式 0 表示该 tier 不可中
+	// 按动态阶梯保存显式中奖概率: key 为 tier 数字字符串，值为百分比；显式 0 表示该 tier 不可中
 	TierWeights map[string]int `json:"tier_weights,omitempty"`
 	// 库存，-1 表示无限
 	Stock int `json:"stock,omitempty"`

@@ -108,6 +108,10 @@ type BatchImageJob struct {
 	Provider          string
 	Model             string
 	TaskName          string
+	CollectionID      *string
+	ImageSize         string
+	AspectRatio       string
+	ResponseMimeType  string
 	ParentBatchID     *string
 	Status            string
 	ProviderJobName   *string
@@ -168,6 +172,10 @@ type CreateBatchImageJobParams struct {
 	Provider          string
 	Model             string
 	TaskName          string
+	CollectionID      *string
+	ImageSize         string
+	AspectRatio       string
+	ResponseMimeType  string
 	ParentBatchID     *string
 	Status            string
 	ProviderJobName   *string

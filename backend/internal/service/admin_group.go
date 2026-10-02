@@ -17,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/typesafe"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 )
 
@@ -296,6 +297,8 @@ func defaultModelsListCandidateIDs(platform string) []string {
 		return xai.DefaultModelIDs()
 	case PlatformOpenCodeGo:
 		return DefaultOpenCodeGoModelIDs()
+	case PlatformTypeSafe:
+		return []string{typesafe.JevLatestModel}
 	case PlatformComposite:
 		return compositeDefaultModelsListCandidateIDs()
 	default:
@@ -313,9 +316,16 @@ func defaultAllowImageGenerationForPlatform(platform string) bool {
 	return platform == PlatformGrok
 }
 
+func supportsBatchImageGenerationPlatform(platform string) bool {
+	return platform == PlatformOpenAI || platform == PlatformGemini
+}
+
 func compositeDefaultModelsListCandidateIDs() []string {
 	seen := make(map[string]struct{})
 	ids := make([]string, 0)
+	// TypeSafe stays out of the static composite candidates (jev-latest only works
+	// through /v1/systemone); groups with TypeSafe accounts still get it from the
+	// account model mappings collected by GetGroupModelsListCandidates.
 	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformOpenCodeGo} {
 		for _, id := range defaultModelsListCandidateIDs(platform) {
 			if _, ok := seen[id]; ok {
@@ -512,7 +522,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	}
 
 	allowImageGeneration := input.AllowImageGeneration || defaultAllowImageGenerationForPlatform(platform)
-	allowBatchImageGeneration := input.AllowBatchImageGeneration && allowImageGeneration && platform == PlatformGemini
+	allowBatchImageGeneration := input.AllowBatchImageGeneration && allowImageGeneration && supportsBatchImageGenerationPlatform(platform)
 
 	// 如果指定了复制账号的源分组，先获取账号 ID 列表
 	var accountIDsToCopy []int64
@@ -813,7 +823,7 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.AllowBatchImageGeneration != nil {
 		group.AllowBatchImageGeneration = *input.AllowBatchImageGeneration
 	}
-	if !group.AllowImageGeneration || group.Platform != PlatformGemini {
+	if !group.AllowImageGeneration || !supportsBatchImageGenerationPlatform(group.Platform) {
 		group.AllowBatchImageGeneration = false
 	}
 	if input.ImageRateIndependent != nil {

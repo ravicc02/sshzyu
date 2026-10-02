@@ -828,7 +828,22 @@ func (r *fakeBatchImageRepository) GetBatchImageItemForDownload(_ context.Contex
 }
 
 func (r *fakeBatchImageRepository) ListBatchImageItemsForDownload(ctx context.Context, batchID string, status string, limit int) ([]*BatchImageItem, error) {
-	return r.ListBatchImageItems(ctx, batchID, BatchImageItemFilter{Status: status, Limit: limit})
+	if limit <= 0 {
+		limit = 100
+	}
+	var items []*BatchImageItem
+	for len(items) < limit {
+		pageSize := min(500, limit-len(items))
+		page, err := r.ListBatchImageItems(ctx, batchID, BatchImageItemFilter{Status: status, Limit: pageSize, Offset: len(items)})
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, page...)
+		if len(page) < pageSize {
+			break
+		}
+	}
+	return items, nil
 }
 
 func (r *fakeBatchImageRepository) ListBatchImageJobsDueForInputCleanup(_ context.Context, cutoff time.Time, limit int) ([]*BatchImageJob, error) {

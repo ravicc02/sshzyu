@@ -20,10 +20,11 @@
     "@stripe/stripe-js": "^9.0.1",
     "@tanstack/vue-virtual": "^3.13.23",
     "@vueuse/core": "^10.7.0",
-    "axios": "^1.18.0",
+    "axios": "^1.20.0",
     "chart.js": "^4.4.1",
     "dompurify": "^3.4.14",
     "driver.js": "^1.4.0",
+    "fflate": "^0.8.3",
     "file-saver": "^2.0.5",
     "marked": "^17.0.1",
     "pinia": "^2.1.7",
@@ -57,6 +58,7 @@
     "vite": "^5.0.10",
     "vite-plugin-checker": "^0.9.1",
     "vitest": "^2.1.9",
+    "vue-eslint-parser": "^9.4.3",
     "vue-tsc": "^2.2.0"
   },
   "pnpm": {

@@ -35,6 +35,12 @@
             </div>
           </div>
 
+          <div v-if="downloadArtifact" class="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 p-3 dark:border-dark-700" role="status" data-testid="download-artifact">
+            <span class="text-sm">{{ t('batchImage.config.downloadReady') }}</span>
+            <a :href="downloadArtifact.url" :download="downloadArtifact.filename" class="btn btn-secondary btn-sm" data-testid="save-zip-link">{{ t('batchImage.config.saveZip') }}</a>
+            <button type="button" class="btn btn-secondary btn-sm" @click="clearDownloadArtifact">{{ t('common.close') }}</button>
+          </div>
+
           <div
             v-if="selectedJobIds.size"
             class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-dark-700 dark:bg-dark-800"
@@ -54,10 +60,11 @@
               <button
                 type="button"
                 class="btn btn-secondary btn-sm"
-                :disabled="bulkDownloading || selectedDownloadableRows.length === 0"
+                :disabled="downloading || bulkDownloading || selectedDownloadableRows.length === 0"
+                data-testid="download-selected-jobs"
                 @click="downloadSelectedJobs"
               >
-                <Icon :name="bulkDownloading ? 'refresh' : 'download'" size="sm" class="mr-1.5" :class="bulkDownloading ? 'animate-spin' : ''" />
+                <Icon :name="bulkDownloading || downloading ? 'refresh' : 'download'" size="sm" class="mr-1.5" :class="bulkDownloading || downloading ? 'animate-spin' : ''" />
                 {{ t('batchImage.actions.downloadSelected') }}
               </button>
               <button
@@ -103,28 +110,16 @@
           </template>
 
           <template #cell-id="{ row }">
-	            <div class="flex w-[220px] items-start gap-1" :class="row.is_child ? 'pl-6' : ''">
-	              <button
-	                v-if="row.child_count > 0 && !row.is_child"
-	                type="button"
-	                class="mt-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 dark:text-gray-400 dark:hover:bg-dark-700 dark:hover:text-white"
-	                :title="expandedParentIds.has(row.id) ? t('batchImage.list.collapseChildren') : t('batchImage.list.expandChildren', { n: row.child_count }, row.child_count)"
-	                @click.stop="toggleChildRows(row.id)"
-	              >
-	                <Icon :name="expandedParentIds.has(row.id) ? 'chevronDown' : 'chevronRight'" size="xs" />
-	              </button>
-	              <span v-else class="w-6 flex-shrink-0" />
+	            <div class="flex w-[220px] items-start gap-1">
+	              <span class="w-2 flex-shrink-0" />
 	              <button type="button" class="min-w-0 flex-1 rounded-lg py-1 text-left transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 dark:hover:bg-dark-700" @click="selectJob(row.id)">
 	                <span
 	                  class="flex min-w-0 items-center gap-2 text-sm font-medium"
 	                  :class="row.task_name ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'"
                 >
                   <span class="min-w-0 truncate">{{ row.task_name || defaultTaskName(row.created_at) }}</span>
-                  <span v-if="row.child_count > 0 && !row.is_child" class="flex-shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-600 dark:bg-dark-700 dark:text-gray-300">
-                    {{ t('batchImage.list.childCount', { n: row.child_count }, row.child_count) }}
-                  </span>
-                  <span v-if="row.is_child" class="flex-shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-normal text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
-                    {{ t('batchImage.list.childBadge') }}
+                  <span v-if="row.technical_batch_count > 1" class="flex-shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-600 dark:bg-dark-700 dark:text-gray-300">
+                    {{ t('batchImage.list.executionBatchCount', { n: row.technical_batch_count }) }}
                   </span>
 	                </span>
 	                <span class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
@@ -148,24 +143,24 @@
 
           <template #cell-status="{ row }">
             <div class="flex justify-center">
-              <span :class="statusBadgeClass(displayJob(row))" class="badge">
-                {{ statusLabel(displayJob(row)) }}
+              <span :class="statusBadgeClass(row)" class="badge">
+                {{ statusLabel(row) }}
               </span>
             </div>
           </template>
 
           <template #cell-counts="{ row }">
             <div class="flex items-center justify-center gap-2 text-sm tabular-nums">
-              <span class="text-emerald-600 dark:text-emerald-300">{{ displayJob(row).success_count }}</span>
+              <span class="text-emerald-600 dark:text-emerald-300">{{ row.success_count }}</span>
               <span class="text-gray-300 dark:text-dark-500">/</span>
-              <span :class="displayJob(row).fail_count > 0 ? 'text-red-600 dark:text-red-300' : 'text-gray-400 dark:text-gray-500'">{{ displayJob(row).fail_count }}</span>
-              <span class="text-xs text-gray-400 dark:text-gray-500">{{ t('batchImage.list.totalCount', { n: displayJob(row).item_count }) }}</span>
+              <span :class="row.fail_count > 0 ? 'text-red-600 dark:text-red-300' : 'text-gray-400 dark:text-gray-500'">{{ row.fail_count }}</span>
+              <span class="text-xs text-gray-400 dark:text-gray-500">{{ t('batchImage.list.totalCount', { n: row.item_count }) }}</span>
             </div>
           </template>
 
           <template #cell-cost="{ row }">
             <span class="block text-center text-sm text-gray-700 dark:text-gray-300">
-              {{ costLabel(displayJob(row)) }}
+              {{ costLabel(row) }}
             </span>
           </template>
 
@@ -192,7 +187,7 @@
                 :class="canDownload(row) ? 'text-gray-500 hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-400' : 'text-gray-300 dark:text-dark-500'"
                 :disabled="!canDownload(row) || downloading"
                 :title="t('batchImage.actions.downloadZip')"
-                @click="downloadJob(row)"
+                @click="downloadTask(row)"
               >
                 <Icon
                   :name="isDownloadingJob(row.id) ? 'refresh' : 'download'"
@@ -285,14 +280,14 @@
         :style="moreMenuStyle"
         @click.stop
       >
-        <template v-for="job in batchJobs" :key="job.id">
+        <template v-for="job in visibleBatchJobs" :key="job.id">
           <template v-if="job.id === openMoreJobId">
             <button
               v-if="canRetry(job)"
               type="button"
               class="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-700 transition-colors hover:bg-amber-50 hover:text-amber-700 disabled:opacity-60 dark:text-gray-200 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
               :disabled="retryingBatchId === job.id"
-              @click="retryFailedJob(job)"
+              @click="retryTask(job)"
             >
               <Icon name="refresh" size="sm" :class="retryingBatchId === job.id ? 'animate-spin' : ''" />
               {{ t('batchImage.actions.retryFailedItems') }}
@@ -302,7 +297,7 @@
               type="button"
               class="flex w-full items-center gap-2 px-3 py-2 text-left text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-900/20"
               :disabled="deletingBatchId === job.id"
-              @click="deleteJob(job)"
+              @click="deleteTask(job)"
             >
               <Icon :name="deletingBatchId === job.id ? 'refresh' : 'trash'" size="sm" :class="deletingBatchId === job.id ? 'animate-spin' : ''" />
               {{ t('batchImage.actions.deleteRecords') }}
@@ -338,6 +333,12 @@
 
     <BaseDialog :show="!!currentJob" :title="t('batchImage.detail.title')" width="extra-wide" @close="closeDetail">
       <div v-if="currentJob" class="space-y-4">
+        <div>
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ currentTask?.task_name || currentJob.task_name }}</h3>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {{ currentTask?.provider || currentJob.provider }} · {{ currentTask?.model || currentJob.model }} · {{ t('batchImage.list.executionBatchCount', { n: currentTask?.technical_batch_count || 1 }) }}
+          </p>
+        </div>
         <div class="rounded-lg border border-gray-200 bg-gray-50/70 px-4 py-3 dark:border-dark-700 dark:bg-dark-900/40">
           <div class="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
             <div class="min-w-0 text-center">
@@ -363,12 +364,22 @@
             <div class="min-w-0 text-center">
               <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('batchImage.detail.downloadStatus') }}</p>
               <p class="mt-1 truncate font-medium text-gray-900 dark:text-white">
-              {{ currentJob.downloaded_at ? formatDate(currentJob.downloaded_at) : t('batchImage.list.notDownloaded') }}
+              {{ (currentTask || currentJob).downloaded_at ? formatDate((currentTask || currentJob).downloaded_at || 0) : t('batchImage.list.notDownloaded') }}
             </p>
             </div>
           </div>
         </div>
 
+        <div class="flex border-b border-gray-200 dark:border-dark-700" role="tablist">
+          <button type="button" class="border-b-2 px-4 py-2 text-sm font-medium" :class="detailTab === 'results' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100'" role="tab" :aria-selected="detailTab === 'results'" @click="detailTab = 'results'">
+            {{ t('batchImage.detail.resultsTab', { n: (currentDisplayJob || currentJob).item_count }) }}
+          </button>
+          <button type="button" class="border-b-2 px-4 py-2 text-sm font-medium" :class="detailTab === 'batches' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100'" role="tab" :aria-selected="detailTab === 'batches'" @click="detailTab = 'batches'">
+            {{ t('batchImage.detail.batchesTab', { n: currentTask?.technical_batch_count || 1 }) }}
+          </button>
+        </div>
+
+        <template v-if="detailTab === 'results'">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('batchImage.detail.items') }}</h3>
           <button type="button" class="btn btn-secondary btn-sm" :disabled="refreshing || loadingItems" @click="refreshDetail">
@@ -496,11 +507,35 @@
             {{ t('batchImage.detail.noItemsHint') }}
           </p>
         </div>
+        </template>
+
+        <div v-else class="overflow-x-auto rounded-lg border border-gray-200 dark:border-dark-700">
+          <table class="w-full min-w-[760px] divide-y divide-gray-200 text-sm dark:divide-dark-700">
+            <thead class="bg-gray-50 dark:bg-dark-800/80">
+              <tr>
+                <th class="px-3 py-3 text-left font-medium text-gray-500">{{ t('batchImage.detail.batchId') }}</th>
+                <th class="px-3 py-3 text-left font-medium text-gray-500">{{ t('batchImage.detail.specification') }}</th>
+                <th class="px-3 py-3 text-center font-medium text-gray-500">{{ t('common.status') }}</th>
+                <th class="px-3 py-3 text-center font-medium text-gray-500">{{ t('batchImage.detail.result') }}</th>
+                <th class="px-3 py-3 text-right font-medium text-gray-500">{{ t('batchImage.detail.cost') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
+              <tr v-for="job in currentTask?.collection_jobs || []" :key="job.id">
+                <td class="px-3 py-3 font-mono text-xs text-gray-700 dark:text-gray-300">{{ job.id }}</td>
+                <td class="px-3 py-3 text-gray-700 dark:text-gray-300">{{ job.image_size || '1K' }} · {{ job.aspect_ratio || '1:1' }} · {{ job.model }}</td>
+                <td class="px-3 py-3 text-center"><span :class="statusBadgeClass(job)" class="badge">{{ statusLabel(job) }}</span></td>
+                <td class="px-3 py-3 text-center tabular-nums">{{ job.success_count }} / {{ job.fail_count }}</td>
+                <td class="px-3 py-3 text-right">{{ costLabel(job) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <template #footer>
         <div class="flex justify-end gap-3">
-	          <button type="button" class="btn btn-secondary" :disabled="!currentJob || !canCancel(currentJob) || cancelling" @click="cancelSelected">
+	          <button type="button" class="btn btn-secondary" :disabled="!currentTask || !currentTask.collection_jobs.some(canCancel) || cancelling" @click="cancelSelected">
 	            <Icon v-if="cancelling" name="refresh" size="sm" class="mr-2 animate-spin" />
 	            {{ t('batchImage.actions.cancelJob') }}
 	          </button>
@@ -517,8 +552,8 @@
 	          <button
             type="button"
             class="btn btn-primary inline-flex min-w-[112px] items-center justify-center"
-            :disabled="!currentJob || !canDownload(currentJob) || downloading"
-            @click="downloadSelected"
+            :disabled="!currentTask || !canDownload(currentTask) || downloading"
+            @click="currentTask && downloadTask(currentTask)"
           >
             <Icon
               :name="currentJob && isDownloadingJob(currentJob.id) ? 'refresh' : 'download'"
@@ -548,8 +583,15 @@
       </div>
     </BaseDialog>
 
-    <BaseDialog :show="showCreateModal" :title="t('batchImage.create.title')" width="wide" @close="closeCreateModal">
-      <form class="space-y-5" @submit.prevent="submitJob">
+    <BaseDialog :show="showCreateModal" :title="t('batchImage.create.title')" width="extra-wide" @close="closeCreateModal">
+      <form class="space-y-5" @submit.prevent="submitConfigJob">
+        <div v-if="pendingConfigAttempts.length" class="space-y-2 rounded-lg border border-amber-200 p-3" data-testid="config-recovery">
+          <p class="text-sm">{{ t('batchImage.config.pending', { count: pendingConfigAttempts.length }) }}</p>
+          <div v-for="attempt in pendingConfigAttempts" :key="attempt.fingerprint" class="flex items-center justify-between gap-3">
+            <span class="truncate text-sm">{{ attempt.config?.task_name || t('batchImage.config.untitled') }}</span>
+            <button type="button" class="btn btn-secondary btn-sm" :disabled="submitting" @click="restorePendingConfig(attempt)">{{ t('batchImage.config.restore') }}</button>
+          </div>
+        </div>
         <div class="grid gap-4 md:grid-cols-2">
           <div class="md:col-span-2">
             <label class="input-label">{{ t('batchImage.create.taskName') }}</label>
@@ -558,176 +600,173 @@
               type="text"
               maxlength="255"
               class="input"
+              :disabled="submitting"
               :placeholder="t('batchImage.create.taskNamePlaceholder')"
             />
           </div>
 
           <div class="md:col-span-2">
             <label class="input-label">API Key</label>
-            <select v-model.number="form.apiKeyId" class="input" :disabled="loadingKeys">
+            <select v-model.number="form.apiKeyId" class="input" :disabled="loadingKeys || submitting" data-testid="config-key">
               <option :value="0">{{ loadingKeys ? t('batchImage.create.loadingKeys') : t('batchImage.create.selectKeyPlaceholder') }}</option>
               <option v-for="key in batchImageApiKeys" :key="key.id" :value="key.id">
-                {{ key.name }} · {{ key.group?.name || key.group?.platform }}
+                [{{ key.group?.platform === 'gemini' ? 'Gemini' : 'OpenAI' }}] {{ key.name }} · {{ key.group?.name || key.group?.platform }}
               </option>
             </select>
-            <p v-if="!loadingKeys && batchImageApiKeys.length === 0" class="input-hint text-amber-600 dark:text-amber-400">
-              {{ t('batchImage.create.noKeysHint') }}
-            </p>
+            <p v-if="!loadingKeys && batchImageApiKeys.length === 0" class="input-hint text-amber-600 dark:text-amber-400">{{ t('batchImage.create.noKeysHint') }}</p>
           </div>
 
-          <div>
-            <label class="input-label">{{ t('batchImage.create.model') }}</label>
-            <select v-model="form.model" class="input" :disabled="loadingModels || availableBatchImageModels.length === 0">
-              <option v-if="loadingModels" value="">{{ batchImageText('loadingModels') }}</option>
-              <option v-else-if="availableBatchImageModels.length === 0" value="">{{ batchImageText('noModels') }}</option>
-              <option v-for="model in availableBatchImageModels" :key="model.value" :value="model.value">
-                {{ model.label }}
-              </option>
-            </select>
-            <p v-if="modelLoadError" class="input-hint text-amber-600 dark:text-amber-400">
-              {{ modelLoadError }}
-            </p>
-            <p v-else-if="selectedApiKey && !loadingModels && availableBatchImageModels.length === 0" class="input-hint text-amber-600 dark:text-amber-400">
-              {{ batchImageText('noModelsHint') }}
-            </p>
-          </div>
-
-          <div>
-            <label class="input-label">{{ t('batchImage.create.imageSize') }}</label>
-            <select v-if="supportsImageParams" v-model="form.imageSize" class="input" data-testid="image-size" :aria-label="t('batchImage.create.imageSize')">
-              <option v-for="size in imageSizeOptions" :key="size" :value="size">{{ size }}</option>
-            </select>
-            <div v-else class="input flex items-center bg-gray-50 text-gray-600 dark:bg-dark-900 dark:text-gray-300">1K</div>
-            <p class="input-hint">{{ t(isOpenAIPlatform ? 'batchImage.create.openaiImageSizeHint' : 'batchImage.create.imageSizeHint') }}</p>
-          </div>
-
-          <div v-if="supportsImageParams">
-            <label class="input-label">{{ t('batchImage.create.aspectRatio') }}</label>
-            <select v-model="form.aspectRatio" class="input" data-testid="aspect-ratio" :aria-label="t('batchImage.create.aspectRatio')">
-              <option v-for="[ratio, pixels] in aspectRatioOptions" :key="ratio" :value="ratio">{{ ratio }} · {{ pixels }}</option>
-            </select>
-            <p class="input-hint">{{ t('batchImage.create.openaiDimensionsHint') }}</p>
-          </div>
-
-          <div>
-            <label class="input-label">{{ t('batchImage.create.outputFormat') }}</label>
-            <select v-model="form.responseMimeType" class="input">
-              <option v-for="mime in outputMimeOptions" :key="mime" :value="mime">{{ mime === 'image/webp' ? 'WebP' : mime.slice(6).toUpperCase() }}</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="input-label">{{ t('batchImage.create.estimatedOutput') }}</label>
-            <div class="input flex items-center bg-gray-50 text-gray-600 dark:bg-dark-900 dark:text-gray-300">
-              {{ t('batchImage.create.estimatedOutputValue', { images: estimatedOutputCount, prompts: promptRows.length }) }}
+          <template v-if="selectedApiKey">
+          <details class="md:col-span-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-900/50" data-testid="config-matrix">
+            <summary class="flex cursor-pointer items-center justify-between gap-3">
+              <div>
+                <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t(isGeminiPlatform ? 'batchImage.config.geminiMatrix' : 'batchImage.config.matrix') }}</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('batchImage.config.matrixHint') }}</p>
+              </div>
+              <span class="text-xs text-gray-500 dark:text-gray-400">1K / 2K / 4K × 8 种比例</span>
+            </summary>
+            <div class="mt-3 grid gap-2 text-xs text-gray-600 dark:text-gray-300 sm:grid-cols-3">
+              <div v-for="size in configSizes" :key="size" class="rounded-md border border-gray-200 bg-white p-2 dark:border-dark-700 dark:bg-dark-800">
+                <p class="font-semibold text-gray-900 dark:text-white">{{ size }}</p>
+                <dl class="mt-1 space-y-1">
+                  <div v-for="ratio in configRatios" :key="ratio" class="flex justify-between gap-2">
+                    <dt>{{ ratio }}</dt><dd>{{ configMatrix[size]?.[ratio] }}</dd>
+                  </div>
+                </dl>
+              </div>
             </div>
-          </div>
-        </div>
+          </details>
 
-        <div class="space-y-3">
-          <div class="flex items-center justify-between gap-3">
-            <label class="input-label mb-0">Prompt</label>
-            <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('batchImage.create.promptAdded', { count: promptRows.length }) }}</span>
-          </div>
-          <div class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
-            <textarea
-              v-model="promptDraft"
-              rows="3"
-              class="h-[76px] w-full resize-y rounded-md border border-gray-300 px-3 py-2 text-sm leading-5 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-dark-600 dark:bg-dark-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/40"
-              :placeholder="t('batchImage.create.promptPlaceholder')"
-            />
-            <div class="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_112px_132px_112px] md:items-center">
-              <input
-                v-model="customIdDraft"
-                type="text"
-                maxlength="255"
-                class="input h-9 text-sm"
-                :placeholder="t('batchImage.create.customIdPlaceholder')"
+          <div class="md:col-span-2 grid items-stretch gap-6 md:grid-cols-2" data-testid="config-workspace">
+            <div class="flex min-w-0 flex-col">
+              <label for="batch-config-input" class="input-label">{{ t('batchImage.config.inputLabel') }}</label>
+              <textarea
+                id="batch-config-input"
+                v-model="configInput"
+                rows="8"
+                class="min-h-[190px] w-full flex-1 resize-y rounded-md border border-gray-300 px-3 py-3 text-sm leading-6 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-dark-600 dark:bg-dark-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/40"
+                :disabled="submitting"
+                :placeholder="t('batchImage.config.inputPlaceholder')"
+                data-testid="config-input"
               />
-              <select
-                v-model.number="outputCountDraft"
-                class="batch-output-count-select input h-9 text-sm"
-                :title="t('batchImage.create.outputCountPerPrompt')"
-                :aria-label="t('batchImage.create.outputCountPerPrompt')"
-              >
-                <option v-for="count in outputCountOptions" :key="count" :value="count">
-                  {{ t('batchImage.create.outputCountOption', { n: count }, count) }}
-                </option>
-              </select>
-              <label
-                class="btn btn-secondary h-9 cursor-pointer justify-center text-sm"
-                :class="referenceImageDrafts.length >= selectedModelReferenceLimit ? 'pointer-events-none opacity-60' : ''"
-              >
-                <Icon name="upload" size="sm" class="mr-1.5" />
-                {{ t('batchImage.create.referenceImage') }}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  multiple
-                  class="hidden"
-                  :disabled="referenceImageDrafts.length >= selectedModelReferenceLimit"
-                  @change="handleReferenceImageFiles"
-                />
-              </label>
-              <button type="button" class="btn btn-secondary h-9 justify-center whitespace-nowrap px-4 text-sm" :disabled="!promptDraft.trim()" @click="addPromptRow">
-                <Icon name="plus" size="sm" class="mr-1.5" />
-                {{ t('common.add') }}
+              <p class="mt-2 text-xs text-gray-600 dark:text-gray-300">{{ t('batchImage.config.inputHint') }}</p>
+              <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50/70 p-3 dark:border-dark-700 dark:bg-dark-900/40" data-testid="reference-settings">
+                <div class="flex items-center justify-between gap-4">
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('batchImage.config.consistency') }}</p>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ configConsistency ? t(isGeminiPlatform ? 'batchImage.config.sharedReferencesHint' : 'batchImage.config.sharedReferenceHint') : t('batchImage.config.itemReferenceHint') }}</p>
+                  </div>
+                  <Toggle v-model="configConsistency" :disabled="submitting" data-testid="config-consistency" :aria-label="t('batchImage.config.consistency')" />
+                </div>
+                <div v-if="configConsistency" class="mt-3 space-y-2">
+                  <p v-if="hasRecommendedConsistencyModel" class="text-xs text-gray-600 dark:text-gray-300">{{ t('batchImage.config.recommendation') }}</p>
+                  <BatchImageReferenceUpload
+                    :images="configReferenceImages" :names="configReferenceNames"
+                    :label="t('batchImage.config.uploadReference')" :limit="sharedReferenceLimit"
+                    :multiple="isGeminiPlatform" :disabled="submitting || loadingModels"
+                    :loading="configReferenceLoading" :error="configReferenceError" required
+                    test-id="config-reference" remove-test-id="remove-shared-reference"
+                    @files="loadConfigReferenceFiles" @remove="removeConfigReference" @clear="clearConfigReference"
+                  />
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary mt-2" :disabled="submitting || configConverting || !configInput.trim()" data-testid="convert-config" @click="convertConfig">
+                {{ configConverting ? t('batchImage.config.converting') : t('batchImage.config.convert') }}
               </button>
+              <p v-if="configError" role="alert" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ configError }}</p>
+              <p v-else-if="configStatus === 'stale'" role="status" class="mt-2 text-xs text-amber-700 dark:text-amber-300">{{ t('batchImage.config.stale') }}</p>
+              <p v-if="configCards.length && modelLoadError" role="alert" class="mt-2 text-xs text-red-600">{{ modelLoadError }}</p>
+              <p v-else-if="configCards.length && !loadingModels && availableBatchImageModels.length === 0" role="alert" class="mt-2 text-xs text-red-600">{{ t('batchImage.config.noModels') }}</p>
             </div>
-            <div v-if="referenceImageDrafts.length" class="mt-3 flex flex-wrap gap-2">
-              <span
-                v-for="(ref, refIndex) in referenceImageDrafts"
-                :key="`${ref.name}-${refIndex}`"
-                class="inline-flex max-w-full items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700 dark:border-dark-700 dark:bg-dark-900 dark:text-gray-200"
-              >
-                <span class="max-w-[180px] truncate">{{ ref.name }}</span>
-                <button type="button" class="text-gray-400 hover:text-red-600" :title="t('batchImage.create.removeReferenceImage')" @click="removeReferenceImageDraft(refIndex)">
-                  <Icon name="x" size="xs" />
+
+            <div class="flex min-h-[380px] min-w-0 flex-col rounded-lg border border-gray-200 bg-white p-3 dark:border-dark-700 dark:bg-dark-800" data-testid="config-cards">
+              <div class="flex items-center justify-between">
+                <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ configCards.length ? t('batchImage.config.preview', { count: configCards.length }) : t('batchImage.config.draftTitle') }}</p>
+                <span class="text-xs text-gray-500 dark:text-gray-400" data-testid="config-status">{{ configStatusLabel }}</span>
+              </div>
+              <template v-if="configCards.length && (configInput.trim() || configRecovered)">
+              <div v-for="(card, index) in configCards" :key="card.localId" class="rounded-lg border border-gray-200 dark:border-dark-700">
+                <button type="button" class="flex w-full items-center justify-between px-3 py-2 text-left text-sm" :aria-expanded="expandedConfigCard === card.localId" data-testid="config-card-toggle" @click="toggleConfigCard(card.localId)">
+                  <span class="truncate font-medium">{{ expandedConfigCard === card.localId ? '▼' : '▶' }} {{ t('batchImage.config.image', { index: String(index + 1).padStart(2, '0') }) }}：{{ card.prompt }}</span>
+                  <span class="ml-2 flex-shrink-0 text-xs text-gray-500">{{ card.image_size }} / {{ card.aspect_ratio }}</span>
                 </button>
-              </span>
+                <div v-if="expandedConfigCard === card.localId" class="space-y-2 border-t border-gray-100 p-3 dark:border-dark-700">
+                  <label class="block text-sm">{{ t('batchImage.config.prompt') }}
+                    <textarea v-model="card.prompt" rows="5" class="input mt-1 resize-y text-sm leading-6" aria-label="prompt" :disabled="submitting" @input="markConfigEdited" />
+                  </label>
+                  <div class="grid gap-3" :class="isGeminiPlatform ? 'sm:grid-cols-2' : 'sm:grid-cols-3'">
+                    <label class="block text-sm">{{ t('batchImage.config.resolution') }}
+                      <select v-model="card.image_size" class="input mt-1 text-sm" aria-label="image_size" :disabled="submitting" @change="markConfigEdited">
+                        <option v-for="size in configSizes" :key="size" :value="size" :disabled="!configModelSupportsSize(card, size)">{{ size }}</option>
+                      </select>
+                    </label>
+                    <label class="block text-sm">{{ t('batchImage.config.ratio') }}
+                      <select v-model="card.aspect_ratio" class="input mt-1 text-sm" aria-label="aspect_ratio" :disabled="submitting" @change="markConfigEdited">
+                        <option v-for="ratio in configRatios" :key="ratio" :value="ratio">{{ ratio }}</option>
+                      </select>
+                    </label>
+                    <label class="block text-sm" :class="isGeminiPlatform ? 'sm:col-span-2' : ''">{{ t('batchImage.config.model') }}
+                      <select v-model="card.model" class="input mt-1 text-sm" aria-label="model" :disabled="submitting" @change="markConfigEdited">
+                        <option :value="BATCH_IMAGE_AUTO_MODEL">{{ t('batchImage.config.auto') }}</option>
+                        <option v-for="model in availableBatchImageModels" :key="model.value" :value="model.value">{{ model.label }}</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label class="block text-sm">{{ t('batchImage.config.count') }}
+                    <select v-model.number="card.output_count" class="input mt-1 text-sm" aria-label="output_count" :disabled="submitting" @change="markConfigEdited">
+                      <option v-for="count in outputCountOptions" :key="count" :value="count">{{ count }}</option>
+                    </select>
+                  </label>
+                  <div v-if="configConsistency && configReferenceImages.length" class="flex min-w-0 items-center gap-2 bg-gray-50 px-2 py-1.5 text-xs text-gray-600 dark:bg-dark-900 dark:text-gray-300">
+                    <span class="min-w-0 break-all">{{ t('batchImage.config.usesSharedReference') }} · {{ configReferenceNames.join(', ') }}</span>
+                  </div>
+                  <div v-else-if="!configConsistency" class="space-y-2">
+                    <BatchImageReferenceUpload
+                      :images="card.reference_images || []" :names="card.reference_names || (card.reference_name ? [card.reference_name] : [])"
+                      :label="t('batchImage.config.uploadItemReference')" :limit="configCardReferenceLimit(card)"
+                      :multiple="isGeminiPlatform" :disabled="submitting || loadingModels"
+                      :loading="!!card.reference_loading" :error="card.reference_error" compact
+                      test-id="config-item-reference" remove-test-id="remove-item-reference" clear-test-id="clear-item-reference"
+                      @files="loadCardReferenceFiles(card, $event)" @remove="removeCardReference(card, $event)" @clear="clearCardReference(card)"
+                    />
+                  </div>
+                  <p class="text-xs text-gray-600 dark:text-gray-300">{{ t(isGeminiPlatform ? 'batchImage.config.geminiPixels' : 'batchImage.config.pixels', { size: batchImageConfigPixels(card, configPlatform) || t('batchImage.config.invalidCombination'), model: resolveBatchImageConfigModel(card, availableBatchImageModels) || t('batchImage.config.notSelected') }) }}</p>
+                </div>
+                <p v-if="configPreview.errors[card.localId]?.length" class="px-3 pb-2 text-xs text-red-600 dark:text-red-400" role="alert">{{ t('batchImage.config.image', { index: index + 1 }) }}：{{ configPreview.errors[card.localId].join('；') }}</p>
+              </div>
+              <details v-if="configPreview.groups.length" class="rounded border border-gray-200 p-2 text-xs dark:border-dark-700" data-testid="config-payload-preview">
+                <summary class="cursor-pointer">{{ t('batchImage.config.payload') }}</summary>
+                <pre class="mt-2 max-h-52 overflow-auto whitespace-pre-wrap break-all">{{ JSON.stringify(configPayloadDisplay, null, 2) }}</pre>
+              </details>
+              </template>
+              <div v-else class="flex flex-1 flex-col items-center justify-center px-6 text-center" data-testid="config-empty-state">
+                <span class="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100 text-gray-400 dark:bg-dark-700 dark:text-gray-300"><Icon name="document" size="lg" /></span>
+                <p class="mt-3 text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('batchImage.config.emptyDraft') }}</p>
+              </div>
             </div>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              {{ t('batchImage.create.limitsHint', { maxPerItem: BATCH_IMAGE_MAX_OUTPUTS_PER_ITEM, maxPerJob: BATCH_IMAGE_MAX_OUTPUTS_PER_JOB, refLimit: selectedModelReferenceLimit }) }}
-            </p>
           </div>
-          <div v-if="promptRows.length" class="overflow-hidden rounded-lg border border-gray-200 dark:border-dark-700">
-            <div
-              v-for="(row, index) in promptRows"
-              :key="row.localId"
-              class="flex items-center gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0 dark:border-dark-700"
-            >
-              <span class="w-20 flex-shrink-0 font-mono text-xs text-gray-500 dark:text-gray-400">{{ row.custom_id }}</span>
-              <p class="min-w-0 flex-1 truncate text-sm text-gray-800 dark:text-gray-100">{{ row.prompt }}</p>
-              <span v-if="row.output_count > 1" class="flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">
-                x{{ row.output_count }}
-              </span>
-              <span v-if="row.reference_images.length" class="flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">
-                {{ t('batchImage.create.referenceCount', { n: row.reference_images.length }, row.reference_images.length) }}
-              </span>
-              <button type="button" class="btn-ghost btn-icon flex-shrink-0 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20" :title="t('common.delete')" @click="removePromptRow(index)">
-                <Icon name="trash" size="sm" />
-              </button>
-            </div>
+
+          <div class="md:col-span-2">
+            <label class="input-label">{{ t('batchImage.create.outputFormat') }}</label>
+            <select v-model="form.responseMimeType" class="input" :disabled="submitting" data-testid="config-mime">
+              <option v-for="mime in batchImageMimeTypes" :key="mime" :value="mime">{{ mime === 'image/webp' ? 'WebP' : mime.slice(6).toUpperCase() }}</option>
+            </select>
           </div>
-          <div v-else class="rounded-lg border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400">
-            {{ t('batchImage.create.noPrompts') }}
+          </template>
+
+          <div v-else class="md:col-span-2 rounded-lg border border-dashed border-gray-200 py-14 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400">
+            {{ t('batchImage.create.selectKeyPlaceholder') }}
           </div>
         </div>
 
-	        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
-	          {{ t('batchImage.create.cancelNotice') }}
-	        </div>
-	        <div v-if="submitting" class="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm leading-6 text-sky-800 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100">
-	          {{ t('batchImage.create.submittingNotice') }}
-	        </div>
-	      </form>
+      </form>
 
       <template #footer>
-        <div class="flex justify-end gap-3">
-          <button type="button" class="btn btn-secondary" :disabled="submitting" @click="closeCreateModal">{{ t('common.cancel') }}</button>
-	          <button type="button" class="btn btn-primary inline-flex min-w-[120px] justify-center" :disabled="submitting || loadingModels || (parsedItems.length === 0 && !promptDraft.trim()) || !selectedApiKey || !form.model || !validImageSpecs" @click="submitJob">
+        <div class="flex w-full items-center justify-end gap-3" data-testid="config-footer">
+          <button type="button" class="btn btn-secondary flex-shrink-0" :disabled="submitting" @click="closeCreateModal">{{ t('common.cancel') }}</button>
+          <button type="button" class="btn btn-primary inline-flex min-w-[156px] justify-center" :disabled="!canSubmitConfig" data-testid="submit-config" @click="submitConfigJob">
             <Icon v-if="submitting" name="refresh" size="sm" class="mr-2 animate-spin" />
-            {{ submitting ? t('common.submitting') : t('batchImage.actions.submitJob') }}
+            {{ submitting ? t('batchImage.config.submitting') : t('batchImage.config.submit') }}
           </button>
         </div>
       </template>
@@ -770,7 +809,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -778,8 +817,22 @@ import DataTable from '@/components/common/DataTable.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select, { type SelectOption } from '@/components/common/Select.vue'
 import SearchInput from '@/components/common/SearchInput.vue'
+import Toggle from '@/components/common/Toggle.vue'
 import Icon from '@/components/icons/Icon.vue'
-import { batchImageMimeTypes, geminiImageSizes, keyAllowsBatchImage, openAIImageSizes } from '@/utils/batchImage'
+import BatchImageReferenceUpload from '@/components/batch-image/BatchImageReferenceUpload.vue'
+import { batchImageMimeTypes, keyAllowsBatchImage } from '@/utils/batchImage'
+import {
+  BATCH_IMAGE_AUTO_MODEL,
+  batchImageConfigMatrix,
+  batchImageConfigPixels,
+  batchImageConfigReferenceLimit,
+  buildBatchImageConfigPreview,
+  parseBatchImageConfigInput,
+  resolveBatchImageConfigModel,
+  type BatchImageConfigCard,
+  type BatchImageConfigPlatform,
+  type BatchImageConfigStatus,
+} from '@/utils/batchImageConfig'
 import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize, setPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { useAppStore } from '@/stores/app'
@@ -801,16 +854,22 @@ import {
   type BatchImageJobsListOptions,
   type BatchImageReferenceImage,
   type BatchImageStatus,
-  type BatchImageSubmitItem,
+  type BatchImageSubmitRequest,
 } from '@/api/batchImage'
 import type { ApiKey } from '@/types'
+import { batchImageZipMergeLimits, buildBatchImageConfigByCustomId, mergeBatchImageZips, type BatchImageZipInput } from '@/utils/mergeBatchImageZips'
 import type { Column } from '@/components/common/types'
 
-type BatchImageJobRow = Pick<BatchImageJob, 'id' | 'task_name' | 'parent_batch_id' | 'status' | 'model' | 'provider' | 'item_count' | 'success_count' | 'fail_count' | 'estimated_cost' | 'hold_amount' | 'actual_cost' | 'created_at' | 'downloaded_at' | 'image_size' | 'aspect_ratio' | 'response_mime_type'> & {
+type BatchImageJobRow = Pick<BatchImageJob, 'id' | 'task_name' | 'collection_id' | 'parent_batch_id' | 'status' | 'model' | 'provider' | 'item_count' | 'success_count' | 'fail_count' | 'estimated_cost' | 'hold_amount' | 'actual_cost' | 'created_at' | 'downloaded_at' | 'image_size' | 'aspect_ratio' | 'response_mime_type'> & {
   api_key_id: number
   api_key_name: string
   child_count: number
   is_child?: boolean
+}
+
+type BatchImageTaskRow = BatchImageJobRow & {
+  collection_jobs: BatchImageJobRow[]
+  technical_batch_count: number
 }
 
 type BatchImageDetailItem = BatchImageItem & {
@@ -818,18 +877,7 @@ type BatchImageDetailItem = BatchImageItem & {
   source_task_name: string
 }
 
-type PromptRow = {
-  localId: string
-  custom_id: string
-  prompt: string
-  output_count: number
-  reference_images: BatchImageReferenceImage[]
-}
-
-type ReferenceImageDraft = BatchImageReferenceImage & {
-  name: string
-  size: number
-}
+type PreviewImageSource = ImageBitmap | HTMLImageElement
 
 type PreviewCacheRecord = {
   key: string
@@ -839,9 +887,27 @@ type PreviewCacheRecord = {
   lastAccessedAt: number
 }
 
-type PreviewImageSource = ImageBitmap | HTMLImageElement
+type ConfigGroupSubmission = {
+  fingerprint: string
+  collectionFingerprints?: string[]
+  idempotencyKey: string
+  job: BatchImageJob
+  config: BatchImageSubmitRequest
+}
 
-const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled', 'output_deleted'])
+type PersistedConfigAttempt = {
+  fingerprint: string
+  collectionFingerprints?: string[]
+  referenceMode?: 'shared' | 'perItem'
+  idempotencyKey: string
+  apiKeyId: number
+  config: BatchImageSubmitRequest
+  job?: BatchImageJob
+  status: 'pending' | 'succeeded'
+  updatedAt: number
+}
+
+const TERMINAL_STATUSES = new Set(['completed', 'partial_success', 'failed', 'cancelled', 'output_deleted'])
 const PREVIEW_CACHE_DB_NAME = 'sub2api-batch-image-preview-cache'
 const PREVIEW_CACHE_STORE_NAME = 'thumbnails'
 const PREVIEW_THUMBNAIL_MAX_EDGE = 360
@@ -850,9 +916,138 @@ const PREVIEW_CACHE_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000
 const PREVIEW_CACHE_MAX_ENTRIES = 120
 const PREVIEW_CACHE_MAX_BYTES = 48 * 1024 * 1024
 const BATCH_IMAGE_MAX_OUTPUTS_PER_ITEM = 4
-const BATCH_IMAGE_MAX_OUTPUTS_PER_JOB = 200
 const outputCountOptions = Array.from({ length: BATCH_IMAGE_MAX_OUTPUTS_PER_ITEM }, (_, index) => index + 1)
 const batchPageSizeOptions: SelectOption[] = [20, 50, 100].map(size => ({ value: size, label: String(size) }))
+const CONFIG_ATTEMPT_STORAGE_PREFIX = 'sub2api-batch-image-config-attempts-v1'
+const CONFIG_HISTORY_STORAGE_PREFIX = 'sub2api-batch-image-config-history-v1'
+const CONFIG_STORAGE_TTL_MS = 30 * 24 * 60 * 60 * 1000
+const CONFIG_HISTORY_MAX_ENTRIES = 200
+
+function configStorageKey(prefix: string) {
+  if (typeof window === 'undefined') return ''
+  try {
+    const user = JSON.parse(window.localStorage.getItem('auth_user') || 'null') as { id?: unknown } | null
+    const userID = Number(user?.id || 0)
+    return Number.isSafeInteger(userID) && userID > 0 ? `${prefix}:${userID}` : ''
+  } catch {
+    return ''
+  }
+}
+
+function jsonClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
+function configForStorage(config: BatchImageSubmitRequest): BatchImageSubmitRequest {
+  const copy = jsonClone(config)
+  copy.items = copy.items.map(item => ({
+    ...item,
+    ...(item.reference_images ? {
+      reference_images: item.reference_images.map(reference => {
+        const { data: _data, file_uri: _fileURI, ...metadata } = reference
+        return metadata
+      }),
+    } : {}),
+  }))
+  return copy
+}
+
+function loadPersistedConfigAttempts(): PersistedConfigAttempt[] {
+  const key = configStorageKey(CONFIG_ATTEMPT_STORAGE_PREFIX)
+  if (!key) return []
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(key) || '[]')
+    if (!Array.isArray(raw)) return []
+    const cutoff = Date.now() - CONFIG_STORAGE_TTL_MS
+    return raw.filter((entry): entry is PersistedConfigAttempt => Boolean(entry)
+      && typeof entry.fingerprint === 'string'
+      && typeof entry.idempotencyKey === 'string'
+      && Number.isSafeInteger(entry.apiKeyId)
+      && (entry.status === 'pending' || entry.status === 'succeeded')
+      && Number.isFinite(entry.updatedAt)
+      && entry.updatedAt >= cutoff)
+  } catch {
+    return []
+  }
+}
+
+function persistConfigAttempts(attempts: PersistedConfigAttempt[]): boolean {
+  const key = configStorageKey(CONFIG_ATTEMPT_STORAGE_PREFIX)
+  if (!key || attempts.length > CONFIG_HISTORY_MAX_ENTRIES) return false
+  try {
+    window.localStorage.setItem(key, JSON.stringify(attempts))
+    return true
+  } catch {
+    // Never send a billable request without a durable idempotency key.
+    return false
+  }
+}
+
+function loadConfigHistory(): ConfigGroupSubmission[] {
+  const key = configStorageKey(CONFIG_HISTORY_STORAGE_PREFIX)
+  if (!key) return []
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(key) || '[]')
+    if (!Array.isArray(raw)) return []
+    const cutoff = Date.now() - CONFIG_STORAGE_TTL_MS
+    return raw.filter((entry): entry is ConfigGroupSubmission & { updatedAt: number } => Boolean(entry)
+      && typeof entry.fingerprint === 'string'
+      && typeof entry.idempotencyKey === 'string'
+      && entry.job && typeof entry.job.id === 'string'
+      && entry.config && Number.isFinite(entry.updatedAt)
+      && entry.updatedAt >= cutoff)
+      .map(({ updatedAt: _updatedAt, ...entry }) => entry)
+  } catch {
+    return []
+  }
+}
+
+function persistConfigHistory(history: ConfigGroupSubmission[]) {
+  const key = configStorageKey(CONFIG_HISTORY_STORAGE_PREFIX)
+  if (!key) return
+  try {
+    window.localStorage.setItem(key, JSON.stringify(history.slice(-CONFIG_HISTORY_MAX_ENTRIES).map(entry => ({
+      ...entry,
+      config: configForStorage(entry.config),
+      updatedAt: Date.now(),
+    }))))
+  } catch {
+    // 本地存储不可用或空间不足时，保留内存态。
+  }
+}
+
+function restoreConfigSubmissionState() {
+  configSubmissions.value = loadConfigHistory()
+  pendingConfigAttempts.value = loadPersistedConfigAttempts().filter(entry => entry.status === 'pending')
+}
+
+function persistConfigAttempt(attempt: PersistedConfigAttempt): boolean {
+  const attempts = loadPersistedConfigAttempts().filter(entry => entry.fingerprint !== attempt.fingerprint)
+  // 只淘汰已确认记录，未确认的计费请求不能被静默丢弃。
+  while (attempts.length >= CONFIG_HISTORY_MAX_ENTRIES) {
+    const confirmed = attempts.findIndex(entry => entry.status === 'succeeded')
+    if (confirmed < 0) return false
+    attempts.splice(confirmed, 1)
+  }
+  attempts.push({ ...attempt, config: configForStorage(attempt.config) })
+  const saved = persistConfigAttempts(attempts)
+  if (saved) pendingConfigAttempts.value = attempts.filter(entry => entry.status === 'pending')
+  return saved
+}
+
+async function configGroupFingerprint(group: BatchImageSubmitRequest, apiKeyId: number): Promise<string> {
+  if (!globalThis.crypto?.subtle) throw new Error('此浏览器环境不支持安全的提交恢复记录；请使用 HTTPS 或本机安全环境。')
+  const { collection_id: _collectionID, ...stableGroup } = group
+  const bytes = new TextEncoder().encode(JSON.stringify([apiKeyId, stableGroup]))
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return `${apiKeyId}:${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')}`
+}
+
+async function collectionIDForFingerprints(fingerprints: string[]) {
+  const bytes = new TextEncoder().encode([...fingerprints].sort().join('|'))
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return `imgcol_${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 32)}`
+}
 
 const appStore = useAppStore()
 const { copyToClipboard } = useClipboard()
@@ -891,10 +1086,7 @@ const downloadFilterOptions = computed<SelectOption[]>(() => [
 const form = reactive({
   apiKeyId: 0,
   taskName: '',
-  model: '',
   responseMimeType: 'image/png',
-  imageSize: '1K',
-  aspectRatio: '1:1',
 })
 
 const filters = reactive({
@@ -927,17 +1119,31 @@ const loadingModels = ref(false)
 const showCreateModal = ref(false)
 const showGuideModal = ref(false)
 const currentJob = ref<BatchImageJob | null>(null)
+const selectedCollectionId = ref('')
+const detailTab = ref<'results' | 'batches'>('results')
 const selectedBatchId = ref('')
 const selectedBatchApiKeyId = ref(0)
 const items = ref<BatchImageDetailItem[]>([])
 const batchJobs = ref<BatchImageJobRow[]>([])
 const selectedJobIds = ref(new Set<string>())
-const expandedParentIds = ref(new Set<string>())
-const promptRows = ref<PromptRow[]>([])
-const promptDraft = ref('')
-const customIdDraft = ref('')
-const outputCountDraft = ref(1)
-const referenceImageDrafts = ref<ReferenceImageDraft[]>([])
+const configInput = ref('')
+const configCards = ref<BatchImageConfigCard[]>([])
+const configError = ref('')
+const configConverting = ref(false)
+const configStatus = ref<BatchImageConfigStatus>('empty')
+const expandedConfigCard = ref('')
+const configEdited = ref(false)
+const configRecovered = ref(false)
+const configConsistency = ref(false)
+const configReferenceImages = ref<BatchImageReferenceImage[]>([])
+const configReferenceNames = ref<string[]>([])
+const configReferenceError = ref('')
+const configReferenceLoading = ref(false)
+const configSubmissions = ref<ConfigGroupSubmission[]>([])
+const configCollectionId = ref('')
+const downloadArtifact = ref<{ url: string; filename: string } | null>(null)
+const pendingConfigAttempts = ref<PersistedConfigAttempt[]>([])
+let configReferenceRequest = 0
 const itemPreviewUrls = reactive<Record<string, string>>({})
 const previewLoadingIds = ref(new Set<string>())
 const previewErrorIds = ref(new Set<string>())
@@ -946,6 +1152,7 @@ const availableBatchImageModels = ref<Array<{
   value: string; label: string; supported_image_sizes?: string[]; supported_mime_types?: string[]
 }>>([])
 const modelLoadError = ref('')
+const modelsApiKeyId = ref(0)
 const openMoreJobId = ref('')
 const moreMenuStyle = ref<Record<string, string>>({})
 const promptPopover = reactive({
@@ -954,6 +1161,8 @@ const promptPopover = reactive({
   style: {} as Record<string, string>,
 })
 let modelRequestSeq = 0
+let revertingApiKey = false
+let restoringConfig = false
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let previewCacheDBPromise: Promise<IDBDatabase | null> | null = null
 let previewCacheCleanupTimer: ReturnType<typeof setInterval> | null = null
@@ -969,41 +1178,69 @@ const selectedApiKey = computed(() =>
   batchImageApiKeys.value.find((key) => key.id === Number(form.apiKeyId)) || null,
 )
 
-// 参数矩阵按 provider 家族路由：openai 平台 → openAIImageSizes（尺寸+宽高比），
-// gemini 平台 → geminiImageSizes（imageConfig: aspectRatio + imageSize，上游已实测
-// 真实生效且计费按张不按档），两者都与 image-playground 的官方表逐格一致。
-// 与后端 provider 路由依据（group.platform，见 batch_image_provider.go）保持一致，
-// 不再按具体模型名（如 gpt-image-2）特判，各家族全部模型走同一套参数。
-const isOpenAIPlatform = computed(() => selectedApiKey.value?.group?.platform === 'openai')
-const supportsImageParams = computed(() =>
-  selectedApiKey.value?.group?.platform === 'openai' || selectedApiKey.value?.group?.platform === 'gemini',
-)
-const activeImageSizes = computed(() => (supportsImageParams.value && selectedApiKey.value?.group?.platform === 'gemini' ? geminiImageSizes : openAIImageSizes))
-const selectedModelSpecs = computed(() => availableBatchImageModels.value.find(model => model.value === form.model))
-const imageSizeOptions = computed(() => Object.keys(activeImageSizes.value).filter(size =>
-  !selectedModelSpecs.value?.supported_image_sizes || selectedModelSpecs.value.supported_image_sizes.includes(size),
-))
-const aspectRatioOptions = computed(() => Object.entries(activeImageSizes.value[form.imageSize] || {}))
-const outputMimeOptions = computed(() => batchImageMimeTypes.filter(mime =>
-  !isOpenAIPlatform.value || !selectedModelSpecs.value?.supported_mime_types || selectedModelSpecs.value.supported_mime_types.includes(mime),
-))
-const validImageSpecs = computed(() => !supportsImageParams.value || (
-  imageSizeOptions.value.includes(form.imageSize) &&
-  !!activeImageSizes.value[form.imageSize]?.[form.aspectRatio] && outputMimeOptions.value.includes(form.responseMimeType)
-))
-watch([supportsImageParams, imageSizeOptions, outputMimeOptions], () => {
-  if (!supportsImageParams.value) {
-    form.imageSize = '1K'
-    form.aspectRatio = '1:1'
-    return
-  }
-  if (!imageSizeOptions.value.includes(form.imageSize)) form.imageSize = imageSizeOptions.value[0] || ''
-  if (!outputMimeOptions.value.includes(form.responseMimeType)) form.responseMimeType = outputMimeOptions.value[0] || ''
-})
-watch(aspectRatioOptions, options => {
-  if (!options.some(([ratio]) => ratio === form.aspectRatio)) form.aspectRatio = options[0]?.[0] || ''
-})
+const isGeminiPlatform = computed(() => selectedApiKey.value?.group?.platform === 'gemini')
+const configPlatform = computed<BatchImageConfigPlatform>(() => isGeminiPlatform.value ? 'gemini' : 'openai')
+const configMatrix = computed(() => batchImageConfigMatrix(configPlatform.value))
+const configSizes = computed(() => Object.keys(configMatrix.value))
+const configRatios = computed(() => Object.keys(configMatrix.value['1K'] || {}))
 
+function configCardReferenceLimit(card: BatchImageConfigCard) {
+  if (!isGeminiPlatform.value) return 1
+  return batchImageConfigReferenceLimit(resolveBatchImageConfigModel(card, availableBatchImageModels.value), configPlatform.value)
+}
+
+function configModelSupportsSize(card: BatchImageConfigCard, size: string) {
+  const model = availableBatchImageModels.value.find(option => option.value === resolveBatchImageConfigModel(card, availableBatchImageModels.value))
+  return !model?.supported_image_sizes || model.supported_image_sizes.includes(size)
+}
+
+const sharedReferenceLimit = computed(() => {
+  if (!isGeminiPlatform.value) return 1
+  const limits = configCards.value.length
+    ? configCards.value.map(configCardReferenceLimit)
+    : [batchImageConfigReferenceLimit(availableBatchImageModels.value[0]?.value || '', configPlatform.value)]
+  return Math.min(...limits)
+})
+const configStatusLabel = computed(() => ({
+  empty: t('batchImage.config.waiting'),
+  converting: t('batchImage.config.converting'),
+  converted: configEdited.value ? t('batchImage.config.edited') : t('batchImage.config.converted'),
+  stale: t('batchImage.config.staleStatus'),
+  invalid: t('batchImage.config.invalid'),
+  submitting: t('batchImage.config.submitting'),
+}[configStatus.value]))
+const hasRecommendedConsistencyModel = computed(() => !isGeminiPlatform.value && availableBatchImageModels.value.some(model => model.value === 'gpt-image-2.5-sunburst'))
+const configPreview = computed(() => buildBatchImageConfigPreview(
+  configCards.value, availableBatchImageModels.value, form.taskName, form.responseMimeType,
+  configConsistency.value ? configReferenceImages.value : undefined, configPlatform.value,
+))
+const canSubmitConfig = computed(() => configStatus.value === 'converted' &&
+  !submitting.value &&
+  (!configConsistency.value || (configReferenceImages.value.length > 0 && !configReferenceLoading.value && !configReferenceError.value)) &&
+  !!selectedApiKey.value && !loadingModels.value && modelsApiKeyId.value === form.apiKeyId &&
+  !modelLoadError.value && configCards.value.length > 0 &&
+  Object.keys(configPreview.value.errors).length === 0)
+const configPayloadDisplay = computed(() => configPreview.value.groups.map(group => ({
+  ...group,
+  items: group.items.map(item => ({ ...item, ...(item.reference_images ? {
+    reference_images: item.reference_images.map(image => ({ ...image, data: configConsistency.value ? '[统一参考图 base64 已省略]' : '[参考图 base64 已省略]' })),
+  } : {}) })),
+})))
+watch(configConsistency, () => {
+  if (configCards.value.length && configStatus.value !== 'stale' && !submitting.value) markConfigEdited()
+})
+watch(configInput, () => {
+  configRecovered.value = false
+  if (configCards.value.length && !configConverting.value) configStatus.value = 'stale'
+  if (configError.value) {
+    configError.value = ''
+    if (!configCards.value.length) configStatus.value = 'empty'
+  }
+})
+watch(configPreview, preview => {
+  if (!configCards.value.length || configStatus.value === 'stale' || submitting.value) return
+  configStatus.value = Object.keys(preview.errors).length ? 'invalid' : 'converted'
+})
 const filteredApiKeys = computed(() => {
   const selectedFilterID = Number(filters.apiKeyId || 0)
   if (!selectedFilterID) return batchImageApiKeys.value
@@ -1017,10 +1254,6 @@ const apiKeyFilterOptions = computed<SelectOption[]>(() => [
     label: key.name || `API Key #${key.id}`,
   })),
 ])
-
-const selectedRows = computed(() =>
-  batchJobs.value.filter(job => selectedJobIds.value.has(job.id)),
-)
 
 const childrenByParent = computed(() => {
   const groups = new Map<string, BatchImageJobRow[]>()
@@ -1036,15 +1269,49 @@ const childrenByParent = computed(() => {
   return groups
 })
 
-const visibleBatchJobs = computed(() => {
-  const rows: BatchImageJobRow[] = []
+const visibleBatchJobs = computed<BatchImageTaskRow[]>(() => {
+  const collections = new Map<string, BatchImageJobRow[]>()
   for (const job of batchJobs.value.filter(item => !item.parent_batch_id)) {
+    const collectionID = job.collection_id || job.id
+    const rows = collections.get(collectionID) || []
     rows.push(job)
-    if (expandedParentIds.value.has(job.id)) {
-      rows.push(...(childrenByParent.value.get(job.id) || []).map(child => ({ ...child, is_child: true })))
-    }
+    collections.set(collectionID, rows)
   }
-  return rows
+  return [...collections.entries()].map(([collectionID, roots]) => {
+    roots.sort((left, right) => right.created_at - left.created_at)
+    const jobs = roots.flatMap(root => [root, ...(childrenByParent.value.get(root.id) || [])])
+    const displayed = roots.map(root => displayJob(root))
+    const representative = roots[0]!
+    const models = new Set(roots.map(job => job.model))
+    const providers = new Set(roots.map(job => job.provider))
+    const allActualCostsReady = displayed.every(job => job.actual_cost !== null)
+    const downloadedJobs = roots.filter(job => job.status === 'completed' && job.success_count > 0)
+    return {
+      ...representative,
+      collection_id: collectionID,
+      model: models.size === 1 ? representative.model : t('batchImage.list.multipleModels'),
+      provider: providers.size === 1 ? representative.provider : 'mixed',
+      status: aggregateTaskStatus(displayed),
+      item_count: displayed.reduce((sum, job) => sum + job.item_count, 0),
+      success_count: displayed.reduce((sum, job) => sum + job.success_count, 0),
+      fail_count: displayed.reduce((sum, job) => sum + job.fail_count, 0),
+      estimated_cost: displayed.reduce((sum, job) => sum + job.estimated_cost, 0),
+      hold_amount: displayed.reduce((sum, job) => sum + job.hold_amount, 0),
+      actual_cost: allActualCostsReady ? displayed.reduce((sum, job) => sum + (job.actual_cost || 0), 0) : null,
+      downloaded_at: downloadedJobs.length > 0 && downloadedJobs.every(job => !!job.downloaded_at)
+        ? Math.max(...downloadedJobs.map(job => job.downloaded_at || 0))
+        : null,
+      collection_jobs: jobs,
+      technical_batch_count: roots.length,
+      child_count: jobs.length - roots.length,
+    }
+  }).sort((left, right) => right.created_at - left.created_at)
+})
+
+const selectedTaskRows = computed(() => visibleBatchJobs.value.filter(task => selectedJobIds.value.has(task.id)))
+const selectedRows = computed(() => {
+  const seen = new Set<string>()
+  return selectedTaskRows.value.flatMap(task => task.collection_jobs).filter(job => !seen.has(job.id) && seen.add(job.id))
 })
 
 const selectedDownloadableRows = computed(() =>
@@ -1079,8 +1346,25 @@ const recoveredOriginalCustomIds = computed(() => {
 
 const currentDisplayJob = computed(() => {
   if (!currentJob.value) return null
+  const task = visibleBatchJobs.value.find(row => row.collection_id === selectedCollectionId.value)
+  if (task) return task
   return displayJob(currentJob.value)
 })
+const currentTask = computed(() => visibleBatchJobs.value.find(row => row.collection_id === selectedCollectionId.value) || null)
+
+function aggregateTaskStatus(jobs: Array<Pick<BatchImageJob, 'status' | 'success_count' | 'fail_count'>>) {
+  if (jobs.some(job => !TERMINAL_STATUSES.has(job.status))) {
+    if (jobs.some(job => ['running', 'indexing', 'processing_results', 'settling'].includes(job.status))) return 'running'
+    return 'queued'
+  }
+  const success = jobs.reduce((sum, job) => sum + job.success_count, 0)
+  const failed = jobs.reduce((sum, job) => sum + job.fail_count, 0)
+  if (success > 0 && failed > 0) return 'partial_success'
+  if (success > 0) return 'completed'
+  if (jobs.every(job => job.status === 'cancelled')) return 'cancelled'
+  if (jobs.every(job => job.status === 'output_deleted')) return 'output_deleted'
+  return 'failed'
+}
 
 const endpointBase = computed(() => {
   const configured = appStore.apiBaseUrl?.trim()
@@ -1088,41 +1372,6 @@ const endpointBase = computed(() => {
   if (typeof window !== 'undefined') return window.location.origin.replace(/\/+$/, '')
   return '<你的 Sub2API API 端点>'
 })
-
-const selectedModelReferenceLimit = computed(() => referenceImageLimitForModel(form.model))
-
-const estimatedOutputCount = computed(() =>
-  promptRows.value.reduce((sum, row) => sum + normalizeOutputCount(row.output_count), 0),
-)
-
-const parsedItems = computed<BatchImageSubmitItem[]>(() => {
-  const used = new Set<string>()
-  return promptRows.value
-    .map((row, index) => {
-      const customID = uniqueCustomID(row.custom_id || `img_${String(index + 1).padStart(3, '0')}`, used, index)
-      const item: BatchImageSubmitItem = { custom_id: customID, prompt: row.prompt.trim() }
-      const outputCount = normalizeOutputCount(row.output_count)
-      if (outputCount > 1) {
-        item.output_count = outputCount
-      }
-      if (row.reference_images.length) {
-        item.reference_images = row.reference_images
-      }
-      return item
-    })
-    .filter(item => item.prompt)
-})
-
-// 与后端 maxBatchImageReferenceImagesForModel 对齐：gpt-image 家族（gpt-image-2、
-// gpt-image-2.5 及其变体）的 edits 支持最多 16 张输入图。2026-09-28 真实上游实测
-// gpt-image-2 ×16 张与 gpt-image-2.5 ×2 张参考图均成功（输出确认真实融合了参考图）。
-function referenceImageLimitForModel(model: string) {
-  const normalized = String(model || '').toLowerCase()
-  if (normalized.startsWith('gpt-image-')) return 16
-  if (normalized.includes('pro-image')) return 14
-  if (normalized.includes('flash-image')) return 3
-  return 0
-}
 
 const agentInstruction = computed(() => `---
 name: sub2api-batch-image
@@ -1195,106 +1444,306 @@ function joinEndpointPath(base: string, path: string): string {
   return `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`
 }
 
-function uniqueCustomID(raw: string, used: Set<string>, index: number): string {
-  const base = raw.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '') || `img_${String(index + 1).padStart(3, '0')}`
-  let candidate = base
-  let suffix = 2
-  while (used.has(candidate)) {
-    candidate = `${base}_${suffix}`
-    suffix += 1
-  }
-  used.add(candidate)
-  return candidate
+function clearConfigReference() {
+  configReferenceRequest += 1
+  configReferenceImages.value = []
+  configReferenceNames.value = []
+  configReferenceError.value = ''
+  configReferenceLoading.value = false
 }
 
-function normalizeOutputCount(value: unknown): number {
-  const parsed = Math.floor(Number(value || 1))
-  if (!Number.isFinite(parsed)) return 1
-  return Math.min(BATCH_IMAGE_MAX_OUTPUTS_PER_ITEM, Math.max(1, parsed))
+const cardReferenceRequests = new WeakMap<BatchImageConfigCard, number>()
+
+function clearCardReference(card: BatchImageConfigCard) {
+  cardReferenceRequests.set(card, (cardReferenceRequests.get(card) || 0) + 1)
+  card.reference_images = []
+  card.reference_name = ''
+  card.reference_names = []
+  card.reference_loading = false
+  card.reference_error = ''
+  markConfigEdited()
 }
 
-function addPromptRow() {
-  const prompt = promptDraft.value.trim()
-  if (!prompt) return
-  const outputCount = normalizeOutputCount(outputCountDraft.value)
-  const used = new Set(promptRows.value.map(row => row.custom_id))
-  const customID = uniqueCustomID(customIdDraft.value || `img_${String(promptRows.value.length + 1).padStart(3, '0')}`, used, promptRows.value.length)
-  promptRows.value = [
-    ...promptRows.value,
-    {
-      localId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      custom_id: customID,
-      prompt,
-      output_count: outputCount,
-      reference_images: referenceImageDrafts.value.map(({ name: _name, size: _size, ...ref }) => ref),
-    },
-  ]
-  promptDraft.value = ''
-  customIdDraft.value = ''
-  outputCountDraft.value = 1
-  referenceImageDrafts.value = []
+function removeCardReference(card: BatchImageConfigCard, index: number) {
+  if (submitting.value || card.reference_loading) return
+  card.reference_images?.splice(index, 1)
+  card.reference_names?.splice(index, 1)
+  card.reference_error = ''
+  markConfigEdited()
 }
 
-function removePromptRow(index: number) {
-  promptRows.value = promptRows.value.filter((_, currentIndex) => currentIndex !== index)
+function validateReferenceFiles(files: File[], existingCount: number, limit: number) {
+  if (files.length + existingCount > limit) return t('batchImage.config.referenceLimitError', { limit })
+  if (files.some(file => !batchImageMimeTypes.includes(file.type))) return t('batchImage.config.referenceTypeError')
+  if (files.some(file => !file.size || file.size > 10 * 1024 * 1024)) return t('batchImage.config.referenceSizeError')
+  return ''
 }
 
-function removeReferenceImageDraft(index: number) {
-  referenceImageDrafts.value = referenceImageDrafts.value.filter((_, currentIndex) => currentIndex !== index)
-}
-
-async function handleReferenceImageFiles(event: Event) {
-  const input = event.target as HTMLInputElement
-  const files = Array.from(input.files || [])
-  input.value = ''
-  if (files.length === 0) return
-  const limit = selectedModelReferenceLimit.value
-  if (limit <= 0) {
-    appStore.showError(t('batchImage.create.modelNoReferenceImages'))
-    return
-  }
-  const slots = Math.max(0, limit - referenceImageDrafts.value.length)
-  if (slots <= 0) {
-    appStore.showError(t('batchImage.create.refLimitReached', { limit }))
-    return
-  }
-  const accepted = files.slice(0, slots)
-  if (accepted.length < files.length) {
-    appStore.showError(t('batchImage.create.refLimitExceededIgnored', { limit }))
-  }
-  const next: ReferenceImageDraft[] = []
-  for (const file of accepted) {
-    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
-      appStore.showError(t('batchImage.create.refFormatUnsupported'))
-      continue
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      appStore.showError(t('batchImage.create.refFileTooLarge', { name: file.name }))
-      continue
-    }
-    const data = await readFileAsBase64(file)
-    next.push({
-      id: file.name,
-      type: 'reference',
-      mime_type: file.type,
-      data,
-      name: file.name,
-      size: file.size,
-    })
-  }
-  referenceImageDrafts.value = [...referenceImageDrafts.value, ...next]
-}
-
-function readFileAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
+async function readReferenceFiles(files: File[]): Promise<BatchImageReferenceImage[]> {
+  return Promise.all(files.map(file => new Promise<BatchImageReferenceImage>((resolve, reject) => {
     const reader = new FileReader()
-    reader.onerror = () => reject(reader.error || new Error('Failed to read file'))
     reader.onload = () => {
-      const result = String(reader.result || '')
-      resolve(result.includes(',') ? result.slice(result.indexOf(',') + 1) : result)
+      const data = String(reader.result || '').split(',')[1]
+      if (!data) reject(new Error('empty reference'))
+      else resolve({ mime_type: file.type, data })
     }
+    reader.onerror = () => reject(new Error('read failed'))
+    reader.onabort = () => reject(new Error('read aborted'))
     reader.readAsDataURL(file)
+  })))
+}
+
+async function loadCardReferenceFiles(card: BatchImageConfigCard, files: File[]) {
+  if (!files.length || submitting.value || configConsistency.value || card.reference_loading) return
+  const existing = isGeminiPlatform.value && card.reference_images?.every(image => image.data) ? card.reference_images : []
+  const names = existing.length ? card.reference_names || [] : []
+  card.reference_error = validateReferenceFiles(files, existing.length, configCardReferenceLimit(card))
+  if (card.reference_error) return
+  const request = (cardReferenceRequests.get(card) || 0) + 1
+  cardReferenceRequests.set(card, request)
+  card.reference_loading = true
+  try {
+    const images = await readReferenceFiles(files)
+    if (request !== cardReferenceRequests.get(card) || !configCards.value.includes(card)) return
+    card.reference_images = [...existing, ...images]
+    card.reference_names = [...names, ...files.map(file => file.name)]
+    card.reference_name = card.reference_names[0] || ''
+    markConfigEdited()
+  } catch {
+    if (request === cardReferenceRequests.get(card)) card.reference_error = t('batchImage.config.referenceReadError')
+  } finally {
+    if (request === cardReferenceRequests.get(card)) card.reference_loading = false
+  }
+}
+
+function removeConfigReference(index: number) {
+  if (submitting.value || configReferenceLoading.value) return
+  configReferenceImages.value.splice(index, 1)
+  configReferenceNames.value.splice(index, 1)
+  configReferenceError.value = ''
+  if (configCards.value.length) markConfigEdited()
+}
+
+async function loadConfigReferenceFiles(files: File[]) {
+  if (!files.length || submitting.value || configReferenceLoading.value) return
+  const existing = isGeminiPlatform.value ? configReferenceImages.value : []
+  const names = existing.length ? configReferenceNames.value : []
+  configReferenceError.value = validateReferenceFiles(files, existing.length, sharedReferenceLimit.value)
+  if (configReferenceError.value) return
+  const request = ++configReferenceRequest
+  configReferenceLoading.value = true
+  try {
+    const images = await readReferenceFiles(files)
+    if (request !== configReferenceRequest) return
+    configReferenceImages.value = [...existing, ...images]
+    configReferenceNames.value = [...names, ...files.map(file => file.name)]
+    if (configCards.value.length) markConfigEdited()
+  } catch {
+    if (request === configReferenceRequest) configReferenceError.value = t('batchImage.config.referenceReadError')
+  } finally {
+    if (request === configReferenceRequest) configReferenceLoading.value = false
+  }
+}
+
+function convertConfig() {
+  if (configConverting.value || submitting.value) return
+  if (configEdited.value && configCards.value.length && !window.confirm(t('batchImage.config.overwrite'))) return
+  configConverting.value = true
+  configStatus.value = 'converting'
+  const result = parseBatchImageConfigInput(configInput.value, configPlatform.value)
+  configConverting.value = false
+  if (!result.ok) {
+    configCards.value = []
+    expandedConfigCard.value = ''
+    configEdited.value = false
+    configStatus.value = 'invalid'
+    configError.value = result.error
+    return
+  }
+  configError.value = ''
+  configCards.value = result.cards
+  expandedConfigCard.value = result.cards[0]?.localId || ''
+  configEdited.value = false
+  configStatus.value = Object.keys(configPreview.value.errors).length ? 'invalid' : 'converted'
+}
+
+function toggleConfigCard(localId: string) {
+  expandedConfigCard.value = expandedConfigCard.value === localId ? '' : localId
+}
+
+function markConfigEdited() {
+  configEdited.value = true
+  if (configStatus.value !== 'stale') configStatus.value = Object.keys(configPreview.value.errors).length ? 'invalid' : 'converted'
+}
+
+function newCollectionID() {
+  if (globalThis.crypto?.randomUUID) return `imgcol_${globalThis.crypto.randomUUID().replace(/-/g, '')}`
+  return `imgcol_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 14)}`
+}
+
+async function submitConfigJob() {
+  if (!canSubmitConfig.value || submitting.value) return
+  const key = selectedApiKey.value
+  if (!key) {
+    appStore.showError(batchImageText('selectApiKey'))
+    return
+  }
+
+  // Lock before the first asynchronous digest so rapid clicks cannot create
+  // independent requests for the same billable configuration.
+  submitting.value = true
+  configStatus.value = 'submitting'
+  const groups = configPreview.value.groups.map(group => jsonClone(group))
+  const submitted = new Map(configSubmissions.value.map(entry => [entry.fingerprint, entry]))
+  const pendingGroups: Array<{ group: BatchImageSubmitRequest; fingerprint: string }> = []
+  const errors: unknown[] = []
+  try {
+    const currentFingerprints = new Set<string>()
+    for (const group of groups) {
+      if (!group.task_name?.trim()) {
+        // Server-side default names depend on the current second and would
+        // change the normalized hash when a lost response is replayed.
+        const digest = await configGroupFingerprint({ ...group, task_name: '' }, key.id)
+        group.task_name = `批量生图-${digest.slice(-12)}`
+      }
+      const fingerprint = await configGroupFingerprint(group, key.id)
+      currentFingerprints.add(fingerprint)
+    }
+    configCollectionId.value = configCollectionId.value || await collectionIDForFingerprints([...currentFingerprints])
+    for (const group of groups) group.collection_id = configCollectionId.value
+    for (const group of groups) {
+      const fingerprint = await configGroupFingerprint(group, key.id)
+      if (!submitted.has(fingerprint)) pendingGroups.push({ group, fingerprint })
+    }
+    if (!pendingGroups.length) {
+      appStore.showSuccess('所有当前配置组均已提交。')
+      return
+    }
+    for (const { group, fingerprint } of pendingGroups) {
+      const previous = loadPersistedConfigAttempts().find(entry => entry.fingerprint === fingerprint)
+      if (previous?.status === 'succeeded') {
+        if (!previous.job) {
+          errors.push(new Error('已提交任务缺少可恢复的任务编号，请先在历史列表核对，勿重复提交。'))
+          continue
+        }
+        const record: ConfigGroupSubmission = { fingerprint, collectionFingerprints: [...currentFingerprints], idempotencyKey: previous.idempotencyKey, job: previous.job, config: previous.config }
+        configSubmissions.value = [...configSubmissions.value, record]
+        submitted.set(fingerprint, record)
+        persistConfigHistory(configSubmissions.value)
+        continue
+      }
+      if (previous && (!previous.config || !canReuseConfigAttempt(previous.config, group))) {
+        errors.push(new Error('已有未确认的提交记录，请恢复完全相同的配置和参考图后重试，或先在历史列表核对。'))
+        continue
+      }
+      const idempotencyKey = previous?.idempotencyKey || `sub2api-ui-config-${fingerprint}`
+      const attempt: PersistedConfigAttempt = {
+        fingerprint, collectionFingerprints: [...currentFingerprints], referenceMode: configConsistency.value ? 'shared' : 'perItem', idempotencyKey, apiKeyId: key.id,
+        config: group, status: 'pending', updatedAt: Date.now(),
+      }
+      if (!persistConfigAttempt(attempt)) {
+        errors.push(new Error('浏览器无法保存提交恢复记录；为避免重复生成和扣费，本组未发送请求。请检查浏览器存储空间。'))
+        continue
+      }
+      try {
+        const submittedJob = await submitBatchImageJob(key.key, group, idempotencyKey)
+        const job = { ...submittedJob, collection_id: submittedJob.collection_id || group.collection_id }
+        const record: ConfigGroupSubmission = { fingerprint, collectionFingerprints: [...currentFingerprints], idempotencyKey, job, config: jsonClone(group) }
+        configSubmissions.value = [...configSubmissions.value, record]
+        submitted.set(fingerprint, record)
+        if (!persistConfigAttempt({ ...attempt, config: group, job, status: 'succeeded', updatedAt: Date.now() })) {
+          errors.push(new Error(`任务 ${job.id} 已提交，但浏览器无法保存结果。请在历史任务列表核对后再操作。`))
+        }
+        persistConfigHistory(configSubmissions.value)
+        upsertJob(job, key)
+      } catch (error) {
+        // 只有服务端明确确认冻结余额失败（尚未调用 provider）才开启新意图。
+        // 超时、断网及其它不确定结果始终复用原键。
+        if ((error as { code?: unknown })?.code === 'INSUFFICIENT_BALANCE') {
+          const round = Number(idempotencyKey.match(/-balance-(\d+)$/)?.[1] || 0) + 1
+          persistConfigAttempt({ ...attempt, idempotencyKey: `sub2api-ui-config-${fingerprint}-balance-${round}` })
+        }
+        errors.push(error)
+      }
+    }
+
+    const completedSubmissions = [...submitted.values()].filter(entry => currentFingerprints.has(entry.fingerprint))
+    const firstSubmitted = completedSubmissions[0]?.job
+    if (firstSubmitted) {
+      currentJob.value = firstSubmitted
+      selectedCollectionId.value = firstSubmitted.collection_id || firstSubmitted.id
+      selectedBatchId.value = firstSubmitted.id
+      selectedBatchApiKeyId.value = key.id
+      items.value = []
+      if (!errors.length) showCreateModal.value = false
+      void loadItems()
+      void loadBatchJobs()
+      startPolling()
+    }
+
+    if (errors.length) {
+      const message = batchImageErrorMessage(errors[0], batchImageText('submitFailed'))
+      const submittedCount = completedSubmissions.length
+      appStore.showError(submittedCount
+        ? `已成功提交 ${submittedCount}/${configPreview.value.groups.length} 组；${errors.length} 组提交失败。再次提交会跳过已成功组。${message}`
+        : message)
+      configStatus.value = 'converted'
+      return
+    }
+
+    if (!completedSubmissions.length) return
+    configStatus.value = 'converted'
+    appStore.showSuccess(`已真实提交 ${completedSubmissions.length} 组批量任务。`)
+    resetCreateDraft()
+  } catch (error) {
+    appStore.showError(batchImageErrorMessage(error, batchImageText('submitFailed')))
+  } finally {
+    submitting.value = false
+    if (configStatus.value === 'submitting') configStatus.value = 'converted'
+  }
+}
+
+function restorePendingConfig(attempt: PersistedConfigAttempt) {
+  if (submitting.value || !attempt.config || !Array.isArray(attempt.config.items)) return
+  if (!batchImageApiKeys.value.some(key => key.id === attempt.apiKeyId)) {
+    appStore.showError(t('batchImage.config.originalKeyUnavailable'))
+    return
+  }
+  if (configCards.value.length && !window.confirm('恢复将覆盖当前未提交的配置，是否继续？')) return
+  const group = attempt.config
+  configCollectionId.value = group.collection_id || newCollectionID()
+  restoringConfig = true
+  form.apiKeyId = attempt.apiKeyId
+  form.taskName = group.task_name || ''
+  form.responseMimeType = group.response_mime_type || 'image/png'
+  clearConfigReference()
+  configInput.value = ''
+  configConsistency.value = attempt.referenceMode !== 'perItem' && group.items.some(item => !!item.reference_images?.length)
+  configCards.value = group.items.map((item, index) => ({
+    localId: `restored-${index + 1}`,
+    custom_id: item.custom_id,
+    prompt: item.prompt,
+    image_size: group.image_size || '1K',
+    aspect_ratio: group.aspect_ratio || '1:1',
+    model: group.model,
+    output_count: item.output_count || 1,
+    ...(!configConsistency.value && item.reference_images?.length ? {
+      reference_images: item.reference_images.map(image => ({ ...image })),
+    } : {}),
+  }))
+  expandedConfigCard.value = configCards.value[0]?.localId || ''
+  configEdited.value = false
+  configError.value = ''
+  // 等 v-model 的原文侦听器执行后，恢复草稿才进入可编辑状态。
+  void nextTick(() => {
+    restoringConfig = false
+    configRecovered.value = true
+    configStatus.value = Object.keys(configPreview.value.errors).length ? 'invalid' : 'converted'
   })
+}
+
+function canReuseConfigAttempt(stored: BatchImageSubmitRequest, current: BatchImageSubmitRequest): boolean {
+  return JSON.stringify(stored) === JSON.stringify(configForStorage(current))
 }
 
 async function loadApiKeys() {
@@ -1302,15 +1751,16 @@ async function loadApiKeys() {
   try {
     const response = await keysAPI.list(1, 100, { status: 'active', sort_by: 'created_at', sort_order: 'desc' })
     apiKeys.value = response.items || []
-    if (!selectedApiKey.value && batchImageApiKeys.value.length > 0) {
-      form.apiKeyId = batchImageApiKeys.value[0].id
+    if (!batchImageApiKeys.value.some(key => key.id === form.apiKeyId)) {
+      form.apiKeyId = batchImageApiKeys.value[0]?.id || 0
     }
     if (filters.apiKeyId && !batchImageApiKeys.value.some(key => String(key.id) === filters.apiKeyId)) {
       filters.apiKeyId = ''
     }
     if (!selectedApiKey.value) {
+      modelRequestSeq += 1
+      modelsApiKeyId.value = 0
       availableBatchImageModels.value = []
-      form.model = ''
     }
   } catch (error: any) {
     appStore.showError(batchImageErrorMessage(error, batchImageText('loadKeysFailed')))
@@ -1323,8 +1773,8 @@ async function loadAvailableModels() {
   const key = selectedApiKey.value
   const requestID = ++modelRequestSeq
   modelLoadError.value = ''
+  modelsApiKeyId.value = 0
   availableBatchImageModels.value = []
-  form.model = ''
   if (!key) {
     loadingModels.value = false
     return
@@ -1342,7 +1792,7 @@ async function loadAvailableModels() {
         seen.add(model.value)
         return true
       })
-    form.model = availableBatchImageModels.value[0]?.value || ''
+    modelsApiKeyId.value = key.id
   } catch (error: any) {
     if (requestID !== modelRequestSeq) return
     modelLoadError.value = batchImageErrorMessage(error, batchImageText('loadModelsFailed'))
@@ -1384,16 +1834,22 @@ function listOptions(): BatchImageJobsListOptions {
 }
 
 function toJobRow(job: BatchImageJob, key = selectedApiKey.value): BatchImageJobRow {
+  const storedSubmission = configSubmissions.value.find(entry => entry.job.id === job.id)
+  const storedConfig = storedSubmission?.config
+  const storedCollectionID = storedSubmission?.config.collection_id || (storedSubmission?.collectionFingerprints?.length
+    ? `legacy_${[...storedSubmission.collectionFingerprints].sort().join('|')}`
+    : '')
   return {
     id: job.id,
     task_name: job.task_name || defaultTaskName(job.created_at),
+    collection_id: job.collection_id || storedCollectionID || job.id,
     parent_batch_id: job.parent_batch_id || null,
     status: job.status,
     model: job.model,
     provider: job.provider,
-    image_size: job.image_size,
-    aspect_ratio: job.aspect_ratio,
-    response_mime_type: job.response_mime_type,
+    image_size: job.image_size || storedConfig?.image_size,
+    aspect_ratio: job.aspect_ratio || storedConfig?.aspect_ratio,
+    response_mime_type: job.response_mime_type || storedConfig?.response_mime_type,
     item_count: job.item_count,
     success_count: job.success_count,
     fail_count: job.fail_count,
@@ -1446,13 +1902,6 @@ function displayJob<T extends Pick<BatchImageJob, 'id' | 'parent_batch_id' | 'st
 
 function hasChildJobs(batchId: string) {
   return (childrenByParent.value.get(batchId) || []).length > 0
-}
-
-function toggleChildRows(batchId: string) {
-  const next = new Set(expandedParentIds.value)
-  if (next.has(batchId)) next.delete(batchId)
-  else next.add(batchId)
-  expandedParentIds.value = next
 }
 
 function closeMoreMenu() {
@@ -1589,8 +2038,13 @@ async function loadBatchJobs() {
   }
 }
 
-function upsertJob(job: BatchImageJob) {
-  const next = toJobRow(job)
+function upsertJob(job: BatchImageJob, key = selectedApiKey.value) {
+  const submission = configSubmissions.value.find(entry => entry.job.id === job.id)
+  if (submission) {
+    submission.job = job
+    persistConfigHistory(configSubmissions.value)
+  }
+  const next = toJobRow(job, key)
   const index = batchJobs.value.findIndex(item => item.id === job.id)
   if (index >= 0) {
     const rows = [...batchJobs.value]
@@ -1632,20 +2086,40 @@ function closeCreateModal() {
 }
 
 function resetCreateDraft() {
+  configRecovered.value = false
+  configCollectionId.value = ''
+  submitting.value = false
   form.taskName = ''
-  form.responseMimeType = outputMimeOptions.value[0] || 'image/png'
-  form.imageSize = supportsImageParams.value ? imageSizeOptions.value[0] || '' : '1K'
-  form.aspectRatio = '1:1'
-  promptRows.value = []
-  promptDraft.value = ''
-  customIdDraft.value = ''
-  outputCountDraft.value = 1
-  referenceImageDrafts.value = []
+  form.responseMimeType = 'image/png'
+  configConsistency.value = false
+  clearConfigReference()
+  configInput.value = ''
+  configCards.value = []
+  configError.value = ''
+  configConverting.value = false
+  configStatus.value = 'empty'
+  expandedConfigCard.value = ''
+  configEdited.value = false
+}
+
+function clearProviderDrafts() {
+  configRecovered.value = false
+  configCollectionId.value = ''
+  configConsistency.value = false
+  clearConfigReference()
+  configInput.value = ''
+  configCards.value = []
+  configError.value = ''
+  configStatus.value = 'empty'
+  expandedConfigCard.value = ''
+  configEdited.value = false
 }
 
 function closeDetail() {
   closePromptPopover()
   currentJob.value = null
+  selectedCollectionId.value = ''
+  detailTab.value = 'results'
   selectedBatchId.value = ''
   selectedBatchApiKeyId.value = 0
   items.value = []
@@ -1668,65 +2142,6 @@ function requireApiKey(): ApiKey | null {
   return selectedApiKey.value
 }
 
-function validateForm(): boolean {
-  if (!requireApiKey()) return false
-  if (!form.model) {
-    appStore.showError(availableBatchImageModels.value.length === 0 ? batchImageText('noModelsForKey') : batchImageText('selectModel'))
-    return false
-  }
-  if (parsedItems.value.length === 0) {
-    appStore.showError(batchImageText('promptRequired'))
-    return false
-  }
-  if (estimatedOutputCount.value > BATCH_IMAGE_MAX_OUTPUTS_PER_JOB) {
-    appStore.showError(batchImageText('tooManyOutputImages'))
-    return false
-  }
-  const refLimit = selectedModelReferenceLimit.value
-  if (promptRows.value.some(row => row.reference_images.length > refLimit)) {
-    appStore.showError(batchImageText('tooManyReferenceImages'))
-    return false
-  }
-  return true
-}
-
-async function submitJob() {
-  if (submitting.value) return
-  if (promptDraft.value.trim()) addPromptRow()
-  if (!validateForm() || !validImageSpecs.value) return
-  const key = requireApiKey()
-  if (!key) return
-	  submitting.value = true
-	  try {
-	    const job = await submitBatchImageJob(
-	      key.key,
-	      {
-	        model: form.model,
-        task_name: form.taskName.trim() || defaultTaskName(),
-        image_size: supportsImageParams.value ? form.imageSize : '1K',
-        ...(supportsImageParams.value ? { aspect_ratio: form.aspectRatio } : {}),
-        response_mime_type: form.responseMimeType,
-        items: parsedItems.value,
-	      },
-	      `sub2api-ui-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-	    )
-	    currentJob.value = job
-	    selectedBatchId.value = job.id
-	    selectedBatchApiKeyId.value = key.id
-	    items.value = []
-	    upsertJob(job)
-	    showCreateModal.value = false
-	    resetCreateDraft()
-	    appStore.showSuccess(batchImageText('submitted'))
-	    void loadItems()
-	    startPolling()
-  } catch (error: any) {
-    appStore.showError(batchImageErrorMessage(error, batchImageText('submitFailed')))
-  } finally {
-    submitting.value = false
-  }
-}
-
 async function refreshSelected() {
   if (!selectedBatchId.value) return
   const key = keyForSelectedBatch() || requireApiKey()
@@ -1736,7 +2151,7 @@ async function refreshSelected() {
     const job = await getBatchImageJob(key.key, selectedBatchId.value)
     currentJob.value = job
     upsertJob(job)
-    if (TERMINAL_STATUSES.has(job.status)) stopPolling()
+    if (TERMINAL_STATUSES.has(job.status) && !configSubmissions.value.some(entry => !TERMINAL_STATUSES.has(entry.job.status))) stopPolling()
   } catch (error: any) {
     appStore.showError(batchImageErrorMessage(error, batchImageText('refreshFailed')))
   } finally {
@@ -1752,13 +2167,15 @@ async function refreshDetail() {
 }
 
 function selectJob(batchId: string) {
-  const row = batchJobs.value.find(job => job.id === batchId)
+  const row = visibleBatchJobs.value.find(job => job.id === batchId)
   if (row?.api_key_id && batchImageApiKeys.value.some(key => key.id === row.api_key_id)) {
     form.apiKeyId = row.api_key_id
     selectedBatchApiKeyId.value = row.api_key_id
   } else {
     selectedBatchApiKeyId.value = 0
   }
+  selectedCollectionId.value = row?.collection_id || row?.id || batchId
+  detailTab.value = 'results'
   selectedBatchId.value = batchId
   currentJob.value = null
   items.value = []
@@ -1769,12 +2186,34 @@ function selectJob(batchId: string) {
 function startPolling() {
   stopPolling()
   pollTimer = setInterval(() => {
-    if (!currentJob.value || TERMINAL_STATUSES.has(currentJob.value.status)) {
+    const active = configSubmissions.value.some(entry => !TERMINAL_STATUSES.has(entry.job.status))
+    if ((!currentJob.value || TERMINAL_STATUSES.has(currentJob.value.status)) && !active) {
       stopPolling()
       return
     }
-    void refreshSelected()
+    if (currentJob.value && !TERMINAL_STATUSES.has(currentJob.value.status)) void refreshSelected()
+    void refreshConfigSubmissions()
   }, 8000)
+}
+
+let refreshingConfigSubmissions = false
+async function refreshConfigSubmissions() {
+  if (refreshingConfigSubmissions) return
+  refreshingConfigSubmissions = true
+  try {
+    for (const entry of configSubmissions.value) {
+      if (entry.job.id === selectedBatchId.value || TERMINAL_STATUSES.has(entry.job.status)) continue
+      const key = batchImageApiKeys.value.find(key => key.id === Number(entry.fingerprint.split(':')[0]))
+      if (!key) continue
+      try {
+        upsertJob(await getBatchImageJob(key.key, entry.job.id), key)
+      } catch {
+        continue
+      }
+    }
+  } finally {
+    refreshingConfigSubmissions = false
+  }
 }
 
 function stopPolling() {
@@ -1789,7 +2228,7 @@ function canCancel(job: Pick<BatchImageJob, 'status'>) {
 }
 
 function canDownload(job: Pick<BatchImageJob, 'status' | 'success_count'>) {
-  return job.status === 'completed' && job.success_count > 0
+  return (job.status === 'completed' || job.status === 'partial_success') && job.success_count > 0
 }
 
 function canRetry(job: Pick<BatchImageJob, 'status' | 'fail_count'>) {
@@ -1835,15 +2274,19 @@ function canDeleteRecord(job: Pick<BatchImageJob, 'status'>) {
 }
 
 async function cancelSelected() {
-  if (!currentJob.value) return
-  const key = keyForSelectedBatch() || requireApiKey()
-  if (!key) return
+  if (!currentTask.value) return
+  const activeJobs = currentTask.value.collection_jobs.filter(job => !job.parent_batch_id && canCancel(job))
+  if (!activeJobs.length) return
   if (!window.confirm(batchImageText('cancelConfirm'))) return
   cancelling.value = true
   try {
-    const job = await cancelBatchImageJob(key.key, currentJob.value.id)
-    currentJob.value = job
-    upsertJob(job)
+    for (const activeJob of activeJobs) {
+      const key = apiKeyForJob(activeJob)
+      if (!key) continue
+      const job = await cancelBatchImageJob(key.key, activeJob.id)
+      if (currentJob.value?.id === job.id) currentJob.value = job
+      upsertJob(job, key)
+    }
     appStore.showSuccess(batchImageText('cancelled'))
   } catch (error: any) {
     appStore.showError(batchImageErrorMessage(error, batchImageText('cancelFailed')))
@@ -1852,14 +2295,14 @@ async function cancelSelected() {
   }
 }
 
-async function downloadSelected() {
-  if (!currentJob.value) return
-  await downloadJob(currentJob.value)
+async function retrySelected() {
+  if (!currentTask.value) return
+  await retryTask(currentTask.value)
 }
 
-async function retrySelected() {
-  if (!currentJob.value) return
-  await retryFailedJob(currentJob.value)
+async function retryTask(task: BatchImageTaskRow) {
+  const failedRoots = task.collection_jobs.filter(job => !job.parent_batch_id && canRetry(displayJob(job)))
+  for (const job of failedRoots) await retryFailedJob(job)
 }
 
 async function retryFailedJob(job: BatchImageJobRow | BatchImageJob) {
@@ -1870,7 +2313,8 @@ async function retryFailedJob(job: BatchImageJobRow | BatchImageJob) {
   retryingBatchId.value = job.id
   try {
     const original = await getBatchImageRetryInput(key.key, job.id)
-    const failedItems = original.items.map(item => ({ ...item, custom_id: retryCustomID(item.custom_id) }))
+    const retryDigest = await configGroupFingerprint({ ...original, parent_batch_id: job.id }, key.id)
+    const failedItems = original.items.map(item => ({ ...item, custom_id: retryCustomID(item.custom_id, retryDigest.slice(-12)) }))
     if (failedItems.length === 0) {
       appStore.showError(batchImageText('retryMissingPrompts'))
       return
@@ -1879,20 +2323,18 @@ async function retryFailedJob(job: BatchImageJobRow | BatchImageJob) {
       key.key,
       {
         ...original,
-        task_name: `${job.task_name || defaultTaskName()} ${t('batchImage.messages.retryTaskNameSuffix')}`,
+        collection_id: job.collection_id || original.collection_id || job.id,
+        task_name: `${original.task_name || job.id} 重试失败项`,
         parent_batch_id: rootBatchIdForRetry(job),
         items: failedItems,
       },
-      `sub2api-ui-retry-${job.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      `sub2api-ui-retry-${retryDigest}`,
     )
     currentJob.value = retryJob
     selectedBatchId.value = retryJob.id
     selectedBatchApiKeyId.value = key.id
     items.value = []
     upsertJob(retryJob)
-    if (retryJob.parent_batch_id) {
-      expandedParentIds.value = new Set([...expandedParentIds.value, retryJob.parent_batch_id])
-    }
     appStore.showSuccess(batchImageText('retrySubmitted'))
     void loadItems()
     startPolling()
@@ -1907,9 +2349,9 @@ async function retryFailedJob(job: BatchImageJobRow | BatchImageJob) {
   }
 }
 
-function retryCustomID(customID: string) {
-  const base = String(customID || 'item').replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '') || 'item'
-  return `${base}_retry_${Date.now().toString(36)}`
+function retryCustomID(customID: string, digest: string) {
+  const base = String(customID || 'item').replace(/(?:_retry_[a-z0-9]+)+$/i, '')
+  return `${base}_retry_${digest}`
 }
 
 function rootBatchIdForRetry(job: BatchImageJobRow | BatchImageJob) {
@@ -1926,7 +2368,7 @@ async function downloadJob(job: (BatchImageJobRow | Pick<BatchImageJob, 'id'>)) 
   downloadingBatchId.value = job.id
   try {
     const blob = await downloadBatchImageZip(key.key, job.id)
-    saveBlob(blob, `${job.id}.zip`)
+    saveBatchResult(blob, `${job.id}.zip`)
     markJobDownloaded(job.id)
   } catch (error: any) {
     appStore.showError(batchImageErrorMessage(error, batchImageText('downloadFailed')))
@@ -1936,22 +2378,89 @@ async function downloadJob(job: (BatchImageJobRow | Pick<BatchImageJob, 'id'>)) 
   }
 }
 
+async function downloadTask(task: BatchImageTaskRow) {
+  await downloadBatchImageRows([...task.collection_jobs])
+}
+
 async function downloadSelectedJobs() {
-  if (bulkDownloading.value || selectedDownloadableRows.value.length === 0) return
+  await downloadBatchImageRows([...selectedRows.value])
+}
+
+function configForSubmittedJob(batchId: string): BatchImageSubmitRequest | undefined {
+  const entry = configSubmissions.value.find(item => item.job.id === batchId)
+  return entry?.config
+}
+
+function clearDownloadArtifact() {
+  if (downloadArtifact.value) URL.revokeObjectURL(downloadArtifact.value.url)
+  downloadArtifact.value = null
+}
+
+function saveBatchResult(blob: Blob, filename: string) {
+  clearDownloadArtifact()
+  downloadArtifact.value = { url: URL.createObjectURL(blob), filename }
+  saveBlob(blob, filename)
+}
+
+async function downloadBatchImageRows(rows: BatchImageJobRow[]) {
+  if (downloading.value || bulkDownloading.value || !rows.some(row => canDownload(row))) return
+  if (rows.length === 1) {
+    await downloadJob(rows[0]!)
+    return
+  }
+  if (rows.length > batchImageZipMergeLimits.maxInputs) {
+    appStore.showError(`一次最多合并 ${batchImageZipMergeLimits.maxInputs} 个任务，请减少选择。`)
+    return
+  }
   bulkDownloading.value = true
+  downloading.value = true
+  const inputs: BatchImageZipInput[] = []
+  let totalBytes = 0
   try {
-    for (const row of selectedDownloadableRows.value) {
+    for (const row of rows) {
       const key = apiKeyForJob(row)
-      if (!key) continue
       downloading.value = true
       downloadingBatchId.value = row.id
-      const blob = await downloadBatchImageZip(key.key, row.id)
-      saveBlob(blob, `${row.id}.zip`)
-      markJobDownloaded(row.id)
+      const budget = Math.min(batchImageZipMergeLimits.maxInputZipBytes, batchImageZipMergeLimits.maxTotalInputBytes - totalBytes)
+      if (budget <= 0) throw new Error('ZIP 总大小超过合并限制，请减少选择或分开下载。')
+      let zip: Blob | undefined
+      let unavailable: BatchImageZipInput['unavailable']
+      if (!key || !canDownload(row)) {
+        unavailable = { code: !key ? 'API_KEY_UNAVAILABLE' : row.status.toUpperCase(), message: `Batch ${row.id}: ${!key ? 'API key unavailable' : row.status}`, model: row.model, itemCount: row.item_count }
+      } else {
+        try {
+          zip = await downloadBatchImageZip(key.key, row.id, budget)
+        } catch {
+          unavailable = { code: 'DOWNLOAD_FAILED', message: `Download failed for batch ${row.id}; retry its download.`, model: row.model, itemCount: row.item_count }
+        }
+      }
+      if (zip) {
+        totalBytes += zip.size
+        if (zip.size > budget) throw new Error('ZIP 超过合并下载大小限制。')
+      }
+      const config = configForSubmittedJob(row.id)
+      inputs.push({
+        batchId: row.id,
+        zip,
+        unavailable,
+        ...(config ? {
+          config: {
+            model: config.model,
+            ...(config.image_size ? { image_size: config.image_size } : {}),
+            ...(config.aspect_ratio ? { aspect_ratio: config.aspect_ratio } : {}),
+            ...(config.response_mime_type ? { response_mime_type: config.response_mime_type } : {}),
+            ...(config.task_name ? { task_name: config.task_name } : {}),
+          },
+          configByCustomId: buildBatchImageConfigByCustomId(config),
+        } : {}),
+      })
+      if (zip) markJobDownloaded(row.id)
     }
-    appStore.showSuccess(batchImageText('batchDownloadStarted'))
+    const merged = await mergeBatchImageZips(inputs)
+    saveBatchResult(merged, `batch-image-merged-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`)
+    appStore.showSuccess(`已合并 ${inputs.length} 个真实批量任务的 ZIP 结果。`)
   } catch (error: any) {
-    appStore.showError(batchImageErrorMessage(error, batchImageText('downloadFailed')))
+    appStore.showError(error?.message || batchImageErrorMessage(error, batchImageText('downloadFailed')))
   } finally {
     bulkDownloading.value = false
     downloading.value = false
@@ -1959,22 +2468,25 @@ async function downloadSelectedJobs() {
   }
 }
 
-async function deleteJob(job: BatchImageJobRow) {
-  if (!canDeleteRecord(job) || deletingBatchId.value) return
+async function deleteTask(task: BatchImageTaskRow) {
+  const rows = task.collection_jobs.filter(job => canDeleteRecord(job))
+  if (!rows.length || deletingBatchId.value) return
   closeMoreMenu()
-  const key = apiKeyForJob(job)
-  if (!key) return
   if (!window.confirm(batchImageText('deleteConfirm'))) return
-  deletingBatchId.value = job.id
-  try {
-    await deleteBatchImageJobRecord(key.key, job.id)
-    removeJobFromList(job.id)
-    appStore.showSuccess(batchImageText('deleted'))
-  } catch (error: any) {
-    appStore.showError(batchImageErrorMessage(error, batchImageText('deleteFailed')))
-  } finally {
-    deletingBatchId.value = ''
+  for (const row of rows) {
+    const key = apiKeyForJob(row)
+    if (!key) continue
+    deletingBatchId.value = row.id
+    try {
+      await deleteBatchImageJobRecord(key.key, row.id)
+      removeJobFromList(row.id)
+    } catch (error: any) {
+      appStore.showError(batchImageErrorMessage(error, batchImageText('deleteFailed')))
+      break
+    }
   }
+  deletingBatchId.value = ''
+  appStore.showSuccess(batchImageText('deleted'))
 }
 
 async function deleteSelectedJobs() {
@@ -2261,7 +2773,13 @@ async function loadItems() {
         source_task_name: detailSourceName(job, batchId),
       }))
     }))
-    const detailItems = results.flat()
+    const detailItems = results.flat().sort((left, right) => {
+      const leftID = retrySourceCustomID(left.custom_id)
+      const rightID = retrySourceCustomID(right.custom_id)
+      const idOrder = leftID.localeCompare(rightID, undefined, { numeric: true })
+      if (idOrder !== 0) return idOrder
+      return left.batch_id.localeCompare(right.batch_id)
+    })
     items.value = detailItems
     void hydrateCachedItemPreviews(detailItems)
   } catch (error: any) {
@@ -2272,6 +2790,8 @@ async function loadItems() {
 }
 
 function detailJobsForBatch(batchId: string): BatchImageJobRow[] {
+  const task = visibleBatchJobs.value.find(job => job.collection_id === selectedCollectionId.value || job.id === batchId)
+  if (task) return task.collection_jobs
   const row = batchJobs.value.find(job => job.id === batchId)
   const base = row || (currentJob.value && currentJob.value.id === batchId ? toJobRow(currentJob.value, keyForSelectedBatch() || selectedApiKey.value) : null)
   if (!base) return []
@@ -2367,6 +2887,7 @@ function statusLabel(jobOrStatus: BatchImageStatus | Pick<BatchImageJob, 'status
     indexing: 'processingResults',
     processing_results: 'processingResults',
     settling: 'settling',
+    partial_success: 'partialSuccess',
     completed: 'completed',
     failed: 'failed',
     cancelled: 'cancelled',
@@ -2383,6 +2904,7 @@ function statusBadgeClass(jobOrStatus: BatchImageStatus | Pick<BatchImageJob, 's
     return 'badge-danger'
   }
   if (status === 'completed') return 'badge-success'
+  if (status === 'partial_success') return 'badge-warning'
   if (status === 'failed' || status === 'cancelled') return 'badge-danger'
   if (status === 'output_deleted') return 'badge-gray'
   return 'badge-primary'
@@ -2663,6 +3185,8 @@ function defaultTaskName(timestamp?: number) {
 }
 
 onMounted(() => {
+  restoreConfigSubmissionState()
+  if (configSubmissions.value.some(entry => !TERMINAL_STATUSES.has(entry.job.status))) startPolling()
   void appStore.fetchPublicSettings()
   void refreshPage()
   void cleanupPreviewCache()
@@ -2678,26 +3202,32 @@ onMounted(() => {
 
 watch(
   () => form.apiKeyId,
-  () => {
+  async (nextID, previousID) => {
+    if (revertingApiKey) return
+    if (restoringConfig) {
+      void loadAvailableModels()
+      return
+    }
+    const nextPlatform = batchImageApiKeys.value.find(key => key.id === nextID)?.group?.platform
+    const previousPlatform = batchImageApiKeys.value.find(key => key.id === previousID)?.group?.platform
+    const hasDraft = configCards.value.length > 0 || !!configInput.value.trim() || configReferenceImages.value.length > 0
+    if (previousID && nextPlatform && previousPlatform && nextPlatform !== previousPlatform && hasDraft) {
+      if (!window.confirm(t('batchImage.config.switchProviderConfirm'))) {
+        revertingApiKey = true
+        await nextTick()
+        form.apiKeyId = previousID
+        await nextTick()
+        revertingApiKey = false
+        return
+      }
+      clearProviderDrafts()
+    }
     void loadAvailableModels()
   },
 )
 
-watch(
-  () => form.model,
-  () => {
-    const limit = selectedModelReferenceLimit.value
-    if (limit <= 0) {
-      referenceImageDrafts.value = []
-      return
-    }
-    if (referenceImageDrafts.value.length > limit) {
-      referenceImageDrafts.value = referenceImageDrafts.value.slice(0, limit)
-    }
-  },
-)
-
 onBeforeUnmount(() => {
+  clearDownloadArtifact()
   stopPolling()
   if (previewCacheCleanupTimer) {
     clearInterval(previewCacheCleanupTimer)
