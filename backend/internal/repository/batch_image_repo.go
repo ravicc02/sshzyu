@@ -881,6 +881,10 @@ func scanBatchImageJob(row rowScanner) (*service.BatchImageJob, error) {
 	var apiKeyID, accountID sql.NullInt64
 	var providerJobName, providerInputRef, providerOutputRef, gcsInputURI, gcsOutputURI sql.NullString
 	var collectionID, parentBatchID sql.NullString
+	// image_size / aspect_ratio / response_mime_type 在 migration 246 中新增且可空，
+	// 历史行为 NULL。必须用 sql.NullString 中转，否则扫描 NULL 会报
+	// "converting NULL to string is unsupported" 导致读接口 500。
+	var imageSize, aspectRatio, responseMimeType sql.NullString
 	var holdAmount, actualCost sql.NullFloat64
 	var holdID, idempotencyKey, requestHash, manifestHash sql.NullString
 	var sessionID sql.NullString
@@ -889,7 +893,7 @@ func scanBatchImageJob(row rowScanner) (*service.BatchImageJob, error) {
 	var submittedAt, startedAt, finishedAt, settledAt sql.NullTime
 
 	err := row.Scan(
-		&job.ID, &job.BatchID, &job.UserID, &apiKeyID, &accountID, &job.Provider, &job.Model, &job.TaskName, &collectionID, &job.ImageSize, &job.AspectRatio, &job.ResponseMimeType, &parentBatchID, &job.Status,
+		&job.ID, &job.BatchID, &job.UserID, &apiKeyID, &accountID, &job.Provider, &job.Model, &job.TaskName, &collectionID, &imageSize, &aspectRatio, &responseMimeType, &parentBatchID, &job.Status,
 		&providerJobName, &providerInputRef, &providerOutputRef, &gcsInputURI, &gcsOutputURI,
 		&job.ItemCount, &job.SuccessCount, &job.FailCount, &job.CancelledCount,
 		&job.EstimatedCost, &holdAmount, &actualCost,
@@ -913,6 +917,9 @@ func scanBatchImageJob(row rowScanner) (*service.BatchImageJob, error) {
 	job.ProviderOutputRef = batchImageNullStringPtr(providerOutputRef)
 	job.CollectionID = batchImageNullStringPtr(collectionID)
 	job.ParentBatchID = batchImageNullStringPtr(parentBatchID)
+	job.ImageSize = imageSize.String
+	job.AspectRatio = aspectRatio.String
+	job.ResponseMimeType = responseMimeType.String
 	job.GCSInputURI = batchImageNullStringPtr(gcsInputURI)
 	job.GCSOutputURI = batchImageNullStringPtr(gcsOutputURI)
 	job.HoldAmount = batchImageNullFloat64Ptr(holdAmount)
