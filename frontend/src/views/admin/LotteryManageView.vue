@@ -56,13 +56,77 @@
 
       <!-- ====================== 中奖记录 ====================== -->
       <template v-if="activeTab === 'draws'" #table>
+        <div
+          v-if="selectedDrawCount > 0"
+          data-test="bulk-draw-toolbar"
+          class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-primary-50 px-3 py-2.5 dark:bg-primary-900/20"
+        >
+          <span class="text-sm font-medium text-primary-900 dark:text-primary-100">
+            {{ t('admin.lottery.selectedDraws', { count: selectedDrawCount }) }}
+          </span>
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              v-if="bulkEligibleCounts.approve > 0"
+              type="button"
+              data-test="bulk-approve"
+              class="btn btn-success btn-sm"
+              :disabled="bulkProcessing"
+              @click="handleBulkAction('approve')"
+            >
+              {{ t('admin.lottery.bulkApprove', { count: bulkEligibleCounts.approve }) }}
+            </button>
+            <button
+              v-if="bulkEligibleCounts.reject > 0"
+              type="button"
+              data-test="bulk-reject"
+              class="btn btn-danger btn-sm"
+              :disabled="bulkProcessing"
+              @click="handleBulkAction('reject')"
+            >
+              {{ t('admin.lottery.bulkReject', { count: bulkEligibleCounts.reject }) }}
+            </button>
+            <button
+              v-if="bulkEligibleCounts.reverse > 0"
+              type="button"
+              data-test="bulk-reverse"
+              class="btn btn-danger btn-sm"
+              :disabled="bulkProcessing"
+              @click="handleBulkAction('reverse')"
+            >
+              {{ t('admin.lottery.bulkReverse', { count: bulkEligibleCounts.reverse }) }}
+            </button>
+            <button
+              v-if="bulkEligibleCounts.retry > 0"
+              type="button"
+              data-test="bulk-retry"
+              class="btn btn-secondary btn-sm"
+              :disabled="bulkProcessing"
+              @click="handleBulkAction('retry')"
+            >
+              {{ t('admin.lottery.bulkRetry', { count: bulkEligibleCounts.retry }) }}
+            </button>
+            <button
+              type="button"
+              class="text-xs font-medium text-primary-700 hover:text-primary-800 dark:text-primary-300 dark:hover:text-primary-200"
+              :disabled="bulkProcessing"
+              @click="clearSelectedDraws"
+            >
+              {{ t('admin.lottery.clearSelection') }}
+            </button>
+          </div>
+        </div>
         <DataTable
           :columns="drawColumns"
           :data="draws"
           :loading="loading"
+          row-key="id"
+          selectable
+          :selected-keys="selectedDrawIds"
+          :selection-label="getDrawSelectionLabel"
           :server-side-sort="true"
           default-sort-key="created_at"
           default-sort-order="desc"
+          @update:selected-keys="handleDrawSelection"
           @sort="handleDrawSort"
         >
           <template #cell-id="{ value }">
@@ -122,7 +186,7 @@
               <template v-if="row.fulfillment_status === 'pending_review'">
                 <button
                   @click="handleApprove(row)"
-                  :disabled="actionLoadingId === row.id"
+                  :disabled="actionLoadingId === row.id || bulkProcessing"
                   class="btn btn-success btn-sm"
                 >
                   <Icon name="checkCircle" size="sm" :class="actionLoadingId === row.id ? 'animate-spin' : ''" />
@@ -130,7 +194,7 @@
                 </button>
                 <button
                   @click="handleReject(row)"
-                  :disabled="actionLoadingId === row.id"
+                  :disabled="actionLoadingId === row.id || bulkProcessing"
                   class="btn btn-danger btn-sm"
                 >
                   <Icon name="xCircle" size="sm" />
@@ -141,7 +205,7 @@
               <template v-else-if="row.fulfillment_status === 'granted' && row.prize_type === 'balance_bonus'">
                 <button
                   @click="handleReverse(row)"
-                  :disabled="actionLoadingId === row.id"
+                  :disabled="actionLoadingId === row.id || bulkProcessing"
                   class="btn btn-danger btn-sm"
                 >
                   <Icon name="sync" size="sm" :class="actionLoadingId === row.id ? 'animate-spin' : ''" />
@@ -152,7 +216,7 @@
               <template v-else-if="row.fulfillment_status === 'pending' || row.fulfillment_status === 'failed'">
                 <button
                   @click="handleRetry(row)"
-                  :disabled="retryingId === row.id"
+                  :disabled="retryingId === row.id || bulkProcessing"
                   class="btn btn-secondary btn-sm"
                 >
                   <Icon name="refresh" size="sm" :class="retryingId === row.id ? 'animate-spin' : ''" />
@@ -462,6 +526,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { useTableSelection } from '@/composables/useTableSelection'
 import { formatDateTime, formatDateTimeLocalInput, parseDateTimeLocalInput } from '@/utils/format'
 import { searchUsers, type SimpleUser } from '@/api/admin/usage'
 import type { Column } from '@/components/common/types'
@@ -521,7 +586,8 @@ const drawUserIdInput = ref('')
 const drawUserId = ref<number | undefined>(undefined)
 const sortOrder = ref<'asc' | 'desc'>('desc')
 const retryingId = ref<number | null>(null)
-	const actionLoadingId = ref<number | null>(null)
+const actionLoadingId = ref<number | null>(null)
+const bulkProcessing = ref(false)
 
 const drawPagination = reactive({
   page: 1,
@@ -545,7 +611,104 @@ const drawColumns = computed<Column[]>(() => [
   { key: 'actions', label: t('admin.lottery.columns.actions') }
 ])
 
+type BulkDrawAction = 'approve' | 'reject' | 'reverse' | 'retry'
+
+const {
+  selectedIds: selectedDrawIds,
+  selectedCount: selectedDrawCount,
+  clear: clearSelectedDraws,
+  setSelectedIds
+} = useTableSelection<AdminLotteryDraw>({
+  rows: draws,
+  getId: (draw) => draw.id
+})
+
+const selectedDrawRows = computed(() =>
+  draws.value.filter((draw) => selectedDrawIds.value.includes(draw.id))
+)
+
+const bulkEligibleCounts = computed<Record<BulkDrawAction, number>>(() => ({
+  approve: selectedDrawRows.value.filter((draw) => draw.fulfillment_status === 'pending_review').length,
+  reject: selectedDrawRows.value.filter((draw) => draw.fulfillment_status === 'pending_review').length,
+  reverse: selectedDrawRows.value.filter(
+    (draw) => draw.fulfillment_status === 'granted' && draw.prize_type === 'balance_bonus'
+  ).length,
+  retry: selectedDrawRows.value.filter(
+    (draw) => draw.fulfillment_status === 'pending' || draw.fulfillment_status === 'failed'
+  ).length
+}))
+
+const bulkActionHandlers: Record<BulkDrawAction, (drawId: number) => Promise<unknown>> = {
+  approve: async (drawId) => approveDraw(drawId),
+  reject: async (drawId) => rejectDraw(drawId),
+  reverse: async (drawId) => reverseGrant(drawId),
+  retry: async (drawId) => retryFulfillment(drawId)
+}
+
+const bulkActionRows = (action: BulkDrawAction) => {
+  if (action === 'approve' || action === 'reject') {
+    return selectedDrawRows.value.filter((draw) => draw.fulfillment_status === 'pending_review')
+  }
+  if (action === 'reverse') {
+    return selectedDrawRows.value.filter(
+      (draw) => draw.fulfillment_status === 'granted' && draw.prize_type === 'balance_bonus'
+    )
+  }
+  return selectedDrawRows.value.filter(
+    (draw) => draw.fulfillment_status === 'pending' || draw.fulfillment_status === 'failed'
+  )
+}
+
+const getDrawSelectionLabel = (draw: AdminLotteryDraw) =>
+  t('admin.lottery.selectDraw', { id: draw.id })
+
+function handleDrawSelection(keys: Array<string | number>) {
+  const visibleIds = new Set(draws.value.map((draw) => draw.id))
+  setSelectedIds(
+    keys
+      .map((key) => Number(key))
+      .filter((id) => Number.isFinite(id) && visibleIds.has(id))
+  )
+}
+
+async function handleBulkAction(action: BulkDrawAction) {
+  const rows = bulkActionRows(action)
+  if (rows.length === 0 || bulkProcessing.value) return
+
+  if (action === 'reject' && !window.confirm(t('admin.lottery.bulkRejectConfirm', { count: rows.length }))) {
+    return
+  }
+  if (action === 'reverse' && !window.confirm(t('admin.lottery.bulkReverseConfirm', { count: rows.length }))) {
+    return
+  }
+
+  bulkProcessing.value = true
+  try {
+    const results = await Promise.allSettled(
+      rows.map((row) => bulkActionHandlers[action](row.id))
+    )
+    const successCount = results.filter((result) => result.status === 'fulfilled').length
+    const failureCount = results.length - successCount
+    clearSelectedDraws()
+
+    if (failureCount > 0) {
+      appStore.showError(
+        t('admin.lottery.bulkActionPartialFailure', {
+          success: successCount,
+          failed: failureCount
+        })
+      )
+    } else {
+      appStore.showSuccess(t('admin.lottery.bulkActionSuccess', { count: successCount }))
+    }
+    await loadDraws(drawPagination.page)
+  } finally {
+    bulkProcessing.value = false
+  }
+}
+
 async function loadDraws(page = drawPagination.page) {
+  clearSelectedDraws()
   loading.value = true
   try {
     const data = await listDraws(page, drawPagination.page_size, drawUserId.value, sortOrder.value)
@@ -561,21 +724,25 @@ async function loadDraws(page = drawPagination.page) {
 }
 
 function handleApplyUserFilter() {
+  clearSelectedDraws()
   const raw = drawUserIdInput.value.trim()
   drawUserId.value = raw === '' ? undefined : Number(raw)
   loadDraws(1)
 }
 
 function handleDrawSort(_key: string, order: 'asc' | 'desc') {
+  clearSelectedDraws()
   sortOrder.value = order
   loadDraws(1)
 }
 
 function handlePageChange(page: number) {
+  clearSelectedDraws()
   loadDraws(page)
 }
 
 function handlePageSizeChange(pageSize: number) {
+  clearSelectedDraws()
   drawPagination.page_size = pageSize
   loadDraws(1)
 }
