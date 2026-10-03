@@ -120,7 +120,7 @@
         <button
           type="button"
           class="btn btn-primary"
-          :disabled="!isActive || resetting"
+          :disabled="loading || !isActive || resetting"
           @click="handleReset"
         >
           <svg
@@ -151,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
@@ -175,6 +175,7 @@ const appStore = useAppStore()
 const loading = ref(false)
 const resetting = ref(false)
 const status = ref<TempUnschedulableStatus | null>(null)
+let statusRequest = 0
 
 const state = computed(() => status.value?.state || null)
 
@@ -236,14 +237,19 @@ const remainingText = computed(() => {
 
 const loadStatus = async () => {
   if (!props.account) return
+  const request = ++statusRequest
+  const accountId = props.account.id
   loading.value = true
+  status.value = null
   try {
-    status.value = await adminAPI.accounts.getTempUnschedulableStatus(props.account.id)
+    const result = await adminAPI.accounts.getTempUnschedulableStatus(accountId)
+    if (request === statusRequest) status.value = result
   } catch (error: any) {
+    if (request !== statusRequest) return
     appStore.showError(error?.message || t('admin.accounts.tempUnschedulable.failedToLoad'))
     status.value = null
   } finally {
-    loading.value = false
+    if (request === statusRequest) loading.value = false
   }
 }
 
@@ -252,14 +258,18 @@ const handleClose = () => {
 }
 
 const handleReset = async () => {
-  if (!props.account) return
+  if (!props.account || loading.value || resetting.value || !isActive.value) return
+  const request = statusRequest
+  const accountId = props.account.id
   resetting.value = true
   try {
-    const updated = await adminAPI.accounts.recoverState(props.account.id)
+    const updated = await adminAPI.accounts.recoverState(accountId)
+    if (request !== statusRequest) return
     appStore.showSuccess(t('admin.accounts.recoverStateSuccess'))
     emit('reset', updated)
     handleClose()
   } catch (error: any) {
+    if (request !== statusRequest) return
     appStore.showError(error?.message || t('admin.accounts.recoverStateFailed'))
   } finally {
     resetting.value = false
@@ -273,7 +283,12 @@ watch(
       loadStatus()
       return
     }
+    statusRequest++
     status.value = null
-  }
+    loading.value = false
+  },
+  { immediate: true }
 )
+
+onBeforeUnmount(() => { statusRequest++ })
 </script>

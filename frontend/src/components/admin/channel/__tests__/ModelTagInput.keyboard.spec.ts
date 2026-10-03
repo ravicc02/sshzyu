@@ -63,4 +63,18 @@ describe('model tag keyboard navigation', () => {
     expect((input.element as HTMLInputElement).value).toBe('')
     expect(pressTab(input.element).defaultPrevented).toBe(false)
   })
+  it('allows reverse keyboard navigation with pending input', async () => {
+    const wrapper = mount(ModelTagInput, { props: { models: [] } })
+    await wrapper.get('input').setValue('pending')
+    expect(pressTab(wrapper.get('input').element, true).defaultPrevented).toBe(false)
+    expect(wrapper.emitted('update:models')).toBeUndefined()
+  })
+  it('leaves legacy composing Enter events to the input method', async () => {
+    const wrapper = mount(ModelTagInput, { props: { models: [] } })
+    await wrapper.get('input').setValue('pending')
+    const event = new KeyboardEvent('keydown', { key: 'Enter', keyCode: 229, bubbles: true, cancelable: true })
+    wrapper.get('input').element.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+    expect(wrapper.emitted('update:models')).toBeUndefined()
+  })
 })

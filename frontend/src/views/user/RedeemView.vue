@@ -215,7 +215,7 @@
         </div>
         <div class="p-6">
           <!-- Loading State -->
-          <div v-if="loadingHistory" class="flex items-center justify-center py-8">
+          <div v-if="loadingHistory && history.length === 0" class="flex items-center justify-center py-8">
             <svg class="h-6 w-6 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
               <circle
                 class="opacity-25"
@@ -344,13 +344,27 @@
             </p>
           </div>
         </div>
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 dark:border-dark-700">
+          <select v-model.number="historyPageSize" class="input w-auto" :aria-label="t('pagination.perPage')" @change="changeHistoryPageSize">
+            <option v-for="size in [20, 50, 100]" :key="size" :value="size">{{ size }}</option>
+          </select>
+          <span class="text-sm text-gray-500">{{ historyTotal }}</span>
+          <div class="flex gap-2">
+            <button type="button" class="btn btn-secondary btn-sm" :disabled="loadingHistory || historyPage <= 1" @click="fetchHistory(historyPage - 1)">
+              {{ t('pagination.previous') }}
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" :disabled="loadingHistory || historyPage * historyPageSize >= historyTotal" @click="fetchHistory(historyPage + 1)">
+              {{ t('pagination.next') }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
@@ -383,6 +397,11 @@ const errorMessage = ref('')
 // History data
 const history = ref<RedeemHistoryItem[]>([])
 const loadingHistory = ref(false)
+const historyPage = ref(1)
+const historyPageSize = ref(20)
+const historyTotal = ref(0)
+let loadedHistoryPageSize = 20
+let historyRequestId = 0
 const contactInfo = ref('')
 
 // Helper functions for history display
@@ -439,18 +458,31 @@ const formatHistoryValue = (item: RedeemHistoryItem) => {
   }
 }
 
-const fetchHistory = async () => {
+const fetchHistory = async (page = historyPage.value) => {
+  const requestId = ++historyRequestId
+  const pageSize = historyPageSize.value
   loadingHistory.value = true
   try {
-    history.value = await redeemAPI.getHistory()
+    const response = await redeemAPI.getHistory(page, pageSize)
+    if (requestId !== historyRequestId) return
+    history.value = response.items
+    historyTotal.value = response.total
+    historyPage.value = page
+    loadedHistoryPageSize = pageSize
   } catch (error) {
+    if (requestId !== historyRequestId) return
+    historyPageSize.value = loadedHistoryPageSize
+    appStore.showError(t('redeem.historyLoadFailed'))
     console.error('Failed to fetch history:', error)
   } finally {
-    loadingHistory.value = false
+    if (requestId === historyRequestId) loadingHistory.value = false
   }
 }
 
+const changeHistoryPageSize = () => fetchHistory(1)
+
 const handleRedeem = async () => {
+  if (submitting.value) return
   if (!redeemCode.value.trim()) {
     appStore.showError(t('redeem.pleaseEnterCode'))
     return
@@ -466,7 +498,12 @@ const handleRedeem = async () => {
     redeemResult.value = result
 
     // Refresh user data to get updated balance/concurrency
-    await authStore.refreshUser()
+    try {
+      await authStore.refreshUser()
+    } catch (error) {
+      console.error('Failed to refresh user after redeem:', error)
+      appStore.showWarning(t('redeem.userRefreshFailed'))
+    }
 
     // If subscription type, immediately refresh subscription status
     if (result.type === 'subscription') {
@@ -482,7 +519,7 @@ const handleRedeem = async () => {
     redeemCode.value = ''
 
     // Refresh history
-    await fetchHistory()
+    await fetchHistory(1)
 
     // Show success toast
     appStore.showSuccess(t('redeem.codeRedeemSuccess'))
@@ -504,6 +541,8 @@ onMounted(async () => {
     console.error('Failed to load contact info:', error)
   }
 })
+
+onBeforeUnmount(() => { historyRequestId++ })
 </script>
 
 <style scoped>

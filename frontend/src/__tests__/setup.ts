@@ -3,7 +3,10 @@
  * 提供全局 mock 和测试工具
  */
 import { config } from '@vue/test-utils'
-import { vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+
+beforeEach(() => setActivePinia(createPinia()))
 
 function createMemoryStorage(): Storage {
   const values = new Map<string, string>()

@@ -82,6 +82,26 @@ export default {
 
     backup: {
       title: '数据库备份',
+      archive: {
+        title: '月度备份归档',
+        enabled: '启用月度归档',
+        dates: '归档日期',
+        selectDates: '选择日期',
+        selectedDates: '已选择 {count} 个日期',
+        day: '{day} 日',
+        monthEnd: '月末',
+        done: '完成',
+        datesHint: '选择每月将定时备份保留为归档的日期。',
+        retention: '归档保留策略',
+        count: '归档保留数量',
+        copies: '份归档',
+        forever: '永久保留',
+        countHint: '归档池按指定数量保留最新归档。',
+        foreverHint: '永久归档不会被自动保留策略清理。',
+        fallbackHint: '超出当月天数的日期按月末处理；错过的日期由当月下一次成功的定时备份补归档。',
+        independentHint: '归档保留策略独立于普通备份的到期时间和数量限制。',
+        disabledHint: '不再创建新的月度归档，已有归档继续按其记录的保留策略处理。'
+      },
       description: '全量数据库备份到 S3 兼容存储，支持定时备份与恢复',
       s3: {
         title: 'S3 存储配置',
@@ -391,11 +411,37 @@ export default {
     affiliates: {
       invitesDescription: '查看全站邀请关系和被邀请用户累计返利',
       rebatesDescription: '查看每一笔产生返利的充值订单',
-      transfersDescription: '查看返利额度转入账户余额的提取流水',
+      transfersDescription: '查看返利转入余额和线下提现的提取流水',
+      outflowTypes: {
+        transfer: '转入余额',
+        withdraw: '线下提现'
+      },
+      withdraw: {
+        button: '登记线下提现',
+        title: '登记已支付的线下提现',
+        user: '用户',
+        userPlaceholder: '搜索邮箱、用户名或用户 ID',
+        changeUser: '更换用户',
+        noUserFound: '未找到匹配用户',
+        availableQuota: '可提取返利',
+        frozenHint: '冻结额度不可提取，此操作不会修改账户余额。',
+        amount: '已线下支付金额（USD）',
+        fillAll: '全部可提额度',
+        amountHint: '支持最多 8 位小数，请填写已在线下支付的金额。',
+        amountRequired: '请输入大于 0 的有效金额。',
+        amountExceeds: '金额不能超过可提取返利。',
+        uncertainHint: '上次登记结果尚未确认。请重试原登记，不要重复支付或另建登记。',
+        warning: '此操作只登记已经在线下支付的款项并扣减可提取返利，不会自动转账。请核对用户与金额。',
+        submit: '确认登记',
+        submitting: '登记中...',
+        success: '已登记线下提现 {amount}，剩余可提返利 {remaining}。',
+        replayed: '已确认原登记 {amount}，未重复扣减；剩余可提返利 {remaining}。'
+      },
       errors: {
         loadFailed: '加载邀请返利记录失败'
       },
       records: {
+        action: '提取类型',
         search: '搜索',
         searchPlaceholder: '邮箱、用户名、用户 ID、订单号',
         startAt: '开始日期',
@@ -434,6 +480,7 @@ export default {
     // Users Management
     users: {
       title: '用户管理',
+      passwordCopied: '密码已复制',
       description: '管理用户账户和权限',
       createUser: '创建用户',
       bulkLimits: {
@@ -829,6 +876,23 @@ export default {
       accountsRateLimited: '限流:',
       accountsTotal: '总量:',
       accountsUnit: '个账号',
+      modelAllowlist: {
+        title: '自定义模型列表',
+        hint: '该开关控制用户通过 {endpoint} 获取的模型列表，不限制模型调用权限。',
+        selectedSummary: '已选择 {selected} / {total} 个模型',
+        selectAll: '全选',
+        invertSelection: '反选',
+        loading: '加载模型中...',
+        empty: '暂无候选模型，可添加模型名称或通配符模式。',
+        wildcardTag: '通配符',
+        customPlaceholder: '模型名称或通配符模式，例如 gpt-*',
+        addCustom: '添加模型',
+        emptySelectionError: '启用自定义模型列表时请至少选择一个模型。',
+        errors: {
+          empty: '请输入模型名称或模式。',
+          duplicate: '该模型或模式已在列表中。'
+        }
+      },
       form: {
         name: '名称',
         description: '描述',
@@ -1222,14 +1286,6 @@ export default {
         selectAccounts: '选择账号',
         noAccounts: '此分组暂无账号',
         loadingAccounts: '加载账号中...',
-      claudeMaxSimulation: {
-        title: 'Claude Max 用量模拟',
-        tooltip:
-          '启用后，对于没有上游缓存写入用量的 Claude 模型，系统会确定性地将 token 映射为少量输入加 1h 缓存创建，同时保持总 token 不变。',
-        enabled: '已启用（模拟 1h 缓存）',
-        disabled: '已禁用',
-        hint: '仅调整用量计费日志中的 token 类别。不会持久化每个请求的映射状态。'
-      },
         removeRule: '删除规则',
         noRules: '暂无路由规则',
         noRulesHint: '添加路由规则以将特定模型请求优先路由到指定账号',
@@ -1241,6 +1297,14 @@ export default {
         tooltip: '启用后，当请求包含 MCP 工具时，会在 system prompt 中注入 XML 格式调用协议提示词。关闭此选项可避免对某些客户端造成干扰。',
         enabled: '已启用',
         disabled: '已禁用'
+      },
+      claudeMaxSimulation: {
+        title: 'Claude Max 用量模拟',
+        tooltip:
+          '启用后，对于没有上游缓存写入用量的 Claude 模型，系统会确定性地将 token 映射为少量输入加 1h 缓存创建，同时保持总 token 不变。',
+        enabled: '已启用（模拟 1h 缓存）',
+        disabled: '已禁用',
+        hint: '仅调整用量计费日志中的 token 类别。不会持久化每个请求的映射状态。'
       },
       supportedScopes: {
         title: '支持的模型系列',

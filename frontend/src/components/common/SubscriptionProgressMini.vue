@@ -257,22 +257,25 @@ function formatUsage(used: number | undefined, limit: number | null | undefined)
   return `$${usedValue}/$${limitValue}`
 }
 
-function formatDaysRemaining(expiresAt: string): string {
+function getDaysRemaining(expiresAt: string): number {
   const now = new Date()
   const expires = new Date(expiresAt)
-  const diff = expires.getTime() - now.getTime()
-  if (diff < 0) return t('subscriptionProgress.expired')
-  const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
+  if (expires.getTime() <= now.getTime()) return -1
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+  const expiryDay = Date.UTC(expires.getFullYear(), expires.getMonth(), expires.getDate())
+  return Math.round((expiryDay - today) / (1000 * 60 * 60 * 24))
+}
+
+function formatDaysRemaining(expiresAt: string): string {
+  const days = getDaysRemaining(expiresAt)
+  if (days < 0) return t('subscriptionProgress.expired')
   if (days === 0) return t('subscriptionProgress.expiresToday')
   if (days === 1) return t('subscriptionProgress.expiresTomorrow')
   return t('subscriptionProgress.daysRemaining', { days })
 }
 
 function getDaysRemainingClass(expiresAt: string): string {
-  const now = new Date()
-  const expires = new Date(expiresAt)
-  const diff = expires.getTime() - now.getTime()
-  const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
+  const days = getDaysRemaining(expiresAt)
   if (days <= 3) return 'text-red-600 dark:text-red-400'
   if (days <= 7) return 'text-orange-600 dark:text-orange-400'
   return 'text-gray-500 dark:text-dark-400'

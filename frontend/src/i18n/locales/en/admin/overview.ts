@@ -82,6 +82,26 @@ export default {
 
     backup: {
       title: 'Database Backup',
+      archive: {
+        title: 'Monthly backup archives',
+        enabled: 'Enable monthly archives',
+        dates: 'Archive dates',
+        selectDates: 'Select dates',
+        selectedDates: '{count} dates selected',
+        day: 'Day {day}',
+        monthEnd: 'Month end',
+        done: 'Done',
+        datesHint: 'Select dates each month on which scheduled backups should be retained as archives.',
+        retention: 'Archive retention',
+        count: 'Number of archives to retain',
+        copies: 'archives',
+        forever: 'Keep forever',
+        countHint: 'The archive pool retains the newest specified number of archives.',
+        foreverHint: 'Permanent archives are not removed by automatic retention cleanup.',
+        fallbackHint: 'Dates beyond the end of a month use its last day. A missed date is covered by the next successful scheduled backup that month.',
+        independentHint: 'Archive retention is independent of ordinary backup expiration and count limits.',
+        disabledHint: 'No new monthly archives will be created. Existing archives keep their recorded retention policy.'
+      },
       description: 'Full database backup to S3-compatible storage with scheduled backup and restore',
       s3: {
         title: 'S3 Storage Configuration',
@@ -391,11 +411,37 @@ export default {
     affiliates: {
       invitesDescription: 'View site-wide inviter and invitee relationships',
       rebatesDescription: 'View recharge orders that generated affiliate rebates',
-      transfersDescription: 'View affiliate quota transfers into account balance',
+      transfersDescription: 'View affiliate balance transfers and offline withdrawals',
+      outflowTypes: {
+        transfer: 'Balance transfer',
+        withdraw: 'Offline withdrawal'
+      },
+      withdraw: {
+        button: 'Record offline withdrawal',
+        title: 'Record a paid offline withdrawal',
+        user: 'User',
+        userPlaceholder: 'Search email, username, or user ID',
+        changeUser: 'Change user',
+        noUserFound: 'No matching user found',
+        availableQuota: 'Available affiliate quota',
+        frozenHint: 'Frozen quota cannot be withdrawn. Account balance will not change.',
+        amount: 'Amount already paid offline (USD)',
+        fillAll: 'All available quota',
+        amountHint: 'Enter the amount already paid offline, with up to 8 decimal places.',
+        amountRequired: 'Enter a valid amount greater than zero.',
+        amountExceeds: 'Amount exceeds the available affiliate quota.',
+        uncertainHint: 'The previous registration is unconfirmed. Retry it without paying again or creating another registration.',
+        warning: 'This records an already paid offline withdrawal and deducts available affiliate quota. It does not send a payment. Verify the user and amount.',
+        submit: 'Confirm registration',
+        submitting: 'Recording...',
+        success: 'Recorded {amount}. Available affiliate quota remaining: {remaining}.',
+        replayed: 'Confirmed the original {amount} registration without a second deduction. Available quota remaining: {remaining}.'
+      },
       errors: {
         loadFailed: 'Failed to load affiliate records'
       },
       records: {
+        action: 'Outflow type',
         search: 'Search',
         searchPlaceholder: 'Email, username, user ID, or order number',
         startAt: 'Start date',
@@ -434,6 +480,7 @@ export default {
     // Users
     users: {
       title: 'User Management',
+      passwordCopied: 'Password copied',
       description: 'Manage users and their permissions',
       createUser: 'Create User',
       bulkLimits: {
@@ -835,7 +882,24 @@ export default {
       accountsAvailable: 'Avail:',
       accountsRateLimited: 'Limited:',
       accountsTotal: 'Total:',
-      accountsUnit: '',
+      accountsUnit: 'accounts',
+      modelAllowlist: {
+        title: 'Customize the model list',
+        hint: 'This switch controls the model list users retrieve through {endpoint}; it does not restrict permission to call models.',
+        selectedSummary: '{selected} of {total} models selected',
+        selectAll: 'Select all',
+        invertSelection: 'Invert selection',
+        loading: 'Loading models...',
+        empty: 'No candidate models. Add a model name or wildcard pattern.',
+        wildcardTag: 'Wildcard',
+        customPlaceholder: 'Model name or wildcard pattern, e.g. gpt-*',
+        addCustom: 'Add model',
+        emptySelectionError: 'Select at least one model while the custom model list is enabled.',
+        errors: {
+          empty: 'Enter a model name or pattern.',
+          duplicate: 'This model or pattern is already in the list.'
+        }
+      },
       rateAndAccounts: '{rate}x rate · {count} accounts',
       accountsCount: '{count} accounts',
       rateLabel: 'rate',

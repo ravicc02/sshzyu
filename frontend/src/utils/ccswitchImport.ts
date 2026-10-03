@@ -30,11 +30,12 @@ export function resolveCcSwitchImportConfig(
   clientType: CcSwitchClientType,
   baseUrl: string
 ): CcSwitchImportConfig {
+  const normalizedBaseUrl = baseUrl.replace(/\/+$/, '')
   switch (platform || 'anthropic') {
     case 'antigravity':
       return {
         app: clientType === 'gemini' ? 'gemini' : 'claude',
-        endpoint: `${baseUrl}/antigravity`
+        endpoint: `${normalizedBaseUrl}/antigravity`
       }
     case 'openai':
       return {

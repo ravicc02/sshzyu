@@ -1,11 +1,12 @@
 <template>
   <Teleport to="body">
-    <div v-if="show && position">
+    <div v-if="show && (anchorRect || position)">
       <!-- Backdrop: click anywhere outside to close -->
       <div class="fixed inset-0 z-[9998]" @click="emit('close')"></div>
       <div
-        class="action-menu-content fixed z-[9999] w-52 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-dark-800"
-        :style="{ top: position.top + 'px', left: position.left + 'px' }"
+        ref="menuRef"
+        class="action-menu-content fixed z-[9999] w-52 overflow-y-auto overscroll-contain rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-dark-800"
+        :style="menuStyle"
         @click.stop
       >
         <div class="py-1">
@@ -62,14 +63,52 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, onUnmounted } from 'vue'
+import { computed, nextTick, ref, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@/components/icons'
 import type { Account } from '@/types'
 
-const props = defineProps<{ show: boolean; account: Account | null; position: { top: number; left: number } | null }>()
+const props = defineProps<{
+  show: boolean
+  account: Account | null
+  anchorRect?: DOMRect | null
+  position?: { top: number; left: number } | null
+}>()
 const emit = defineEmits(['close', 'test', 'stats', 'schedule', 'duplicate', 'reauth', 'refresh-token', 'recover-state', 'reset-quota', 'set-privacy', 'create-spark-shadow'])
 const { t } = useI18n()
+const menuRef = ref<HTMLElement | null>(null)
+const viewport = ref({ width: window.innerWidth, height: window.innerHeight })
+const measuredPosition = ref({ top: 8, left: 8 })
+let resizeObserver: ResizeObserver | undefined
+const menuStyle = computed(() => ({
+  top: `${props.anchorRect ? measuredPosition.value.top : props.position?.top ?? 8}px`,
+  left: `${props.anchorRect ? measuredPosition.value.left : props.position?.left ?? 8}px`,
+  maxHeight: `${Math.max(0, viewport.value.height - 16)}px`,
+  maxWidth: `${Math.max(0, viewport.value.width - 16)}px`
+}))
+
+function updatePosition() {
+  if (!props.show || !props.anchorRect || !menuRef.value) return
+  const anchor = props.anchorRect
+  const { width, height } = menuRef.value.getBoundingClientRect()
+  const preferredLeft = viewport.value.width < 768
+    ? anchor.left + anchor.width / 2 - width / 2
+    : anchor.right - width
+  const below = anchor.bottom + 4
+  const preferredTop = below + height <= viewport.value.height - 8
+    ? below
+    : anchor.top - height - 4
+  measuredPosition.value = {
+    top: Math.max(8, Math.min(preferredTop, viewport.value.height - height - 8)),
+    left: Math.max(8, Math.min(preferredLeft, viewport.value.width - width - 8))
+  }
+}
+
+async function handleResize() {
+  viewport.value = { width: window.innerWidth, height: window.innerHeight }
+  await nextTick()
+  updatePosition()
+}
 const canDuplicate = computed(() => {
   if (!props.account || props.account.parent_account_id != null) return false
   return ['apikey', 'upstream', 'bedrock', 'service_account'].includes(props.account.type)
@@ -111,19 +150,26 @@ const handleKeydown = (event: KeyboardEvent) => {
   if (event.key === 'Escape') emit('close')
 }
 
-watch(
-  () => props.show,
-  (visible) => {
-    if (visible) {
-      window.addEventListener('keydown', handleKeydown)
-    } else {
-      window.removeEventListener('keydown', handleKeydown)
-    }
-  },
-  { immediate: true }
-)
+watch(() => [props.show, props.anchorRect, props.account], async () => {
+  resizeObserver?.disconnect()
+  window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('resize', handleResize)
+  if (!props.show) return
+  viewport.value = { width: window.innerWidth, height: window.innerHeight }
+  window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('resize', handleResize)
+  await nextTick()
+  if (!props.show || !menuRef.value) return
+  updatePosition()
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(updatePosition)
+    resizeObserver.observe(menuRef.value)
+  }
+}, { immediate: true })
 
 onUnmounted(() => {
+  resizeObserver?.disconnect()
   window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('resize', handleResize)
 })
 </script>

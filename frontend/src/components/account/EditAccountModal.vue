@@ -522,6 +522,36 @@
 
       </div>
 
+      <div
+        v-if="isGrokMediaAccount"
+        class="space-y-2 border-t border-gray-200 pt-4 dark:border-dark-600"
+        data-testid="grok-media-eligibility-card"
+      >
+        <label for="grok-media-eligibility-mode" class="input-label">
+          {{ t('admin.accounts.grokMediaEligibility.title') }}
+        </label>
+        <p class="input-hint">{{ t('admin.accounts.grokMediaEligibility.hint') }}</p>
+        <select
+          id="grok-media-eligibility-mode"
+          v-model="grokMediaEligibilityMode"
+          class="input"
+          data-testid="grok-media-eligibility-mode"
+          :disabled="grokMediaEligibilityLoading || !grokMediaEligibility || submitting"
+        >
+          <option value="auto">{{ t('admin.accounts.grokMediaEligibility.auto') }}</option>
+          <option value="enabled">{{ t('admin.accounts.grokMediaEligibility.enabled') }}</option>
+          <option value="disabled">{{ t('admin.accounts.grokMediaEligibility.disabled') }}</option>
+        </select>
+        <p class="input-hint" data-testid="grok-media-eligibility-status" aria-live="polite">
+          <template v-if="grokMediaEligibilityLoading">{{ t('common.loading') }}</template>
+          <template v-else-if="grokMediaEligibility">
+            {{ grokMediaEligibility.eligible ? t('admin.accounts.grokMediaEligibility.eligible') : t('admin.accounts.grokMediaEligibility.ineligible') }}
+            · {{ grokMediaEligibility.reason }}
+          </template>
+          <template v-else>{{ t('admin.accounts.grokMediaEligibility.loadFailed') }}</template>
+        </p>
+      </div>
+
       <!-- Grok OAuth client-tool prompt cache opt-in -->
       <div
         v-if="account.platform === 'grok' && account.type === 'oauth'"
@@ -2904,7 +2934,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, nextTick } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
@@ -2918,7 +2948,9 @@ import type {
   OpenAICompactMode,
   OpenAIResponsesMode,
   OpenAIEndpointCapability,
-  OllamaCloudUsageState
+  OllamaCloudUsageState,
+  GrokMediaEligibilityMode,
+  GrokMediaEligibilityState
 } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
@@ -3232,6 +3264,11 @@ const grokOAuthBaseUrl = ref('')
 // Grok Free OAuth accounts use client-tool prompt caching by default. Keep an
 // explicit false in the account extra as the opt-out signal.
 const grokClientToolCacheEnabled = ref(true)
+const isGrokMediaAccount = computed(() => props.account?.platform === 'grok' && props.account.type === 'oauth')
+const grokMediaEligibility = ref<GrokMediaEligibilityState | null>(null)
+const grokMediaEligibilityMode = ref<GrokMediaEligibilityMode>('auto')
+const grokMediaEligibilityLoading = ref(false)
+let grokMediaEligibilityRequest = 0
 
 const interceptWarmupRequests = ref(false)
 const autoPauseOnExpired = ref(false)
@@ -4153,6 +4190,25 @@ async function loadTLSProfiles() {
   }
 }
 
+async function loadGrokMediaEligibility(accountId: number) {
+  const request = ++grokMediaEligibilityRequest
+  grokMediaEligibility.value = null
+  grokMediaEligibilityMode.value = 'auto'
+  grokMediaEligibilityLoading.value = true
+  try {
+    const state = await adminAPI.accounts.getGrokMediaEligibility(accountId)
+    if (request !== grokMediaEligibilityRequest || !props.show || props.account?.id !== accountId) return
+    grokMediaEligibility.value = state
+    grokMediaEligibilityMode.value = state.mode
+  } catch {
+    if (request === grokMediaEligibilityRequest && props.show && props.account?.id === accountId) {
+      appStore.showError(t('admin.accounts.grokMediaEligibility.loadFailed'))
+    }
+  } finally {
+    if (request === grokMediaEligibilityRequest) grokMediaEligibilityLoading.value = false
+  }
+}
+
 watch(
   [() => props.show, () => props.account],
   ([show, newAccount], [wasShow, previousAccount]) => {
@@ -4166,6 +4222,23 @@ watch(
   },
   { immediate: true }
 )
+
+watch(
+  [() => props.show, () => props.account?.id, isGrokMediaAccount],
+  ([show, accountId, eligible]) => {
+    if (show && accountId != null && eligible) {
+      void loadGrokMediaEligibility(accountId)
+      return
+    }
+    grokMediaEligibilityRequest++
+    grokMediaEligibility.value = null
+    grokMediaEligibilityMode.value = 'auto'
+    grokMediaEligibilityLoading.value = false
+  },
+  { immediate: true }
+)
+
+onBeforeUnmount(() => { grokMediaEligibilityRequest++ })
 
 // Model mapping helpers
 const addModelMapping = () => {
@@ -4668,9 +4741,30 @@ const handleClose = () => {
 }
 
 const submitUpdateAccount = async (accountID: number, updatePayload: Record<string, unknown>) => {
+  const mediaMode = isGrokMediaAccount.value &&
+    grokMediaEligibility.value?.account_id === accountID &&
+    grokMediaEligibilityMode.value !== grokMediaEligibility.value.mode
+    ? grokMediaEligibilityMode.value
+    : null
   submitting.value = true
   try {
     const updatedAccount = await adminAPI.accounts.update(accountID, withAntigravityConfirmFlag(updatePayload))
+    if (mediaMode != null) {
+      try {
+        const state = await adminAPI.accounts.updateGrokMediaEligibility(accountID, mediaMode)
+        if (props.show && props.account?.id === accountID) {
+          grokMediaEligibility.value = state
+          grokMediaEligibilityMode.value = state.mode
+        }
+      } catch {
+        if (props.show && props.account?.id === accountID) {
+          await loadGrokMediaEligibility(accountID)
+          appStore.showError(t('admin.accounts.grokMediaEligibility.partialSave'))
+        }
+        emit('updated', updatedAccount)
+        return
+      }
+    }
     appStore.showSuccess(t('admin.accounts.accountUpdated'))
     emit('updated', updatedAccount)
     handleClose()

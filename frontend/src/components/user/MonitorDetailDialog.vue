@@ -61,6 +61,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { createRequestGuard } from '@/utils/requestGuard'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -87,23 +88,28 @@ const { statusLabel, statusBadgeClass, formatLatency, formatPercent, formatMonit
 
 const detail = ref<UserMonitorDetail | null>(null)
 const loading = ref(false)
+const requests = createRequestGuard()
 
 async function load(id: number) {
+  const current = requests.start()
   detail.value = null
   loading.value = true
   try {
-    detail.value = await fetchChannelMonitorDetail(id)
+    const result = await fetchChannelMonitorDetail(id)
+    if (current()) detail.value = result
   } catch (err: unknown) {
-    appStore.showError(extractApiErrorMessage(err, t('channelStatus.detailLoadError')))
+    if (current()) appStore.showError(extractApiErrorMessage(err, t('channelStatus.detailLoadError')))
   } finally {
-    loading.value = false
+    if (current()) loading.value = false
   }
 }
 
 watch(
   () => [props.show, props.monitorId] as const,
   ([show, id]) => {
+    requests.invalidate()
     if (!show) {
+      loading.value = false
       detail.value = null
       return
     }

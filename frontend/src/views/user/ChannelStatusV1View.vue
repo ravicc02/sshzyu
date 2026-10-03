@@ -67,7 +67,7 @@ const autoRefresh = useAutoRefresh({
   intervals: [30, 60, 120] as const,
   defaultInterval: DEFAULT_INTERVAL_SECONDS,
   onRefresh: () => reload(true),
-  shouldPause: () => document.hidden || loading.value,
+  shouldPause: () => document.hidden || loading.value || abortController !== null,
 })
 const countdown = autoRefresh.countdown
 
@@ -102,7 +102,7 @@ async function reload(silent = false) {
   } finally {
     if (abortController === ctrl) {
       if (!silent) loading.value = false
-      countdown.value = DEFAULT_INTERVAL_SECONDS
+      autoRefresh.resetCountdown()
       abortController = null
     }
   }
@@ -151,6 +151,14 @@ watch(items, () => {
   void ensureDetailsForWindow()
 })
 
+watch(countdown, (seconds) => {
+  if (seconds === 0 && autoRefresh.enabled.value &&
+      appStore.cachedPublicSettings?.channel_monitor_enabled !== false &&
+      !document.hidden && !abortController) {
+    void reload(true)
+  }
+})
+
 watch(
   () => appStore.cachedPublicSettings?.channel_monitor_enabled,
   (enabled) => {
@@ -162,7 +170,16 @@ watch(
 onMounted(() => {
   void reload(false)
   if (appStore.cachedPublicSettings?.channel_monitor_enabled !== false) {
-    autoRefresh.setEnabled(true)
+    try {
+      if (localStorage.getItem('channel-status-auto-refresh') === null) {
+        autoRefresh.setEnabled(true)
+      } else if (autoRefresh.enabled.value) {
+        autoRefresh.resetCountdown()
+        autoRefresh.start()
+      }
+    } catch {
+      autoRefresh.setEnabled(true)
+    }
   }
 })
 

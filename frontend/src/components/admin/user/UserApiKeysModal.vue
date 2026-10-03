@@ -108,6 +108,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { createRequestGuard } from '@/utils/requestGuard'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
 import { formatDateTime } from '@/utils/format'
@@ -144,7 +145,11 @@ const setGroupButtonRef = (keyId: number, el: Element | ComponentPublicInstance 
   }
 }
 
-watch(() => props.show, (v) => {
+const requests = createRequestGuard()
+watch(() => [props.show, props.user?.id] as const, ([v]) => {
+  requests.invalidate()
+  apiKeys.value = []
+  loading.value = false
   if (v && props.user) {
     load()
     loadGroups()
@@ -155,15 +160,18 @@ watch(() => props.show, (v) => {
 
 const load = async () => {
   if (!props.user) return
+  const current = requests.start()
   loading.value = true
   groupButtonRefs.value.clear()
   try {
     const res = await adminAPI.users.getUserApiKeys(props.user.id)
+    if (!current()) return
     apiKeys.value = res.items || []
   } catch (error) {
+    if (!current()) return
     console.error('Failed to load API keys:', error)
   } finally {
-    loading.value = false
+    if (current()) loading.value = false
   }
 }
 

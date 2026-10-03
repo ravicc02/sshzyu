@@ -107,10 +107,11 @@ const containerRef = ref<HTMLElement | null>(null)
 const localStartDate = ref(props.startDate)
 const localEndDate = ref(props.endDate)
 const activePreset = ref<string | null>('last24Hours')
+const currentTime = ref(new Date())
 
 const today = computed(() => {
   // Use local timezone to avoid UTC timezone issues
-  const now = new Date()
+  const now = currentTime.value
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const day = String(now.getDate()).padStart(2, '0')
@@ -120,7 +121,7 @@ const today = computed(() => {
 // Tomorrow's date - used for max date to handle timezone differences
 // When user is in a timezone behind the server, "today" on server might be "tomorrow" locally
 const tomorrow = computed(() => {
-  const d = new Date()
+  const d = new Date(currentTime.value)
   d.setDate(d.getDate() + 1)
   return formatDateToString(d)
 })
@@ -245,6 +246,7 @@ const isPresetActive = (preset: DatePreset): boolean => {
 }
 
 const selectPreset = (preset: DatePreset) => {
+  currentTime.value = new Date()
   const range = preset.getRange()
   localStartDate.value = range.start
   localEndDate.value = range.end
@@ -264,7 +266,24 @@ const onDateChange = () => {
 }
 
 const toggle = () => {
-  isOpen.value = !isOpen.value
+  if (isOpen.value) {
+    dismiss()
+  } else {
+    currentTime.value = new Date()
+    restoreCommittedRange()
+    isOpen.value = true
+  }
+}
+
+const restoreCommittedRange = () => {
+  localStartDate.value = props.startDate
+  localEndDate.value = props.endDate
+  onDateChange()
+}
+
+const dismiss = () => {
+  restoreCommittedRange()
+  isOpen.value = false
 }
 
 const apply = () => {
@@ -280,13 +299,13 @@ const apply = () => {
 
 const handleClickOutside = (event: MouseEvent) => {
   if (containerRef.value && !containerRef.value.contains(event.target as Node)) {
-    isOpen.value = false
+    dismiss()
   }
 }
 
 const handleEscape = (event: KeyboardEvent) => {
   if (event.key === 'Escape' && isOpen.value) {
-    isOpen.value = false
+    dismiss()
   }
 }
 

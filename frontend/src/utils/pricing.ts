@@ -22,3 +22,28 @@ export function formatScaled(value: number | null, scale: number, minFractionDig
   }
   return `$${s}`
 }
+
+type PriceValues = {
+  input_price?: number | null
+  output_price?: number | null
+  cache_write_price?: number | null
+  cache_write_1h_price?: number | null
+  cache_read_price?: number | null
+  per_request_price?: number | null
+}
+
+export function resolveIntervalPrices(
+  interval: PriceValues & { input_multiplier?: number | null; output_multiplier?: number | null; cache_write_multiplier?: number | null; cache_read_multiplier?: number | null },
+  base: PriceValues
+): PriceValues {
+  const inherited = (value: number | null | undefined, multiplier: number | null | undefined) =>
+    value == null ? value : value * (multiplier ?? 1)
+  return {
+    input_price: interval.input_price ?? inherited(base.input_price, interval.input_multiplier),
+    output_price: interval.output_price ?? inherited(base.output_price, interval.output_multiplier),
+    cache_write_price: interval.cache_write_price ?? inherited(base.cache_write_price, interval.cache_write_multiplier),
+    cache_write_1h_price: interval.cache_write_1h_price ?? interval.cache_write_price ?? inherited(base.cache_write_1h_price, interval.cache_write_multiplier),
+    cache_read_price: interval.cache_read_price ?? inherited(base.cache_read_price, interval.cache_read_multiplier),
+    per_request_price: interval.per_request_price ?? base.per_request_price
+  }
+}

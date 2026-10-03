@@ -41,6 +41,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { extractApiErrorMessage } from '@/utils/apiError'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { userAPI } from '@/api'
@@ -77,7 +78,7 @@ const handleUpdateProfile = async () => {
     authStore.user = updatedUser
     appStore.showSuccess(t('profile.updateSuccess'))
   } catch (error: any) {
-    appStore.showError(error.response?.data?.detail || t('profile.updateFailed'))
+    appStore.showError(extractApiErrorMessage(error, t('profile.updateFailed')))
   } finally {
     loading.value = false
   }

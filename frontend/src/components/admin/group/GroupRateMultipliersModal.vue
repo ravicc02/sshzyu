@@ -63,7 +63,7 @@
           <button
             type="button"
             class="btn btn-primary shrink-0"
-            :disabled="!selectedUser || !newRate"
+            :disabled="!selectedUser || !validNewRate"
             @click="handleAddLocal"
           >
             {{ t('common.add') }}
@@ -239,7 +239,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
@@ -279,6 +279,15 @@ const pageSize = ref(10)
 const batchFactor = ref<number | null>(null)
 
 let searchTimeout: ReturnType<typeof setTimeout>
+let searchSequence = 0
+
+const validNewRate = computed(() => typeof newRate.value === 'number' && Number.isFinite(newRate.value) && newRate.value > 0)
+
+function cancelSearch() {
+  clearTimeout(searchTimeout)
+  searchSequence++
+  showDropdown.value = false
+}
 
 const platformColorClass = computed(() => {
   switch (props.group?.platform) {
@@ -342,6 +351,7 @@ const adjustPage = () => {
 }
 
 watch(() => props.show, (val) => {
+  cancelSearch()
   if (val && props.group) {
     currentPage.value = 1
     batchFactor.value = null
@@ -359,7 +369,9 @@ const handlePageSizeChange = (newSize: number) => {
 }
 
 const handleSearchUsers = () => {
-  clearTimeout(searchTimeout)
+  cancelSearch()
+  const sequence = searchSequence
+  const query = searchQuery.value.trim()
   selectedUser.value = null
   if (!searchQuery.value.trim()) {
     searchResults.value = []
@@ -368,16 +380,19 @@ const handleSearchUsers = () => {
   }
   searchTimeout = setTimeout(async () => {
     try {
-      const res = await adminAPI.users.list(1, 10, { search: searchQuery.value.trim() })
+      const res = await adminAPI.users.list(1, 10, { search: query })
+      if (sequence !== searchSequence) return
       searchResults.value = res.items
       showDropdown.value = true
     } catch {
+      if (sequence !== searchSequence) return
       searchResults.value = []
     }
   }, 300)
 }
 
 const selectUser = (user: AdminUser) => {
+  cancelSearch()
   selectedUser.value = user
   searchQuery.value = user.email
   showDropdown.value = false
@@ -386,7 +401,7 @@ const selectUser = (user: AdminUser) => {
 
 // 本地添加（或覆盖已有用户）
 const handleAddLocal = () => {
-  if (!selectedUser.value || !newRate.value) return
+  if (!selectedUser.value || !validNewRate.value) return
   const user = selectedUser.value
   const idx = localEntries.value.findIndex(e => e.user_id === user.id)
   const entry: LocalEntry = {
@@ -417,8 +432,8 @@ const updateLocalRate = (userId: number, value: string) => {
     entry.rate_multiplier = null
     return
   }
-  const num = parseFloat(value)
-  if (isNaN(num)) return
+  const num = Number(value)
+  if (!Number.isFinite(num) || num <= 0) return
   entry.rate_multiplier = num
 }
 
@@ -453,7 +468,9 @@ const handleCancel = () => {
 
 // 保存：一次性提交所有数据（只提交 rate_multiplier；rpm_override 由独立弹窗管理）
 const handleSave = async () => {
-  if (!props.group) return
+  if (!props.group || saving.value || localEntries.value.some(entry =>
+    entry.rate_multiplier != null && (!Number.isFinite(entry.rate_multiplier) || entry.rate_multiplier <= 0)
+  )) return
   saving.value = true
   try {
     const entries = localEntries.value
@@ -476,6 +493,7 @@ const handleSave = async () => {
 
 // 关闭时如果有未保存修改，先恢复
 const handleClose = () => {
+  cancelSearch()
   if (isDirty.value) {
     localEntries.value = cloneEntries(serverEntries.value)
   }
@@ -490,6 +508,11 @@ const handleClickOutside = () => {
 if (typeof document !== 'undefined') {
   document.addEventListener('click', handleClickOutside)
 }
+
+onBeforeUnmount(() => {
+  cancelSearch()
+  document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <style scoped>

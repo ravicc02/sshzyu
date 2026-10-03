@@ -305,7 +305,8 @@ async function verifyPending(idx: number) {
   try {
     await userAPI.verifyNotifyEmail(pe.email, pe.code)
     if (pe.timer) clearInterval(pe.timer)
-    pendingEmails.value.splice(idx, 1)
+    const currentIndex = pendingEmails.value.indexOf(pe)
+    if (currentIndex !== -1) pendingEmails.value.splice(currentIndex, 1)
     appStore.showSuccess(t('profile.balanceNotify.verifySuccess'))
     const updated = await userAPI.getProfile()
     authStore.user = updated

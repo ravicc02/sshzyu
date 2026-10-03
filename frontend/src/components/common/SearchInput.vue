@@ -9,12 +9,15 @@
       class="input pl-10"
       :placeholder="placeholder"
       @input="handleInput"
+      @compositionstart="composing = true"
+      @compositionend="finishComposition"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core'
+import { ref } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 
 const props = withDefaults(defineProps<{
@@ -30,12 +33,19 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
   (e: 'search', value: string): void
 }>()
+const composing = ref(false)
+
+const finishComposition = (event: Event) => {
+  composing.value = false
+  handleInput(event)
+}
 
 const debouncedEmitSearch = useDebounceFn((value: string) => {
   emit('search', value)
 }, props.debounceMs)
 
 const handleInput = (event: Event) => {
+  if (composing.value) return
   const value = (event.target as HTMLInputElement).value
   emit('update:modelValue', value)
   debouncedEmitSearch(value)

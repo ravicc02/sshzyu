@@ -67,6 +67,19 @@ export default {
   // API Keys
   keys: {
     title: 'API Keys',
+    bulkEdit: {
+      title: 'Bulk edit API keys',
+      selectedCount: '{count} keys selected',
+      hint: 'Only enabled fields are changed. Other settings are preserved.',
+      apply: 'Apply to {count} keys',
+      limitHint: 'Enter 0 for no limit. Only selected limit fields are changed.',
+      ipHint: 'Enter one IP address or CIDR range per line. Leave empty to clear the list.',
+      invalidLimit: 'Limits must be non-negative numbers.',
+      invalidExpiration: 'Enter a valid expiration date and time.',
+      failureHint: 'Only failed keys remain selected. Retry to apply the changes to them.',
+      partialFailure: '{success} keys updated; {failed} failed.',
+      success: '{count} keys updated successfully.'
+    },
     description: 'Manage your API keys and access tokens',
     searchPlaceholder: 'Search name or key...',
     endpoints: {
@@ -739,6 +752,8 @@ export default {
   // Redeem
   redeem: {
     title: 'Redeem Code',
+    historyLoadFailed: 'Could not load redemption history.',
+    userRefreshFailed: 'Redemption succeeded, but account details could not be refreshed.',
     description: 'Enter your redeem code to add balance or increase concurrency',
     currentBalance: 'Current Balance',
     concurrency: 'Concurrency',

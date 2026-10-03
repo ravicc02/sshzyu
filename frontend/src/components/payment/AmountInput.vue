@@ -162,7 +162,10 @@ function selectAmount(amt: number) {
 
 function handleInput(e: Event) {
   const val = (e.target as HTMLInputElement).value
-  if (!AMOUNT_PATTERN.test(val)) return
+  if (!AMOUNT_PATTERN.test(val)) {
+    (e.target as HTMLInputElement).value = customText.value
+    return
+  }
   customText.value = val
   if (val === '') {
     emit('update:modelValue', null)
@@ -177,6 +180,7 @@ function handleInput(e: Event) {
 }
 
 watch(() => props.modelValue, (v) => {
+  if (v === null) customText.value = ''
   if (v !== null && String(v) !== customText.value) {
     customText.value = String(v)
   }

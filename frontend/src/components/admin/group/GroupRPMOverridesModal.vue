@@ -62,7 +62,7 @@
           <button
             type="button"
             class="btn btn-primary shrink-0"
-            :disabled="!selectedUser || newRpm == null || newRpm < 0"
+            :disabled="!selectedUser || !validNewRpm"
             @click="handleAddLocal"
           >
             {{ t('common.add') }}
@@ -206,7 +206,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
@@ -245,6 +245,15 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 
 let searchTimeout: ReturnType<typeof setTimeout>
+let searchSequence = 0
+
+const validNewRpm = computed(() => typeof newRpm.value === 'number' && Number.isSafeInteger(newRpm.value) && newRpm.value >= 0)
+
+function cancelSearch() {
+  clearTimeout(searchTimeout)
+  searchSequence++
+  showDropdown.value = false
+}
 
 const platformColorClass = computed(() => {
   switch (props.group?.platform) {
@@ -291,6 +300,7 @@ const adjustPage = () => {
 }
 
 watch(() => props.show, (val) => {
+  cancelSearch()
   if (val && props.group) {
     currentPage.value = 1
     searchQuery.value = ''
@@ -307,7 +317,9 @@ const handlePageSizeChange = (newSize: number) => {
 }
 
 const handleSearchUsers = () => {
-  clearTimeout(searchTimeout)
+  cancelSearch()
+  const sequence = searchSequence
+  const query = searchQuery.value.trim()
   selectedUser.value = null
   if (!searchQuery.value.trim()) {
     searchResults.value = []
@@ -316,16 +328,19 @@ const handleSearchUsers = () => {
   }
   searchTimeout = setTimeout(async () => {
     try {
-      const res = await adminAPI.users.list(1, 10, { search: searchQuery.value.trim() })
+      const res = await adminAPI.users.list(1, 10, { search: query })
+      if (sequence !== searchSequence) return
       searchResults.value = res.items
       showDropdown.value = true
     } catch {
+      if (sequence !== searchSequence) return
       searchResults.value = []
     }
   }, 300)
 }
 
 const selectUser = (user: AdminUser) => {
+  cancelSearch()
   selectedUser.value = user
   searchQuery.value = user.email
   showDropdown.value = false
@@ -333,7 +348,7 @@ const selectUser = (user: AdminUser) => {
 }
 
 const handleAddLocal = () => {
-  if (!selectedUser.value || newRpm.value == null || newRpm.value < 0) return
+  if (!selectedUser.value || !validNewRpm.value || typeof newRpm.value !== 'number') return
   const user = selectedUser.value
   const idx = localEntries.value.findIndex(e => e.user_id === user.id)
   const entry: LocalEntry = {
@@ -356,8 +371,9 @@ const handleAddLocal = () => {
 }
 
 const updateLocalRpm = (userId: number, value: string) => {
-  const num = parseInt(value, 10)
-  if (isNaN(num) || num < 0) return
+  if (!value.trim()) return
+  const num = Number(value)
+  if (!Number.isSafeInteger(num) || num < 0) return
   const entry = localEntries.value.find(e => e.user_id === userId)
   if (entry) entry.rpm_override = num
 }
@@ -390,7 +406,9 @@ const handleCancel = () => {
 }
 
 const handleSave = async () => {
-  if (!props.group) return
+  if (!props.group || saving.value || localEntries.value.some(entry =>
+    entry.rpm_override != null && (!Number.isSafeInteger(entry.rpm_override) || entry.rpm_override < 0)
+  )) return
   saving.value = true
   try {
     const entries = localEntries.value.map(e => ({
@@ -410,6 +428,7 @@ const handleSave = async () => {
 }
 
 const handleClose = () => {
+  cancelSearch()
   if (isDirty.value) {
     localEntries.value = cloneEntries(serverEntries.value)
   }
@@ -420,6 +439,11 @@ const handleClickOutside = () => { showDropdown.value = false }
 if (typeof document !== 'undefined') {
   document.addEventListener('click', handleClickOutside)
 }
+
+onBeforeUnmount(() => {
+  cancelSearch()
+  document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <style scoped>

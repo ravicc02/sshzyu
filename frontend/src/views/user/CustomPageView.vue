@@ -94,12 +94,22 @@
         </div>
 
         <!-- Iframe embed mode -->
-        <div v-else class="custom-embed-shell">
+        <div v-else ref="embedShell" class="custom-embed-shell">
           <a
+            v-if="!menuItem.hide_open_button"
+            ref="openButton"
             :href="embeddedUrl"
             target="_blank"
             rel="noopener noreferrer"
             class="btn btn-secondary btn-sm custom-open-fab"
+            :style="openButtonStyle"
+            :draggable="false"
+            @pointerdown="startButtonDrag"
+            @pointermove="moveButtonDrag"
+            @pointerup="finishButtonDrag"
+            @pointercancel="cancelButtonDrag"
+            @lostpointercapture="cancelButtonDrag"
+            @click="handleOpenClick"
           >
             <Icon name="externalLink" size="sm" class="mr-1.5" :stroke-width="2" />
             {{ t('customPage.openInNewTab') }}
@@ -149,6 +159,90 @@ const tocItems = ref<TocItem[]>([])
 const tocVisible = ref(typeof window !== 'undefined' ? window.innerWidth > 768 : true)
 const activeHeadingId = ref('')
 let themeObserver: MutationObserver | null = null
+const embedShell = ref<HTMLElement | null>(null)
+const openButton = ref<HTMLAnchorElement | null>(null)
+const buttonPosition = ref<{ left: number; top: number } | null>(null)
+let buttonResizeObserver: ResizeObserver | null = null
+let buttonDrag: { pointerId: number; x: number; y: number; left: number; top: number; moved: boolean } | null = null
+let suppressOpenClick = false
+
+const openButtonStyle = computed(() => buttonPosition.value ? {
+  left: `${buttonPosition.value.left}px`,
+  top: `${buttonPosition.value.top}px`,
+  right: 'auto'
+} : {})
+
+function clampButtonPosition(left: number, top: number) {
+  const shell = embedShell.value
+  const button = openButton.value
+  if (!shell || !button) return
+  buttonPosition.value = {
+    left: Math.max(0, Math.min(left, shell.clientWidth - button.offsetWidth)),
+    top: Math.max(0, Math.min(top, shell.clientHeight - button.offsetHeight))
+  }
+}
+
+function startButtonDrag(event: PointerEvent) {
+  if (event.button !== 0 || event.isPrimary === false || buttonDrag) return
+  const button = openButton.value
+  if (!button) return
+  suppressOpenClick = false
+  buttonDrag = {
+    pointerId: event.pointerId, x: event.clientX, y: event.clientY,
+    left: button.offsetLeft, top: button.offsetTop, moved: false
+  }
+  button.setPointerCapture(event.pointerId)
+}
+
+function moveButtonDrag(event: PointerEvent) {
+  const drag = buttonDrag
+  if (!drag || drag.pointerId !== event.pointerId) return
+  const deltaX = event.clientX - drag.x
+  const deltaY = event.clientY - drag.y
+  if (!drag.moved && Math.hypot(deltaX, deltaY) < 4) return
+  drag.moved = true
+  event.preventDefault()
+  clampButtonPosition(drag.left + deltaX, drag.top + deltaY)
+}
+
+function finishButtonDrag(event: PointerEvent) {
+  if (!buttonDrag || buttonDrag.pointerId !== event.pointerId) return
+  suppressOpenClick = buttonDrag.moved
+  buttonDrag = null
+  if (openButton.value?.hasPointerCapture(event.pointerId)) {
+    openButton.value.releasePointerCapture(event.pointerId)
+  }
+}
+
+function cancelButtonDrag(event: PointerEvent) {
+  if (!buttonDrag || buttonDrag.pointerId !== event.pointerId) return
+  buttonDrag = null
+  suppressOpenClick = false
+  if (openButton.value?.hasPointerCapture(event.pointerId)) {
+    openButton.value.releasePointerCapture(event.pointerId)
+  }
+}
+
+function handleOpenClick(event: MouseEvent) {
+  if (suppressOpenClick && event.detail !== 0) event.preventDefault()
+  suppressOpenClick = false
+}
+
+watch(embedShell, (shell, previousShell) => {
+  buttonResizeObserver?.disconnect()
+  buttonResizeObserver = null
+  if (previousShell) {
+    buttonPosition.value = null
+    buttonDrag = null
+  }
+  if (!shell || typeof ResizeObserver === 'undefined') return
+  buttonResizeObserver = new ResizeObserver(() => {
+    if (buttonPosition.value) {
+      clampButtonPosition(buttonPosition.value.left, buttonPosition.value.top)
+    }
+  })
+  buttonResizeObserver.observe(shell)
+}, { flush: 'post' })
 
 const menuItemId = computed(() => route.params.id as string)
 
@@ -366,6 +460,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  buttonResizeObserver?.disconnect()
   if (themeObserver) {
     themeObserver.disconnect()
     themeObserver = null
@@ -447,6 +542,8 @@ onUnmounted(() => {
 .custom-open-fab {
   @apply absolute right-3 top-3 z-10;
   @apply shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:supports-[backdrop-filter]:bg-dark-800/80;
+  touch-action: none;
+  user-select: none;
 }
 
 .custom-embed-frame {

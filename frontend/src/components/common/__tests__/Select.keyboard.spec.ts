@@ -52,4 +52,19 @@ describe('Select keyboard focus', () => {
     await press('Enter')
     expect(wrapper.emitted('update:modelValue')).toEqual([['beta']])
   })
+
+  it('does not select group headers even if they are not marked disabled', async () => {
+    await open(false)
+    await wrapper.setProps({ options: [
+      { value: 'header', label: 'Section', kind: 'group' },
+      { value: 'alpha', label: 'Alpha' },
+      { value: 'beta', label: 'Beta' }
+    ] })
+    document.querySelector<HTMLElement>('.select-option-group')!.click()
+    await nextTick()
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    await press('ArrowUp')
+    await press('Enter')
+    expect(wrapper.emitted('update:modelValue')).toEqual([['beta']])
+  })
 })

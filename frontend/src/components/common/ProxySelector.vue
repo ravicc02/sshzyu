@@ -273,24 +273,11 @@ const handleBatchTest = async () => {
 
   batchTesting.value = true
 
-  // Test all proxies in parallel
-  const testPromises = props.proxies.map(async (proxy) => {
-    testingProxyIds.add(proxy.id)
-    try {
-      const result = await adminAPI.proxies.testProxy(proxy.id)
-      testResults[proxy.id] = result
-    } catch (error: any) {
-      testResults[proxy.id] = {
-        success: false,
-        message: error.response?.data?.detail || 'Test failed'
-      }
-    } finally {
-      testingProxyIds.delete(proxy.id)
-    }
-  })
-
-  await Promise.all(testPromises)
-  batchTesting.value = false
+  try {
+    await Promise.all(props.proxies.map(handleTestProxy))
+  } finally {
+    batchTesting.value = false
+  }
 }
 
 const handleClickOutside = (event: MouseEvent) => {

@@ -55,4 +55,13 @@ describe('GroupRPMOverridesModal new override validation', () => {
     await flushPromises()
     expect(mocks.batchSetGroupRPMOverrides).toHaveBeenCalledWith(1, [{ user_id: 7, rpm_override: value }])
   })
+  it.each(['', '1.5', '-1'])('does not truncate or coerce an invalid existing RPM %j', async (value) => {
+    const wrapper = await selectUser()
+    await wrapper.get('input[placeholder="100"]').setValue('100')
+    await wrapper.findAll('button').find(button => button.text() === 'common.add')!.trigger('click')
+    await wrapper.get('tbody input').setValue(value)
+    await wrapper.findAll('button').find(button => button.text() === 'common.save')!.trigger('click')
+    await flushPromises()
+    expect(mocks.batchSetGroupRPMOverrides).toHaveBeenCalledWith(1, [{ user_id: 7, rpm_override: 100 }])
+  })
 })

@@ -169,6 +169,21 @@
 
       <!-- Subscriptions Table -->
       <template #table>
+        <div v-if="selectedSubscriptionIds.length" class="mb-3 flex flex-wrap items-center gap-2">
+          <span class="text-sm text-gray-500">{{ t('common.selectedCount', { count: selectedSubscriptionIds.length }) }}</span>
+          <button
+            v-for="action in bulkActions"
+            :key="action.value"
+            type="button"
+            :data-test="`bulk-${action.value}`"
+            class="btn btn-secondary btn-sm"
+            :disabled="bulkSubmitting || loading || eligibleSubscriptions(action.value).length === 0"
+            @click="openBulkAction(action.value)"
+          >
+            <Icon :name="action.icon" size="sm" class="mr-1.5" />
+            {{ action.label }}
+          </button>
+        </div>
         <DataTable
           :columns="columns"
           :data="subscriptions"
@@ -176,6 +191,9 @@
           :server-side-sort="true"
           default-sort-key="created_at"
           default-sort-order="desc"
+          :selectable="true"
+          :selected-keys="selectedSubscriptionIds"
+          @update:selected-keys="selectSubscriptions"
           @sort="handleSort"
         >
           <template #cell-user="{ row }">
@@ -190,12 +208,16 @@
                   }}
                 </span>
               </div>
-              <span class="font-medium text-gray-900 dark:text-white">
+              <RouterLink
+                :to="{ path: '/admin/usage', query: { user_id: row.user_id } }"
+                class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+                @click.stop
+              >
                 {{ userColumnMode === 'email'
                   ? (row.user?.email || t('admin.redeem.userPrefix', { id: row.user_id }))
-                  : (row.user?.username || '-')
+                  : (row.user?.username || t('admin.redeem.userPrefix', { id: row.user_id }))
                 }}
-              </span>
+              </RouterLink>
             </div>
           </template>
 
@@ -444,6 +466,34 @@
       </template>
     </TablePageLayout>
 
+    <BaseDialog
+      :show="showBulkActionModal"
+      :title="bulkActions.find(action => action.value === bulkActionType)?.label || ''"
+      width="normal"
+      @close="closeBulkAction"
+    >
+      <form id="bulk-subscription-action-form" class="space-y-4" @submit.prevent="submitBulkAction">
+        <ul class="space-y-1 text-sm">
+          <li v-for="subscription in bulkTargets" :key="subscription.id">
+            {{ subscription.user?.email || t('admin.redeem.userPrefix', { id: subscription.user_id }) }}
+          </li>
+        </ul>
+        <div v-if="bulkActionType === 'extend'">
+          <label class="input-label">{{ t('admin.subscriptions.form.validityDays') }}</label>
+          <input v-model.number="bulkDays" type="number" required class="input" :disabled="bulkSubmitting" />
+        </div>
+        <ul v-if="bulkResult" class="space-y-1 text-sm text-red-600">
+          <li v-for="result in bulkResult.results.filter(result => !result.success)" :key="result.subscription_id">
+            #{{ result.subscription_id }}: {{ result.error }}
+          </li>
+        </ul>
+      </form>
+      <template #footer>
+        <button type="button" class="btn btn-secondary" :disabled="bulkSubmitting" @click="closeBulkAction">{{ t('common.cancel') }}</button>
+        <button type="submit" form="bulk-subscription-action-form" class="btn btn-primary" :disabled="bulkSubmitting || bulkTargets.length === 0">{{ t('common.confirm') }}</button>
+      </template>
+    </BaseDialog>
+
     <!-- Assign Subscription Modal -->
     <BaseDialog
       :show="showAssignModal"
@@ -456,6 +506,19 @@
         @submit.prevent="handleAssignSubscription"
         class="space-y-5"
       >
+        <label class="flex items-center gap-2 text-sm">
+          <input v-model="batchAssign" type="checkbox" :disabled="submitting" @change="resetAssignUsers" />
+          {{ t('admin.users.attributes.types.multi_select') }}
+        </label>
+        <div v-if="batchAssign && assignUsers.length" data-test="assign-users" class="flex flex-wrap gap-2">
+          <button v-for="user in assignUsers" :key="user.id" type="button" class="btn btn-secondary btn-sm" :disabled="submitting" @click="removeAssignUser(user.id)">
+            {{ user.email }} <Icon name="x" size="sm" class="ml-1.5" />
+          </button>
+        </div>
+        <div v-if="batchAssignResult" data-test="batch-assign-result" class="space-y-1 text-sm">
+          <p>{{ t('common.success') }}: {{ batchAssignResult.success_count }}</p>
+          <p v-for="error in batchAssignResult.errors" :key="error" class="text-red-600">{{ error }}</p>
+        </div>
         <div>
           <label class="input-label">{{ t('admin.subscriptions.form.user') }}</label>
           <div class="relative" data-assign-user-search>
@@ -763,14 +826,17 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
+import type { BulkAssignSubscriptionResult, SubscriptionBulkAction, SubscriptionBulkActionResult } from '@/api/admin/subscriptions'
 import type { UserSubscription, Group, GroupPlatform, SubscriptionType } from '@/types'
 import type { SimpleUser } from '@/api/admin/usage'
 import type { Column } from '@/components/common/types'
 import { formatDateTimeToMinute } from '@/utils/format'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { useTableSelection } from '@/composables/useTableSelection'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
@@ -927,6 +993,83 @@ const statusOptions = computed(() => [
 ])
 
 const subscriptions = ref<UserSubscription[]>([])
+const {
+  selectedIds: selectedSubscriptionIds,
+  setSelectedIds,
+  clear: clearSubscriptionSelection,
+  removeMany: removeSelectedSubscriptions
+} = useTableSelection({ rows: subscriptions, getId: (subscription) => subscription.id })
+const selectSubscriptions = (keys: Array<string | number>) => {
+  const visibleIds = new Set(subscriptions.value.map(subscription => subscription.id))
+  setSelectedIds(keys.map(Number).filter(id => visibleIds.has(id)))
+}
+const bulkActions = computed(() => [
+  { value: 'extend' as const, label: t('admin.subscriptions.adjust'), icon: 'calendar' as const },
+  { value: 'reset_quota' as const, label: t('admin.subscriptions.resetQuota'), icon: 'refresh' as const },
+  { value: 'revoke' as const, label: t('admin.subscriptions.revoke'), icon: 'ban' as const },
+  { value: 'restore' as const, label: t('admin.subscriptions.restore'), icon: 'refresh' as const }
+])
+const showBulkActionModal = ref(false)
+const bulkActionType = ref<SubscriptionBulkAction>('extend')
+const bulkDays = ref(30)
+const bulkTargets = ref<UserSubscription[]>([])
+const bulkSubmitting = ref(false)
+const bulkResult = ref<SubscriptionBulkActionResult | null>(null)
+let bulkOperation: { payload: string; key: string } | null = null
+
+const eligibleSubscriptions = (action: SubscriptionBulkAction) => subscriptions.value.filter(subscription =>
+  selectedSubscriptionIds.value.includes(subscription.id) &&
+  (action === 'restore' ? subscription.status === 'revoked' :
+    action === 'extend' ? subscription.status === 'active' || subscription.status === 'expired' :
+      subscription.status === 'active')
+)
+
+const openBulkAction = (action: SubscriptionBulkAction) => {
+  if (bulkSubmitting.value) return
+  bulkTargets.value = eligibleSubscriptions(action)
+  if (bulkTargets.value.length === 0) return
+  bulkActionType.value = action
+  bulkDays.value = 30
+  bulkResult.value = null
+  showBulkActionModal.value = true
+}
+
+const closeBulkAction = () => {
+  if (!bulkSubmitting.value) showBulkActionModal.value = false
+}
+
+const submitBulkAction = async () => {
+  if (bulkSubmitting.value || bulkTargets.value.length === 0) return
+  if (bulkActionType.value === 'extend' && (!Number.isInteger(bulkDays.value) || bulkDays.value === 0)) {
+    appStore.showError(t('admin.subscriptions.validityDaysRequired'))
+    return
+  }
+  const request = {
+    subscription_ids: bulkTargets.value.map(subscription => subscription.id),
+    action: bulkActionType.value,
+    ...(bulkActionType.value === 'extend' ? { days: bulkDays.value } : {}),
+    ...(bulkActionType.value === 'reset_quota' ? { daily: true, weekly: true, monthly: true } : {})
+  }
+  const payload = JSON.stringify(request)
+  if (bulkOperation?.payload !== payload) {
+    bulkOperation = { payload, key: crypto.randomUUID() }
+  }
+  bulkSubmitting.value = true
+  try {
+    const result = await adminAPI.subscriptions.bulkAction(request, bulkOperation.key)
+    bulkResult.value = result
+    const succeeded = result.results.filter(result => result.success).map(result => result.subscription_id)
+    removeSelectedSubscriptions(succeeded)
+    bulkTargets.value = bulkTargets.value.filter(subscription => !succeeded.includes(subscription.id))
+    bulkOperation = null
+    await loadSubscriptions()
+    if (bulkTargets.value.length === 0) showBulkActionModal.value = false
+  } catch (error: any) {
+    appStore.showError(error.response?.data?.detail || t('common.error'))
+  } finally {
+    bulkSubmitting.value = false
+  }
+}
 const groups = ref<Group[]>([])
 const loading = ref(false)
 let abortController: AbortController | null = null
@@ -984,6 +1127,18 @@ const assignForm = reactive({
   group_id: null as number | null,
   validity_days: 30
 })
+const batchAssign = ref(false)
+const assignUsers = ref<SimpleUser[]>([])
+const batchAssignResult = ref<BulkAssignSubscriptionResult | null>(null)
+const resetAssignUsers = () => {
+  if (submitting.value) return
+  clearUserSelection()
+  assignUsers.value = []
+  batchAssignResult.value = null
+}
+const removeAssignUser = (id: number) => {
+  assignUsers.value = assignUsers.value.filter(user => user.id !== id)
+}
 
 const extendForm = reactive({
   days: 30
@@ -1015,6 +1170,7 @@ const subscriptionGroupOptions = computed(() =>
 )
 
 const applyFilters = () => {
+  clearSubscriptionSelection()
   pagination.page = 1
   loadSubscriptions()
 }
@@ -1046,6 +1202,7 @@ const loadSubscriptions = async () => {
     )
     if (signal.aborted || abortController !== requestController) return
     subscriptions.value = response.items
+    selectSubscriptions(selectedSubscriptionIds.value)
     pagination.total = response.total
     pagination.pages = response.pages
   } catch (error: any) {
@@ -1123,6 +1280,11 @@ const clearFilterUser = () => {
 
 // User search with debounce
 const debounceSearchUsers = () => {
+  if (selectedUser.value && userSearchKeyword.value.trim() !== selectedUser.value.email) {
+    selectedUser.value = null
+    assignForm.user_id = null
+    userSearchResults.value = []
+  }
   if (userSearchTimeout) {
     clearTimeout(userSearchTimeout)
   }
@@ -1145,7 +1307,15 @@ const searchUsers = async () => {
 
   userSearchLoading.value = true
   try {
-    userSearchResults.value = await adminAPI.usage.searchUsers(keyword)
+    const response = await adminAPI.users.list(1, 30, {
+      search: keyword, sort_by: 'email', sort_order: 'asc'
+    })
+    if (keyword !== userSearchKeyword.value.trim()) return
+    userSearchResults.value = response.items.map(user => ({
+      id: user.id,
+      email: user.email,
+      deleted: false
+    }))
   } catch (error) {
     console.error('Failed to search users:', error)
     userSearchResults.value = []
@@ -1155,6 +1325,14 @@ const searchUsers = async () => {
 }
 
 const selectUser = (user: SimpleUser) => {
+  if (userSearchTimeout) clearTimeout(userSearchTimeout)
+  if (batchAssign.value) {
+    if (!assignUsers.value.some(selected => selected.id === user.id)) assignUsers.value.push(user)
+    userSearchKeyword.value = ''
+    userSearchResults.value = []
+    showUserDropdown.value = false
+    return
+  }
   selectedUser.value = user
   userSearchKeyword.value = user.email
   showUserDropdown.value = false
@@ -1169,17 +1347,20 @@ const clearUserSelection = () => {
 }
 
 const handlePageChange = (page: number) => {
+  clearSubscriptionSelection()
   pagination.page = page
   loadSubscriptions()
 }
 
 const handlePageSizeChange = (pageSize: number) => {
+  clearSubscriptionSelection()
   pagination.page_size = pageSize
   pagination.page = 1
   loadSubscriptions()
 }
 
 const handleSort = (key: string, order: 'asc' | 'desc') => {
+  clearSubscriptionSelection()
   sortState.sort_by = key
   sortState.sort_order = order
   pagination.page = 1
@@ -1187,6 +1368,7 @@ const handleSort = (key: string, order: 'asc' | 'desc') => {
 }
 
 const closeAssignModal = () => {
+  if (submitting.value) return
   showAssignModal.value = false
   assignForm.user_id = null
   assignForm.group_id = null
@@ -1196,10 +1378,14 @@ const closeAssignModal = () => {
   userSearchKeyword.value = ''
   userSearchResults.value = []
   showUserDropdown.value = false
+  batchAssign.value = false
+  assignUsers.value = []
+  batchAssignResult.value = null
 }
 
 const handleAssignSubscription = async () => {
-  if (!assignForm.user_id) {
+  if (submitting.value) return
+  if (batchAssign.value ? assignUsers.value.length === 0 : !assignForm.user_id) {
     appStore.showError(t('admin.subscriptions.pleaseSelectUser'))
     return
   }
@@ -1214,14 +1400,29 @@ const handleAssignSubscription = async () => {
 
   submitting.value = true
   try {
-    await adminAPI.subscriptions.assign({
-      user_id: assignForm.user_id,
-      group_id: assignForm.group_id,
-      validity_days: assignForm.validity_days
-    })
-    appStore.showSuccess(t('admin.subscriptions.subscriptionAssigned'))
-    closeAssignModal()
-    loadSubscriptions()
+    if (batchAssign.value) {
+      const result = await adminAPI.subscriptions.bulkAssign({
+        user_ids: assignUsers.value.map(user => user.id),
+        group_id: assignForm.group_id,
+        validity_days: assignForm.validity_days
+      })
+      batchAssignResult.value = result
+      const succeeded = new Set(result.subscriptions.map(subscription => subscription.user_id))
+      assignUsers.value = assignUsers.value.filter(user =>
+        result.statuses ? result.statuses[String(user.id)] !== 'created' && result.statuses[String(user.id)] !== 'reused' :
+          !succeeded.has(user.id)
+      )
+    } else {
+      await adminAPI.subscriptions.assign({
+        user_id: assignForm.user_id!,
+        group_id: assignForm.group_id,
+        validity_days: assignForm.validity_days
+      })
+      appStore.showSuccess(t('admin.subscriptions.subscriptionAssigned'))
+      submitting.value = false
+      closeAssignModal()
+    }
+    await loadSubscriptions()
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.subscriptions.failedToAssign'))
     console.error('Error assigning subscription:', error)
@@ -1456,6 +1657,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  abortController?.abort()
   document.removeEventListener('click', handleClickOutside)
   if (filterUserSearchTimeout) {
     clearTimeout(filterUserSearchTimeout)

@@ -56,7 +56,7 @@
           v-if="modelValue"
           type="button"
           class="btn btn-secondary btn-sm text-red-600 hover:text-red-700 dark:text-red-400"
-          @click="$emit('update:modelValue', '')"
+          @click="removeImage"
         >
           <Icon name="trash" size="sm" class="mr-1.5" :stroke-width="2" />
           {{ resolvedRemoveLabel }}
@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
@@ -98,6 +98,21 @@ const emit = defineEmits<{
 }>()
 
 const error = ref('')
+let activeReader: FileReader | null = null
+let selection = 0
+
+function cancelRead() {
+  selection++
+  activeReader?.abort()
+  activeReader = null
+}
+
+function removeImage() {
+  cancelRead()
+  emit('update:modelValue', '')
+}
+
+onUnmounted(cancelRead)
 
 const resolvedUploadLabel = computed(() => props.uploadLabel || t('common.upload'))
 const resolvedRemoveLabel = computed(() => props.removeLabel || t('common.remove'))
@@ -113,6 +128,8 @@ const innerSizeClass = computed(() => props.size === 'sm' ? 'h-7 w-7' : 'h-12 w-
 const placeholderSizeClass = computed(() => props.size === 'sm' ? 'h-5 w-5' : 'h-8 w-8')
 
 function handleUpload(event: Event) {
+  cancelRead()
+  const current = selection
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   error.value = ''
@@ -129,8 +146,10 @@ function handleUpload(event: Event) {
   }
 
   const reader = new FileReader()
+  activeReader = reader
   if (props.mode === 'svg') {
     reader.onload = (e) => {
+      if (current !== selection) return
       const text = e.target?.result as string
       if (text) emit('update:modelValue', text.trim())
     }
@@ -142,12 +161,14 @@ function handleUpload(event: Event) {
       return
     }
     reader.onload = (e) => {
+      if (current !== selection) return
       emit('update:modelValue', e.target?.result as string)
     }
     reader.readAsDataURL(file)
   }
 
   reader.onerror = () => {
+    if (current !== selection) return
     error.value = t('common.fileReadFailed')
   }
   input.value = ''

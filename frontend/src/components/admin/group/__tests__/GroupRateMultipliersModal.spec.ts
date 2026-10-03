@@ -55,4 +55,13 @@ describe('GroupRateMultipliersModal new override validation', () => {
     await flushPromises()
     expect(mocks.batchSetGroupRateMultipliers).toHaveBeenCalledWith(1, [{ user_id: 7, rate_multiplier: value }])
   })
+  it.each(['-1', '0'])('does not replace an existing rate with invalid value %s', async (value) => {
+    const wrapper = await selectUser()
+    await wrapper.get('input[placeholder="1.0"]').setValue('0.5')
+    await wrapper.findAll('button').find(button => button.text() === 'common.add')!.trigger('click')
+    await wrapper.get('tbody input').setValue(value)
+    await wrapper.findAll('button').find(button => button.text() === 'common.save')!.trigger('click')
+    await flushPromises()
+    expect(mocks.batchSetGroupRateMultipliers).toHaveBeenCalledWith(1, [{ user_id: 7, rate_multiplier: 0.5 }])
+  })
 })

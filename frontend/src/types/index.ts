@@ -1558,6 +1558,10 @@ export interface UpdateAccountRequest {
 
 export type GrokMediaEligibilityMode = 'auto' | 'enabled' | 'disabled'
 
+export interface UpdateGrokMediaEligibilityRequest {
+  mode: GrokMediaEligibilityMode
+}
+
 export interface GrokMediaEligibilityState {
   account_id: number
   mode: GrokMediaEligibilityMode

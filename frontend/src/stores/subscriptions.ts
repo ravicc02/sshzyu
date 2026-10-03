@@ -11,10 +11,8 @@ import type { UserSubscription } from '@/types'
 // Cache TTL: 60 seconds
 const CACHE_TTL_MS = 60_000
 
-// Request generation counter to invalidate stale in-flight responses
-let requestGeneration = 0
-
 export const useSubscriptionStore = defineStore('subscriptions', () => {
+  let requestGeneration = 0
   // State
   const activeSubscriptions = ref<UserSubscription[]>([])
   const loading = ref(false)
@@ -111,6 +109,7 @@ export const useSubscriptionStore = defineStore('subscriptions', () => {
   function clear() {
     requestGeneration++
     activePromise = null
+    loading.value = false
     activeSubscriptions.value = []
     loaded.value = false
     lastFetchedAt.value = null

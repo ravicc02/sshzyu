@@ -126,6 +126,17 @@
 
             <PricingRow
               v-if="
+                model.pricing.billing_mode === BILLING_MODE_VIDEO &&
+                model.pricing.per_request_price != null
+              "
+              :label="t(prefixKey('videoPrice'))"
+              :value="model.pricing.per_request_price"
+              :unit="t(prefixKey('unitPerSecond'))"
+              :scale="1"
+            />
+
+            <PricingRow
+              v-if="
                 model.pricing.billing_mode === BILLING_MODE_IMAGE &&
                 model.pricing.image_output_price != null
               "
@@ -168,11 +179,12 @@
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import PricingRow from './PricingRow.vue'
-import { formatScaled } from '@/utils/pricing'
+import { formatScaled, resolveIntervalPrices } from '@/utils/pricing'
 import {
   BILLING_MODE_TOKEN,
   BILLING_MODE_PER_REQUEST,
   BILLING_MODE_IMAGE,
+  BILLING_MODE_VIDEO,
   type BillingMode
 } from '@/constants/channel'
 // 复用 api/channels.ts 的用户侧最小形态 DTO。
@@ -236,6 +248,8 @@ const billingModeLabel = computed(() => {
       return t(prefixKey('billingModePerRequest'))
     case BILLING_MODE_IMAGE:
       return t(prefixKey('billingModeImage'))
+    case BILLING_MODE_VIDEO:
+      return t(prefixKey('billingModeVideo'))
     default:
       return '-'
   }
@@ -247,11 +261,15 @@ function formatRange(min: number, max: number | null): string {
 }
 
 function formatInterval(iv: UserPricingInterval, mode: BillingMode): string {
-  if (mode === BILLING_MODE_PER_REQUEST || mode === BILLING_MODE_IMAGE) {
-    return formatScaled(iv.per_request_price, 1)
+  const prices = resolveIntervalPrices(iv, props.model.pricing ?? {})
+  if (mode === BILLING_MODE_VIDEO) {
+    return `${formatScaled(prices.per_request_price ?? null, 1)} ${t(prefixKey('unitPerSecond'))}`
   }
-  const input = formatScaled(iv.input_price, perMillionScale)
-  const output = formatScaled(iv.output_price, perMillionScale)
+  if (mode === BILLING_MODE_PER_REQUEST || mode === BILLING_MODE_IMAGE) {
+    return formatScaled(prices.per_request_price ?? null, 1)
+  }
+  const input = formatScaled(prices.input_price ?? null, perMillionScale)
+  const output = formatScaled(prices.output_price ?? null, perMillionScale)
   return `${input} / ${output}`
 }
 

@@ -353,8 +353,8 @@ const handleSave = async () => {
       key: form.key,
       name: form.name,
       type: form.type,
-      description: form.description || undefined,
-      placeholder: form.placeholder || undefined,
+      description: editingAttribute.value ? form.description : form.description || undefined,
+      placeholder: editingAttribute.value ? form.placeholder : form.placeholder || undefined,
       required: form.required,
       enabled: form.enabled,
       options: (form.type === 'select' || form.type === 'multi_select') ? form.options : undefined

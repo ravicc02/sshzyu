@@ -67,6 +67,19 @@ export default {
   // API Keys
   keys: {
     title: 'API 密钥',
+    bulkEdit: {
+      title: '批量编辑 API 密钥',
+      selectedCount: '已选择 {count} 个密钥',
+      hint: '仅修改勾选的字段，其它设置保持不变。',
+      apply: '应用到 {count} 个密钥',
+      limitHint: '填写 0 表示不限额，仅修改勾选的限额字段。',
+      ipHint: '每行填写一个 IP 地址或 CIDR 网段，留空表示清空列表。',
+      invalidLimit: '限额必须为非负数。',
+      invalidExpiration: '请输入有效的到期日期和时间。',
+      failureHint: '仅保留失败的密钥，重试会将修改应用到这些密钥。',
+      partialFailure: '已更新 {success} 个密钥，{failed} 个失败。',
+      success: '已成功更新 {count} 个密钥。'
+    },
     description: '管理您的 API 密钥和访问令牌',
     searchPlaceholder: '搜索名称或Key...',
     endpoints: {
@@ -743,6 +756,8 @@ export default {
   // Redeem
   redeem: {
     title: '兑换码',
+    historyLoadFailed: '无法加载兑换记录。',
+    userRefreshFailed: '兑换已成功，但未能刷新账号信息。',
     description: '输入兑换码以充值余额或增加并发数',
     currentBalance: '当前余额',
     concurrency: '并发数',

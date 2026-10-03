@@ -12,6 +12,16 @@
           <button class="btn btn-secondary px-2 md:px-3" :disabled="loading" :title="t('common.refresh')" @click="loadRecords">
             <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
           </button>
+          <button
+            v-if="props.type === 'transfers'"
+            type="button"
+            class="btn btn-primary"
+            data-test="affiliate-withdraw-open"
+            @click="withdrawDialog = true"
+          >
+            <Icon name="plus" size="md" />
+            {{ t('admin.affiliates.withdraw.button') }}
+          </button>
         </div>
       </template>
 
@@ -57,31 +67,38 @@
             <span class="font-mono text-sm text-gray-700 dark:text-gray-300">{{ row.aff_code || '-' }}</span>
           </template>
           <template #cell-order="{ row }">
-            <div class="space-y-0.5">
+            <div v-if="row.order_id != null" class="space-y-0.5">
               <div class="font-mono text-sm text-gray-900 dark:text-white">#{{ row.order_id }}</div>
               <div class="max-w-56 truncate text-sm text-gray-500 dark:text-dark-400">{{ row.out_trade_no }}</div>
             </div>
+            <span v-else>-</span>
           </template>
           <template #cell-payment_type="{ row }">
-            {{ t('payment.methods.' + row.payment_type, row.payment_type || '-') }}
+            {{ row.payment_type ? t('payment.methods.' + row.payment_type, row.payment_type) : '-' }}
           </template>
           <template #cell-order_status="{ row }">
-            <OrderStatusBadge :status="row.order_status" />
+            <OrderStatusBadge v-if="row.order_status" :status="row.order_status" />
+            <span v-else>-</span>
           </template>
           <template #cell-total_rebate="{ row }">
             <AmountText :value="row.total_rebate" />
           </template>
           <template #cell-order_amount="{ row }">
-            <AmountText :value="row.order_amount" />
+            <NullableAmountText :value="row.order_amount" />
           </template>
           <template #cell-pay_amount="{ row }">
-            <span class="text-sm text-gray-900 dark:text-white">¥{{ formatAmount(row.pay_amount) }}</span>
+            <span class="text-sm text-gray-900 dark:text-white">{{ row.pay_amount == null ? '-' : '¥' + formatAmount(row.pay_amount) }}</span>
           </template>
           <template #cell-rebate_amount="{ row }">
             <AmountText :value="row.rebate_amount" strong />
           </template>
           <template #cell-amount="{ row }">
             <AmountText :value="row.amount" strong />
+          </template>
+          <template #cell-action="{ row }">
+            {{ row.action === 'withdraw'
+              ? t('admin.affiliates.outflowTypes.withdraw')
+              : t('admin.affiliates.outflowTypes.transfer') }}
           </template>
           <template #cell-balance_after="{ row }">
             <NullableAmountText :value="row.balance_after" />
@@ -112,6 +129,13 @@
         />
       </template>
     </TablePageLayout>
+
+    <AffiliateOfflineWithdrawDialog
+      v-if="props.type === 'transfers'"
+      :show="withdrawDialog"
+      @close="withdrawDialog = false"
+      @success="handleWithdrawalSuccess"
+    />
 
     <BaseDialog
       :show="overviewDialog"
@@ -151,6 +175,7 @@ import Pagination from '@/components/common/Pagination.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import OrderStatusBadge from '@/components/payment/OrderStatusBadge.vue'
+import AffiliateOfflineWithdrawDialog from './AffiliateOfflineWithdrawDialog.vue'
 import type { Column } from '@/components/common/types'
 import { useAppStore } from '@/stores/app'
 import { affiliatesAPI, type AffiliateInviteRecord, type AffiliateRebateRecord, type AffiliateTransferRecord, type AffiliateUserOverview, type ListAffiliateRecordsParams } from '@/api/admin/affiliates'
@@ -174,6 +199,7 @@ const pagination = reactive({ page: 1, page_size: 20, total: 0 })
 const overviewDialog = ref(false)
 const overviewLoading = ref(false)
 const selectedOverview = ref<AffiliateUserOverview | null>(null)
+const withdrawDialog = ref(false)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 const columns = computed<Column[]>(() => {
@@ -201,6 +227,7 @@ const columns = computed<Column[]>(() => {
   }
   return [
     { key: 'user', label: t('admin.affiliates.records.user'), sortable: true },
+    { key: 'action', label: t('admin.affiliates.records.action') },
     { key: 'amount', label: t('admin.affiliates.records.transferAmount'), sortable: true },
     { key: 'balance_after', label: t('admin.affiliates.records.balanceAfter'), sortable: true },
     { key: 'available_quota_after', label: t('admin.affiliates.records.availableQuotaAfter'), sortable: true },
@@ -283,6 +310,11 @@ function debounceLoad() {
 function reloadFromFirstPage() {
   pagination.page = 1
   void loadRecords()
+}
+
+function handleWithdrawalSuccess() {
+  withdrawDialog.value = false
+  reloadFromFirstPage()
 }
 
 function handlePageChange(page: number) {

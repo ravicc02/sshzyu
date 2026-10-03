@@ -2,6 +2,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import AdminAffiliateRecordsTable from '../AdminAffiliateRecordsTable.vue'
+import zhOverview from '@/i18n/locales/zh/admin/overview'
+import enOverview from '@/i18n/locales/en/admin/overview'
 
 const { listInviteRecords, listRebateRecords, listTransferRecords, getUserOverview } = vi.hoisted(() => ({
   listInviteRecords: vi.fn(),
@@ -79,6 +81,18 @@ describe('AdminAffiliateRecordsTable', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
+  })
+
+  it.each([zhOverview, enOverview])('provides translated outflow actions and withdrawal controls', (locale) => {
+    const affiliates = locale.affiliates
+    expect(affiliates.records.action).toBeTruthy()
+    expect(affiliates.outflowTypes.transfer).toBeTruthy()
+    expect(affiliates.outflowTypes.withdraw).toBeTruthy()
+    for (const key of [
+      'button', 'title', 'user', 'userPlaceholder', 'changeUser', 'noUserFound',
+      'availableQuota', 'frozenHint', 'amount', 'fillAll', 'amountHint', 'amountRequired',
+      'amountExceeds', 'uncertainHint', 'warning', 'submit', 'submitting', 'success', 'replayed'
+    ]) expect(affiliates.withdraw).toHaveProperty(key, expect.any(String))
   })
 
   it('renders non-order rebate accruals with empty order fields', async () => {

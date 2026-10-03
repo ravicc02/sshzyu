@@ -22,6 +22,10 @@ export function proxyExpiryLabelKey(
   status?: string,
 ): { key: string; params?: { days: number } } {
   if (status === 'expired') return { key: 'admin.proxies.expired' }
+  if (expiresAt) {
+    const remaining = new Date(expiresAt).getTime() - Date.now()
+    if (remaining <= 0 && remaining > -86400000) return { key: 'admin.proxies.expired' }
+  }
   const d = expiresAt ? daysUntil(expiresAt) : Infinity
   if (d < 0) return { key: 'admin.proxies.overdueDays', params: { days: Math.abs(d) } }
   if (d <= EXPIRY_WARN_DAYS) return { key: 'admin.proxies.expiringInDays', params: { days: d } }

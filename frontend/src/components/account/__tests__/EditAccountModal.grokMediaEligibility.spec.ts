@@ -98,6 +98,24 @@ describe('EditAccountModal Grok media eligibility', () => {
     await vi.waitFor(() => expect(updateEligibilityMock).toHaveBeenCalledWith(12, 'enabled'))
   })
 
+  it('does not write eligibility when the loaded mode is unchanged', async () => {
+    const wrapper = mountModal()
+    await vi.waitFor(() => expect(getEligibilityMock).toHaveBeenCalled())
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await vi.waitFor(() => expect(updateAccountMock).toHaveBeenCalled())
+    expect(updateEligibilityMock).not.toHaveBeenCalled()
+  })
+
+  it('does not change eligibility when the ordinary account save fails', async () => {
+    updateAccountMock.mockRejectedValueOnce(new Error('account save failed'))
+    const wrapper = mountModal()
+    await vi.waitFor(() => expect(getEligibilityMock).toHaveBeenCalled())
+    await wrapper.get('[data-testid="grok-media-eligibility-mode"]').setValue('enabled')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await vi.waitFor(() => expect(showErrorMock).toHaveBeenCalledWith('account save failed'))
+    expect(updateEligibilityMock).not.toHaveBeenCalled()
+  })
+
   it('reports partial-save errors when the dedicated endpoint fails', async () => {
     updateEligibilityMock.mockRejectedValueOnce(new Error('eligibility failed'))
     const wrapper = mountModal()

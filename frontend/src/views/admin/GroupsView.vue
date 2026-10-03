@@ -775,7 +775,7 @@
                 {{ t("admin.groups.modelAllowlist.title") }}
               </label>
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {{ t("admin.groups.modelAllowlist.hint") }}
+                {{ t("admin.groups.modelAllowlist.hint", { endpoint: modelsListEndpoint(createForm.platform) }) }}
               </p>
             </div>
             <Toggle v-model="createModelAllowlistState.enabled" />
@@ -2421,7 +2421,7 @@
                 {{ t("admin.groups.modelAllowlist.title") }}
               </label>
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {{ t("admin.groups.modelAllowlist.hint") }}
+                {{ t("admin.groups.modelAllowlist.hint", { endpoint: modelsListEndpoint(editForm.platform) }) }}
               </p>
             </div>
             <Toggle v-model="editModelAllowlistState.enabled" />
@@ -5229,6 +5229,9 @@ const resetModelAllowlistState = (
   state.savedModels = fresh.savedModels;
   state.items = fresh.items;
 };
+
+const modelsListEndpoint = (platform: GroupPlatform) =>
+  platform === "gemini" ? "/v1beta/models" : "/v1/models";
 
 const loadModelAllowlistCandidates = async (
   mode: "create" | "edit",

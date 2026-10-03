@@ -72,6 +72,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { createRequestGuard } from '@/utils/requestGuard'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import { getMyErrorDetail } from '@/api/usage'
@@ -92,30 +93,36 @@ const { t } = useI18n()
 const loading = ref(false)
 const loadError = ref(false)
 const detail = ref<UserErrorRequestDetail | null>(null)
+const requests = createRequestGuard()
 
 watch(
   () => [props.show, props.errorId] as const,
   ([show, id]) => {
+    requests.invalidate()
     if (show && id != null) {
       fetchDetail(id)
     } else if (!show) {
       detail.value = null
       loadError.value = false
+      loading.value = false
     }
   }
 )
 
 async function fetchDetail(id: number) {
+  const current = requests.start()
   loading.value = true
   loadError.value = false
   detail.value = null
   try {
-    detail.value = await getMyErrorDetail(id)
+    const result = await getMyErrorDetail(id)
+    if (current()) detail.value = result
   } catch (e) {
+    if (!current()) return
     console.error('[UserErrorDetailModal] Failed to load error detail:', e)
-    loadError.value = true
+    if (current()) loadError.value = true
   } finally {
-    loading.value = false
+    if (current()) loading.value = false
   }
 }
 

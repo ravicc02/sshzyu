@@ -96,6 +96,7 @@ import { ref, watch, onMounted } from 'vue'
 import { adminAPI } from '@/api/admin'
 import type { UserAttributeDefinition, UserAttributeValuesMap } from '@/types'
 import Select from '@/components/common/Select.vue'
+import { createRequestGuard } from '@/utils/requestGuard'
 
 interface Props {
   userId?: number
@@ -112,6 +113,7 @@ const emit = defineEmits<Emits>()
 const loading = ref(false)
 const attributes = ref<UserAttributeDefinition[]>([])
 const localValues = ref<UserAttributeValuesMap>({})
+const requests = createRequestGuard()
 
 const loadAttributes = async () => {
   loading.value = true
@@ -126,9 +128,12 @@ const loadAttributes = async () => {
 
 const loadUserValues = async () => {
   if (!props.userId) return
+  const current = requests.start()
+  localValues.value = {}
 
   try {
     const values = await adminAPI.userAttributes.getUserAttributeValues(props.userId)
+    if (!current()) return
     const valuesMap: UserAttributeValuesMap = {}
     values.forEach(v => {
       valuesMap[v.attribute_id] = v.value
@@ -141,7 +146,8 @@ const loadUserValues = async () => {
 }
 
 const emitChange = () => {
-  emit('update:modelValue', { ...localValues.value })
+  const values = Object.fromEntries(Object.entries(localValues.value).map(([key, value]) => [key, value == null ? '' : String(value)]))
+  emit('update:modelValue', values)
 }
 
 const isOptionSelected = (attrId: number, optionValue: string): boolean => {
@@ -185,6 +191,7 @@ watch(() => props.modelValue, (newVal) => {
 }, { immediate: true })
 
 watch(() => props.userId, (newUserId) => {
+  requests.invalidate()
   if (newUserId) {
     loadUserValues()
   } else {

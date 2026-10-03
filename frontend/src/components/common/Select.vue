@@ -55,6 +55,7 @@
           :class="[instanceId]"
           :style="dropdownStyle"
           role="listbox"
+          tabindex="-1"
           @click.stop
           @mousedown.stop
           @keydown="onDropdownKeyDown"
@@ -81,7 +82,7 @@
               role="option"
               :aria-selected="isSelected(option)"
               :aria-disabled="isOptionDisabled(option)"
-              @click.stop="!isOptionDisabled(option) && selectOption(option)"
+              @click.stop="!isOptionDisabled(option) && !isGroupHeaderOption(option) && selectOption(option)"
               @mouseenter="handleOptionMouseEnter(option, index)"
               :class="[
                 'select-option',
@@ -318,7 +319,7 @@ const findNextEnabledIndex = (startIndex: number): number => {
   if (opts.length === 0) return -1
   for (let offset = 0; offset < opts.length; offset++) {
     const idx = (startIndex + offset) % opts.length
-    if (!isOptionDisabled(opts[idx])) return idx
+    if (!isOptionDisabled(opts[idx]) && !isGroupHeaderOption(opts[idx])) return idx
   }
   return -1
 }
@@ -328,7 +329,7 @@ const findPrevEnabledIndex = (startIndex: number): number => {
   if (opts.length === 0) return -1
   for (let offset = 0; offset < opts.length; offset++) {
     const idx = (startIndex - offset + opts.length) % opts.length
-    if (!isOptionDisabled(opts[idx])) return idx
+    if (!isOptionDisabled(opts[idx]) && !isGroupHeaderOption(opts[idx])) return idx
   }
   return -1
 }
@@ -377,14 +378,12 @@ watch(isOpen, (open) => {
     } else {
       const selectedIdx = filteredOptions.value.findIndex(isSelected)
       const initialIdx = selectedIdx >= 0 ? selectedIdx : 0
-      focusedIndex.value = isOptionDisabled(filteredOptions.value[initialIdx])
+      focusedIndex.value = isOptionDisabled(filteredOptions.value[initialIdx]) || isGroupHeaderOption(filteredOptions.value[initialIdx])
         ? findNextEnabledIndex(initialIdx + 1)
         : initialIdx
     }
 
-    if (isSearchable.value) {
-      nextTick(() => searchInputRef.value?.focus())
-    }
+    nextTick(() => (isSearchable.value ? searchInputRef.value : dropdownRef.value)?.focus())
     // Add scroll listener to update position
     window.addEventListener('scroll', updateTriggerRect, { capture: true, passive: true })
     window.addEventListener('resize', calculateDropdownPosition)
@@ -399,6 +398,12 @@ watch(isOpen, (open) => {
     window.removeEventListener('scroll', updateTriggerRect, { capture: true })
     window.removeEventListener('resize', calculateDropdownPosition)
   }
+})
+
+watch(filteredOptions, () => {
+  if (!isOpen.value) return
+  const selectedIndex = filteredOptions.value.findIndex(isSelected)
+  focusedIndex.value = findNextEnabledIndex(selectedIndex >= 0 ? selectedIndex : 0)
 })
 
 // 远程搜索：输入防抖后交给父组件请求（!isOpen 抑制关闭重置 searchQuery 触发的空 query）。
@@ -448,7 +453,7 @@ const onDropdownKeyDown = (e: KeyboardEvent) => {
       e.preventDefault()
       if (focusedIndex.value >= 0 && focusedIndex.value < filteredOptions.value.length) {
         const opt = filteredOptions.value[focusedIndex.value]
-        if (!isOptionDisabled(opt)) selectOption(opt)
+        if (!isOptionDisabled(opt) && !isGroupHeaderOption(opt)) selectOption(opt)
       }
       break
     case 'Escape':

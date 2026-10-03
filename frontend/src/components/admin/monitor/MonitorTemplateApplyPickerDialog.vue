@@ -87,7 +87,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
+import { createRequestGuard } from '@/utils/requestGuard'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -113,12 +114,18 @@ const loading = ref(false)
 const submitting = ref(false)
 const monitors = ref<AssociatedMonitorBrief[]>([])
 const selectedIds = ref<number[]>([])
+const requests = createRequestGuard()
+onUnmounted(requests.invalidate)
 
 const selectedSet = computed(() => new Set(selectedIds.value))
 
 watch(
   () => [props.show, props.templateId] as const,
   ([show, id]) => {
+    requests.invalidate()
+    loading.value = false
+    monitors.value = []
+    selectedIds.value = []
     if (!show || id == null) return
     void fetchMonitors(id)
   },
@@ -126,18 +133,20 @@ watch(
 )
 
 async function fetchMonitors(id: number) {
+  const current = requests.start()
   loading.value = true
   monitors.value = []
   selectedIds.value = []
   try {
     const { items } = await adminAPI.channelMonitorTemplate.listAssociatedMonitors(id)
+    if (!current()) return
     monitors.value = items
     // 默认全选
     selectedIds.value = items.map((m) => m.id)
   } catch (err: unknown) {
-    appStore.showError(extractApiErrorMessage(err, t('common.error')))
+    if (current()) appStore.showError(extractApiErrorMessage(err, t('common.error')))
   } finally {
-    loading.value = false
+    if (current()) loading.value = false
   }
 }
 

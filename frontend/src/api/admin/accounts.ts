@@ -29,7 +29,10 @@ import type {
   OllamaCloudUsageSettings,
   OllamaCloudUsageState,
   OpenCodeGoUsageSettings,
-  OpenCodeGoUsageState
+  OpenCodeGoUsageState,
+  GrokMediaEligibilityMode,
+  GrokMediaEligibilityState,
+  UpdateGrokMediaEligibilityRequest
 } from '@/types'
 
 /**
@@ -1104,6 +1107,23 @@ export async function refreshOpenCodeGoUsage(id: number): Promise<OpenCodeGoUsag
 }
 
 
+export async function getGrokMediaEligibility(id: number): Promise<GrokMediaEligibilityState> {
+  const { data } = await apiClient.get<GrokMediaEligibilityState>(`/admin/accounts/${id}/grok-media-eligibility`)
+  return data
+}
+
+export async function updateGrokMediaEligibility(
+  id: number,
+  mode: GrokMediaEligibilityMode
+): Promise<GrokMediaEligibilityState> {
+  const request: UpdateGrokMediaEligibilityRequest = { mode }
+  const { data } = await apiClient.put<GrokMediaEligibilityState>(
+    `/admin/accounts/${id}/grok-media-eligibility`,
+    request
+  )
+  return data
+}
+
 export const accountsAPI = {
   list,
   listWithEtag,
@@ -1172,7 +1192,9 @@ export const accountsAPI = {
   updateOpenCodeGoUsageSettings,
   getOpenCodeGoUsage,
   setOpenCodeGoUsageAutoRefresh,
-  refreshOpenCodeGoUsage
+  refreshOpenCodeGoUsage,
+  getGrokMediaEligibility,
+  updateGrokMediaEligibility
 }
 
 export default accountsAPI

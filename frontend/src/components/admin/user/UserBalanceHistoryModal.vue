@@ -172,8 +172,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { createRequestGuard } from '@/utils/requestGuard'
 import { adminAPI, type BalanceHistoryItem } from '@/api/admin'
 import { formatDateTime } from '@/utils/format'
 import type { AdminUser } from '@/types'
@@ -207,7 +208,12 @@ const typeOptions = computed(() => [
 ])
 
 // Watch modal open
-watch(() => props.show, (v) => {
+const requests = createRequestGuard()
+onUnmounted(requests.invalidate)
+watch(() => [props.show, props.user?.id] as const, ([v]) => {
+  requests.invalidate()
+  history.value = []
+  loading.value = false
   if (v && props.user) {
     typeFilter.value = ''
     loadHistory(1)
@@ -216,6 +222,7 @@ watch(() => props.show, (v) => {
 
 const loadHistory = async (page: number) => {
   if (!props.user) return
+  const current = requests.start()
   loading.value = true
   currentPage.value = page
   try {
@@ -225,13 +232,15 @@ const loadHistory = async (page: number) => {
       pageSize,
       typeFilter.value || undefined
     )
+    if (!current()) return
     history.value = res.items || []
     total.value = res.total || 0
     totalRecharged.value = res.total_recharged || 0
   } catch (error) {
+    if (!current()) return
     console.error('Failed to load balance history:', error)
   } finally {
-    loading.value = false
+    if (current()) loading.value = false
   }
 }
 

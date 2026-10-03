@@ -78,6 +78,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { extractApiErrorMessage } from '@/utils/apiError'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
 import type { AdminUser, AdminGroup } from '@/types'
@@ -123,6 +124,7 @@ const handleReplace = async () => {
     emit('success')
     emit('close')
   } catch (error) {
+    appStore.showError(extractApiErrorMessage(error, t('common.error')))
     console.error('Failed to replace group:', error)
   } finally {
     submitting.value = false

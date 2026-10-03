@@ -38,6 +38,14 @@ const { copyToClipboard } = useClipboard()
 
 // 与 DataTable 一致：< 768px 切换为卡片视图，避免宽表在移动端被截断。
 const isDesktopViewport = useMediaQuery('(min-width: 768px)')
+const latencyLabel = computed(() => t(props.preset.sort === 'ttft_desc'
+  ? 'admin.ops.ttftLabel'
+  : 'admin.ops.requestDetails.table.duration'))
+
+function latencyText(row: OpsRequestDetail): string {
+  const value = props.preset.sort === 'ttft_desc' ? row.first_token_ms : row.duration_ms
+  return typeof value === 'number' ? `${value} ms` : '-'
+}
 
 const loading = ref(false)
 const items = ref<OpsRequestDetail[]>([])
@@ -205,7 +213,7 @@ const kindBadgeClass = (kind: string) => {
                   </div>
                   <div class="break-all text-xs text-gray-600 dark:text-gray-300">{{ row.model || '-' }}</div>
                   <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
-                    <span>{{ typeof row.duration_ms === 'number' ? `${row.duration_ms} ms` : '-' }}</span>
+                    <span>{{ latencyLabel }}: {{ latencyText(row) }}</span>
                     <span>{{ row.status_code ?? '-' }}</span>
                   </div>
                   <div v-if="row.request_id" class="flex items-center gap-2">
@@ -244,7 +252,7 @@ const kindBadgeClass = (kind: string) => {
                     {{ t('admin.ops.requestDetails.table.model') }}
                   </th>
                   <th class="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    {{ t('admin.ops.requestDetails.table.duration') }}
+                    {{ latencyLabel }}
                   </th>
                   <th class="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     {{ t('admin.ops.requestDetails.table.status') }}
@@ -274,7 +282,7 @@ const kindBadgeClass = (kind: string) => {
                     {{ row.model || '-' }}
                   </td>
                   <td class="whitespace-nowrap px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
-                    {{ typeof row.duration_ms === 'number' ? `${row.duration_ms} ms` : '-' }}
+                    {{ latencyText(row) }}
                   </td>
                   <td class="whitespace-nowrap px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
                     {{ row.status_code ?? '-' }}
