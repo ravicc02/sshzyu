@@ -1,0 +1,27 @@
+[Unit]
+Description=sshzy signed custom release deployment executor
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/local/sbin/sshzy-updater serve --config /etc/sshzy-updater/config.json
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+RuntimeDirectory=sshzy-updater
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/sub2api-deploy /opt/sshzyu-ui /run/sshzy-updater /var/lib/sshzy-updater
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

@@ -19,6 +19,14 @@ export interface VersionInfo {
   cached: boolean
   warning?: string
   build_type: string // "source" for manual builds, "release" for CI builds
+  installation_mode?: string
+  update_source?: string
+  check_status?: string
+  can_update?: boolean
+  commit?: string
+  upstream_version?: string
+  custom_release?: import('./customUpdate').CustomRelease
+  official_notice?: { version: string; has_update: boolean; url: string }
 }
 
 /**

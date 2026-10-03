@@ -1,0 +1,17 @@
+{
+  "241_add_payment_order_bonus_amount.sql": {
+    "checksum": "18b6a524a9873d3e4a45e6f9bd03b6e69f4384b701825c659817e017f2e8244f",
+    "risk": "backward-compatible",
+    "description": "Add a bonus amount column without deleting existing orders."
+  },
+  "241_add_typesafe_platform.sql": {
+    "checksum": "b6559525bf8d0b5d7c617e7415944f0d1fae8c408e9131ace84139795f66dcd2",
+    "risk": "backward-compatible",
+    "description": "Expand two platform constraints to include TypeSafe; no row deletion."
+  },
+  "246_batch_image_collection_id.sql": {
+    "checksum": "38f86900247b31e00df8e9168fb5af28e4b522e4826f8e17d2efaddf32d17bb5",
+    "risk": "backward-compatible",
+    "description": "Add batch collection and parameter snapshot columns plus an index."
+  }
+}

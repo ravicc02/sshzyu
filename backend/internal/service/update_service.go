@@ -65,6 +65,8 @@ type UpdateService struct {
 	githubClient   GitHubReleaseClient
 	currentVersion string
 	buildType      string // "source" for manual builds, "release" for CI builds
+	commit         string
+	agent          UpdateAgent
 }
 
 // NewUpdateService creates a new UpdateService
@@ -79,13 +81,28 @@ func NewUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, versi
 
 // UpdateInfo contains update information
 type UpdateInfo struct {
-	CurrentVersion string       `json:"current_version"`
-	LatestVersion  string       `json:"latest_version"`
-	HasUpdate      bool         `json:"has_update"`
-	ReleaseInfo    *ReleaseInfo `json:"release_info,omitempty"`
-	Cached         bool         `json:"cached"`
-	Warning        string       `json:"warning,omitempty"`
-	BuildType      string       `json:"build_type"` // "source" or "release"
+	CurrentVersion   string                `json:"current_version"`
+	LatestVersion    string                `json:"latest_version"`
+	HasUpdate        bool                  `json:"has_update"`
+	ReleaseInfo      *ReleaseInfo          `json:"release_info,omitempty"`
+	Cached           bool                  `json:"cached"`
+	Warning          string                `json:"warning,omitempty"`
+	BuildType        string                `json:"build_type"` // "source" or "release"
+	Distribution     string                `json:"distribution,omitempty"`
+	UpdateSource     string                `json:"update_source,omitempty"`
+	InstallationMode string                `json:"installation_mode,omitempty"`
+	Commit           string                `json:"commit,omitempty"`
+	UpstreamVersion  string                `json:"upstream_version,omitempty"`
+	CheckStatus      string                `json:"check_status,omitempty"`
+	CanUpdate        bool                  `json:"can_update"`
+	CustomRelease    *CustomRelease        `json:"custom_release,omitempty"`
+	OfficialNotice   *OfficialUpdateNotice `json:"official_notice,omitempty"`
+}
+
+type OfficialUpdateNotice struct {
+	Version   string `json:"version"`
+	URL       string `json:"url"`
+	HasUpdate bool   `json:"has_update"`
 }
 
 // ReleaseInfo contains GitHub release details
@@ -131,6 +148,9 @@ type GitHubAsset struct {
 
 // CheckUpdate checks for available updates
 func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInfo, error) {
+	if s.IsCustomDistribution() {
+		return s.checkCustomUpdate(ctx)
+	}
 	// Try cache first
 	if !force {
 		if cached, err := s.getFromCache(ctx); err == nil && cached != nil {
@@ -163,6 +183,9 @@ func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInf
 // PerformUpdate downloads and applies the update
 // Uses atomic file replacement pattern for safe in-place updates
 func (s *UpdateService) PerformUpdate(ctx context.Context) error {
+	if s.IsCustomDistribution() {
+		return infraerrors.Conflict("CUSTOM_UPDATE_REQUIRES_AGENT", "Custom Docker installations must use the deployment agent")
+	}
 	info, err := s.CheckUpdate(ctx, true)
 	if err != nil {
 		return err
@@ -281,6 +304,9 @@ func (s *UpdateService) applyReleaseAssets(ctx context.Context, releaseAssets []
 
 // Rollback restores the previous version
 func (s *UpdateService) Rollback() error {
+	if s.IsCustomDistribution() {
+		return infraerrors.Conflict("CUSTOM_UPDATE_REQUIRES_AGENT", "Custom Docker installations must use the deployment agent")
+	}
 	exePath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %w", err)
@@ -307,6 +333,9 @@ func (s *UpdateService) Rollback() error {
 // strictly older than the current version (the current version itself is excluded),
 // newest first. Draft and prerelease entries are skipped.
 func (s *UpdateService) ListRollbackVersions(ctx context.Context) ([]RollbackVersion, error) {
+	if s.IsCustomDistribution() {
+		return nil, infraerrors.Conflict("CUSTOM_UPDATE_REQUIRES_AGENT", "Use verified custom deployment history")
+	}
 	releases, err := s.fetchRollbackCandidates(ctx)
 	if err != nil {
 		return nil, err
@@ -327,6 +356,9 @@ func (s *UpdateService) ListRollbackVersions(ctx context.Context) ([]RollbackVer
 // The target must be one of the versions returned by ListRollbackVersions;
 // anything else (including the current version) is rejected.
 func (s *UpdateService) RollbackToVersion(ctx context.Context, version string) error {
+	if s.IsCustomDistribution() {
+		return infraerrors.Conflict("CUSTOM_UPDATE_REQUIRES_AGENT", "Use verified custom deployment history")
+	}
 	target := strings.TrimPrefix(strings.TrimSpace(version), "v")
 	if target == "" {
 		return ErrRollbackVersionNotAllowed

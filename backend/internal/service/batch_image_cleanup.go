@@ -10,6 +10,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/pkg/deployment"
 	"go.uber.org/zap"
 )
 
@@ -97,6 +98,11 @@ func (s *BatchImageCleanupService) RunOnce(ctx context.Context, now time.Time) (
 	if s == nil || s.Repo == nil {
 		return BatchImageCleanupRunResult{}, ErrBatchImageCleanupFailed
 	}
+	done, err := deployment.Default.Enter()
+	if err != nil {
+		return BatchImageCleanupRunResult{}, err
+	}
+	defer done()
 	if now.IsZero() {
 		now = time.Now()
 	}

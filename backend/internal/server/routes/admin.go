@@ -691,6 +691,12 @@ func registerSystemRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		system.POST("/update", h.Admin.System.PerformUpdate)
 		system.POST("/rollback", h.Admin.System.Rollback)
 		system.POST("/restart", h.Admin.System.RestartService)
+		system.GET("/releases", h.Admin.System.CustomReleases)
+		system.POST("/updates/prepare", h.Admin.System.PrepareCustomUpdate)
+		system.GET("/updates/operations/:id", h.Admin.System.CustomOperation)
+		system.POST("/updates/operations/:id/activate", h.Admin.System.ActivateCustomUpdate)
+		system.POST("/updates/operations/:id/cancel", h.Admin.System.CancelCustomUpdate)
+		system.POST("/updates/rollback", h.Admin.System.PrepareCustomUpdate)
 	}
 }
 

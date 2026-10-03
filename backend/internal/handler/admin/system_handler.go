@@ -18,8 +18,10 @@ import (
 
 // SystemHandler handles system-related operations
 type SystemHandler struct {
-	updateSvc systemUpdateService
-	lockSvc   *service.SystemOperationLockService
+	updateSvc   systemUpdateService
+	lockSvc     *service.SystemOperationLockService
+	updateTotp  *service.TotpService
+	updateUsers *service.UserService
 }
 
 // systemUpdateTimeout bounds a full in-place update or rollback: the release
@@ -62,6 +64,12 @@ func NewSystemHandler(updateSvc systemUpdateService, lockSvc *service.SystemOper
 // GetVersion returns the current version
 // GET /api/v1/admin/system/version
 func (h *SystemHandler) GetVersion(c *gin.Context) {
+	if svc, ok := h.updateSvc.(*service.UpdateService); ok {
+		info := svc.LocalVersionInfo()
+		response.Success(c, gin.H{"version": info.CurrentVersion, "commit": info.Commit, "build_type": info.BuildType,
+			"distribution": info.Distribution, "upstream_version": info.UpstreamVersion, "installation_mode": info.InstallationMode})
+		return
+	}
 	info, _ := h.updateSvc.CheckUpdate(c.Request.Context(), false)
 	response.Success(c, gin.H{
 		"version": info.CurrentVersion,
@@ -201,6 +209,10 @@ func (h *SystemHandler) Rollback(c *gin.Context) {
 // RestartService restarts the systemd service
 // POST /api/v1/admin/system/restart
 func (h *SystemHandler) RestartService(c *gin.Context) {
+	if svc, ok := h.updateSvc.(*service.UpdateService); ok && svc.IsCustomDistribution() {
+		middleware2.AbortWithError(c, 409, "CUSTOM_UPDATE_REQUIRES_AGENT", "Use the approved custom deployment operation")
+		return
+	}
 	operationID := buildSystemOperationID(c, "restart")
 	payload := gin.H{"operation_id": operationID}
 	executeAdminIdempotentJSON(c, "admin.system.restart", payload, service.DefaultSystemOperationIdempotencyTTL(), func(ctx context.Context) (any, error) {

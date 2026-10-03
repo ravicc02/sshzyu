@@ -1,0 +1,130 @@
+name: Publish signed sshzy distribution
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: custom-publish
+  cancel-in-progress: false
+jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
+    permissions:
+      contents: read
+  publish:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.repository == 'ravicc02/sshzyu'
+    runs-on: ubuntu-latest
+    environment: custom-release
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check immutable custom version
+        id: identity
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/release/check_publish.py
+      - name: Confirm official baseline and clean build
+        if: steps.identity.outputs.publish == 'true'
+        run: |
+          git remote add upstream https://github.com/Wei-Shaw/sub2api.git
+          python scripts/upstream_release_guard.py
+          python scripts/upstream_release_guard.py --validate-clean-build --build-target root
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        if: steps.identity.outputs.publish == 'true'
+        with:
+          go-version-file: backend/go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        if: steps.identity.outputs.publish == 'true'
+        with:
+          node-version: '24'
+      - name: Build matching UI and updater
+        if: steps.identity.outputs.publish == 'true'
+        env:
+          SSHZY_BUILD_TYPE: release
+          SSHZY_BUILD_COMMIT: ${{ github.sha }}
+        run: |
+          corepack enable
+          corepack prepare pnpm@9 --activate
+          pnpm --dir frontend install --frozen-lockfile
+          pnpm --dir frontend build
+          node scripts/build-online-equivalent.mjs
+          go -C tools/sshzy-updater build -trimpath -o "$RUNNER_TEMP/sshzy-updater" ./cmd/sshzy-updater
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        if: steps.identity.outputs.publish == 'true'
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        if: steps.identity.outputs.publish == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        id: image
+        if: steps.identity.outputs.publish == 'true'
+        with:
+          context: backend
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/ravicc02/sshzyu-backend:sha-${{ github.sha }}
+            ghcr.io/ravicc02/sshzyu-backend:${{ steps.identity.outputs.version }}
+          build-args: |
+            VERSION=${{ steps.identity.outputs.version }}
+            COMMIT=${{ github.sha }}
+            DATE=${{ steps.identity.outputs.date }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Verify binary identity
+        if: steps.identity.outputs.publish == 'true'
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          EXPECTED_VERSION: ${{ steps.identity.outputs.version }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker pull "ghcr.io/ravicc02/sshzyu-backend@$IMAGE_DIGEST"
+          output="$(docker run --rm --network none --read-only --cap-drop ALL "ghcr.io/ravicc02/sshzyu-backend@$IMAGE_DIGEST" /app/main --version 2>&1)"
+          printf '%s' "$output" | grep -F "$EXPECTED_VERSION"
+          printf '%s' "$output" | grep -F "$EXPECTED_SHA"
+      - name: Generate and sign release bundle
+        if: steps.identity.outputs.publish == 'true'
+        env:
+          SIGNING_KEY: ${{ secrets.SSHZY_RELEASE_SIGNING_KEY }}
+          SIGNING_KEY_ID: ${{ vars.SSHZY_RELEASE_SIGNING_KEY_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test -n "$SIGNING_KEY" && test -n "$SIGNING_KEY_ID"
+          umask 077
+          printf '%s' "$SIGNING_KEY" > "$RUNNER_TEMP/signing.pem"
+          openssl pkey -in "$RUNNER_TEMP/signing.pem" -pubout -out "$RUNNER_TEMP/trust.pem"
+          python scripts/release/check_publish.py --download-previous "$RUNNER_TEMP/previous"
+          previous=()
+          if test -f "$RUNNER_TEMP/previous/release-manifest.json"; then
+            "$RUNNER_TEMP/sshzy-updater" verify --manifest "$RUNNER_TEMP/previous/release-manifest.json" --signature "$RUNNER_TEMP/previous/release-manifest.sig" --public-key "$RUNNER_TEMP/trust.pem"
+            previous=(--previous-manifest "$RUNNER_TEMP/previous/release-manifest.json")
+          fi
+          python -c 'import json,os; json.dump({"source_sha":os.environ["SOURCE_SHA"],"tests_passed":True},open(os.environ["RUNNER_TEMP"]+"/verification.json","w"))'
+          "$RUNNER_TEMP/sshzy-updater" bundle --repo-root "$GITHUB_WORKSPACE" --output "$RUNNER_TEMP/bundle" --image-digest "$IMAGE_DIGEST" --key-file "$RUNNER_TEMP/signing.pem" --key-id "$SIGNING_KEY_ID" --verification-file "$RUNNER_TEMP/verification.json" "${previous[@]}"
+          cp "$RUNNER_TEMP/sshzy-updater" "$RUNNER_TEMP/bundle/sshzy-updater-linux-amd64"
+      - name: Publish only the complete custom release
+        if: steps.identity.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: sshzy-v${{ steps.identity.outputs.version }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" --repo ravicc02/sshzyu --target "$SOURCE_SHA" --draft --title "sshzy $TAG" --notes "Signed custom distribution. Official baseline is recorded in release-manifest.json. Site activation remains a manual operation."
+          gh release upload "$TAG" "$RUNNER_TEMP/bundle/"* --repo ravicc02/sshzyu
+          gh release view "$TAG" --repo ravicc02/sshzyu --json assets --jq '.assets[].name'
+          gh release edit "$TAG" --repo ravicc02/sshzyu --draft=false

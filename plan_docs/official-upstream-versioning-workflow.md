@@ -1,6 +1,6 @@
 # 官方 Sub2API 上游同步与本地定制版本治理方案
 
-> 状态：2026-10-01 开始配置；`upstream` 已配置、`upstream-baseline.json` 与本机 `pre-push` 门禁已落地。未进行新的上游合并、线上部署或历史 migration 验收。
+> 状态：官方基线已受控整合至 `v0.2.13`；本机守卫和 GitHub 构建/签名发布代码已落地。具体运行版本以现场为准，不将旧发布记录或源码状态当作当前已部署证明。
 > 适用仓库：`sshzy` 统一仓库
 > 官方上游：`Wei-Shaw/sub2api`
 > 更新日期：2026-09-30
@@ -146,3 +146,12 @@ integrated_at: YYYY-MM-DD
 ```
 
 当前仓库已选择根目录 `upstream-baseline.json` 记录可审查的官方 tag、commit 和本地构建号；本机通过 `git config core.hooksPath .githooks` 启用 `pre-push`，检查逻辑位于 `scripts/upstream_release_guard.py`。其他开发者仍须独立启用钩子。`AGENTS.md` 已补充准入与构建约束；此记录只证明基线来源，不替代三方移植、迁移或部署验证。
+
+## 8. 定制构建与网站更新
+
+- 正式版本同时绑定自有仓库、定制 tag、完整版号、源 SHA、镜像 digest、UI build-info 和签名清单。
+- GitHub 在独立 checkout 重新执行门禁；pre-push 不是 CI 或人工部署确认的替代品。
+- 定制发布使用 `sshzy-vX.Y.Z-rN`；`r9 → r10` 按数字比较，不能继续剥离 `-rN`。
+- 新增 migration 必须审阅风险并绑定 runner checksum，历史集合与上一签名 manifest 对照；未审阅/非事务/不兼容项进入单独维护流程。
+- 网站官方提醒与定制安装 provider 分离，不能发现官方版本后直接安装原版覆盖品牌与业务功能。
+- 生产更新由独立执行器维护持久化状态，准备/激活分离；具体信任、权限、排空、离线备份及恢复规则见 `deploy/updater/README.md`。

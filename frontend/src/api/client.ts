@@ -49,6 +49,7 @@ apiClient.interceptors.request.use(
     // Attach locale for backend translations
     if (config.headers) {
       config.headers['Accept-Language'] = getLocale()
+      config.headers['X-Sshzy-Client-Contract'] = 'sshzy-api-1'
     }
 
     // Attach timezone for all GET requests (backend may use it for default date ranges)

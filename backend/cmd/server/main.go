@@ -22,6 +22,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/setup"
 	"github.com/Wei-Shaw/sub2api/internal/web"
+	"github.com/Wei-Shaw/sub2api/pkg/deployment"
 
 	"github.com/gin-gonic/gin"
 )
@@ -146,6 +147,8 @@ func runMainServer() {
 	buildInfo := handler.BuildInfo{
 		Version:   Version,
 		BuildType: BuildType,
+		Commit:    Commit,
+		Date:      Date,
 	}
 
 	app, err := initializeApplication(buildInfo)
@@ -153,6 +156,7 @@ func runMainServer() {
 		log.Fatalf("Failed to initialize application: %v", err)
 	}
 	defer app.Cleanup()
+	defer deployment.Default.Close()
 	if app.PluginManager != nil {
 		if err := app.PluginManager.Start(context.Background()); err != nil {
 			log.Printf("Plugin manager started in degraded state: %v", err)

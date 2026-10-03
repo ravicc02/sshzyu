@@ -6,6 +6,7 @@ import batchImage from './batchImage'
 import imageStudio from './imageStudio'
 import admin from './admin'
 import misc from './misc'
+import customUpdate from './customUpdate'
 
 export default {
   ...landing,
@@ -16,4 +17,5 @@ export default {
   ...imageStudio,
   admin,
   ...misc,
+  ...customUpdate,
 }

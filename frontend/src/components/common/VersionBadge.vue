@@ -1,5 +1,6 @@
 <template>
-  <div class="relative">
+  <CustomUpdateBadge v-if="isAdmin && currentVersion.includes('-r')" :version="currentVersion" :info="appStore.customVersionInfo" />
+  <div v-else class="relative">
     <!-- Admin: Full version badge with dropdown -->
     <template v-if="isAdmin">
       <button
@@ -650,6 +651,7 @@ import {
 } from '@/api/admin/system'
 import { useClipboard } from '@/composables/useClipboard'
 import Icon from '@/components/icons/Icon.vue'
+import CustomUpdateBadge from './CustomUpdateBadge.vue'
 
 const GITHUB_REPO = 'Wei-Shaw/sub2api'
 // Docker Hub image published by CI (tags carry no "v" prefix, e.g. weishaw/sub2api:0.1.146)

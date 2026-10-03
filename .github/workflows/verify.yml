@@ -1,0 +1,53 @@
+name: Verify custom distribution
+on:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: |
+            backend/go.sum
+            tools/sshzy-updater/go.sum
+      - name: Verify distribution contract
+        run: |
+          python -m unittest discover -s scripts -p 'test_upstream_release_guard.py'
+          go -C backend test ./pkg/release ./pkg/deployment
+          go -C tools/sshzy-updater test -race ./...
+          go -C backend test -tags=unit ./...
+      - name: Validate migrations in isolated containers
+        run: go -C backend test -tags=integration ./internal/repository -run '^TestMigrations' -count=1
+      - name: Compile backend and Linux updater
+        run: |
+          go -C backend build -o "$RUNNER_TEMP/backend" ./cmd/server
+          go -C tools/sshzy-updater build -o "$RUNNER_TEMP/sshzy-updater" ./cmd/sshzy-updater
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Install locked frontend dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@9 --activate
+          pnpm --dir frontend install --frozen-lockfile
+      - name: Check and build frontend
+        run: |
+          pnpm --dir frontend typecheck
+          pnpm --dir frontend test:run
+          pnpm --dir frontend build
+          node scripts/build-online-equivalent.mjs

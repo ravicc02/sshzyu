@@ -159,8 +159,8 @@ func ProvideBatchImageHandler(
 }
 
 // ProvideSystemHandler creates admin.SystemHandler with UpdateService
-func ProvideSystemHandler(updateService *service.UpdateService, lockService *service.SystemOperationLockService) *admin.SystemHandler {
-	return admin.NewSystemHandler(updateService, lockService)
+func ProvideSystemHandler(updateService *service.UpdateService, lockService *service.SystemOperationLockService, totp *service.TotpService, users *service.UserService) *admin.SystemHandler {
+	return admin.NewSystemHandler(updateService, lockService).WithUpdateAuthorization(totp, users)
 }
 
 // ProvideSettingHandler creates SettingHandler with version from BuildInfo

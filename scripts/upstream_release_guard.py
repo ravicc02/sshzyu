@@ -149,7 +149,7 @@ def check(refs):
 
 def validate_clean_build(build_target="backend"):
     """拒绝将未提交的镜像输入标记为 HEAD 的正式发布构建。"""
-    paths = ["backend", "upstream-baseline.json"]
+    paths = ["backend", "upstream-baseline.json", "customizations.json", "scripts/release", "tools/sshzy-updater", ".github/workflows"]
     if build_target == "root":
         paths += ["Dockerfile", ".dockerignore", "frontend", "docs/legal", "deploy/docker-entrypoint.sh"]
     elif build_target != "backend":

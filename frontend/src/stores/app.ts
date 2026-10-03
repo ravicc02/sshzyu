@@ -42,6 +42,7 @@ export const useAppStore = defineStore('app', () => {
   const latestVersion = ref<string>('')
   const hasUpdate = ref<boolean>(false)
   const buildType = ref<string>('source')
+  const customVersionInfo = ref<VersionInfo | null>(null)
   const releaseInfo = ref<ReleaseInfo | null>(null)
 
   // Auto-incrementing ID for toasts
@@ -261,6 +262,7 @@ export const useAppStore = defineStore('app', () => {
     versionLoading.value = true
     try {
       const data = await checkUpdatesAPI(force)
+      customVersionInfo.value = data
       currentVersion.value = data.current_version
       latestVersion.value = data.latest_version
       hasUpdate.value = data.has_update
@@ -464,6 +466,7 @@ export const useAppStore = defineStore('app', () => {
     latestVersion,
     hasUpdate,
     buildType,
+    customVersionInfo,
     releaseInfo,
 
     // Computed

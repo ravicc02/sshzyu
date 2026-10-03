@@ -19,6 +19,12 @@
 | `docs/` | **线上文档站**（前端 nginx 挂到 `/docs/`） | 对外公开 |
 | `playground/` | 生图应用静态产物（nginx 挂到 `/image/`） | 生图工作台 |
 | `scripts/` | `rebuild.sh` + 构建/校验脚本 | 本地重建 |
+| `scripts/release/` | 发布准入、migration 审阅记录 | GitHub 发布辅助 |
+| `backend/pkg/release/` | 共享发布契约、版本比较和验签 | 后端/执行器共用 |
+| `backend/pkg/deployment/` | 维护屏障、在途计数 | 更新期间业务保护 |
+| `tools/sshzy-updater/` | 独立 Go module、宿主机执行器及发布 CLI | 不在网站进程内运行 |
+| `deploy/updater/` | 执行器配置、unit、挂载样例和手册 | 样例，不代表已接入生产 |
+| `.github/workflows/` | 验证与定制发布工作流 | 不自动上线 |
 | `deploy/` | 本地运行时数据卷（`data/`、`postgres_data/`、`redis_data/`，已被 `.gitignore` 忽略） | 本地数据 |
 | `records/` | 运营问答梳理记录（`.gitignore` 忽略，不入版本库、不对外） | 内部记录 |
 
@@ -32,6 +38,9 @@
 
 - **SSH 连接：使用你本地的 SSH 配置**。本仓库为多人协作，主机别名（`us-server`）、密钥等连接凭据由各人按自己本机 `~/.ssh/config` 维护，本文件不写死具体的密钥路径或本机专属配置。
 - 服务器上**没有源码、没有 git 仓库**，sub2api 使用本地构建镜像 + `docker save/load` 部署。
+- **定制发布主链已源码化**：本地开发 → GitHub 检查/构建 → GHCR 镜像与签名 Release → 网站人工准备/确认。生产仍需按 `deploy/updater/README.md` 完成一次性接入；接入前继续使用人工发布，不把代码改造当成服务已启用。
+- **所有上传统一使用 rsync，不使用 scp**，目标主机使用 `us-server` 别名。目录上传使用 `-a --partial --info=progress2`；镜像归档使用 `--partial --append-verify --info=progress2`，完成后核对本地与服务器 SHA256。`.tar.gz` 已压缩，不再加 `-z`；不得使用 `--delete` 删除远端历史资源、日志或备份。
+- **Windows 传输**：本机未安装原生 rsync 时，使用 WSL Ubuntu 的 rsync；Windows 文件路径转换为 `/mnt/<盘符>/...`。SSH 必须复用已有本机配置，可通过 rsync 的 `-e` 指定 Git for Windows 的 `ssh.exe`；不要为传输复制私钥到仓库或放宽凭证文件权限。
 
 > ❌ **边界声明**：其它任何服务器（尤其 `Ravi-server` `199.68.217.212`）不在本工作区职责范围，不对其做任何操作。
 
@@ -52,11 +61,11 @@ sshzyu.com / www.sshzyu.com (443, Certbot 管理)
 
 | 容器 | 镜像 | 端口 | 说明 |
 | --- | --- | --- | --- |
-| `sub2api` | `local/sub2api-batch:<tag>` | `127.0.0.1:8080→8080` | 主应用，**纯 Go 后端，不内嵌前端** |
+| `sub2api` | 人工部署 `local/sub2api-batch:<tag>`；接入后 `ghcr.io/ravicc02/sshzyu-backend@sha256:<digest>` | `127.0.0.1:8080→8080` | 主应用，**纯 Go 后端，不内嵌前端** |
 | `sub2api-postgres` | `postgres:18-alpine` | 内网 5432 | 数据库 |
 | `sub2api-redis` | `redis:8-alpine` | 内网 6379 | 缓存 |
 
-- **⚠️ 镜像为本地构建（`local/` 前缀，无 registry）**。服务器上 `docker compose pull` 拉不到，升级/回滚只能 `docker save/load` 搬运镜像 tar。
+- **⚠️ 区分部署模式**：`local/` 人工镜像不能从 registry pull，继续用 save/load；接入后的定制版从自己的 GHCR 按签名清单 digest 拉取，禁止使用官方镜像或浮动 `latest` 替换定制版。源码工作流存在不等于镜像已经发布。
 - `.env`（`/opt/sub2api-deploy/.env`）：数据库/Redis/JWT/账号等敏感凭证，**含值不外传**，只用路径引用。
 - `data/`（挂载 `/app/data`）：`config.yaml`、日志、插件、页面；`backups/` 等历史备份**不要删**
 - 健康检查：`curl http://127.0.0.1:8080/health` → `{"status":"ok"}`
@@ -82,6 +91,18 @@ sshzyu.com / www.sshzyu.com (443, Certbot 管理)
 
 ## 3. 端到端开发部署流程
 
+### 3.0 定制版日常发布主链（完成首次接入后）
+
+1. 保留官方基线与本地定制的三方整合规则；每次发布递增 `backend/cmd/server/VERSION` 的 `rN` 并同步 `upstream-baseline.json`，不得复用旧版本。定制 tag 前缀为 `sshzy-v`，不用官方 `vX.Y.Z`。
+2. 本地定向验证和 pre-push 守卫通过后，按用户授权提交/推送；不得擅自提交未归属的改动。GitHub 对 main 执行全量门禁，成功且版号递增才发布；失败阻断，不能伪造通过。
+3. `.github/workflows/publish-custom.yml` 只发布签名 manifest、同提交 UI、精简后端镜像和执行器产物，不持生产 SSH 私钥，不重启站点。
+4. 网站只更新 `ravicc02/sshzyu` / `ghcr.io/ravicc02/sshzyu-backend` 的签名定制版。官方 `Wei-Shaw/sub2api` 仅用于基线核验与提醒，不提供本站安装/回退按钮。
+5. 准备阶段只下载、验签和预检；激活需要真人管理员、近期 TOTP、明确 migration 列表与停机确认。未配置执行器/信任链/权限时禁止回退旧的原地二进制更新逻辑。
+6. 独立宿主机执行器通过 Unix socket 控制，不暴露公网、不挂 Docker socket 给网站。首次安装、凭证配置、权限、服务启停及生产迁移均需单独授权。
+7. 首版维护窗口包含优雅退出和离线数据库备份，不能保证几秒完成。失败保留记录/备份，不自动还原数据库；人工恢复见 `deploy/updater/README.md`。
+
+下述 3.1–3.3 保留为首次接入、人工应急和离线发布方式；上传继续只用 rsync。
+
 ### 3.1 修改前端 → 本地验证 → 线上发布（UI）
 
 ```bash
@@ -97,18 +118,21 @@ bash scripts/rebuild.sh
 # 4. 提交源码（正源是 frontend/，构建链自动产出 ui/）
 git add -A && git commit
 
-# 5. 构建线上产物体积小，直接上传 current 目录
-scp -r ui/current/* root@64.83.2.153:/opt/sshzyu-ui/current/   # 或做成新 release
+# 5. 上传到新 release（将 <new> 替换为本次发布版本，不覆盖 current）
+RELEASE="<new>"
+ssh us-server "mkdir -p '/opt/sshzyu-ui/releases/$RELEASE'"
+rsync -a --partial --info=progress2 ui/current/ "us-server:/opt/sshzyu-ui/releases/$RELEASE/"
 ```
 
-> 若需保留旧版本用于回退：先 `mkdir /opt/sshzyu-ui/releases/<new>` 上传，再 `bash /opt/sshzyu-ui/switch-release.sh` 切 `current`。
+> 上传与生效分开：校验新 release 后，按已授权的发布流程运行 `bash /opt/sshzyu-ui/switch-release.sh <new>` 切 `current`，保留旧 release 用于回退。固定 `shared/assets/fw-cachebust.js` 的更新与备份仍须按发布流程处理，不能因上传而提前切换。
 > 前端产物 `ui/` 由构建生成，**不要手改**；只改 `frontend/` 源码再重建。
 
 ### 3.2 修改文档站（docs/）
 
 ```bash
 # docs/ 直接是构建产物且无构建链，改完上传即可
-scp docs/index.html docs/content.md docs/iamge/* root@64.83.2.153:/opt/sshzyu-docs/
+rsync -a --partial --info=progress2 docs/index.html docs/content.md us-server:/opt/sshzyu-docs/
+rsync -a --partial --info=progress2 docs/iamge/ us-server:/opt/sshzyu-docs/iamge/
 ```
 
 ### 3.3 修改后端 → 构建镜像 → 线上部署
@@ -134,8 +158,9 @@ python scripts/upstream_release_guard.py --validate-clean-build --build-target b
 # 4. 导出镜像 tar（若服务器无法直接访问本地 Docker）
 docker save local/sub2api-batch:<tag> | gzip -6 > /tmp/sub2api-<tag>.tar.gz
 
-# 5. 上传（用你本地的 scp/rsync，连接方式按本机 SSH 配置）
-scp /tmp/sub2api-<tag>.tar.gz root@64.83.2.153:/tmp/
+# 5. 上传（统一使用 rsync，连接方式按本机 SSH 配置）
+rsync --partial --append-verify --info=progress2 "/tmp/sub2api-<tag>.tar.gz" us-server:/tmp/
+# 核对本地与远端归档 SHA256 一致后，才继续加载和部署
 
 # 6. 服务器：加载镜像 + 更新 compose tag + 重建容器
 ssh us-server '
@@ -151,6 +176,7 @@ ssh us-server 'docker exec sub2api /app/main --version && curl -s http://127.0.0
 > **版本号规则**：本地定制版完整版本号由 `backend/cmd/server/VERSION` 决定，格式为 `X.Y.Z-rN`；`resolve-version.sh` 不再从本地/官方 tag 自动推断。`upstream-baseline.json` 必须与版本文件及官方稳定 Release/tag/commit 对齐。根 Dockerfile 默认构建本地 `source` 内嵌前端镜像；发布根镜像需先运行 `python scripts/upstream_release_guard.py --validate-clean-build --build-target root`，然后以 `--build-arg BUILD_TYPE=release` 及 VERSION、COMMIT、DATE 显式构建。`backend/Dockerfile` 只构建线上纯后端 `release` 镜像，发布前应使用 `--build-target backend` 验证。正式发布须核验镜像 tag、二进制输出及管理端 `build_type`。
 > **推送门禁**：每次向 `origin` 推送前运行 `python scripts/upstream_release_guard.py`，在当前机器执行一次 `git config core.hooksPath .githooks` 启用自动 `pre-push`。守卫读取待推送提交中的基线、核对官方最新稳定 Release 及 tag SHA；上游状态未知或有新版本时阻止 push 并向用户汇报，未经确认不得自动合并。钩子是本机机制，可被跳过；团队级强制保护仍需服务端分支保护/必需 CI。完整三方增量合并、migration 和部署边界见 `plan_docs/official-upstream-versioning-workflow.md`。
 > **回滚**：compose 改回旧 tag → `docker compose up -d --force-recreate`。
+> **定制更新回滚**：接入后的回滚使用已部署 history 中的签名版本，恢复后端、UI 和固定 bootstrap；必须先核对当前 schema 的兼容性。不能用容器内 `.backup`、官方 install.sh 或官方 Docker Hub 镜像替换定制版。
 
 ---
 

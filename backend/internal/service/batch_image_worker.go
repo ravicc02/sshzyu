@@ -7,6 +7,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/pkg/deployment"
 	"go.uber.org/zap"
 )
 
@@ -133,6 +134,11 @@ func (w *BatchImageWorker) RunOnce(ctx context.Context) error {
 	if w == nil || w.queue == nil || w.processor == nil {
 		return nil
 	}
+	done, err := deployment.Default.Enter()
+	if err != nil {
+		return err
+	}
+	defer done()
 
 	reserved, err := w.queue.Reserve(ctx, w.opts.ReserveBlockTimeout)
 	if errors.Is(err, ErrBatchImageQueueEmpty) {

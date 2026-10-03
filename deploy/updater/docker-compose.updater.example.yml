@@ -1,0 +1,10 @@
+services:
+  sub2api:
+    environment:
+      SSHZY_UPDATE_AGENT_SOCKET: /run/sshzy-updater/control.sock
+      SSHZY_UPDATE_AGENT_TOKEN_FILE: /run/secrets/sshzy-update-control.token
+      SSHZY_UPDATE_MAINTENANCE_FILE: /run/sshzy-updater/maintenance.json
+      SSHZY_UPDATE_SITE_ORIGIN: https://sshzyu.com
+    volumes:
+      - /run/sshzy-updater:/run/sshzy-updater:ro
+      - /etc/sshzy-updater/control.token:/run/secrets/sshzy-update-control.token:ro

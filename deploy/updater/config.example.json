@@ -1,0 +1,17 @@
+{
+  "state_dir": "/opt/sub2api-deploy/updater/state",
+  "socket": "/run/sshzy-updater/control.sock",
+  "control_dir": "/run/sshzy-updater",
+  "control_token_file": "/etc/sshzy-updater/control.token",
+  "public_key_file": "/etc/sshzy-updater/release-public.pem",
+  "signing_key_id": "release-1",
+  "github_token_file": "/etc/sshzy-updater/github-read.token",
+  "docker_config": "/var/lib/sshzy-updater/docker",
+  "deployment_dir": "/opt/sub2api-deploy",
+  "ui_root": "/opt/sshzyu-ui",
+  "expected_hostname": "RainYun-LFS4goAS",
+  "socket_gid": 1000,
+  "client_uid": 1000,
+  "activation_enabled": false,
+  "payment_callbacks_reviewed": false
+}

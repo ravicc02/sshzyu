@@ -4,9 +4,15 @@
 // 3) index.html 入口指向 fw-cachebust.js?v=<entry-hash>
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const DIST = path.resolve(fileURLToPath(new URL('../backend/internal/web/dist', import.meta.url)));
+const ROOT = path.resolve(fileURLToPath(new URL('../', import.meta.url)));
+const version = fs.readFileSync(path.join(ROOT, 'backend/cmd/server/VERSION'), 'utf8').trim();
+const commit = process.env.SSHZY_BUILD_COMMIT || execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
+if (!/^[0-9]+\.[0-9]+\.[0-9]+-r[1-9][0-9]*$/.test(version) || !/^[a-f0-9]{40}$/.test(commit)) throw new Error('Invalid UI build identity');
+fs.writeFileSync(path.join(DIST, 'build-info.json'), JSON.stringify({ version, commit, contract: 'sshzy-api-1', build_type: process.env.SSHZY_BUILD_TYPE || 'source' }, null, 2) + '\n');
 
 const assetsDir = path.join(DIST, 'assets');
 const fail = (m) => { console.error('FAIL:', m); process.exit(1); };

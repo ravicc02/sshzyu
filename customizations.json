@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "distribution": "sshzy",
+  "repository": "ravicc02/sshzyu",
+  "official_repository": "Wei-Shaw/sub2api",
+  "image": "ghcr.io/ravicc02/sshzyu-backend",
+  "release_tag_prefix": "sshzy-v",
+  "client_contract": "sshzy-api-1",
+  "modules": [
+    {"name": "brand-ui", "paths": ["frontend/src/components/layout", "frontend/src/i18n"], "preserve": "Brand layout and local terminology"},
+    {"name": "model-policy", "paths": ["backend/internal/service", "frontend/src/views/admin"], "preserve": "Custom model catalog and quota policy"},
+    {"name": "lottery", "paths": ["backend/internal/service/lottery_service.go", "frontend/src/views/admin/LotteryManageView.vue"], "preserve": "Lottery operations and rewards"},
+    {"name": "batch-image", "paths": ["backend/internal/service/batch_image_public.go", "frontend/src/components/batch-image", "frontend/src/views/user/BatchImageGuideView.vue"], "preserve": "OpenAI/Gemini configuration, collections and ZIP downloads"},
+    {"name": "custom-update", "paths": ["backend/pkg/release", "tools/sshzy-updater", "frontend/src/components/common/CustomUpdateBadge.vue"], "preserve": "Signed custom source, manual activation and recovery"}
+  ]
+}

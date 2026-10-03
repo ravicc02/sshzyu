@@ -3,9 +3,9 @@
   "upstream_release": "v0.2.13",
   "upstream_commit": "3040209f205472038c1ba745a1bedd2edd9053b1",
   "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.13",
-  "local_build_version": "0.2.13-r2",
+  "local_build_version": "0.2.13-r3",
   "integration_commit": "351827563530519f4f3b83b37268240220e7f08b",
   "integrated_at": "2026-10-03",
   "verified_at": "2026-10-03",
-  "note": "已按 v0.2.11、本地定制、v0.2.13 三方增量整合；历史迁移校验值一致，本地隔离库验证三项新增迁移通过。0.2.13-r1 已上线 us-server；0.2.13-r2 修复 batch_image_jobs 三列(image_size/aspect_ratio/response_mime_type)可空扫描导致的 GET /v1/images/batches 间歇 500。"
+  "note": "已按 v0.2.11、本地定制、v0.2.13 三方增量整合；历史迁移校验值一致，本地隔离库验证三项新增迁移通过。保留 0.2.13-r2 的 batch_image_jobs 可空扫描修复。0.2.13-r3 为签名定制发布、独立执行器和网站人工激活改造；凭证设置、生产安装和 migration 仍须单独授权。"
 }

@@ -1,2 +1,14 @@
-.cache/
-.DS_Store
+.git
+.env
+.env.*
+*.pem
+*.key
+config.yaml
+config.local.yaml
+server.exe
+*.log
+internal/web/dist
+vendor
+coverage
+.cache
+*.tsbuildinfo
