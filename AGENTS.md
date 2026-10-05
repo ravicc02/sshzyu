@@ -174,7 +174,7 @@ ssh us-server 'docker exec sub2api /app/main --version && curl -s http://127.0.0
 ```
 
 > **版本号规则**：本地定制版完整版本号由 `backend/cmd/server/VERSION` 决定，格式为 `X.Y.Z-rN`；`resolve-version.sh` 不再从本地/官方 tag 自动推断。`upstream-baseline.json` 必须与版本文件及官方稳定 Release/tag/commit 对齐。根 Dockerfile 默认构建本地 `source` 内嵌前端镜像；发布根镜像需先运行 `python scripts/upstream_release_guard.py --validate-clean-build --build-target root`，然后以 `--build-arg BUILD_TYPE=release` 及 VERSION、COMMIT、DATE 显式构建。`backend/Dockerfile` 只构建线上纯后端 `release` 镜像，发布前应使用 `--build-target backend` 验证。正式发布须核验镜像 tag、二进制输出及管理端 `build_type`。
-> **推送门禁**：每次向 `origin` 推送前运行 `python scripts/upstream_release_guard.py`，在当前机器执行一次 `git config core.hooksPath .githooks` 启用自动 `pre-push`。守卫读取待推送提交中的基线、核对官方最新稳定 Release 及 tag SHA；上游状态未知或有新版本时阻止 push 并向用户汇报，未经确认不得自动合并。钩子是本机机制，可被跳过；团队级强制保护仍需服务端分支保护/必需 CI。完整三方增量合并、migration 和部署边界见 `plan_docs/official-upstream-versioning-workflow.md`。
+> **推送门禁**：每次向 `origin` 推送前运行 `python scripts/upstream_release_guard.py`，在当前机器执行一次 `git config core.hooksPath .githooks` 启用自动 `pre-push`。守卫读取待推送提交中的基线、核对官方最新稳定 Release 及 tag SHA；上游状态未知或有新版本时阻止 push 并向用户汇报，未经确认不得自动合并。钩子是本机机制，可被跳过；团队级强制保护已由服务端 `main` 分支保护承接（见 §3.4）。完整三方增量合并、migration 和部署边界见 `plan_docs/official-upstream-versioning-workflow.md`。
 > **回滚**：compose 改回旧 tag → `docker compose up -d --force-recreate`。
 > **定制更新回滚**：接入后的回滚使用已部署 history 中的签名版本，恢复后端、UI 和固定 bootstrap；必须先核对当前 schema 的兼容性。不能用容器内 `.backup`、官方 install.sh 或官方 Docker Hub 镜像替换定制版。
 
@@ -182,7 +182,7 @@ ssh us-server 'docker exec sub2api /app/main --version && curl -s http://127.0.0
 
 本仓库多人 + agent 协作，所有改动要可追溯、可验证。规则：
 
-1. **改动走 PR，不直推 `main`**：本地建分支（`feat/` `fix/` `docs/` `chore/` `build/`）→ push → 开 PR → `verify.yml`（后端测试 / migration / 编译 + 前端 typecheck / test / build）全绿才 merge。仓库公开后 `main` 启用分支保护（要求 PR + CI 通过），不允许绕过。
+1. **改动走 PR，不直推 `main`**：本地建分支（`feat/` `fix/` `docs/` `chore/` `build/`）→ push → 开 PR → `verify.yml`（后端测试 / migration / 编译 + 前端 typecheck / test / build）全绿才 merge。`main` **已启用分支保护**（仓库已公开）：要求 PR、`verify / backend` 与 `verify / frontend` 两个必需检查通过、至少 1 人批准，禁止 force-push 与删除分支；管理员可在紧急时绕过（`enforce_admins=false`）。
 2. **提交信息用 conventional commits**：`feat(scope): …` / `fix(scope): …` / `docs: …` / `chore: …`，一次提交只做一件事。
 3. **发版前先同步**：`git fetch origin && git pull --rebase origin main`，再本地验证。发版人各自独立，但**先 rebase 再递增版本**，避免 `main` 分叉。
 4. **`VERSION` 是唯一发版入口**：递增 `backend/cmd/server/VERSION` 的 `rN` 并同步 `upstream-baseline.json`，放在**最后一步**；只有版本严格递增 `publish-custom.yml` 才真正发布，未递增则自动跳过（不会误发）。两人都可发版，但同一时刻只由一人递增版本。
