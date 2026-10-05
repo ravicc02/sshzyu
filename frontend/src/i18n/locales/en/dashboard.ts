@@ -660,6 +660,18 @@ export default {
       exclusive: 'Exclusive',
       subscription: 'Subscription'
     },
+    card: {
+      modelCount: '{count} available models',
+      showPricing: 'View pricing',
+      hidePricing: 'Hide pricing',
+      basePrice: 'Base',
+      paidPrice: 'Your price',
+      pricingHint: 'Standard-period rates. Group cards compare the base rate with your price after the multiplier; official reference pricing is in the detailed table.',
+      standardRate: 'Effective group rate ×{rate}',
+      discount: '{percent}% off',
+      surcharge: '{percent}% higher',
+      independentRate: 'Independent rate'
+    },
     detail: {
       noModels: 'No models configured for this group',
       noPricing: 'Pricing not configured',
@@ -668,6 +680,8 @@ export default {
     },
     table: {
       model: 'Model',
+      inputShort: 'In',
+      outputShort: 'Out',
       input: 'Input',
       output: 'Output',
       cache: 'Cache',
@@ -691,6 +705,7 @@ export default {
       officialPrice: 'Official Price',
       rate: 'Rate',
       unitPerMillion: '$ / 1M tokens',
+      unitPerMillionShort: '/ 1M tokens',
       perUnitRequest: '/ request',
       perUnitImage: '/ image',
       perRequest: 'Per request',

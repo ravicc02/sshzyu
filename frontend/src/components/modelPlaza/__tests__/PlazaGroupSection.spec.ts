@@ -89,9 +89,25 @@ function mountSection(g: ModelPlazaGroup) {
 
 const NOTE = 'modelPlaza.detail.longContextDisabledNote'
 
+describe('PlazaGroupSection 模型卡片', () => {
+  it('默认展示分组的完整模型清单，并在点击后展开价格表', async () => {
+    const wrapper = mountSection(group({ rate_multiplier: 0.5 }))
+
+    expect(wrapper.text()).toContain('gpt-5.6-sol')
+    expect(wrapper.text()).toContain('$5.00')
+    expect(wrapper.text()).toContain('$2.50')
+    expect(wrapper.findComponent(PlazaModelPricingTable).exists()).toBe(false)
+
+    await wrapper.get('button').trigger('click')
+    expect(wrapper.get('button').attributes('aria-expanded')).toBe('true')
+    expect(wrapper.findComponent(PlazaModelPricingTable).exists()).toBe(true)
+  })
+})
+
 describe('PlazaGroupSection 长上下文说明', () => {
-  it('分组关闭阶梯且组内有官方阶梯模型时显示说明', () => {
+  it('分组关闭阶梯且组内有官方阶梯模型时展开后显示说明', async () => {
     const wrapper = mountSection(group({ long_context_pricing_enabled: false }))
+    await wrapper.get('button').trigger('click')
     expect(wrapper.text()).toContain(NOTE)
   })
 
@@ -100,10 +116,11 @@ describe('PlazaGroupSection 长上下文说明', () => {
     expect(wrapper.text()).not.toContain(NOTE)
   })
 
-  it('分组关闭但没有官方阶梯模型时不显示', () => {
+  it('分组关闭但没有官方阶梯模型时不显示', async () => {
     const wrapper = mountSection(
       group({ long_context_pricing_enabled: false, models: [ladderModel(1)] })
     )
+    await wrapper.get('button').trigger('click')
     expect(wrapper.text()).not.toContain(NOTE)
   })
 
@@ -116,7 +133,7 @@ describe('PlazaGroupSection 长上下文说明', () => {
 })
 
 describe('PlazaGroupSection 高峰配置传递', () => {
-  it('分组启用高峰时把窗口描述与倍率传给价格表', () => {
+  it('分组启用高峰时把窗口描述与倍率传给价格表', async () => {
     const wrapper = mountSection(
       group({
         subscription_type: 'subscription',
@@ -126,14 +143,16 @@ describe('PlazaGroupSection 高峰配置传递', () => {
         peak_rate_multiplier: 1.5
       })
     )
+    await wrapper.get('button').trigger('click')
     const table = wrapper.findComponent(PlazaModelPricingTable)
     // appStore mock 无 server_utc_offset,窗口描述不带时区标注
     expect(table.props('peakWindow')).toBe('14:00-18:00 ×1.5')
     expect(table.props('peakRateMultiplier')).toBe(1.5)
   })
 
-  it('分组未启用高峰时窗口描述为空串', () => {
+  it('分组未启用高峰时窗口描述为空串', async () => {
     const wrapper = mountSection(group())
+    await wrapper.get('button').trigger('click')
     expect(wrapper.findComponent(PlazaModelPricingTable).props('peakWindow')).toBe('')
   })
 })
