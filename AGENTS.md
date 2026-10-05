@@ -191,6 +191,33 @@ ssh us-server 'docker exec sub2api /app/main --version && curl -s http://127.0.0
 
 > 详细三方合并、migration 安全与发布边界见 `plan_docs/official-upstream-versioning-workflow.md`。
 
+### 3.5 定制更新与磁盘运维要点
+
+> 首次接入后定制更新由宿主机执行器 `sshzy-updater` 驱动。以下要点均已源码核验，供日常运维与排障。
+
+**更新门控（`/etc/sshzy-updater/config.json`）**
+
+- 两个部署策略开关默认 `false`，**网页不提供修改入口**，只能以 root 编辑该文件：
+  - `activation_enabled`：是否启用"网站定制更新入口"（决定后端 `CanUpdate`）。
+  - `payment_callbacks_reviewed`：支付回调是否已复核。**本站确有支付业务**，开启前须确认支付回调具备重试与本地幂等，不得仅为解锁而翻转。
+- **改后必须 `systemctl restart sshzy-updater`**：daemon 在启动时读取并缓存该配置，不重启不生效。
+- **门是设计内的，不是故障**：`payment_callbacks_reviewed=false` 时 activate 直接返回 `PAYMENT_CALLBACK_REVIEW_REQUIRED`。此时应如实告知"更新器有效开关仍关闭"，不得绕过。
+- **两条激活路径的门不同**：网站控制台路径需真人管理员 + 近期 TOTP（step-up；TOTP 服务不可用会返回 `503 STEP_UP_UNAVAILABLE`）；宿主机 socket 路径（root + control token）不经过控制台 TOTP。二者勿混淆。
+- **该标记无审计、无时效**：纯布尔，无"谁在何时复核"的记录；翻转前后建议补一次真复核。
+
+**维护屏障与监控盲区**
+
+- `maintenance.json` 属组必须是执行器的 `socket_gid`（容器内 `app` 的 gid，通常 1000）。属组错误会让后端读不到 → `DeploymentMaintenance` **fail-closed 全站 503**。
+- **`/health` 是放行路径**，维护态下仍返回 200——"健康检查全绿、业务 API 全 503"会静默发生。**必须另加一条对业务端点（如 `/v1/...`）的外部拨测**。
+
+**磁盘运维（发布前先看 `/` 使用率）**
+
+- activate 的 backup 环节会写 `pg_dump -Fc`（未压缩，可能数百 MB）。空间紧张时先清理再发布。
+- **可清理（非红线）**：`/tmp` 的旧镜像 tar 与脚本残留、`/var/cache/apt`（`apt-get clean`）、悬空镜像（`docker image prune -f`）、确认无用的历史 fat 镜像。
+- **绝不能清（红线，见 §5）**：`backups/`、`ui/releases/`、`data/`、`*.bak*`，以及**当前与上一版的回滚镜像**（`local/sub2api-batch:<上一版>`、`ghcr…@<上一版 digest>`）。
+- **不要用 `docker image prune -a`**：会连同回滚镜像一起删除；必须按 ID 定向 `docker rmi`。
+- 上传用的镜像 tar 部署后即从 `/tmp` 清掉，避免堆积（曾累积到 2.7G）。
+
 ---
 
 ## 4. 本地开发栈
