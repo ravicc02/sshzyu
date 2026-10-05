@@ -245,6 +245,7 @@ export const useAppStore = defineStore('app', () => {
     // Return cached data if available and not forcing refresh
     if (versionLoaded.value && !force) {
       return {
+        ...customVersionInfo.value,
         current_version: currentVersion.value,
         latest_version: latestVersion.value,
         has_update: hasUpdate.value,

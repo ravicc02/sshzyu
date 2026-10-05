@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import { getPublicSettings } from '@/api/auth'
+import { checkUpdates } from '@/api/admin/system'
 import type { PublicSettings } from '@/types'
 
 function createDeferred<T>() {
@@ -74,6 +75,18 @@ vi.mock('@/api/auth', () => ({
 }))
 
 describe('useAppStore', () => {
+  it('preserves custom installation metadata when returning a cached version', async () => {
+    setActivePinia(createPinia())
+    const data = {
+      current_version: '0.2.13-r4', latest_version: '0.2.13-r6', has_update: true,
+      build_type: 'release', cached: false, check_status: 'verified', can_update: true,
+      update_source: 'ravicc02/sshzyu', upstream_version: '0.2.13', commit: 'a'.repeat(40)
+    }
+    vi.mocked(checkUpdates).mockResolvedValueOnce(data)
+    const store = useAppStore()
+    await store.fetchVersion(true)
+    expect(await store.fetchVersion(false)).toMatchObject({ ...data, cached: true })
+  })
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.useFakeTimers()

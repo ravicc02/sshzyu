@@ -36,10 +36,12 @@ type Config struct {
 }
 
 type Release struct {
-	Hash      string           `json:"manifest_hash"`
-	Manifest  release.Manifest `json:"manifest"`
-	ReleaseID int64            `json:"release_id"`
-	UIAssetID int64            `json:"-"`
+	Hash              string           `json:"manifest_hash"`
+	Manifest          release.Manifest `json:"manifest"`
+	ReleaseID         int64            `json:"release_id"`
+	UIAssetID         int64            `json:"-"`
+	RollbackAvailable bool             `json:"rollback_available"`
+	InstalledAt       *time.Time       `json:"installed_at,omitempty"`
 }
 
 type Snapshot struct {
