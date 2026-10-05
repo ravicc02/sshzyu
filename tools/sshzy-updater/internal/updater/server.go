@@ -37,10 +37,10 @@ func (manager *Manager) Handler(token string) http.Handler {
 		var installed Installed
 		err := readJSON(manager.config.StateDir+"/installed.json", &installed)
 		reply(response, 200, map[string]any{"protocol": release.Protocol, "activation_enabled": manager.config.ActivationEnabled && manager.config.PaymentCallbacksReviewed,
-			"bootstrapped": err == nil, "installed": installed})
+			"bootstrapped": err == nil, "installed": installed, "active_operation": manager.currentOperation()})
 	})
 	mux.HandleFunc("GET /v1/releases", func(response http.ResponseWriter, request *http.Request) {
-		targets, err := manager.source.List(request.Context())
+		targets, err := manager.releaseCatalog(request.Context())
 		if err != nil {
 			failure(response, err)
 			return

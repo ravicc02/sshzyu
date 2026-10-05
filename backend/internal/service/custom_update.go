@@ -90,15 +90,28 @@ func (agent *UnixUpdateAgent) Call(ctx context.Context, method, path string, inp
 }
 
 type CustomRelease struct {
-	ManifestHash string           `json:"manifest_hash"`
-	Manifest     release.Manifest `json:"manifest"`
-	ReleaseID    int64            `json:"release_id"`
+	ManifestHash      string           `json:"manifest_hash"`
+	Manifest          release.Manifest `json:"manifest"`
+	ReleaseID         int64            `json:"release_id"`
+	RollbackAvailable bool             `json:"rollback_available"`
+	InstalledAt       *time.Time       `json:"installed_at,omitempty"`
+}
+
+type CustomUpdateOperation struct {
+	ID                string              `json:"id"`
+	Kind              string              `json:"kind"`
+	Stage             string              `json:"stage"`
+	ManifestHash      string              `json:"manifest_hash"`
+	Target            release.Manifest    `json:"target"`
+	PendingMigrations []release.Migration `json:"pending_migrations"`
+	Error             string              `json:"error,omitempty"`
 }
 
 type AgentCapabilities struct {
-	Protocol          int  `json:"protocol"`
-	ActivationEnabled bool `json:"activation_enabled"`
-	Bootstrapped      bool `json:"bootstrapped"`
+	Protocol          int                    `json:"protocol"`
+	ActivationEnabled bool                   `json:"activation_enabled"`
+	Bootstrapped      bool                   `json:"bootstrapped"`
+	ActiveOperation   *CustomUpdateOperation `json:"active_operation,omitempty"`
 	Installed         struct {
 		ManifestHash string           `json:"manifest_hash"`
 		Manifest     release.Manifest `json:"manifest"`
@@ -172,6 +185,7 @@ func (service *UpdateService) checkCustomUpdate(ctx context.Context) (*UpdateInf
 		info.Warning = "Custom updater is unavailable or requires initial installation"
 		return info, nil
 	}
+	info.ActiveOperation = capabilities.ActiveOperation
 	targets, err := service.CustomReleases(ctx)
 	if err != nil {
 		info.Warning = "Unable to verify the custom release source"

@@ -31,6 +31,17 @@ func TestControlAPIRequiresTokenAndPreservesOperationAcrossRequests(t *testing.T
 		t.Fatal("invalid operation response")
 	}
 	waitStage(t, manager, operation.ID, "ready")
+	request = httptest.NewRequest("GET", "/v1/capabilities", nil)
+	request.Header.Set("Authorization", "Bearer unit-test-control")
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	var capabilities struct {
+		ActiveOperation *Operation `json:"active_operation"`
+	}
+	if json.Unmarshal(response.Body.Bytes(), &capabilities) != nil || capabilities.ActiveOperation == nil ||
+		capabilities.ActiveOperation.ID != operation.ID || capabilities.ActiveOperation.Stage != "ready" {
+		t.Fatal("active host preparation omitted from capabilities")
+	}
 	for _, path := range []string{"/v1/capabilities", "/v1/releases", "/v1/operations/" + operation.ID} {
 		request = httptest.NewRequest("GET", path, nil)
 		request.Header.Set("Authorization", "Bearer unit-test-control")

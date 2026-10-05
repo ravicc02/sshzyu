@@ -27,6 +27,7 @@ export interface VersionInfo {
   upstream_version?: string
   custom_release?: import('./customUpdate').CustomRelease
   official_notice?: { version: string; has_update: boolean; url: string }
+  active_operation?: import('./customUpdate').UpdateOperation
 }
 
 /**

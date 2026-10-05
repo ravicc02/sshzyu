@@ -81,22 +81,23 @@ func NewUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, versi
 
 // UpdateInfo contains update information
 type UpdateInfo struct {
-	CurrentVersion   string                `json:"current_version"`
-	LatestVersion    string                `json:"latest_version"`
-	HasUpdate        bool                  `json:"has_update"`
-	ReleaseInfo      *ReleaseInfo          `json:"release_info,omitempty"`
-	Cached           bool                  `json:"cached"`
-	Warning          string                `json:"warning,omitempty"`
-	BuildType        string                `json:"build_type"` // "source" or "release"
-	Distribution     string                `json:"distribution,omitempty"`
-	UpdateSource     string                `json:"update_source,omitempty"`
-	InstallationMode string                `json:"installation_mode,omitempty"`
-	Commit           string                `json:"commit,omitempty"`
-	UpstreamVersion  string                `json:"upstream_version,omitempty"`
-	CheckStatus      string                `json:"check_status,omitempty"`
-	CanUpdate        bool                  `json:"can_update"`
-	CustomRelease    *CustomRelease        `json:"custom_release,omitempty"`
-	OfficialNotice   *OfficialUpdateNotice `json:"official_notice,omitempty"`
+	CurrentVersion   string                 `json:"current_version"`
+	LatestVersion    string                 `json:"latest_version"`
+	HasUpdate        bool                   `json:"has_update"`
+	ReleaseInfo      *ReleaseInfo           `json:"release_info,omitempty"`
+	Cached           bool                   `json:"cached"`
+	Warning          string                 `json:"warning,omitempty"`
+	BuildType        string                 `json:"build_type"` // "source" or "release"
+	Distribution     string                 `json:"distribution,omitempty"`
+	UpdateSource     string                 `json:"update_source,omitempty"`
+	InstallationMode string                 `json:"installation_mode,omitempty"`
+	Commit           string                 `json:"commit,omitempty"`
+	UpstreamVersion  string                 `json:"upstream_version,omitempty"`
+	CheckStatus      string                 `json:"check_status,omitempty"`
+	CanUpdate        bool                   `json:"can_update"`
+	CustomRelease    *CustomRelease         `json:"custom_release,omitempty"`
+	OfficialNotice   *OfficialUpdateNotice  `json:"official_notice,omitempty"`
+	ActiveOperation  *CustomUpdateOperation `json:"active_operation,omitempty"`
 }
 
 type OfficialUpdateNotice struct {
