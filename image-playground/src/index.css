@@ -487,13 +487,21 @@ input[type="number"] {
   -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
-/* 主应用 iframe 嵌入模式：左侧 key 栏（w-60）存在时，底部输入栏中心右移半个侧栏宽度 */
-body.embedded-with-sidebar .input-bar-dock {
-  left: calc(50% + 7.5rem);
+@layer components {
+  .mobile-panel-trigger {
+    @apply fixed top-16 z-30 flex h-11 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-left text-gray-800 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-white/[0.08] dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-white/[0.06];
+    width: calc((100% - 2.25rem) / 2);
+  }
 }
 
-@media (max-width: 767px) {
+@media (min-width: 768px) {
+  .input-bar-dock {
+    left: calc((100% - 18rem) / 2);
+    width: min(56rem, calc(100% - 18rem));
+  }
+
   body.embedded-with-sidebar .input-bar-dock {
-    left: 50%;
+    left: calc((100% + 15rem - 18rem) / 2);
+    width: min(56rem, calc(100% - 33rem));
   }
 }

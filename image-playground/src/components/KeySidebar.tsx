@@ -288,19 +288,18 @@ export default function KeySidebar() {
 
   return (
     <>
-      {/* 移动端悬浮入口：主色药丸按钮，标明 Key + 当前 key 名，点击唤起抽屉 */}
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
-        className="fixed right-3 top-16 z-20 flex max-w-[70vw] items-center gap-2 rounded-full bg-blue-500 py-2.5 pl-4 pr-3 text-white shadow-lg shadow-blue-500/40 transition hover:bg-blue-600 active:scale-95 md:hidden"
+        className="mobile-panel-trigger left-3 md:hidden"
         aria-label="选择 key"
       >
-        <span className="shrink-0 text-[13px] font-semibold tracking-wide">Key</span>
-        <span className="h-3.5 w-px shrink-0 bg-white/40" aria-hidden />
-        <span className="max-w-[42vw] truncate text-[12px] font-medium text-white/95">
+        <span className="shrink-0 text-[13px] font-semibold">Key</span>
+        <span className="h-3.5 w-px shrink-0 bg-gray-200 dark:bg-white/15" aria-hidden />
+        <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-gray-600 dark:text-gray-300">
           {activeKeyRecord ? activeKeyRecord.name : '点击选择'}
         </span>
-        <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 text-white/80" />
+        <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 text-gray-500 dark:text-gray-400" />
       </button>
 
       {/* 移动端遮罩 */}
