@@ -146,8 +146,10 @@ docker compose exec postgres pg_dump -U sub2api sub2api > backup.sql
 | `sshzyu-local-site` | `nginx/` `ui/` `scripts/` | `ravicc02/sshzyu-local-site` |
 | `sshzyu-sub2api` | `backend/` `frontend/` `docs/legal/` `deploy/` `Dockerfile` | `ravicc02/sshzyu-sub2api` |
 | `sshzyu-docs` | `docs/`（站点部分） | `ravicc02/sshzyu-docs` |
+| `gpt_image_playground` | `image-playground/`（源码）+ `playground/`（产物） | `ravicc02/imageplayground` |
 | 运营记录 | `records/operational/` | （原先无远程） |
 
-> 注：`/image/` 路由指向可选的外部目录（生图工作室产物，不属于本仓库）。
-> 缺失时该路由返回 404，不影响其它功能；如需启用，在 `.env` 里设置
-> `IMAGE_PLAYGROUND_DIST` 指向对应 `dist` 目录。
+> 注：生图工作台（`/image/`）已并入本仓库——源码在 `image-playground/`，
+> 构建产物同步到 `playground/`（构建：`bash scripts/build-playground.sh`）。
+> 原外部目录 `gpt_image_playground` 已归档停用，不再作为源码源。
+> 产物缺失时该路由返回 404，不影响其它功能。

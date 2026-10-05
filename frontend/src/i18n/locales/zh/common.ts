@@ -113,7 +113,9 @@ export default {
         minutes: '{m}m',
         withSuffix: '{time} 后解除'
       }
-    }
+    },
+    openInNewWindow: '在新窗口打开',
+    openInNewWindowFailed: '登录状态异常，请刷新页面后重试'
   },
 
   adminCompliance: {
