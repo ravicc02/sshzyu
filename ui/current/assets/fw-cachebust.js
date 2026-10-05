@@ -4,9 +4,9 @@
 // no-cache，每次都会回源，所以在这里先强制回源校验被补丁过的 chunk，
 // 再加载真正的 Vue 入口。任何一步失败都不阻塞页面。
 const BUST = [
-  '/assets/AppLayout.vue_vue_type_script_setup_true_lang-DHq3v7oX.js',
+  '/assets/AppLayout.vue_vue_type_script_setup_true_lang-tVJFSmh7.js',
 ];
 await Promise.all(
   BUST.map((u) => fetch(u, { cache: 'no-cache' }).catch(() => {}))
 );
-await import('/assets/index-WlLaF22m.js');
+await import('/assets/index-DOZhuhz-.js');
