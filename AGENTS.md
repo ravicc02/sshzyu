@@ -183,14 +183,26 @@ ssh us-server 'docker exec sub2api /app/main --version && curl -s http://127.0.0
 
 ### 3.4 多人协作与提交规范
 
-本仓库多人 + agent 协作，所有改动要可追溯、可验证。规则：
+本仓库多人 + agent 协作，改动要可追溯、可验证。**按改动风险分级**，不同级别走不同流程：
 
-1. **改动走 PR，不直推** `main`：本地建分支（`feat/` `fix/` `docs/` `chore/` `build/`）→ push → 开 PR → `verify.yml`（后端测试 / migration / 编译 + 前端 typecheck / test / build）全绿才 merge。`main` **已启用分支保护**（仓库已公开）：要求 PR、**必需检查 `backend` 与 `frontend`** 通过，禁止 force-push 与删除分支；管理员可在紧急时绕过（`enforce_admins=false`）。**不要求审批**（`required_approving_review_count=0`）：GitHub 不允许 PR 作者批准自己的 PR，owner 单人提 PR 时无法自批，保留「1 人批准」会让每个 PR 永久 `REVIEW_REQUIRED`，故审批降为 0，门禁只由 CI 承担。仓库另有协作者 `Eternite-0`（write 权限），**跨账号互批是可行的**（PR #3 即由两人互批完成）；如需恢复审批门槛，把该值改回 1 并由协作者点 Approve 即可。**必需检查的 context 必须用 `verify.yml` 的 job 名（`backend`/`frontend`），不要写成 `verify / backend` 这种「workflow 名 / job 名」形式**——写错会让 required check 永远停在 expected 未满足状态，导致**所有 PR 永久无法合并**（症状：CI 全绿且已批准，`mergeStateStatus` 却一直是 `BLOCKED`）。另外注意**批准（Approve）≠ 合并（Merge）**：批准只是审查通过、不改动 `main`；合并才把改动写入 `main`（并可能触发发布）。本仓库当前不设审批，正常路径只有「CI 全绿 → Merge」一步；日后若启用审批才需区分这两步。
-2. **提交信息用 conventional commits**：`feat(scope): …` / `fix(scope): …` / `docs: …` / `chore: …`，一次提交只做一件事。
-3. **发版前先同步**：`git fetch origin && git pull --rebase origin main`，再本地验证。发版人各自独立，但**先 rebase 再递增版本**，避免 `main` 分叉。
-4. `VERSION` **是唯一发版入口**：递增 `backend/cmd/server/VERSION` 的 `rN` 并同步 `upstream-baseline.json`，放在**最后一步**；只有版本严格递增 `publish-custom.yml` 才真正发布，未递增则自动跳过（不会误发）。两人都可发版，但同一时刻只由一人递增版本。**递增只触发「构建 + 签名 + 发布 Release 产物」，不会部署到线上**——`publish-custom.yml` 只 `gh release create`（说明文字明确 "Site activation remains a manual operation"），站点切换**始终是人工操作**（管理员登录控制台 + 近期 TOTP，或宿主机受控 CLI）。**不要把「递增版本 / 合并 PR」误当成「部署上线」**。
-5. **启用本机守卫**：每台机器执行一次 `git config core.hooksPath .githooks`，push 前自动核对官方上游 Release 状态；未启用则该守卫不生效。
-6. **禁止**：直接 push 到 `main`、force-push 已发布分支、复用已发布的版本号、用官方镜像替换定制版。
+| 级别 | 改动内容 | 路径 | 流程 |
+|---|---|---|---|
+| **L0 文档** | 方案、规范、说明 | `*.md`、`plan_docs/`、`AGENTS.md`、`README.md` | **直推 `main`** |
+| **L1 生图** | 生图工作台 | `image-playground/**` | PR + verify |
+| **L2 前端** | 管理面板 | `frontend/**` | PR + verify |
+| **L3 后端/工具** | 服务、更新器、脚本 | `backend/**`、`tools/**`、`scripts/**` | PR + verify |
+| **L4 发版** | `VERSION` 递增 | `backend/cmd/server/VERSION` | 人工门（见第 6 条） |
+
+规则：
+
+1. **L0 文档直推 `main`**：`git push origin main` 直接推送，不建分支、不开 PR。`main` 保护对管理员不强制（`enforce_admins=false`），管理员可绕过「必须走 PR」。**代价要清楚**：`main` 上的任何 push 都会触发 `publish-custom.yml`，其中 `verify` job **无条件**运行全量测试（`backend` + `frontend` + `image-playground`，约 6 分钟）——它**在后台运行、不阻塞你**；版本未递增时 `publish` job 自动跳过，不会误发。**L0 之外的改动严禁直推**：直推既不产生 PR、也不受 required check 约束（`push` 事件不检查 required check），等于无审查、无门禁地写入主干。
+2. **L1–L3 走 PR**：本地建分支（`feat/` `fix/` `docs/` `chore/` `build/`）→ push → 开 PR → `verify.yml` 三个 job（`backend` / `frontend` / `image-playground`）全绿才 merge。`main` 已启用分支保护（仓库公开）：要求 PR、必需检查 `backend` + `frontend` + `image-playground`、`strict=false`（**不要求 PR 基于最新 `main`，因此 `main` 前进后无需再 rebase**）、禁止 force-push 与删除分支；管理员可紧急绕过（`enforce_admins=false`）。**必需检查的 context 必须用 `verify.yml` 的 job 名（`backend` / `frontend` / `image-playground`）**，不要写成 `verify / backend` 这种「workflow 名 / job 名」形式——写错会让 required check 永远停在 expected 未满足状态，导致所有 PR 永久 `BLOCKED`（症状：CI 全绿却始终无法合并）。**新增 job 必须先成功运行过一次，才能加入 required checks**，否则同样会卡死所有 PR。
+3. **不要求审批**（`required_approving_review_count=0`）：GitHub 不允许 PR 作者批准自己的 PR，单人提 PR 时无法自批，保留「1 人批准」会让每个 PR 永久 `REVIEW_REQUIRED`，故审批降为 0，门禁只由 CI 承担。仓库另有协作者 `Eternite-0`（write 权限），**跨账号互批是可行的**（PR #3 即由两人互批完成）；如需恢复审批门槛，把该值改回 1 并由协作者点 Approve 即可。注意**批准（Approve）≠ 合并（Merge）**：批准只是审查通过、不改动 `main`；合并才把改动写入 `main`（并可能触发发布）。当前正常路径只有「CI 全绿 → Merge」一步。
+4. **提交信息用 conventional commits**：`feat(scope): …` / `fix(scope): …` / `docs: …` / `chore: …`，一次提交只做一件事。
+5. **发版前先同步**：`git fetch origin && git pull --rebase origin main`，再本地验证。发版人各自独立，但**先 rebase 再递增版本**，避免 `main` 分叉。
+6. `VERSION` **是唯一发版入口**：递增 `backend/cmd/server/VERSION` 的 `rN` 并同步 `upstream-baseline.json`，放在**最后一步**；只有版本严格递增 `publish-custom.yml` 才真正发布，未递增则自动跳过（不会误发）。两人都可发版，但同一时刻只由一人递增版本。**递增只触发「构建 + 签名 + 发布 Release 产物」，不会部署到线上**——`publish-custom.yml` 只 `gh release create`（说明文字明确 "Site activation remains a manual operation"），站点切换**始终是人工操作**（管理员登录控制台 + 近期 TOTP，或宿主机受控 CLI）。**不要把「递增版本 / 合并 PR」误当成「部署上线」**。
+7. **启用本机守卫**：每台机器执行一次 `git config core.hooksPath .githooks`，push 前自动核对官方上游 Release 状态；未启用则该守卫不生效。
+8. **禁止**：force-push 已发布分支、复用已发布的版本号、用官方镜像替换定制版、**L0 之外的改动直推 `main`**。
 
 > 详细三方合并、migration 安全与发布边界见 `plan_docs/official-upstream-versioning-workflow.md`。
 
