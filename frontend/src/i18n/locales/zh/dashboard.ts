@@ -665,6 +665,18 @@ export default {
       exclusive: '专属分组',
       subscription: '订阅'
     },
+    card: {
+      modelCount: '{count} 个可用模型',
+      showPricing: '查看价格',
+      hidePricing: '收起价格',
+        basePrice: '倍率前',
+        paidPrice: '实付',
+      pricingHint: '以下为标准时段价；卡片对比倍率前基准价与实付价，官方参考价见详情表',
+      standardRate: '分组生效倍率 ×{rate}',
+      discount: '优惠 {percent}%',
+      surcharge: '加价 {percent}%',
+      independentRate: '独立倍率'
+    },
     detail: {
       noModels: '该分组暂未配置模型',
       noPricing: '未配置定价',
@@ -673,6 +685,8 @@ export default {
     },
     table: {
       model: '模型',
+      inputShort: '入',
+      outputShort: '出',
       input: '输入',
       output: '输出',
       cache: '缓存',
@@ -695,6 +709,7 @@ export default {
       officialPrice: '官方价格',
       rate: '折扣倍率',
       unitPerMillion: '$ / 1M token',
+      unitPerMillionShort: '/ 1M token',
       perUnitRequest: '/ 次',
       perUnitImage: '/ 张',
       perRequest: '按次计费',
