@@ -62,3 +62,40 @@ func TestReplaceBackendImagePreservesOtherSettings(t *testing.T) {
 		t.Fatal("accepted missing backend service")
 	}
 }
+
+func TestReplaceBackendImagePreservesFormatting(t *testing.T) {
+	previous := "local/sub2api-batch:0.2.13-r2"
+	next := release.Image + "@sha256:" + strings.Repeat("b", 64)
+	input := []byte("# deployment header\n" +
+		"services:\n" +
+		"  sub2api:\n" +
+		"    image: " + previous + "\n" +
+		"    ports: ['127.0.0.1:8080:8080']\n" +
+		"    environment:\n" +
+		"      JWT_SECRET: ${JWT_SECRET}\n" +
+		"  redis:\n" +
+		"    image: redis:8-alpine\n" +
+		"    # every line needs a trailing backslash\n" +
+		"    command: >\n" +
+		"        sh -c '\n" +
+		"          redis-server \\\n" +
+		"          --save 60 1 \\\n" +
+		"          --appendonly yes'\n")
+	output, err := replaceBackendImage(input, next)
+	if err != nil {
+		t.Fatalf("replaceBackendImage failed: %v", err)
+	}
+	expected := bytes.Replace(input, []byte(previous), []byte(next), 1)
+	if !bytes.Equal(output, expected) {
+		t.Fatalf("replacement changed unrelated formatting:\n--- got ---\n%s\n--- want ---\n%s", output, expected)
+	}
+	if !bytes.Contains(output, []byte("redis:8-alpine")) || !bytes.Contains(output, []byte("--appendonly yes")) {
+		t.Fatal("redis service block was altered")
+	}
+
+	quoted := []byte("services:\n  sub2api:\n    image: \"" + previous + "\"\n  redis:\n    image: redis:8-alpine\n")
+	output, err = replaceBackendImage(quoted, next)
+	if err != nil || !bytes.Contains(output, []byte("\""+next+"\"")) || !bytes.Contains(output, []byte("redis:8-alpine")) {
+		t.Fatalf("quoted image replacement failed: %v", err)
+	}
+}

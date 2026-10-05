@@ -26,6 +26,11 @@ func Serve(ctx context.Context, config Config, manager *Manager, token string) e
 	if err := os.Chmod(config.ControlDir, 0750); err != nil {
 		return err
 	}
+	if hostDriver, ok := manager.driver.(*HostDriver); ok {
+		if err := hostDriver.ensureMaintenanceOwnership(); err != nil {
+			return err
+		}
+	}
 	lock, err := os.OpenFile(filepath.Join(config.StateDir, "executor.lock"), os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return err

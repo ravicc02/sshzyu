@@ -43,7 +43,7 @@ func (driver *HostDriver) Bootstrap(ctx context.Context, manifestPath, signature
 	if _, err := os.Stat(statePath); errors.Is(err, os.ErrNotExist) {
 		return driver.maintenance(false, "")
 	}
-	return nil
+	return driver.ensureMaintenanceOwnership()
 }
 
 func (manager *Manager) Recover(ctx context.Context, id, decision string) error {

@@ -227,13 +227,87 @@ func replaceBackendImage(data []byte, image string) ([]byte, error) {
 	if target == nil || target.Kind != yaml.ScalarNode {
 		return nil, CodeError("COMPOSE_INVALID")
 	}
-	target.Value, target.Tag = image, "!!str"
-	return yaml.Marshal(&document)
+	return replaceScalarValue(data, target.Line, target.Column, target.Value, image)
+}
+
+// replaceScalarValue replaces the scalar beginning at the 1-based line/column with
+// newValue, editing the original bytes so the rest of the document keeps its exact
+// formatting (multi-line block scalars, comments, quoting). Re-serializing the whole
+// YAML tree instead would normalize that formatting and trip the activation guard,
+// which renders the candidate and the active file and compares them for equality.
+func replaceScalarValue(data []byte, line, column int, oldValue, newValue string) ([]byte, error) {
+	if line < 1 || column < 1 {
+		return nil, CodeError("COMPOSE_INVALID")
+	}
+	offset, currentLine := 0, 1
+	for offset < len(data) && currentLine < line {
+		if data[offset] == '\n' {
+			currentLine++
+		}
+		offset++
+	}
+	if currentLine != line {
+		return nil, CodeError("COMPOSE_INVALID")
+	}
+	start := offset + column - 1
+	if start < 0 || start > len(data) {
+		return nil, CodeError("COMPOSE_INVALID")
+	}
+	if start < len(data) && (data[start] == '"' || data[start] == '\'') {
+		quote := data[start]
+		end := start + 1
+		for end < len(data) && data[end] != '\n' && data[end] != quote {
+			end++
+		}
+		if end >= len(data) || data[end] != quote {
+			return nil, CodeError("COMPOSE_INVALID")
+		}
+		body := data[start+1 : end]
+		if quote == '"' {
+			body = bytes.ReplaceAll(body, []byte(`\"`), []byte{'"'})
+		} else {
+			body = bytes.ReplaceAll(body, []byte("''"), []byte{'\''})
+		}
+		if string(body) != oldValue {
+			return nil, CodeError("COMPOSE_INVALID")
+		}
+		replaced := make([]byte, 0, len(data)-len(body)+len(newValue))
+		replaced = append(replaced, data[:start+1]...)
+		replaced = append(replaced, newValue...)
+		replaced = append(replaced, data[end:]...)
+		return replaced, nil
+	}
+	if end := start + len(oldValue); end <= len(data) && string(data[start:end]) == oldValue {
+		replaced := make([]byte, 0, len(data)-len(oldValue)+len(newValue))
+		replaced = append(replaced, data[:start]...)
+		replaced = append(replaced, newValue...)
+		replaced = append(replaced, data[end:]...)
+		return replaced, nil
+	}
+	end := start
+	for end < len(data) && data[end] != '\n' {
+		end++
+	}
+	index := bytes.Index(data[start:end], []byte(oldValue))
+	if index < 0 {
+		return nil, CodeError("COMPOSE_INVALID")
+	}
+	absolute := start + index
+	replaced := make([]byte, 0, len(data)-len(oldValue)+len(newValue))
+	replaced = append(replaced, data[:absolute]...)
+	replaced = append(replaced, newValue...)
+	replaced = append(replaced, data[absolute+len(oldValue):]...)
+	return replaced, nil
 }
 
 func extractUI(archivePath, destination string) error {
 	if err := os.Mkdir(destination, 0755); err != nil {
 		return CodeError("UI_RELEASE_ALREADY_EXISTS")
+	}
+	// Mkdir/OpenFile 的 perm 会被进程 umask 削减（daemon unit 为 UMask=0077），
+	// 会让 UI 产物变成 700/600 而 nginx worker 读不到，故创建后显式 chmod。
+	if err := os.Chmod(destination, 0755); err != nil {
+		return err
 	}
 	file, err := os.Open(archivePath)
 	if err != nil {
@@ -275,6 +349,9 @@ func extractUI(archivePath, destination string) error {
 			if err := os.MkdirAll(path, 0755); err != nil {
 				return err
 			}
+			if err := os.Chmod(path, 0755); err != nil {
+				return err
+			}
 			continue
 		}
 		total += header.Size
@@ -288,6 +365,10 @@ func extractUI(archivePath, destination string) error {
 		if err != nil {
 			return CodeError("UI_ARCHIVE_DUPLICATE")
 		}
+		if err := output.Chmod(0644); err != nil {
+			output.Close()
+			return err
+		}
 		written, copyErr := io.CopyN(output, reader, header.Size)
 		closeErr := output.Close()
 		if copyErr != nil || closeErr != nil || written != header.Size {
@@ -295,6 +376,22 @@ func extractUI(archivePath, destination string) error {
 		}
 	}
 	return nil
+}
+
+// normalizeUIPermissions 幂等地把 UI 静态资源树规范为目录 0755 / 文件 0644。
+// daemon 以 UMask=0077 运行，extractUI 与 rsync -a 创建的产物会被削成 700/600，
+// nginx worker（www-data）读不到，导致全站 /assets/* 404、前端白屏。
+func normalizeUIPermissions(root string) error {
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		mode := os.FileMode(0644)
+		if entry.IsDir() {
+			mode = 0755
+		}
+		return os.Chmod(path, mode)
+	})
 }
 
 func (driver *HostDriver) verifyUI(manifest release.Manifest, directory string) error {
@@ -517,6 +614,24 @@ func (driver *HostDriver) maintenance(active bool, id string) error {
 	return os.Chown(path, -1, driver.config.SocketGID)
 }
 
+// ensureMaintenanceOwnership forces the maintenance file to stay readable by the
+// backend container. The backend runs as the SocketGID group and reads this file
+// through a fail-closed gate: if it cannot read the file it treats the site as
+// under maintenance and returns 503 for every business request. The file must
+// therefore exist with the group set even when no operation is in flight.
+func (driver *HostDriver) ensureMaintenanceOwnership() error {
+	path := filepath.Join(driver.config.ControlDir, "maintenance.json")
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		if err := writeJSON(path, map[string]any{"active": false, "operation_id": ""}, 0640); err != nil {
+			return err
+		}
+	}
+	if err := os.Chmod(path, 0640); err != nil {
+		return err
+	}
+	return os.Chown(path, -1, driver.config.SocketGID)
+}
+
 func (driver *HostDriver) backup(ctx context.Context, operation Operation) (string, error) {
 	if driver.backupOverride != nil {
 		return driver.backupOverride(ctx, operation)
@@ -702,11 +817,21 @@ func (driver *HostDriver) Activate(ctx context.Context, operation Operation, sta
 		if err := os.Rename(source, target); err != nil {
 			return err
 		}
+		// os.Rename 保留源目录权限（prepared 产物曾被 umask 削成 700/600），
+		// 切版前先规范化，避免 nginx worker 读不到。
+		if err := normalizeUIPermissions(target); err != nil {
+			return err
+		}
 	}
 	if err := driver.verifyUI(operation.Target, target); err != nil {
 		return err
 	}
 	if _, err := driver.run(ctx, "rsync", "-a", "--ignore-existing", "--exclude=/fw-cachebust.js", target+"/assets/", driver.config.UIRoot+"/shared/assets/"); err != nil {
+		return err
+	}
+	// rsync -a 会把目标 shared/assets 目录及新文件的权限同步为源权限，
+	// 同步后强制规范化整个 shared 累积库，确保 nginx worker 可读。
+	if err := normalizeUIPermissions(filepath.Join(driver.config.UIRoot, "shared")); err != nil {
 		return err
 	}
 	bootstrap, err := os.ReadFile(filepath.Join(target, "assets/fw-cachebust.js"))
@@ -722,6 +847,11 @@ func (driver *HostDriver) Activate(ctx context.Context, operation Operation, sta
 			_ = atomicWrite(filepath.Join(driver.config.UIRoot, "shared/assets/fw-cachebust.js"), old, 0644)
 		}
 		return CodeError("UI_SWITCH_FAILED")
+	}
+	// switch-release.sh 内部用 cp -rn 把 release assets 补入 shared，
+	// cp 同样受进程 umask 削减，切版后再兜底规范化一次。
+	if err := normalizeUIPermissions(filepath.Join(driver.config.UIRoot, "shared")); err != nil {
+		return err
 	}
 	stage("verifying_site")
 	if _, err := driver.run(ctx, "curl", "--fail", "--silent", "--show-error", "--max-time", "15", "https://sshzyu.com/health"); err != nil {
