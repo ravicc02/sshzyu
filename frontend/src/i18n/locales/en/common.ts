@@ -113,7 +113,9 @@ export default {
         minutes: '{m}m',
         withSuffix: '{time} to lift'
       }
-    }
+    },
+    openInNewWindow: 'Open in new window',
+    openInNewWindowFailed: 'Session expired, please refresh the page and retry'
   },
 
   adminCompliance: {

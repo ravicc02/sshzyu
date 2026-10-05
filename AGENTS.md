@@ -18,7 +18,8 @@
 | `nginx/`                  | 本地 nginx 配置（`default.conf` 等，与线上同构、无 TLS）                           | 本地站点入口                   |
 | `ui/`                     | UI 构建产物装配（`current/` + `shared/` + `releases/`）                     | 站点静态资源，nginx 直读          |
 | `docs/`                   | **线上文档站**（前端 nginx 挂到 `/docs/`）                                     | 对外公开                     |
-| `playground/`             | 生图应用静态产物（nginx 挂到 `/image/`）                                        | 生图工作台                    |
+| `image-playground/`       | 生图工作台源码（React + TS + Vite，`npm run build` 产出 `dist`）                | 生图工作台源码（唯一源）              |
+| `playground/`             | 生图工作台构建产物（由 `image-playground/` 生成，nginx 挂到 `/image/`）            | 生图工作台产物，nginx 直读         |
 | `scripts/`                | `rebuild.sh` + 构建/校验脚本                                              | 本地重建                     |
 | `scripts/release/`        | 发布准入、migration 审阅记录                                                 | GitHub 发布辅助              |
 | `backend/pkg/release/`    | 共享发布契约、版本比较和验签                                                      | 后端/执行器共用                 |
@@ -30,7 +31,9 @@
 | `records/`                | 运营问答梳理记录（`.gitignore` 忽略，不入版本库、不对外）                                 | 内部记录                     |
 
 
-**构建链**：`frontend/`(源码) → `scripts/rebuild.sh` → `ui/current`、`ui/shared`（静态产物）。
+**构建链**：
+- UI：`frontend/`(源码) → `scripts/rebuild.sh` → `ui/current`、`ui/shared`（静态产物）
+- 生图工作台：`image-playground/`(源码) → `scripts/build-playground.sh` → `playground/`（静态产物）
 
 ---
 

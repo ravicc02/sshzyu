@@ -4,9 +4,14 @@
 /backend/migrations/*.sql text eol=lf
 /backend/**/*.go text eol=lf
 /scripts/rebuild.sh text eol=lf
+/scripts/build-playground.sh text eol=lf
 /backend/migrations/241_batch_image_idempotency_unique.sql text eol=lf
 /backend/migrations/242_lottery.sql text eol=lf
 /backend/migrations/243_lottery_tier.sql text eol=lf
 /backend/migrations/244_lottery_activity_tier_config.sql text eol=lf
 /backend/migrations/245_lottery_dynamic_tiers.sql text eol=lf
 /backend/migrations/246_batch_image_collection_id.sql text eol=lf
+
+# 生图工作台构建产物：GitHub 语言统计忽略、diff 默认折叠（不改行尾，行尾由 core.autocrlf 统一）
+/playground/** linguist-generated=true
+/image-playground/dist/** linguist-generated=true

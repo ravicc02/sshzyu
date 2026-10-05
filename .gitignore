@@ -13,6 +13,10 @@ frontend/dist/
 frontend/node_modules/
 frontend/coverage/
 frontend/*.tsbuildinfo
+# 生图工作台源码（统一仓库内，唯一源）；产物同步到 playground/，故此处忽略其 dist
+image-playground/dist/
+image-playground/node_modules/
+image-playground/.wrangler/
 backend/server.exe
 tools/sshzy-updater/sshzy-updater.exe
 tools/sshzy-updater/bin/

@@ -1,0 +1,264 @@
+import type { ApiProfile, ApiProvider, AppSettings, CustomProviderDefinition, PresetProviderPresets } from '../types'
+import { readRuntimeEnv } from './runtimeEnv'
+
+const RAW_SHOW_PRESET_CONFIG_ONLY = readRuntimeEnv(import.meta.env.VITE_SHOW_PRESET_CONFIG_ONLY)
+const SHOW_PRESET_CONFIG_ONLY = (RAW_SHOW_PRESET_CONFIG_ONLY || readRuntimeEnv(import.meta.env.VITE_SHOW_DEFAULT_CONFIG_ONLY)) === 'true'
+const LOCK_PRESET_CONFIG_PARAMS = readRuntimeEnv(import.meta.env.VITE_LOCK_PRESET_CONFIG_PARAMS) === 'true'
+const PREVENT_PRESET_CONFIG_DELETION = readRuntimeEnv(import.meta.env.VITE_PREVENT_PRESET_CONFIG_DELETION) === 'true'
+// 锁定预置参数时仍允许用户编辑的字段（逗号分隔），例如 VITE_PRESET_UNLOCKED_FIELDS=model 表示模型 ID 仅预填、可自行修改
+const UNLOCKED_PRESET_FIELDS = readRuntimeEnv(import.meta.env.VITE_PRESET_UNLOCKED_FIELDS)
+  .split(',')
+  .map((field) => field.trim())
+  .filter(Boolean)
+// 豁免机制不可覆盖的受控字段：身份与鉴权始终由部署方/用户自身控制
+const PROTECTED_PRESET_FIELDS = new Set(['id', 'apiKey', 'provider', 'isDefault'])
+// 「单配置 + 类型切换」模式下允许用户在配置内切换的服务商类型
+const SWITCHABLE_PRESET_PROVIDERS = new Set<string>(['openai', 'gemini'])
+// 预填模型历史值迁移（VITE_PRESET_MODEL_MIGRATIONS=旧值:新值，逗号分隔多组）：
+// 部署方更新预填模型后，仍停留在旧预填值（即未自定义）的存量配置在启动 enforce 时自动跟随新值
+const PRESET_MODEL_MIGRATIONS = parsePresetModelMigrations(readRuntimeEnv(import.meta.env.VITE_PRESET_MODEL_MIGRATIONS))
+
+function parsePresetModelMigrations(raw: string): Map<string, string> {
+  const migrations = new Map<string, string>()
+  for (const pair of raw.split(',')) {
+    const separatorIndex = pair.indexOf(':')
+    if (separatorIndex <= 0) continue
+    const from = pair.slice(0, separatorIndex).trim()
+    const to = pair.slice(separatorIndex + 1).trim()
+    if (from && to) migrations.set(from, to)
+  }
+  return migrations
+}
+
+let presetProfiles: ApiProfile[] = []
+let presetProviders: CustomProviderDefinition[] = []
+let presetProfileFields: Record<string, string[]> | undefined
+let presetProviderPresets: PresetProviderPresets | undefined
+let defaultPresetProfileId: string | null = null
+
+export function setPresetConfig(settings: Pick<AppSettings, 'customProviders' | 'profiles'> & {
+  presetProfileFields?: Record<string, string[]>
+  providerPresets?: PresetProviderPresets
+} | null) {
+  presetProfiles = settings?.profiles.map((profile) => ({ ...profile })) ?? []
+  presetProviders = settings?.customProviders.map((provider) => ({ ...provider })) ?? []
+  presetProfileFields = settings?.presetProfileFields
+  presetProviderPresets = settings?.providerPresets
+  defaultPresetProfileId = presetProfiles.length === 1
+    ? presetProfiles[0].id
+    : presetProfiles.find((profile) => profile.isDefault === true)?.id ?? null
+}
+
+export function getPresetProfileIds() {
+  return new Set(presetProfiles.map((profile) => profile.id))
+}
+
+export function getPresetProfileDescription(id: string) {
+  return presetProfiles.find((profile) => profile.id === id)?.description
+}
+
+export function getPresetProviderIds() {
+  return new Set(presetProviders.map((provider) => provider.id))
+}
+
+export function getPresetConfig() {
+  if (presetProfiles.length === 0 && presetProviders.length === 0) return null
+  return {
+    customProviders: presetProviders.map((provider) => ({ ...provider })),
+    profiles: presetProfiles.map((profile) => ({ ...profile })),
+    presetProfileFields,
+  }
+}
+
+export function getDefaultPresetProfileId() {
+  return defaultPresetProfileId
+}
+
+export function getDefaultPresetBaseUrl() {
+  const profile = presetProfiles.find((profile) => profile.id === defaultPresetProfileId)
+  if (!profile || profile.provider === 'fal') return ''
+  return profile.baseUrl
+}
+
+export function isPresetProfile(id: string) {
+  return presetProfiles.some((profile) => profile.id === id)
+}
+
+export function isPresetProvider(id: string) {
+  return presetProviders.some((provider) => provider.id === id)
+}
+
+export function isPresetConfigOnlyEnabled() {
+  return SHOW_PRESET_CONFIG_ONLY && presetProfiles.length > 0
+}
+
+export function isPresetConfigParamsLocked() {
+  return LOCK_PRESET_CONFIG_PARAMS && presetProfiles.length > 0
+}
+
+export function isPresetConfigDeletionPrevented() {
+  return (PREVENT_PRESET_CONFIG_DELETION || SHOW_PRESET_CONFIG_ONLY) && presetProfiles.length > 0
+}
+
+export function isPresetProfileLocked(id: string) {
+  return isPresetConfigParamsLocked() && isPresetProfile(id)
+}
+
+export function isPresetProfileFieldUnlocked(field: string) {
+  return presetProfiles.length > 0 && UNLOCKED_PRESET_FIELDS.includes(field.trim())
+}
+
+export function getPresetProviderPresets() {
+  return presetProviderPresets
+}
+
+/** 「单配置 + 类型切换」模式：锁定部署提供了 providerPresets 时启用 */
+export function isPresetProviderSwitchable() {
+  return LOCK_PRESET_CONFIG_PARAMS && presetProfiles.length > 0 && Boolean(presetProviderPresets)
+}
+
+/** 该服务商类型是否在 providerPresets 允许切换的范围内 */
+export function isPresetSwitchableProvider(provider: string) {
+  if (!isPresetProviderSwitchable()) return false
+  return SWITCHABLE_PRESET_PROVIDERS.has(provider.trim()) && Boolean(presetProviderPresets?.[provider.trim() as keyof PresetProviderPresets])
+}
+
+/**
+ * 锁定部署下是否放行「服务商类型切换」的整包 patch。
+ * 这类 patch 由 switchApiProfileProvider 生成（含 provider/baseUrl/model 等字段），
+ * baseUrl/model 会再经 enforcePresetConfigPolicy 按预置归位，因此整包放行是安全的；
+ * 不含 provider 字段的 patch（如自由编辑 URL）不在此列，仍走字段白名单。
+ */
+export function isPresetProviderSwitchPatch(patch: Partial<ApiProfile>) {
+  if (!isPresetProviderSwitchable()) return false
+  const { provider } = patch
+  return typeof provider === 'string' && isPresetSwitchableProvider(provider)
+}
+
+/**
+ * 类型切换模式下，把 switchApiProfileProvider 的结果按 providerPresets 归位：
+ * baseUrl 强制为该类型的预置地址（URL 固定），model 仅在为空时预填（保留用户自定义）。
+ * 必须在写入 draft/store 前调用——enforce 只在启动/导入时运行，运行中保存不经过它，
+ * 否则 switchApiProfileProvider 的空 baseUrl fallback 会以空 URL 显示并持久化。
+ */
+export function applyPresetProviderSwitch(profile: ApiProfile, provider: ApiProfile['provider']): ApiProfile {
+  if (!isPresetProviderSwitchable() || profile.provider !== provider) return profile
+  const preset = getPresetProviderPreset(provider)
+  if (!preset) return profile
+  return {
+    ...profile,
+    baseUrl: typeof preset.baseUrl === 'string' ? preset.baseUrl : profile.baseUrl,
+    model: typeof preset.model === 'string' && !profile.model.trim() ? preset.model : profile.model,
+  }
+}
+
+function getPresetProviderPreset(provider: string) {
+  return presetProviderPresets?.[provider.trim() as keyof PresetProviderPresets]
+}
+
+/** 旧预填模型值 → 当前预填值；用户自定义值与空值原样返回 */
+export function migratePresetModelValue(model: string): string {
+  if (!model.trim()) return model
+  return PRESET_MODEL_MIGRATIONS.get(model.trim()) ?? model
+}
+
+/** 分类型存档（providerDrafts）里的旧预填模型值一并迁移，避免切换类型时旧值回流 */
+function migrateProviderDraftModels(drafts: NonNullable<ApiProfile['providerDrafts']>): NonNullable<ApiProfile['providerDrafts']> {
+  const migrated: NonNullable<ApiProfile['providerDrafts']> = {}
+  for (const [provider, draft] of Object.entries(drafts)) {
+    migrated[provider as ApiProvider] = draft?.model ? { ...draft, model: migratePresetModelValue(draft.model) } : draft
+  }
+  return migrated
+}
+
+export function isPresetProviderLocked(id: string) {
+  return isPresetConfigParamsLocked() && isPresetProvider(id)
+}
+
+export function isPresetProviderDeletionPrevented(id: string, profiles: ApiProfile[]) {
+  if (!isPresetProvider(id)) return false
+  if (isPresetConfigDeletionPrevented()) return true
+  return profiles.some((profile) => profile.provider === id && isPresetProfileLocked(profile.id))
+}
+
+export function enforcePresetConfigPolicy(
+  settings: AppSettings,
+  options: { dismissedPresetProviderIds?: string[] } = {},
+): AppSettings {
+  const presetConfigOnly = isPresetConfigOnlyEnabled()
+  const paramsLocked = isPresetConfigParamsLocked()
+  if (presetProfiles.length === 0) return settings
+
+  const dismissedProviderIds = new Set(options.dismissedPresetProviderIds ?? [])
+  const profileIds = getPresetProfileIds()
+  const presetProfilesById = new Map(presetProfiles.map((profile) => [profile.id, profile]))
+  const presetProvidersById = new Map(presetProviders.map((provider) => [provider.id, provider]))
+  const providerSwitchable = isPresetProviderSwitchable()
+  let profiles = settings.profiles.map((profile) => {
+    const preset = presetProfilesById.get(profile.id)
+    if (!preset) return profile.isDefault ? { ...profile, isDefault: undefined } : profile
+    // 类型切换模式：provider 放行为 providerPresets 内的类型，其余场景维持原有锁定行为
+    const nextProvider = providerSwitchable && isPresetSwitchableProvider(profile.provider)
+      ? profile.provider
+      : (paramsLocked || presetConfigOnly ? preset.provider : profile.provider)
+    const providerPreset = providerSwitchable ? getPresetProviderPreset(nextProvider) : undefined
+    const enforced: ApiProfile = {
+      ...(paramsLocked ? preset : profile),
+      apiKey: profile.apiKey,
+      provider: nextProvider,
+      isDefault: profile.id === defaultPresetProfileId ? true : undefined,
+    }
+    if (providerSwitchable && profile.providerDrafts) enforced.providerDrafts = migrateProviderDraftModels(profile.providerDrafts)
+    if (providerPreset) {
+      if (typeof providerPreset.baseUrl === 'string') enforced.baseUrl = providerPreset.baseUrl
+      if (typeof providerPreset.model === 'string') enforced.model = providerPreset.model
+    }
+    if (paramsLocked) {
+      const profileRecord = profile as unknown as Record<string, unknown>
+      for (const field of UNLOCKED_PRESET_FIELDS) {
+        if (PROTECTED_PRESET_FIELDS.has(field)) continue
+        ;(enforced as unknown as Record<string, unknown>)[field] = profileRecord[field]
+      }
+      // 存量用户停留在旧预填模型值（未自定义）时跟随新预填，自定义值原样保留
+      if (UNLOCKED_PRESET_FIELDS.includes('model')) enforced.model = migratePresetModelValue(enforced.model)
+    }
+    return enforced
+  })
+  // 类型切换的锁定部署不允许删掉预置配置：它是用户唯一的配置来源
+  if (isPresetConfigDeletionPrevented() || providerSwitchable) {
+    for (const profile of presetProfiles) {
+      if (!profiles.some((item) => item.id === profile.id)) profiles.push({ ...profile, isDefault: profile.id === defaultPresetProfileId ? true : undefined })
+    }
+  }
+  // 单配置收敛：类型切换的锁定部署只保留预置配置；历史残留配置的 API Key 迁移到默认预置，避免用户重新填写
+  if (providerSwitchable) {
+    const legacyProfiles = profiles.filter((profile) => !profileIds.has(profile.id))
+    if (legacyProfiles.length > 0) {
+      const fallbackApiKey = legacyProfiles.find((profile) => profile.apiKey.trim())?.apiKey ?? ''
+      profiles = profiles
+        .filter((profile) => profileIds.has(profile.id))
+        .map((profile) =>
+          fallbackApiKey && profile.id === defaultPresetProfileId && !profile.apiKey.trim()
+            ? { ...profile, apiKey: fallbackApiKey }
+            : profile,
+        )
+    }
+  }
+  const customProviders = settings.customProviders.filter((provider) => !dismissedProviderIds.has(provider.id)).map((provider) => {
+    const preset = presetProvidersById.get(provider.id)
+    return preset && paramsLocked ? preset : provider
+  })
+  for (const provider of presetProviders) {
+    if (dismissedProviderIds.has(provider.id)) continue
+    if (!customProviders.some((item) => item.id === provider.id)) customProviders.push(provider)
+  }
+  const activeProfileId = (presetConfigOnly || providerSwitchable) && !profileIds.has(settings.activeProfileId)
+    ? defaultPresetProfileId ?? presetProfiles[0]?.id ?? settings.activeProfileId
+    : settings.activeProfileId
+  return {
+    ...settings,
+    customProviders,
+    profiles,
+    activeProfileId,
+  }
+}
