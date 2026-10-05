@@ -1532,8 +1532,8 @@ export default function InputBar() {
             )
           )}
 
-          {/* 输入框 */}
-          <div className={`relative grid${promptExpanded ? ' min-h-0 flex-1' : ''}`}>
+          <div data-prompt-composer className={`flex gap-2 sm:gap-3${promptExpanded ? ' min-h-0 flex-1 items-end' : ' items-center'}`}>
+          <div className={`relative grid min-w-0 flex-1${promptExpanded ? ' h-full min-h-0' : ''}`}>
             {showAtImageMenu && (
               <div style={{ left: `${menuLeft}px` }} className="absolute bottom-full z-50 mb-2 w-64 overflow-hidden rounded-2xl border border-gray-200/70 bg-white/95 p-1.5 shadow-xl ring-1 ring-black/5 backdrop-blur-xl dark:border-white/[0.08] dark:bg-gray-900/95 dark:ring-white/10">
                 <div className="px-2 pb-1 pt-0.5 text-[11px] text-gray-400 dark:text-gray-500">选择图片引用</div>
@@ -1615,7 +1615,7 @@ export default function InputBar() {
             />
             {prompt.length === 0 && (
               <div className={`prompt-placeholder col-start-1 row-start-1 pointer-events-none pl-4 pr-10 py-3 text-sm leading-relaxed text-gray-400 dark:text-gray-500${
-                isMobile && mobileCollapsed ? ' truncate' : ''
+                !promptExpanded ? ' truncate' : ''
               }`}>
                 {promptPlaceholder}
               </div>
@@ -1666,9 +1666,7 @@ export default function InputBar() {
             )}
           </div>
 
-          {/* 参数 + 按钮 */}
-          <div className="mt-3">
-            {/* 桌面端布局：生图参数已移至右侧「生图配置」抽屉，此处仅保留上传/发送 */}
+          <div data-prompt-actions className="shrink-0 pb-0.5">
             <div className="hidden sm:flex items-center justify-end gap-3">
               <div className="flex gap-2 flex-shrink-0">
                 <div
@@ -1715,7 +1713,6 @@ export default function InputBar() {
               </div>
             </div>
 
-            {/* 移动端布局：生图参数已移至右侧「生图配置」抽屉，此处仅保留上传/发送 */}
             <div className="sm:hidden flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <div
@@ -1784,7 +1781,7 @@ export default function InputBar() {
                   )}
                 </div>
                 <div
-                  className="relative flex-1"
+                  className="relative"
                   onMouseEnter={() => setSubmitHover(true)}
                   onMouseLeave={() => setSubmitHover(false)}
                 >
@@ -1793,7 +1790,7 @@ export default function InputBar() {
                     onClick={() => hasSubmitApiConfig ? submitCurrentMode() : setShowSettings(true)}
                     disabled={hasSubmitApiConfig ? !canSubmit : false}
                     aria-label={submitButtonAriaLabel}
-                    className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm ${
+                    className={`flex items-center justify-center p-2.5 rounded-xl text-sm font-medium transition-all shadow-sm ${
                       !hasSubmitApiConfig
                         ? 'bg-gray-300 dark:bg-white/[0.06] text-white cursor-pointer'
                         : 'bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-white/[0.04] disabled:opacity-50 disabled:cursor-not-allowed'
@@ -1802,11 +1799,12 @@ export default function InputBar() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
-                    {maskDraft ? '遮罩编辑' : '生成图像'}
+                    <span className="sr-only">{maskDraft ? '遮罩编辑' : '生成图像'}</span>
                   </button>
                 </div>
               </div>
             </div>
+          </div>
           </div>
 
           <input
@@ -1828,7 +1826,6 @@ export default function InputBar() {
         </div>
       </div>
 
-      {/* 右侧「生图配置」抽屉：承载从底部搬出的生图参数，嵌入/独立两种模式全局生效 */}
       <ConfigDrawer>{renderParams('grid-cols-1', 'cards')}</ConfigDrawer>
     </>
   )

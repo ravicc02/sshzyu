@@ -171,7 +171,7 @@ export default function App() {
     <>
       <Header />
       {EMBEDDED_MODE && <KeySidebar />}
-      <main data-home-main data-drag-select-surface className={`pb-48${EMBEDDED_MODE ? ' md:ml-60' : ''}`}>
+      <main data-home-main data-drag-select-surface className={`pb-48 md:mr-72${EMBEDDED_MODE ? ' md:ml-60' : ''}`}>
         <div className="safe-area-x max-w-7xl mx-auto">
           <SearchBar />
           {filterFavorite && !activeFavoriteCollectionId ? <FavoriteCollectionsView /> : <TaskGrid />}
