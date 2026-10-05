@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -51,3 +54,23 @@ jobs:
           pnpm --dir frontend test:run
           pnpm --dir frontend build
           node scripts/build-online-equivalent.mjs
+  image-playground:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: image-playground
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: image-playground/package-lock.json
+      - name: Install locked image-playground dependencies
+        run: npm ci
+      - name: Test and build image playground
+        run: |
+          npm test
+          npm run build
