@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -67,6 +68,7 @@ type PlazaGroup struct {
 type ModelPlazaService struct {
 	channelRepo    ChannelRepository
 	groupRepo      GroupRepository
+	routeRepo      CompositeModelRouteRepository
 	pricingService *PricingService
 	billingService *BillingService
 	resolver       *ModelPricingResolver
@@ -76,6 +78,7 @@ type ModelPlazaService struct {
 func NewModelPlazaService(
 	channelRepo ChannelRepository,
 	groupRepo GroupRepository,
+	routeRepo CompositeModelRouteRepository,
 	pricingService *PricingService,
 	billingService *BillingService,
 	resolver *ModelPricingResolver,
@@ -83,6 +86,7 @@ func NewModelPlazaService(
 	return &ModelPlazaService{
 		channelRepo:    channelRepo,
 		groupRepo:      groupRepo,
+		routeRepo:      routeRepo,
 		pricingService: pricingService,
 		billingService: billingService,
 		resolver:       resolver,
@@ -195,6 +199,60 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 					Platform: m.Platform,
 					Pricing:  m.Pricing,
 				})
+			}
+		}
+	}
+
+	// Composite 的公开模型名可能只存在显式路由表中（public_model），而渠道
+	// SupportedModels 只知道 concrete channel 的 mapping/pricing。把启用路由
+	// 也纳入展示，并从目标平台的目标模型继承渠道定价；否则配置了多条路由的
+	// Composite 分组在模型广场会漏掉这些入口模型。
+	if s.routeRepo != nil {
+		for _, gid := range order {
+			group := groupEnt[gid]
+			pg := byGroup[gid]
+			if group.Platform != PlatformComposite {
+				continue
+			}
+			routes, err := s.routeRepo.ListByGroup(ctx, gid, false)
+			if err != nil {
+				return nil, fmt.Errorf("list composite routes for group %d: %w", gid, err)
+			}
+			idx := modelIdx[gid]
+			if idx == nil {
+				idx = make(map[modelKey]int)
+				modelIdx[gid] = idx
+			}
+			for _, route := range routes {
+				name := strings.TrimSpace(route.PublicModel)
+				platform := strings.TrimSpace(route.TargetPlatform)
+				if name == "" || !isConcreteRequestPlatform(platform) {
+					continue
+				}
+				if group.ModelAllowlistEnabled() && !group.ModelAllowlist.Allows(name) {
+					continue
+				}
+				key := modelKey{platform: platform, name: name}
+				if _, seen := idx[key]; seen {
+					continue
+				}
+				var pricing *ChannelModelPricing
+				upstreamModel := strings.TrimSpace(route.UpstreamModel)
+				if upstreamModel == "" {
+					upstreamModel = name
+				}
+				for i := range channels {
+					ch := &channels[i]
+					if ch.Status != StatusActive || !slices.Contains(ch.GroupIDs, gid) {
+						continue
+					}
+					pricing = ch.GetModelPricingByPlatform(platform, upstreamModel)
+					if pricing != nil {
+						break
+					}
+				}
+				idx[key] = len(pg.Models)
+				pg.Models = append(pg.Models, PlazaModel{Name: name, Platform: platform, Pricing: pricing})
 			}
 		}
 	}
