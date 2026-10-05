@@ -51,12 +51,13 @@ func TestProductionDriverRejectsForeignHostAndPaths(t *testing.T) {
 	if _, err := NewHostDriver(config, nil); err == nil {
 		t.Fatal("foreign host accepted")
 	}
-	config.ExpectedHostname = "RainYun-LFS4goAS"
+	hostname, err := os.Hostname()
+	if err != nil || hostname == "" {
+		t.Skip("host identity unavailable")
+	}
+	config.ExpectedHostname = hostname
 	if _, err := NewHostDriver(config, nil); err == nil {
 		t.Fatal("invalid paths accepted")
-	}
-	if hostname, _ := os.Hostname(); hostname != "RainYun-LFS4goAS" {
-		return
 	}
 	token := filepath.Join(t.TempDir(), "synthetic-control-token")
 	os.WriteFile(token, []byte("unit-test-control"), 0600)

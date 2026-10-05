@@ -46,7 +46,7 @@ func (driver *HostDriver) run(ctx context.Context, name string, arguments ...str
 
 func NewHostDriver(config Config, source *GitHubSource) (*HostDriver, error) {
 	hostname, err := os.Hostname()
-	if err != nil || config.ExpectedHostname != "RainYun-LFS4goAS" || hostname != config.ExpectedHostname {
+	if err != nil || config.ExpectedHostname == "" || hostname != config.ExpectedHostname {
 		return nil, errors.New("production host identity mismatch")
 	}
 	for _, path := range []string{config.StateDir, config.DeploymentDir, config.UIRoot, config.ControlDir, config.DockerConfig} {

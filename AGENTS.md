@@ -34,7 +34,7 @@
 
 ## 1. 服务器与 SSH
 
-本工作区只服务一台服务器：**us-server**（`64.83.2.153`，hostname `RainYun-LFS4goAS`）。
+本工作区只服务一台服务器：**us-server**。其地址、hostname 与连接凭据由各人本机 SSH 配置维护，本文件不写死。
 
 - **SSH 连接：使用你本地的 SSH 配置**。本仓库为多人协作，主机别名（`us-server`）、密钥等连接凭据由各人按自己本机 `~/.ssh/config` 维护，本文件不写死具体的密钥路径或本机专属配置。
 - 服务器上**没有源码、没有 git 仓库**，sub2api 使用本地构建镜像 + `docker save/load` 部署。
@@ -177,6 +177,19 @@ ssh us-server 'docker exec sub2api /app/main --version && curl -s http://127.0.0
 > **推送门禁**：每次向 `origin` 推送前运行 `python scripts/upstream_release_guard.py`，在当前机器执行一次 `git config core.hooksPath .githooks` 启用自动 `pre-push`。守卫读取待推送提交中的基线、核对官方最新稳定 Release 及 tag SHA；上游状态未知或有新版本时阻止 push 并向用户汇报，未经确认不得自动合并。钩子是本机机制，可被跳过；团队级强制保护仍需服务端分支保护/必需 CI。完整三方增量合并、migration 和部署边界见 `plan_docs/official-upstream-versioning-workflow.md`。
 > **回滚**：compose 改回旧 tag → `docker compose up -d --force-recreate`。
 > **定制更新回滚**：接入后的回滚使用已部署 history 中的签名版本，恢复后端、UI 和固定 bootstrap；必须先核对当前 schema 的兼容性。不能用容器内 `.backup`、官方 install.sh 或官方 Docker Hub 镜像替换定制版。
+
+### 3.4 多人协作与提交规范
+
+本仓库多人 + agent 协作，所有改动要可追溯、可验证。规则：
+
+1. **改动走 PR，不直推 `main`**：本地建分支（`feat/` `fix/` `docs/` `chore/` `build/`）→ push → 开 PR → `verify.yml`（后端测试 / migration / 编译 + 前端 typecheck / test / build）全绿才 merge。仓库公开后 `main` 启用分支保护（要求 PR + CI 通过），不允许绕过。
+2. **提交信息用 conventional commits**：`feat(scope): …` / `fix(scope): …` / `docs: …` / `chore: …`，一次提交只做一件事。
+3. **发版前先同步**：`git fetch origin && git pull --rebase origin main`，再本地验证。发版人各自独立，但**先 rebase 再递增版本**，避免 `main` 分叉。
+4. **`VERSION` 是唯一发版入口**：递增 `backend/cmd/server/VERSION` 的 `rN` 并同步 `upstream-baseline.json`，放在**最后一步**；只有版本严格递增 `publish-custom.yml` 才真正发布，未递增则自动跳过（不会误发）。两人都可发版，但同一时刻只由一人递增版本。
+5. **启用本机守卫**：每台机器执行一次 `git config core.hooksPath .githooks`，push 前自动核对官方上游 Release 状态；未启用则该守卫不生效。
+6. **禁止**：直接 push 到 `main`、force-push 已发布分支、复用已发布的版本号、用官方镜像替换定制版。
+
+> 详细三方合并、migration 安全与发布边界见 `plan_docs/official-upstream-versioning-workflow.md`。
 
 ---
 

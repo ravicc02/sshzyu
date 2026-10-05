@@ -9,7 +9,7 @@
   "docker_config": "/var/lib/sshzy-updater/docker",
   "deployment_dir": "/opt/sub2api-deploy",
   "ui_root": "/opt/sshzyu-ui",
-  "expected_hostname": "RainYun-LFS4goAS",
+  "expected_hostname": "REPLACE_WITH_PRODUCTION_HOSTNAME",
   "socket_gid": 1000,
   "client_uid": 1000,
   "activation_enabled": false,

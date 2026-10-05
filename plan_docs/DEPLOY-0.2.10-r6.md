@@ -2,7 +2,7 @@
 
 > **历史归档，禁止按本文直接部署当前版本。** 本文记录当时的 `0.2.10-r6` 迁移前提及步骤，不适用于当前 `0.2.11-r6`；迁移记录、版本身份和线上状态须按当前方案重新核实。本文不是部署授权。
 
-> 目标服务器：**us-server**（`64.83.2.153`）
+> 目标服务器：**us-server**
 > 交付物：后端镜像 `local/sub2api-batch:0.2.10-r6` + 前端 UI
 > 说明：本文档是把「本地已合并并验证通过（本地 docker 栈 + 全量 293 个 migration 全新迁移成功）」的版本，部署到线上 us-server 的完整操作手册。**支持无损升级（不丢线上数据）。**
 
@@ -105,7 +105,7 @@ docker save local/sub2api-batch:0.2.10-r6 | gzip -6 > /tmp/sub2api-0.2.10-r6.tar
 # 历史上传示例已停用：必须使用经本机 SSH 配置校验的 us-server 主机身份，不得关闭 StrictHostKeyChecking。
 # rsync -e ssh -avP /tmp/sub2api-0.2.10-r6.tar.gz us-server:/tmp/
 # 若无 rsync，用 scp
-# scp /tmp/sub2api-0.2.10-r6.tar.gz root@64.83.2.153:/tmp/
+# scp /tmp/sub2api-0.2.10-r6.tar.gz root@us-server:/tmp/
 
 ssh us-server 'docker load -i /tmp/sub2api-0.2.10-r6.tar.gz'
 ```
@@ -153,7 +153,7 @@ ssh us-server 'mkdir -p /opt/sshzyu-ui/releases/0.2.10-r6'
 
 # 2. 上传构建产物（在本地仓库根目录）
 cd /f/中转站运营/sshzy
-scp -r ui/current/* root@64.83.2.153:/opt/sshzyu-ui/releases/0.2.10-r6/
+scp -r ui/current/* us-server:/opt/sshzyu-ui/releases/0.2.10-r6/
 # 共享资源 assets 若跨版本累积，需确认 shared 是否也需要带头文件；照 AGENTS.md 流程处理
 
 # 3. 切换 current 软链（改软链 + nginx reload，不要手动 ln）
