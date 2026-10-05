@@ -116,6 +116,24 @@ func TestListPlazaGroups_PlatformIsolation(t *testing.T) {
 	require.Equal(t, "gpt-5", byName["g-gpt"][0].Name)
 }
 
+func TestListPlazaGroups_RespectsGroupModelAllowlist(t *testing.T) {
+	channel := plazaPricedChannel(1, "models", []int64{10}, PlatformOpenAI,
+		"gpt-5.6", "gpt-5.6-codex", "gpt-5.5")
+	group := Group{
+		ID: 10, Name: "restricted", Platform: PlatformOpenAI, RateMultiplier: 1,
+		ModelAllowlist: GroupModelAllowlist{Enabled: true, Models: []string{"gpt-5.6-*", "gpt-5.5"}},
+	}
+
+	groups, err := newPlazaService([]Channel{channel}, []Group{group}, nil).ListGroups(context.Background())
+
+	require.NoError(t, err)
+	require.Len(t, groups, 1)
+	require.Equal(t, []string{"gpt-5.5", "gpt-5.6-codex"}, []string{
+		groups[0].Models[0].Name,
+		groups[0].Models[1].Name,
+	})
+}
+
 func TestListPlazaGroups_CompositeIncludesConfiguredConcretePlatforms(t *testing.T) {
 	anthropicPrice := 3e-6
 	openAIPrice := 2e-6

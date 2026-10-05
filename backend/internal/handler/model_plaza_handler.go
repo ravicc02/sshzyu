@@ -162,7 +162,8 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 }
 
 // filterPlazaVisibleGroups 按登录态裁剪分组可见性。
-// allowedGroups == nil 表示匿名（仅非专属）；非 nil 包含普通授权及有效订阅分组。
+// 模型广场只展示公开分组。allowedGroups == nil 表示匿名；非 nil 是用户可见的公开分组
+// 以及普通授权分组集合。专属分组不属于广场公开目录，在任何登录状态下都不展示。
 // restrictPublicGroups 为 true 时，公开分组也必须落在 allowedGroups 内，否则用户会
 // 在广场看到自己实际绑定不了的分组。
 func filterPlazaVisibleGroups(
@@ -172,10 +173,10 @@ func filterPlazaVisibleGroups(
 ) []service.PlazaGroup {
 	visible := make([]service.PlazaGroup, 0, len(groups))
 	for _, g := range groups {
-		if g.IsExclusive || (restrictPublicGroups && allowedGroups != nil) {
-			if allowedGroups == nil {
-				continue
-			}
+		if g.IsExclusive {
+			continue
+		}
+		if restrictPublicGroups && allowedGroups != nil {
 			if _, ok := allowedGroups[g.ID]; !ok {
 				continue
 			}
