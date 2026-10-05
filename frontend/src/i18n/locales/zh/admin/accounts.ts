@@ -34,6 +34,12 @@ export default {
         consentRequired: '请先确认当前邀请计划。'
       },
       opencodeGo: {
+        accountMode: {
+          zen: 'Zen',
+          zenDesc: '按量付费网关，消耗账户余额，按 Token 计费。',
+          go: 'GO',
+          goDesc: '订阅制网关，按 5 小时 / 周 / 月滚动用量窗口限流。'
+        },
         rollingShort: '滚动窗口',
         weeklyShort: '每周',
         monthlyShort: '每月',
