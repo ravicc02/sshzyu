@@ -16,7 +16,7 @@ func newPlazaService(channels []Channel, groups []Group, pricing *PricingService
 	repo := &mockChannelRepository{
 		listAllFn: func(ctx context.Context) ([]Channel, error) { return channels, nil },
 	}
-	return NewModelPlazaService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, pricing, nil, nil)
+	return NewModelPlazaService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, nil, pricing, nil, nil)
 }
 
 func plazaPricedChannel(id int64, name string, groupIDs []int64, platform string, models ...string) Channel {
@@ -196,6 +196,32 @@ func TestListPlazaGroups_CompositeAndOrdinaryGroupsDoNotLeakPlatforms(t *testing
 	})
 }
 
+func TestListPlazaGroups_CompositeIncludesExplicitRouteModels(t *testing.T) {
+	channel := plazaPricedChannel(1, "multi", []int64{10}, PlatformOpenAI, "gpt-5.6")
+	channel.ModelPricing[0].InputPrice = testPtrFloat64(2e-6)
+	groups := []Group{{ID: 10, Name: "Composite", Platform: PlatformComposite, RateMultiplier: 1}}
+	routes := compositeRouteRepoStub{routes: []CompositeModelRoute{
+		{ID: 1, GroupID: 10, PublicModel: "gpt-5.6", MatchType: CompositeRouteMatchExact, TargetPlatform: PlatformOpenAI, UpstreamModel: "gpt-5.6", Enabled: true},
+		{ID: 2, GroupID: 10, PublicModel: "router/claude-sonnet", MatchType: CompositeRouteMatchExact, TargetPlatform: PlatformAnthropic, UpstreamModel: "claude-sonnet-4-6", Enabled: true},
+		{ID: 3, GroupID: 10, PublicModel: "disabled-model", MatchType: CompositeRouteMatchExact, TargetPlatform: PlatformOpenAI, Enabled: false},
+		{ID: 4, GroupID: 10, PublicModel: "invalid-target", MatchType: CompositeRouteMatchExact, TargetPlatform: PlatformComposite, Enabled: true},
+	}}
+	repo := &mockChannelRepository{listAllFn: func(context.Context) ([]Channel, error) { return []Channel{channel}, nil }}
+	svc := NewModelPlazaService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, routes, nil, nil, nil)
+
+	out, err := svc.ListGroups(context.Background())
+
+	require.NoError(t, err)
+	require.Len(t, out, 1)
+	require.Len(t, out[0].Models, 2)
+	require.Equal(t, "gpt-5.6", out[0].Models[0].Name)
+	require.Equal(t, "router/claude-sonnet", out[0].Models[1].Name)
+	require.Equal(t, PlatformAnthropic, out[0].Models[1].Platform)
+	require.NotNil(t, out[0].Models[0].Pricing)
+	require.InDelta(t, 2e-6, *out[0].Models[0].Pricing.InputPrice, 1e-12)
+	require.Nil(t, out[0].Models[1].Pricing, "unpriced explicit aliases remain visible")
+}
+
 func TestListPlazaGroups_InactiveChannelSkipped(t *testing.T) {
 	inactive := plazaPricedChannel(1, "off", []int64{10}, "anthropic", "claude-sonnet")
 	inactive.Status = "inactive"
@@ -348,7 +374,7 @@ func TestListPlazaGroups_RepoErrorsPropagate(t *testing.T) {
 	repo := &mockChannelRepository{
 		listAllFn: func(ctx context.Context) ([]Channel, error) { return nil, sentinel },
 	}
-	svc := NewModelPlazaService(repo, &stubGroupRepoForAvailable{}, nil, nil, nil)
+	svc := NewModelPlazaService(repo, &stubGroupRepoForAvailable{}, nil, nil, nil, nil)
 	out, err := svc.ListGroups(context.Background())
 	require.Nil(t, out)
 	require.ErrorIs(t, err, sentinel)
@@ -356,7 +382,7 @@ func TestListPlazaGroups_RepoErrorsPropagate(t *testing.T) {
 	svc2 := NewModelPlazaService(
 		&mockChannelRepository{listAllFn: func(ctx context.Context) ([]Channel, error) { return nil, nil }},
 		&stubGroupRepoForAvailable{listActiveErr: sentinel},
-		nil, nil, nil,
+		nil, nil, nil, nil,
 	)
 	out2, err2 := svc2.ListGroups(context.Background())
 	require.Nil(t, out2)
@@ -373,7 +399,7 @@ func newPlazaServiceWithBilling(channels []Channel, groups []Group, groupPlatfor
 	}
 	cs := NewChannelService(repo, nil, nil, nil, nil)
 	bs := NewBillingService(&config.Config{}, catalog)
-	return NewModelPlazaService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, catalog, bs, NewModelPricingResolver(cs, bs))
+	return NewModelPlazaService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, nil, catalog, bs, NewModelPricingResolver(cs, bs))
 }
 
 func plazaModelsByName(models []PlazaModel) map[string]PlazaModel {
