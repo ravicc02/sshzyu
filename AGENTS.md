@@ -29,6 +29,7 @@
 | `.github/workflows/`      | 验证与定制发布工作流                                                          | 不自动上线                    |
 | `deploy/`                 | 本地运行时数据卷（`data/`、`postgres_data/`、`redis_data/`，已被 `.gitignore` 忽略） | 本地数据                     |
 | `records/`                | 运营问答梳理记录（`.gitignore` 忽略，不入版本库、不对外）                                 | 内部记录                     |
+| `plan_docs/`              | 本地规划/方案文档（`.gitignore` 忽略，不入版本库、仅本地保留、不对外）                           | 本地规划文档                   |
 
 
 **构建链**：
@@ -179,32 +180,54 @@ cd /opt/sub2api-deploy && docker compose up -d --no-build --force-recreate sub2a
 ssh us-server 'docker exec sub2api /app/main --version && curl -s http://127.0.0.1:8080/health'
 ```
 
-> **版本号规则**：本地定制版完整版本号由 `backend/cmd/server/VERSION` 决定，格式为 `X.Y.Z-rN`；`resolve-version.sh` 不再从本地/官方 tag 自动推断。`upstream-baseline.json` 必须与版本文件及官方稳定 Release/tag/commit 对齐。根 Dockerfile 默认构建本地 `source` 内嵌前端镜像；发布根镜像需先运行 `python scripts/upstream_release_guard.py --validate-clean-build --build-target root`，然后以 `--build-arg BUILD_TYPE=release` 及 VERSION、COMMIT、DATE 显式构建。`backend/Dockerfile` 只构建线上纯后端 `release` 镜像，发布前应使用 `--build-target backend` 验证。正式发布须核验镜像 tag、二进制输出及管理端 `build_type`。 **推送门禁**：每次向 `origin` 推送前运行 `python scripts/upstream_release_guard.py`，在当前机器执行一次 `git config core.hooksPath .githooks` 启用自动 `pre-push`。守卫读取待推送提交中的基线、核对官方最新稳定 Release 及 tag SHA；上游状态未知或有新版本时阻止 push 并向用户汇报，未经确认不得自动合并。钩子是本机机制，可被跳过；团队级强制保护已由服务端 `main` 分支保护承接（见 §3.4）。完整三方增量合并、migration 和部署边界见 `plan_docs/official-upstream-versioning-workflow.md`。 **回滚**：compose 改回旧 tag → `docker compose up -d --force-recreate`。 **定制更新回滚**：接入后的回滚使用已部署 history 中的签名版本，恢复后端、UI 和固定 bootstrap；必须先核对当前 schema 的兼容性。不能用容器内 `.backup`、官方 install.sh 或官方 Docker Hub 镜像替换定制版。
+> **版本号规则**：本地定制版完整版本号由 `backend/cmd/server/VERSION` 决定，格式为 `X.Y.Z-rN`；`resolve-version.sh` 不再从本地/官方 tag 自动推断。`upstream-baseline.json` 必须与版本文件及官方稳定 Release/tag/commit 对齐。根 Dockerfile 默认构建本地 `source` 内嵌前端镜像；发布根镜像需先运行 `python scripts/upstream_release_guard.py --validate-clean-build --build-target root`，然后以 `--build-arg BUILD_TYPE=release` 及 VERSION、COMMIT、DATE 显式构建。`backend/Dockerfile` 只构建线上纯后端 `release` 镜像，发布前应使用 `--build-target backend` 验证。正式发布须核验镜像 tag、二进制输出及管理端 `build_type`。 **推送门禁**：每次向 `origin` 推送前运行 `python scripts/upstream_release_guard.py`，在当前机器执行一次 `git config core.hooksPath .githooks` 启用自动 `pre-push`。守卫读取待推送提交中的基线、核对官方最新稳定 Release 及 tag SHA；上游状态未知或有新版本时阻止 push 并向用户汇报，未经确认不得自动合并。钩子是本机机制，可被跳过；团队级强制保护已由服务端 `main` 分支保护承接（见 §3.4）。完整三方增量合并、migration 和部署边界见本地规划文档 `plan_docs/official-upstream-versioning-workflow.md`（`plan_docs/` 不入版本库，仅本地保留）。 **回滚**：compose 改回旧 tag → `docker compose up -d --force-recreate`。 **定制更新回滚**：接入后的回滚使用已部署 history 中的签名版本，恢复后端、UI 和固定 bootstrap；必须先核对当前 schema 的兼容性。不能用容器内 `.backup`、官方 install.sh 或官方 Docker Hub 镜像替换定制版。
 
 ### 3.4 多人协作与提交规范
 
-本仓库多人 + agent 协作，改动要可追溯、可验证。**按改动风险分级**，不同级别走不同流程：
+本仓库多人 + agent 协作。**按角色区分流程**：维护者直推、协作者走 PR、发版权归维护者。
 
-| 级别 | 改动内容 | 路径 | 流程 |
+**角色与权限**
+
+| 角色 | 账号 | 权限 | 能否直推 `main` |
 |---|---|---|---|
-| **L0 文档** | 方案、规范、说明 | `*.md`、`plan_docs/`、`AGENTS.md`、`README.md` | **直推 `main`** |
-| **L1 生图** | 生图工作台 | `image-playground/**` | PR + verify |
-| **L2 前端** | 管理面板 | `frontend/**` | PR + verify |
-| **L3 后端/工具** | 服务、更新器、脚本 | `backend/**`、`tools/**`、`scripts/**` | PR + verify |
-| **L4 发版** | `VERSION` 递增 | `backend/cmd/server/VERSION` | 人工门（见第 6 条） |
+| 维护者 | `ravicc02` | admin | ✅ 可以（`enforce_admins=false`，可绕过分支保护） |
+| 协作者 | `Eternite-0` | write | ❌ 不可以（`main` 要求 PR，write 推不了保护分支） |
 
-规则：
+**A. 维护者（`ravicc02`）—— 不走 PR，直接合入 `main`**
 
-1. **L0 文档直推 `main`**：`git push origin main` 直接推送，不建分支、不开 PR。`main` 保护对管理员不强制（`enforce_admins=false`），管理员可绕过「必须走 PR」。**代价要清楚**：`main` 上的任何 push 都会触发 `publish-custom.yml`，其中 `verify` job **无条件**运行全量测试（`backend` + `frontend` + `image-playground`，约 6 分钟）——它**在后台运行、不阻塞你**；版本未递增时 `publish` job 自动跳过，不会误发。**L0 之外的改动严禁直推**：直推既不产生 PR、也不受 required check 约束（`push` 事件不检查 required check），等于无审查、无门禁地写入主干。
-2. **L1–L3 走 PR**：本地建分支（`feat/` `fix/` `docs/` `chore/` `build/`）→ push → 开 PR → `verify.yml` 三个 job（`backend` / `frontend` / `image-playground`）全绿才 merge。`main` 已启用分支保护（仓库公开）：要求 PR、必需检查 `backend` + `frontend` + `image-playground`、`strict=false`（**不要求 PR 基于最新 `main`，因此 `main` 前进后无需再 rebase**）、禁止 force-push 与删除分支；管理员可紧急绕过（`enforce_admins=false`）。**必需检查的 context 必须用 `verify.yml` 的 job 名（`backend` / `frontend` / `image-playground`）**，不要写成 `verify / backend` 这种「workflow 名 / job 名」形式——写错会让 required check 永远停在 expected 未满足状态，导致所有 PR 永久 `BLOCKED`（症状：CI 全绿却始终无法合并）。**新增 job 必须先成功运行过一次，才能加入 required checks**，否则同样会卡死所有 PR。
-3. **不要求审批**（`required_approving_review_count=0`）：GitHub 不允许 PR 作者批准自己的 PR，单人提 PR 时无法自批，保留「1 人批准」会让每个 PR 永久 `REVIEW_REQUIRED`，故审批降为 0，门禁只由 CI 承担。仓库另有协作者 `Eternite-0`（write 权限），**跨账号互批是可行的**（PR #3 即由两人互批完成）；如需恢复审批门槛，把该值改回 1 并由协作者点 Approve 即可。注意**批准（Approve）≠ 合并（Merge）**：批准只是审查通过、不改动 `main`；合并才把改动写入 `main`（并可能触发发布）。当前正常路径只有「CI 全绿 → Merge」一步。
-4. **提交信息用 conventional commits**：`feat(scope): …` / `fix(scope): …` / `docs: …` / `chore: …`，一次提交只做一件事。
-5. **发版前先同步**：`git fetch origin && git pull --rebase origin main`，再本地验证。发版人各自独立，但**先 rebase 再递增版本**，避免 `main` 分叉。
-6. `VERSION` **是唯一发版入口**：递增 `backend/cmd/server/VERSION` 的 `rN` 并同步 `upstream-baseline.json`，放在**最后一步**；只有版本严格递增 `publish-custom.yml` 才真正发布，未递增则自动跳过（不会误发）。两人都可发版，但同一时刻只由一人递增版本。**递增只触发「构建 + 签名 + 发布 Release 产物」，不会部署到线上**——`publish-custom.yml` 只 `gh release create`（说明文字明确 "Site activation remains a manual operation"），站点切换**始终是人工操作**（管理员登录控制台 + 近期 TOTP，或宿主机受控 CLI）。**不要把「递增版本 / 合并 PR」误当成「部署上线」**。
-7. **启用本机守卫**：每台机器执行一次 `git config core.hooksPath .githooks`，push 前自动核对官方上游 Release 状态；未启用则该守卫不生效。
-8. **禁止**：force-push 已发布分支、复用已发布的版本号、用官方镜像替换定制版、**L0 之外的改动直推 `main`**。
+1. 本地改 → 本地验证 → `git push origin main`。不建分支、不开 PR。
+2. **代价（必知）**：`push` 事件**不检查 required status check**，`verify` 是**事后**在后台跑、不阻塞你。所以**推送前先本地跑最小相关验证**——坏代码一旦进了 `main`，`verify` 再红也已经写在主干上了。
+3. 不改 `VERSION` 的推送：`verify` 照跑，`publish` 空转，**不会误发**。
 
-> 详细三方合并、migration 安全与发布边界见 `plan_docs/official-upstream-versioning-workflow.md`。
+**B. 协作者（`Eternite-0`）—— 必须提 PR，由维护者审核合并**
+
+1. 建分支（`feat/` `fix/` `docs/` `chore/` `build/`）→ push → 开 PR。
+2. `verify.yml` 三个 job（`backend` / `frontend` / `image-playground`）全绿才可合并。
+3. **审核是「约定」，不是「硬拦截」**：当前 `required_approving_review_count=0`，协作者技术上能自己点 Merge。**团队约定：协作者的 PR 由维护者审核后合并，协作者不要自行 Merge。** 若日后要改成硬拦截，把该值改为 `1` 即可——维护者不走 PR，不受影响。
+4. **协作者的 PR 不得修改 `backend/cmd/server/VERSION`**（见下「发布」）。
+
+**发布：唯一入口是 `VERSION`，且只有维护者能改**
+
+1. `backend/cmd/server/VERSION` 递增 `rN` **并同步 `upstream-baseline.json`**，是唯一发版入口。
+2. 只有版本严格递增，`publish-custom.yml` 才真正发布；未递增则 `verify` 跑完后 `publish` 自动跳过（不会误发）。
+3. **`VERSION` 的修改权归维护者**：协作者若在 PR 里改了 `VERSION`，合并即误发 → 维护者 review 时必须逐行检查此文件。
+4. **递增 `VERSION` ≠ 部署上线**：`publish` 只做构建 + 签名 + `gh release create` 传产物，站点切换**始终是人工操作**（管理员控制台 + 近期 TOTP，或宿主机受控 CLI）。**不要把「递增版本 / 合并 PR」误当成「部署上线」**。
+5. 同一时刻只由一人递增版本；先 `git fetch origin && git pull --rebase origin main` 再递增，避免 `main` 分叉。
+
+**分支保护配置须知（改配置前必读）**
+
+- 必需检查的 context 必须写 `verify.yml` 的 **job 名**（`backend` / `frontend` / `image-playground`），**不要**写成 `verify / backend` 这种「workflow 名 / job 名」形式——写错会让 required check 永远停在 expected 未满足状态，导致所有 PR 永久 `BLOCKED`（症状：CI 全绿却始终无法合并）。
+- **新增 job 必须先成功运行过一次**，才能加入 required checks，否则同样会卡死所有 PR。
+- `strict=false`：不要求 PR 基于最新 `main`，`main` 前进后无需再 rebase。
+- 禁止 force-push `main`、禁止删除 `main`。
+
+**通用规则**
+
+- 提交信息用 conventional commits：`feat(scope): …` / `fix(scope): …` / `docs: …` / `chore: …`，一次提交只做一件事。
+- 每台机器执行一次 `git config core.hooksPath .githooks` 启用 pre-push 守卫（核对官方上游 Release 状态）；钩子是本机机制、可被跳过，团队级强制由服务端 `main` 分支保护承接。
+- 禁止：force-push 已发布分支、复用已发布的版本号、用官方镜像替换定制版、**协作者直推 `main`**。
+
+> 详细三方合并、migration 安全与发布边界见本地规划文档 `plan_docs/official-upstream-versioning-workflow.md`（`plan_docs/` 不入版本库，仅本地保留）。
 
 ### 3.5 定制更新与磁盘运维要点
 
