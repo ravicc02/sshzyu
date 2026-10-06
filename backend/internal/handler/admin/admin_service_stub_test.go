@@ -415,6 +415,24 @@ func (s *stubAdminService) BatchSetGroupRateMultipliers(_ context.Context, _ int
 	return nil
 }
 
+func (s *stubAdminService) GetGroupModelPrices(_ context.Context, _ int64) ([]service.GroupModelPriceEntry, error) {
+	return nil, nil
+}
+
+func (s *stubAdminService) ListAllGroupModelPrices(_ context.Context) ([]service.GroupModelPriceGroup, error) {
+	return nil, nil
+}
+
+func (s *stubAdminService) SetGroupModelRateMultiplier(_ context.Context, _ int64, _ string, _ float64) error {
+	s.advancedGroupOperationCalls++
+	return nil
+}
+
+func (s *stubAdminService) ClearGroupModelRateMultiplier(_ context.Context, _ int64, _ string) error {
+	s.advancedGroupOperationCalls++
+	return nil
+}
+
 func (s *stubAdminService) ClearGroupRPMOverrides(_ context.Context, _ int64) error {
 	return nil
 }

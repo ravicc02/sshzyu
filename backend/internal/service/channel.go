@@ -106,6 +106,9 @@ type ChannelModelPricing struct {
 	PerRequestPrice            *float64            `json:"per_request_price"`
 	Intervals                  []PricingInterval   `json:"intervals"`
 	TimePricing                *ChannelTimePricing `json:"time_pricing,omitempty"`
+	// RateMultiplier 模型级计费倍率（隐式配置）：命中该计费模型时「替代」分组/用户默认倍率，
+	// 仅对命中的模型生效，不影响同分组其他模型。nil 表示未配置（走分组默认）。
+	RateMultiplier             *float64            `json:"rate_multiplier,omitempty"`
 	CreatedAt                  time.Time           `json:"created_at,omitempty"`
 	UpdatedAt                  time.Time           `json:"updated_at,omitempty"`
 }

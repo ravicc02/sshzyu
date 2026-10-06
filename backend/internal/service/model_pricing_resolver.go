@@ -79,9 +79,13 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 			stripped.Intervals = nil
 			groupPricing = &stripped
 		}
-		resolved := r.resolveConfiguredPricing(groupPricing, input.Model, PricingSourceGroup)
-		resolved.longContextPricingEnabled = longContextPricingEnabled
-		return resolved
+		// 仅含非价格配置（如模型级 rate_multiplier）的条目不应短路价格解析，
+		// 否则会跳过渠道/LiteLLM 定价导致错价；此时落到下方正常链路。
+		if groupPricingHasPricing(groupPricing) {
+			resolved := r.resolveConfiguredPricing(groupPricing, input.Model, PricingSourceGroup)
+			resolved.longContextPricingEnabled = longContextPricingEnabled
+			return resolved
+		}
 	}
 
 	var chPricing *ChannelModelPricing
@@ -165,6 +169,26 @@ func matchGroupModelPricing(group *Group, model string) *ChannelModelPricing {
 		}
 	}
 	return wildcard
+}
+
+// groupPricingHasPricing 判断分组逐模型定价条目是否含「价格类」配置。
+// 仅含非价格配置（如模型级 rate_multiplier）的条目不应短路价格解析。
+func groupPricingHasPricing(c *ChannelModelPricing) bool {
+	if c == nil {
+		return false
+	}
+	if c.InputPrice != nil || c.OutputPrice != nil ||
+		c.CacheWritePrice != nil || c.CacheWrite1hPrice != nil || c.CacheReadPrice != nil ||
+		c.ImageInputPrice != nil || c.ImageOutputPrice != nil || c.PerRequestPrice != nil {
+		return true
+	}
+	if len(c.Intervals) > 0 || c.TimePricing != nil {
+		return true
+	}
+	if c.FastMultiplier != nil || c.FlexMultiplier != nil || len(c.ReasoningEffortMultipliers) > 0 {
+		return true
+	}
+	return false
 }
 
 // resolveBasePricing 从 LiteLLM 或 Fallback 获取基础定价

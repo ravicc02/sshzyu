@@ -161,7 +161,7 @@ describe('AppSidebar Dock navigation', () => {
     ])
     await expandGroups(wrapper)
     expect(navigationPaths(wrapper)).toEqual([
-      '/admin/dashboard', '/admin/ops', '/admin/users', '/admin/groups',
+      '/admin/dashboard', '/admin/ops', '/admin/users', '/admin/groups', '/admin/model-prices',
       '/admin/channels/pricing', '/admin/channels/monitor', '/admin/subscriptions',
       '/admin/accounts', '/admin/plugins', '/admin/announcements', '/admin/proxies',
       '/admin/risk-control', '/admin/prompt-audit', '/admin/redeem', '/admin/promo-codes', '/admin/lottery',

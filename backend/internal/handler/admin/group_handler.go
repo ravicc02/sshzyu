@@ -1061,6 +1061,94 @@ func (h *GroupHandler) BatchSetGroupRateMultipliers(c *gin.Context) {
 	response.Success(c, gin.H{"message": "Rate multipliers updated successfully"})
 }
 
+// GetGroupModelPrices 返回分组下模型的独立倍率配置状态（不回传倍率数值）。
+// GET /api/v1/admin/groups/:id/model-prices
+func (h *GroupHandler) GetGroupModelPrices(c *gin.Context) {
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+	entries, err := h.adminService.GetGroupModelPrices(c.Request.Context(), groupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"models": entries})
+}
+
+// ListAllGroupModelPrices 返回所有活跃分组及其可配置模型清单与配置状态。
+// GET /api/v1/admin/model-prices
+func (h *GroupHandler) ListAllGroupModelPrices(c *gin.Context) {
+	groups, err := h.adminService.ListAllGroupModelPrices(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"groups": groups})
+}
+
+// SetGroupModelRateMultiplierRequest 设置单模型独立倍率的请求体。
+type SetGroupModelRateMultiplierRequest struct {
+	RateMultiplier float64 `json:"rate_multiplier" binding:"required,gt=0"`
+}
+
+// SetGroupModelRateMultiplier 设置某模型的独立计费倍率（隐式配置，替代分组默认）。
+// PUT /api/v1/admin/groups/:id/model-prices/:model/rate-multiplier
+func (h *GroupHandler) SetGroupModelRateMultiplier(c *gin.Context) {
+	if h.rejectUnsupportedSimpleModeOperation(c, "advanced") {
+		return
+	}
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+	model := c.Param("model")
+	if model == "" {
+		response.BadRequest(c, "Invalid model")
+		return
+	}
+
+	var req SetGroupModelRateMultiplierRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	if err := h.adminService.SetGroupModelRateMultiplier(c.Request.Context(), groupID, model, req.RateMultiplier); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{"message": "Model rate multiplier updated successfully"})
+}
+
+// ClearGroupModelRateMultiplier 清除某模型的独立倍率（回落分组默认）。
+// DELETE /api/v1/admin/groups/:id/model-prices/:model/rate-multiplier
+func (h *GroupHandler) ClearGroupModelRateMultiplier(c *gin.Context) {
+	if h.rejectUnsupportedSimpleModeOperation(c, "advanced") {
+		return
+	}
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+	model := c.Param("model")
+	if model == "" {
+		response.BadRequest(c, "Invalid model")
+		return
+	}
+
+	if err := h.adminService.ClearGroupModelRateMultiplier(c.Request.Context(), groupID, model); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{"message": "Model rate multiplier cleared successfully"})
+}
+
 // BatchSetGroupRPMOverridesRequest represents batch set rpm_override request
 type BatchSetGroupRPMOverridesRequest struct {
 	Entries []service.GroupRPMOverrideInput `json:"entries" binding:"required"`

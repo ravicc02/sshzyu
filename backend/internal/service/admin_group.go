@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -1277,6 +1278,233 @@ func (s *adminServiceImpl) BatchSetGroupRateMultipliers(ctx context.Context, gro
 	}
 	return s.userGroupRateRepo.SyncGroupRateMultipliers(ctx, groupID, entries)
 }
+
+// GroupModelPriceEntry 是「模型价格」页的单个模型条目。
+// CustomRate 表示该模型是否已配置独立倍率；界面不展示具体数值（隐式配置）。
+type GroupModelPriceEntry struct {
+	Model      string `json:"model"`
+	CustomRate bool   `json:"custom_rate"`
+}
+
+// GetGroupModelPrices 返回分组下可用于配置独立倍率的模型清单及其配置状态。
+// 模型清单来源：该分组可调度账号的 model_mapping（账号级模型列表）并集，
+// 即分组实际配置的模型；不含平台默认模型兜底——分组没配的模型不出现在「模型价格」页。
+// 仅返回是否已配独立倍率（CustomRate），不回传倍率数值。
+func (s *adminServiceImpl) GetGroupModelPrices(ctx context.Context, groupID int64) ([]GroupModelPriceEntry, error) {
+	group, err := s.groupRepo.GetByID(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if group == nil {
+		return nil, infraerrors.NotFound("GROUP_NOT_FOUND", "group not found")
+	}
+	return s.groupModelPriceEntries(ctx, group)
+}
+
+// groupConfiguredModelNames 返回分组实际配置的模型名清单。
+// 口径：该分组可调度账号的 model_mapping 并集（composite 分组收集所有具体平台账号的映射）。
+// 刻意不并入平台默认模型：分组未配置的模型不应出现在「模型价格」页，
+// 否则会把与该分组无关的全量模型铺开成一大串。
+func (s *adminServiceImpl) groupConfiguredModelNames(ctx context.Context, group *Group) ([]string, error) {
+	if group == nil || group.ID <= 0 || s.accountRepo == nil {
+		return nil, nil
+	}
+	platform := strings.TrimSpace(group.Platform)
+	accounts, err := s.accountRepo.ListSchedulableByGroupID(ctx, group.ID)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{})
+	models := make([]string, 0, len(accounts))
+	for _, acc := range accounts {
+		if platform == PlatformComposite {
+			if !isConcreteRequestPlatform(acc.Platform) {
+				continue
+			}
+		} else if acc.Platform != platform {
+			continue
+		}
+		for model := range acc.GetModelMapping() {
+			model = strings.TrimSpace(model)
+			if model == "" {
+				continue
+			}
+			if _, ok := seen[model]; ok {
+				continue
+			}
+			seen[model] = struct{}{}
+			models = append(models, model)
+		}
+	}
+	sort.Strings(models)
+	return models, nil
+}
+
+// groupModelPriceEntries 计算单个分组下每个模型的独立倍率配置状态。
+func (s *adminServiceImpl) groupModelPriceEntries(ctx context.Context, group *Group) ([]GroupModelPriceEntry, error) {
+	models, err := s.groupConfiguredModelNames(ctx, group)
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]GroupModelPriceEntry, 0, len(models))
+	for _, m := range models {
+		entry := matchGroupModelPricing(group, m)
+		entries = append(entries, GroupModelPriceEntry{
+			Model:      m,
+			CustomRate: entry != nil && entry.RateMultiplier != nil && *entry.RateMultiplier > 0,
+		})
+	}
+	return entries, nil
+}
+
+// GroupModelPriceGroup 是「模型价格」页的单个分组条目：分组信息 + 该分组下可配置的模型清单。
+// RateMultiplier 是分组默认计费倍率，供页面在分组名旁展示；模型级独立倍率不回传数值（隐式配置）。
+type GroupModelPriceGroup struct {
+	ID             int64                  `json:"id"`
+	Name           string                 `json:"name"`
+	Platform       string                 `json:"platform"`
+	RateMultiplier float64                `json:"rate_multiplier"`
+	Models         []GroupModelPriceEntry `json:"models"`
+}
+
+// ListAllGroupModelPrices 返回所有活跃分组及其可配置模型清单与配置状态，
+// 供「模型价格」页一次性列出全部分组（不再按分组筛选）。
+func (s *adminServiceImpl) ListAllGroupModelPrices(ctx context.Context) ([]GroupModelPriceGroup, error) {
+	groups, err := s.groupRepo.ListActive(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]GroupModelPriceGroup, 0, len(groups))
+	for i := range groups {
+		g := &groups[i]
+		entries, err := s.groupModelPriceEntries(ctx, g)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, GroupModelPriceGroup{
+			ID:             g.ID,
+			Name:           g.Name,
+			Platform:       g.Platform,
+			RateMultiplier: g.RateMultiplier,
+			Models:         entries,
+		})
+	}
+	return out, nil
+}
+
+// SetGroupModelRateMultiplier 为分组下某个模型设置独立计费倍率。
+// 该配置是「隐式」的：仅对命中的计费模型生效，替代分组/用户默认倍率，
+// 不改动 groups.rate_multiplier，也不影响同分组其他模型。
+func (s *adminServiceImpl) SetGroupModelRateMultiplier(ctx context.Context, groupID int64, model string, rateMultiplier float64) error {
+	if err := s.ValidateSimpleModeGroupOperation(AdminGroupOperationMultiplier); err != nil {
+		return err
+	}
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return infraerrors.BadRequest("INVALID_MODEL", "model is required")
+	}
+	if !(rateMultiplier > 0) {
+		return infraerrors.BadRequest("INVALID_RATE_MULTIPLIER", "rate_multiplier must be > 0")
+	}
+	group, err := s.groupRepo.GetByID(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	if group == nil {
+		return infraerrors.NotFound("GROUP_NOT_FOUND", "group not found")
+	}
+	pricing := group.ModelPricing
+	target := normalizeChannelPricingModelName(model)
+	idx := -1
+	for i := range pricing {
+		for _, pattern := range pricing[i].Models {
+			if normalizeChannelPricingModelName(pattern) == target {
+				idx = i
+				break
+			}
+		}
+		if idx >= 0 {
+			break
+		}
+	}
+	value := rateMultiplier
+	if idx >= 0 {
+		pricing[idx].RateMultiplier = &value
+	} else {
+		pricing = append(pricing, ChannelModelPricing{
+			Models:         []string{model},
+			RateMultiplier: &value,
+		})
+	}
+	normalized, err := normalizeGroupModelPricing(group.Platform, pricing)
+	if err != nil {
+		return err
+	}
+	group.ModelPricing = normalized
+	if err := s.groupRepo.Update(ctx, group); err != nil {
+		return err
+	}
+	if s.authCacheInvalidator != nil {
+		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, groupID)
+	}
+	return nil
+}
+
+// ClearGroupModelRateMultiplier 清除某模型的独立倍率（回落分组默认）。
+// 若该条目在清除后不含任何其它配置，则整体移除，避免留下空壳。
+func (s *adminServiceImpl) ClearGroupModelRateMultiplier(ctx context.Context, groupID int64, model string) error {
+	if err := s.ValidateSimpleModeGroupOperation(AdminGroupOperationMultiplier); err != nil {
+		return err
+	}
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return infraerrors.BadRequest("INVALID_MODEL", "model is required")
+	}
+	group, err := s.groupRepo.GetByID(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	if group == nil {
+		return infraerrors.NotFound("GROUP_NOT_FOUND", "group not found")
+	}
+	target := normalizeChannelPricingModelName(model)
+	next := make([]ChannelModelPricing, 0, len(group.ModelPricing))
+	changed := false
+	for i := range group.ModelPricing {
+		entry := group.ModelPricing[i]
+		matched := false
+		for _, pattern := range entry.Models {
+			if normalizeChannelPricingModelName(pattern) == target {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			next = append(next, entry)
+			continue
+		}
+		changed = true
+		entry.RateMultiplier = nil
+		if !groupPricingHasPricing(&entry) && len(entry.Models) <= 1 {
+			continue // 空壳条目，整体移除
+		}
+		next = append(next, entry)
+	}
+	if !changed {
+		return nil
+	}
+	group.ModelPricing = next
+	if err := s.groupRepo.Update(ctx, group); err != nil {
+		return err
+	}
+	if s.authCacheInvalidator != nil {
+		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, groupID)
+	}
+	return nil
+}
+
+// groupModelPriceEntries 的模型清单已改为复用「分组模型候选」口径，故原先按
+// ModelPricing ∪ ModelAllowlist 拼凑模型名的 collectGroupModelNames 已移除。
 
 func (s *adminServiceImpl) ClearGroupRPMOverrides(ctx context.Context, groupID int64) error {
 	if err := s.ValidateSimpleModeGroupOperation(AdminGroupOperationRPMOverride); err != nil {

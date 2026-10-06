@@ -59,6 +59,14 @@ type AdminService interface {
 	GetGroupRateMultipliers(ctx context.Context, groupID int64) ([]UserGroupRateEntry, error)
 	ClearGroupRateMultipliers(ctx context.Context, groupID int64) error
 	BatchSetGroupRateMultipliers(ctx context.Context, groupID int64, entries []GroupRateMultiplierInput) error
+	// GetGroupModelPrices 返回分组下模型的独立倍率配置状态（不回传倍率数值）。
+	GetGroupModelPrices(ctx context.Context, groupID int64) ([]GroupModelPriceEntry, error)
+	// ListAllGroupModelPrices 返回所有活跃分组及其可配置模型清单与配置状态。
+	ListAllGroupModelPrices(ctx context.Context) ([]GroupModelPriceGroup, error)
+	// SetGroupModelRateMultiplier 设置某模型的独立计费倍率（隐式配置，替代分组默认）。
+	SetGroupModelRateMultiplier(ctx context.Context, groupID int64, model string, rateMultiplier float64) error
+	// ClearGroupModelRateMultiplier 清除某模型的独立倍率（回落分组默认）。
+	ClearGroupModelRateMultiplier(ctx context.Context, groupID int64, model string) error
 	ClearGroupRPMOverrides(ctx context.Context, groupID int64) error
 	BatchSetGroupRPMOverrides(ctx context.Context, groupID int64, entries []GroupRPMOverrideInput) error
 	UpdateGroupSortOrders(ctx context.Context, updates []GroupSortOrderUpdate) error

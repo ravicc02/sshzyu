@@ -787,24 +787,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		cacheTTLOverridden = (result.Usage.CacheCreation5mTokens + result.Usage.CacheCreation1hTokens) > 0
 	}
 
-	// 获取费率倍数（优先级：用户专属 > 分组默认 > 系统默认）
-	multiplier := 1.0
-	if s.cfg != nil {
-		multiplier = s.cfg.Default.RateMultiplier
-	}
-	if apiKey.GroupID != nil && apiKey.Group != nil {
-		groupDefault := apiKey.Group.RateMultiplier
-		multiplier = s.ResolveUserGroupRateMultiplier(ctx, user.ID, *apiKey.GroupID, groupDefault)
-	}
-	// token 倍率叠加高峰因子（token 计费含图片 token，图片按次倍率不受影响）。高峰因子按请求时刻现算，
-	// 不并入上面的 getUserGroupRateMultiplier，以免污染 user:group 倍率缓存。
-	pricingAt := input.PricingAt
-	if pricingAt.IsZero() {
-		pricingAt = timezone.Now()
-	}
-	multiplier, imageMultiplier := computePeakAwareMultipliers(apiKey, multiplier, pricingAt)
-
-	// 确定计费模型
+	// 确定计费模型（须先于倍率计算：模型级倍率按计费模型名匹配）
 	concreteBillingModel := forwardResultBillingModel(result.Model, result.UpstreamModel)
 	billingModel := concreteBillingModel
 	if input.BillingModelSource == BillingModelSourceChannelMapped && input.ChannelMappedModel != "" {
@@ -823,6 +806,26 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	// 通用兜底（与 OpenAI 路径的 usageBillingModelCandidates 语义对齐）：
 	// 选定模型查不到任何价格时回退到实际转发的具体模型。已定价流量不受影响。
 	billingModel = s.billableModelWithFallback(ctx, apiKey, billingModel, result.UpstreamModel, result.Model)
+
+	// 获取费率倍数（优先级：用户专属 > 分组默认 > 系统默认）
+	multiplier := 1.0
+	if s.cfg != nil {
+		multiplier = s.cfg.Default.RateMultiplier
+	}
+	if apiKey.GroupID != nil && apiKey.Group != nil {
+		groupDefault := apiKey.Group.RateMultiplier
+		multiplier = s.ResolveUserGroupRateMultiplier(ctx, user.ID, *apiKey.GroupID, groupDefault)
+	}
+	// 模型级计费倍率（隐式配置）：命中时「替代」上述分组/用户倍率，仅对命中的计费模型生效。
+	// 置于高峰叠加之前，使最终倍率 = 模型级倍率 × 高峰因子（见 §5.1 替代语义）。
+	multiplier = s.applyModelRateMultiplier(apiKey, billingModel, multiplier)
+	// token 倍率叠加高峰因子（token 计费含图片 token，图片按次倍率不受影响）。高峰因子按请求时刻现算，
+	// 不并入上面的 getUserGroupRateMultiplier，以免污染 user:group 倍率缓存。
+	pricingAt := input.PricingAt
+	if pricingAt.IsZero() {
+		pricingAt = timezone.Now()
+	}
+	multiplier, imageMultiplier := computePeakAwareMultipliers(apiKey, multiplier, pricingAt)
 
 	// 确定 RequestedModel（渠道映射前的原始模型）
 	requestedModel := result.Model
@@ -981,6 +984,24 @@ func (s *GatewayService) calculateRecordUsageCost(
 		}
 	}
 	return tokenCost
+}
+
+// applyModelRateMultiplier 应用「模型级计费倍率」（隐式配置，存于 groups.model_pricing 条目的
+// rate_multiplier 字段）。语义为「替代」：命中时用该倍率覆盖分组/用户默认倍率，仅对命中的计费
+// 模型生效，不影响同分组其他模型。返回「基础倍率」（尚未叠加高峰因子），调用方随后照常叠加高峰。
+// 未命中或配置非法（<=0）时原样返回，保证向后兼容。
+func (s *GatewayService) applyModelRateMultiplier(apiKey *APIKey, billingModel string, base float64) float64 {
+	if apiKey == nil || apiKey.Group == nil || billingModel == "" {
+		return base
+	}
+	entry := matchGroupModelPricing(apiKey.Group, billingModel)
+	if entry == nil || entry.RateMultiplier == nil {
+		return base
+	}
+	if v := *entry.RateMultiplier; v > 0 {
+		return v
+	}
+	return base
 }
 
 // compositeBillableModel 决定 composite 分组请求的计费模型：来源覆盖把计费模型

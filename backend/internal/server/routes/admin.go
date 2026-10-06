@@ -351,10 +351,16 @@ func registerGroupRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		groups.GET("/:id/rate-multipliers", h.Admin.Group.GetGroupRateMultipliers)
 		groups.PUT("/:id/rate-multipliers", h.Admin.Group.BatchSetGroupRateMultipliers)
 		groups.DELETE("/:id/rate-multipliers", h.Admin.Group.ClearGroupRateMultipliers)
+		groups.GET("/:id/model-prices", h.Admin.Group.GetGroupModelPrices)
+		groups.PUT("/:id/model-prices/:model/rate-multiplier", h.Admin.Group.SetGroupModelRateMultiplier)
+		groups.DELETE("/:id/model-prices/:model/rate-multiplier", h.Admin.Group.ClearGroupModelRateMultiplier)
 		groups.PUT("/:id/rpm-overrides", h.Admin.Group.BatchSetGroupRPMOverrides)
 		groups.DELETE("/:id/rpm-overrides", h.Admin.Group.ClearGroupRPMOverrides)
 		groups.GET("/:id/api-keys", h.Admin.Group.GetGroupAPIKeys)
 	}
+	// 「模型价格」页：一次性列出全部分组及其可配置模型。
+	// 放在 /groups 组外，避免与 /groups/:id 通配路径冲突（gin 不允许同层静态段与参数段共存）。
+	admin.GET("/model-prices", h.Admin.Group.ListAllGroupModelPrices)
 }
 
 func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {

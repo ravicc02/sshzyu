@@ -41,6 +41,9 @@ type groupRepoStubForAdmin struct {
 	listWithFiltersGroups      []Group
 	listWithFiltersResult      *pagination.PaginationResult
 	listWithFiltersErr         error
+
+	// activeGroups 供 ListActive 返回；为 nil 时 ListActive 仍 panic（避免掩盖未预期的调用）。
+	activeGroups []Group
 }
 
 func (s *groupRepoStubForAdmin) Create(_ context.Context, g *Group) error {
@@ -295,6 +298,9 @@ func TestAdminServiceSimpleModeListUsesRepositoryFilteredTotal(t *testing.T) {
 }
 
 func (s *groupRepoStubForAdmin) ListActive(_ context.Context) ([]Group, error) {
+	if s.activeGroups != nil {
+		return s.activeGroups, nil
+	}
 	panic("unexpected ListActive call")
 }
 
