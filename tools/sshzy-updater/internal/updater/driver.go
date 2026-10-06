@@ -35,6 +35,7 @@ type HostDriver struct {
 	runCommand     func(context.Context, string, ...string) ([]byte, error)
 	runtimeProbe   func(context.Context) (map[string]any, error)
 	backupOverride func(context.Context, Operation) (string, error)
+	renameOverride func(string, string) error
 }
 
 func (driver *HostDriver) run(ctx context.Context, name string, arguments ...string) ([]byte, error) {
@@ -42,6 +43,36 @@ func (driver *HostDriver) run(ctx context.Context, name string, arguments ...str
 		return driver.runCommand(ctx, name, arguments...)
 	}
 	return command(ctx, name, arguments...)
+}
+
+// rename 默认使用 os.Rename（同一挂载点内为原子操作）；测试可注入 renameOverride。
+func (driver *HostDriver) rename(source, target string) error {
+	if driver.renameOverride != nil {
+		return driver.renameOverride(source, target)
+	}
+	return os.Rename(source, target)
+}
+
+// materializeUI 把 prepared 的 UI 产物落到目标 release 目录。
+// 源（state/prepared/<id>/ui）与目标（ui_root/releases/<version>）可能位于不同的
+// vfsmount——例如 /opt/sub2api-deploy 与 /opt/sshzyu-ui 是两个独立 bind mount，
+// 此时 rename(2) 返回 EXDEV，即便 stat 的设备号相同。因此 rename 失败且属跨设备
+// 错误时，回退到复制 + 删除源；其它错误照常上抛。
+func (driver *HostDriver) materializeUI(ctx context.Context, source, target string) error {
+	err := driver.rename(source, target)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, errCrossDevice) {
+		return err
+	}
+	if _, copyErr := driver.run(ctx, "cp", "-a", source, target); copyErr != nil {
+		return err
+	}
+	if _, removeErr := driver.run(ctx, "rm", "-rf", source); removeErr != nil {
+		return removeErr
+	}
+	return nil
 }
 
 func NewHostDriver(config Config, source *GitHubSource) (*HostDriver, error) {
@@ -814,10 +845,10 @@ func (driver *HostDriver) Activate(ctx context.Context, operation Operation, sta
 	source := filepath.Join(driver.config.StateDir, "prepared", operation.ID, "ui")
 	target := filepath.Join(driver.config.UIRoot, "releases", operation.Target.Version)
 	if _, err := os.Stat(target); errors.Is(err, os.ErrNotExist) {
-		if err := os.Rename(source, target); err != nil {
+		if err := driver.materializeUI(ctx, source, target); err != nil {
 			return err
 		}
-		// os.Rename 保留源目录权限（prepared 产物曾被 umask 削成 700/600），
+		// 产物可能被 umask 削成 700/600（prepared 解包与跨设备复制都会如此），
 		// 切版前先规范化，避免 nginx worker 读不到。
 		if err := normalizeUIPermissions(target); err != nil {
 			return err
