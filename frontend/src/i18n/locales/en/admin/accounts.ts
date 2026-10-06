@@ -34,6 +34,12 @@ export default {
         consentRequired: 'Confirm the invitation program before sending.'
       },
       opencodeGo: {
+        accountMode: {
+          zen: 'Zen',
+          zenDesc: 'Pay-as-you-go gateway. Consumes account credits, billed per token.',
+          go: 'GO',
+          goDesc: 'Subscription gateway, rate-limited by 5-hour / weekly / monthly usage windows.'
+        },
         rollingShort: 'Rolling',
         weeklyShort: 'Weekly',
         monthlyShort: 'Monthly',
