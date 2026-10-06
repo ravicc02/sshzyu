@@ -1282,14 +1282,19 @@ func (s *adminServiceImpl) BatchSetGroupRateMultipliers(ctx context.Context, gro
 // GroupModelPriceEntry 是「模型价格」页的单个模型条目。
 // CustomRate 表示该模型是否已配置独立倍率；界面不展示具体数值（隐式配置）。
 type GroupModelPriceEntry struct {
-	Model      string `json:"model"`
-	CustomRate bool   `json:"custom_rate"`
+	Model string `json:"model"`
+	// CustomRate 表示该模型是否已配置独立倍率（等价于 RateMultiplier != nil）。
+	CustomRate bool `json:"custom_rate"`
+	// RateMultiplier 是该模型的实际覆盖倍率（未配置为 nil）。这是管理员侧页面，
+	// 需要直接展示配置值，故回传数值；对终端用户的用量记录不暴露该值。
+	RateMultiplier *float64 `json:"rate_multiplier,omitempty"`
 }
 
 // GetGroupModelPrices 返回分组下可用于配置独立倍率的模型清单及其配置状态。
 // 模型清单来源：该分组可调度账号的 model_mapping（账号级模型列表）并集，
 // 即分组实际配置的模型；不含平台默认模型兜底——分组没配的模型不出现在「模型价格」页。
-// 仅返回是否已配独立倍率（CustomRate），不回传倍率数值。
+// 每个模型返回是否已配独立倍率（CustomRate）与实际覆盖倍率（RateMultiplier，未配置为 nil），
+// 供管理端「模型价格」页直接展示配置值。
 func (s *adminServiceImpl) GetGroupModelPrices(ctx context.Context, groupID int64) ([]GroupModelPriceEntry, error) {
 	group, err := s.groupRepo.GetByID(ctx, groupID)
 	if err != nil {
@@ -1349,16 +1354,19 @@ func (s *adminServiceImpl) groupModelPriceEntries(ctx context.Context, group *Gr
 	entries := make([]GroupModelPriceEntry, 0, len(models))
 	for _, m := range models {
 		entry := matchGroupModelPricing(group, m)
-		entries = append(entries, GroupModelPriceEntry{
-			Model:      m,
-			CustomRate: entry != nil && entry.RateMultiplier != nil && *entry.RateMultiplier > 0,
-		})
+		item := GroupModelPriceEntry{Model: m}
+		if entry != nil && entry.RateMultiplier != nil && *entry.RateMultiplier > 0 {
+			rate := *entry.RateMultiplier
+			item.CustomRate = true
+			item.RateMultiplier = &rate
+		}
+		entries = append(entries, item)
 	}
 	return entries, nil
 }
 
 // GroupModelPriceGroup 是「模型价格」页的单个分组条目：分组信息 + 该分组下可配置的模型清单。
-// RateMultiplier 是分组默认计费倍率，供页面在分组名旁展示；模型级独立倍率不回传数值（隐式配置）。
+// RateMultiplier 是分组默认计费倍率，供页面在分组名旁展示。
 type GroupModelPriceGroup struct {
 	ID             int64                  `json:"id"`
 	Name           string                 `json:"name"`

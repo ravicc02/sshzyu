@@ -556,6 +556,54 @@ describe('admin UsageTable tooltip', () => {
     expect(text).toContain('not recorded')
     expect(text).not.toContain('(2K)')
   })
+
+  it('shows the group default rate multiplier in cost details, keeping the model-level rate implicit', async () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [
+          {
+            request_id: 'req-model-rate-implicit',
+            model: 'gpt-6.1-sol',
+            total_cost: 0.001,
+            actual_cost: 0.0005,
+            input_cost: 0.001,
+            output_cost: 0,
+            cache_creation_cost: 0,
+            cache_read_cost: 0,
+            input_tokens: 100,
+            output_tokens: 0,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
+            // 最终生效倍率（含模型级独立倍率），不应在费用详情中暴露
+            rate_multiplier: 0.5,
+            account_rate_multiplier: 1,
+            // 分组默认倍率，费用详情应展示这个值
+            group: { rate_multiplier: 0.25 },
+          },
+        ],
+        loading: false,
+        columns: [],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStub,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    // 费用详情 tooltip 由第二个 .group.relative 触发（第一个是 token 详情）
+    const triggers = wrapper.findAll('.group.relative')
+    expect(triggers.length).toBeGreaterThan(1)
+    await triggers[1].trigger('mouseenter')
+    await nextTick()
+
+    const text = wrapper.text()
+    expect(text).toContain('0.25x')
+    expect(text).not.toContain('0.5x')
+  })
 })
 
 describe('admin UsageTable request ID column', () => {

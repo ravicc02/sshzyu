@@ -1,4 +1,4 @@
-import type { GroupModelPriceGroup } from '@/api/admin/modelPrice'
+import type { GroupModelPriceEntry, GroupModelPriceGroup } from '@/api/admin/modelPrice'
 
 /** 「模型价格」页的平台分节：一个平台 + 该平台下的全部分组。 */
 export interface PlatformSection {
@@ -48,4 +48,18 @@ export function buildPlatformSections(
 export function formatRate(value: number): string {
   const rate = Number.isFinite(value) && value > 0 ? value : 1
   return `${Number(rate.toFixed(3))}x`
+}
+
+/**
+ * 模型行展示的实际生效倍率：已配独立倍率时取覆盖值，否则回落分组默认倍率。
+ * 页面据此直接显示数值（不再用「已自定义 / 默认」这类状态标记）。
+ */
+export function effectiveModelRate(
+  groupRate: number,
+  entry: Pick<GroupModelPriceEntry, 'rate_multiplier'>
+): number {
+  const override = entry.rate_multiplier
+  return typeof override === 'number' && Number.isFinite(override) && override > 0
+    ? override
+    : groupRate
 }

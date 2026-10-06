@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildPlatformSections, formatRate } from '../modelPriceView'
+import { buildPlatformSections, effectiveModelRate, formatRate } from '../modelPriceView'
 import type { GroupModelPriceGroup } from '@/api/admin/modelPrice'
 
 function g(partial: Partial<GroupModelPriceGroup> & { id: number }): GroupModelPriceGroup {
@@ -73,5 +73,26 @@ describe('formatRate', () => {
     expect(formatRate(-2)).toBe('1x')
     expect(formatRate(Number.NaN)).toBe('1x')
     expect(formatRate(Number.POSITIVE_INFINITY)).toBe('1x')
+  })
+})
+
+describe('effectiveModelRate', () => {
+  it('已配独立倍率时取覆盖值', () => {
+    expect(effectiveModelRate(0.3, { rate_multiplier: 0.6 })).toBe(0.6)
+  })
+
+  it('未配置（null）时回落分组默认倍率', () => {
+    expect(effectiveModelRate(0.3, { rate_multiplier: null })).toBe(0.3)
+  })
+
+  it('非法覆盖值不生效，仍回落分组默认倍率', () => {
+    expect(effectiveModelRate(0.3, { rate_multiplier: 0 })).toBe(0.3)
+    expect(effectiveModelRate(0.3, { rate_multiplier: -1 })).toBe(0.3)
+    expect(effectiveModelRate(0.3, { rate_multiplier: Number.NaN })).toBe(0.3)
+  })
+
+  it('与 formatRate 组合得到页面展示文本', () => {
+    expect(formatRate(effectiveModelRate(0.25, { rate_multiplier: 0.5 }))).toBe('0.5x')
+    expect(formatRate(effectiveModelRate(0.25, { rate_multiplier: null }))).toBe('0.25x')
   })
 })

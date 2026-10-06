@@ -84,7 +84,7 @@
                       v-if="customCount(g) > 0"
                       class="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
                     >
-                      {{ t('admin.modelPrice.customCount', { count: customCount(g) }) }}
+                      {{ t('admin.modelPrice.overrideCount', { count: customCount(g) }) }}
                     </span>
                     <span class="text-gray-500 dark:text-dark-400">
                       {{ t('admin.modelPrice.modelCount', { count: g.models.length }) }}
@@ -113,17 +113,21 @@
                       <span class="truncate text-sm text-gray-900 dark:text-gray-100">{{
                         m.model
                       }}</span>
+                      <!-- 直接显示实际生效倍率：已覆盖为覆盖值（琥珀），否则为分组默认倍率（灰） -->
                       <span
-                        class="inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+                        class="inline-flex shrink-0 rounded-full px-2 py-0.5 font-mono text-xs font-medium"
                         :class="
                           m.custom_rate
                             ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
                             : 'bg-gray-100 text-gray-600 dark:bg-dark-900 dark:text-dark-300'
                         "
+                        :title="
+                          m.custom_rate
+                            ? t('admin.modelPrice.overrideRateTitle')
+                            : t('admin.modelPrice.groupDefaultRateTitle')
+                        "
                       >
-                        {{
-                          m.custom_rate ? t('admin.modelPrice.custom') : t('admin.modelPrice.default')
-                        }}
+                        {{ formatRate(effectiveModelRate(g.rate_multiplier, m)) }}
                       </span>
                     </div>
                     <div class="flex shrink-0 items-center gap-2">
@@ -209,7 +213,7 @@ import {
   platformLabel
 } from '@/utils/platformColors'
 import type { GroupPlatform } from '@/types'
-import { buildPlatformSections, formatRate } from './modelPriceView'
+import { buildPlatformSections, effectiveModelRate, formatRate } from './modelPriceView'
 import {
   clearModelRateMultiplier,
   listAllGroupModelPrices,
@@ -282,7 +286,8 @@ function openDialog(groupId: number, m: GroupModelPriceEntry) {
   dialog.visible = true
   dialog.groupId = groupId
   dialog.model = m.model
-  dialog.value = undefined // 不回显当前倍率（隐式配置）
+  // 回显当前覆盖倍率；未配置时留空，提示将回落分组默认倍率。
+  dialog.value = m.rate_multiplier ?? undefined
 }
 
 async function saveRate() {

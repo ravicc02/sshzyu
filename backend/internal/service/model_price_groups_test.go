@@ -13,7 +13,7 @@ import (
 //   - 列出所有活跃分组（不再按分组筛选）；
 //   - 模型清单只取分组实际配置的模型（可调度账号 model_mapping），
 //     不含平台默认模型兜底，也不再用 ModelPricing ∪ ModelAllowlist 拼凑；
-//   - CustomRate 反映该模型是否已配独立倍率，且不泄露倍率数值。
+//   - CustomRate 反映该模型是否已配独立倍率，RateMultiplier 回传实际覆盖倍率（未配置为 nil）。
 func TestAdminService_ListAllGroupModelPrices(t *testing.T) {
 	accountRepo := &accountRepoStubForCompositeModelsList{
 		accounts: []Account{
@@ -65,4 +65,6 @@ func TestAdminService_ListAllGroupModelPrices(t *testing.T) {
 	// 来自账号 model_mapping 的模型在列，且已配独立倍率。
 	require.Contains(t, byModel, "gpt-custom")
 	require.True(t, byModel["gpt-custom"], "gpt-custom 应标记为已配独立倍率")
+	require.NotNil(t, groups[0].Models[0].RateMultiplier, "已配独立倍率的模型应回传覆盖倍率数值")
+	require.Equal(t, 1.5, *groups[0].Models[0].RateMultiplier, "覆盖倍率应为配置值，供管理端页面展示")
 }

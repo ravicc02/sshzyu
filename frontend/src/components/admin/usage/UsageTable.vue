@@ -497,7 +497,8 @@
           </div>
           <div class="flex items-center justify-between gap-6">
             <span class="text-gray-400">{{ t('usage.rate') }}</span>
-            <span class="font-semibold text-blue-400">{{ formatMultiplier(tooltipData?.rate_multiplier || 1) }}x</span>
+            <!-- 有意展示「分组默认倍率」而非最终生效倍率：模型级独立倍率属隐式配置，不在用量详情中暴露 -->
+            <span class="font-semibold text-blue-400">{{ formatMultiplier(tooltipData?.group?.rate_multiplier ?? 1) }}x</span>
           </div>
           <div class="flex items-center justify-between gap-6">
             <span class="text-gray-400">{{ t('usage.original') }}</span>
