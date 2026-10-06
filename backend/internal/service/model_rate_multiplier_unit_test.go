@@ -218,3 +218,61 @@ func TestRecordUsage_ModelRateMultiplierReplacesGroupRate(t *testing.T) {
 		require.InDelta(t, groupRate, usageRepo.lastLog.RateMultiplier, 1e-12)
 	})
 }
+
+// TestRecordUsage_ModelRateMultiplierAppliesAcrossPlatforms 断言模型级倍率的匹配与应用
+// 与分组平台无关：通用计费路径（recordUsageCore）服务的每一种平台分组，命中模型级倍率时
+// 都必须生效，不存在「某些平台漏接」的旁路。
+//
+// openai / grok 走 OpenAIGatewayService，另有
+// model_rate_multiplier_openai_path_test.go 参数化覆盖，本测试不重复。
+func TestRecordUsage_ModelRateMultiplierAppliesAcrossPlatforms(t *testing.T) {
+	const groupID = int64(22)
+	const groupRate = 0.4
+	const modelRate = 0.9
+
+	platforms := []string{
+		PlatformAnthropic,
+		PlatformGemini,
+		PlatformAntigravity,
+		PlatformKimi,
+		PlatformZhipu,
+		PlatformDeepseek,
+		PlatformMiniMax,
+		PlatformTypeSafe,
+		PlatformOpenCodeGo,
+		PlatformComposite,
+	}
+
+	for _, platform := range platforms {
+		t.Run(platform, func(t *testing.T) {
+			usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+			userRepo := &openAIRecordUsageUserRepoStub{}
+			svc := newGatewayRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{})
+			svc.resolver = NewModelPricingResolver(nil, svc.billingService)
+
+			group := &Group{
+				ID:             groupID,
+				Platform:       platform,
+				RateMultiplier: groupRate,
+				ModelPricing: []ChannelModelPricing{
+					{Models: []string{"gpt-5.1"}, RateMultiplier: testRatePtr(modelRate)},
+				},
+			}
+			require.NoError(t, svc.RecordUsage(context.Background(), &RecordUsageInput{
+				Result: &ForwardResult{
+					RequestID: "mm_platform_" + platform,
+					Model:     "gpt-5.1",
+					Usage:     ClaudeUsage{InputTokens: 1000, OutputTokens: 500},
+					Duration:  time.Second,
+				},
+				APIKey:  &APIKey{ID: 1, GroupID: i64p(groupID), Group: group},
+				User:    &User{ID: 2},
+				Account: &Account{ID: 3, Platform: platform, Type: AccountTypeAPIKey},
+			}))
+
+			require.NotNil(t, usageRepo.lastLog)
+			require.InDelta(t, modelRate, usageRepo.lastLog.RateMultiplier, 1e-12,
+				"平台 %s 的模型级倍率须生效", platform)
+		})
+	}
+}

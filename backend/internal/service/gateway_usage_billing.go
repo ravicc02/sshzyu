@@ -990,11 +990,23 @@ func (s *GatewayService) calculateRecordUsageCost(
 // rate_multiplier 字段）。语义为「替代」：命中时用该倍率覆盖分组/用户默认倍率，仅对命中的计费
 // 模型生效，不影响同分组其他模型。返回「基础倍率」（尚未叠加高峰因子），调用方随后照常叠加高峰。
 // 未命中或配置非法（<=0）时原样返回，保证向后兼容。
-func (s *GatewayService) applyModelRateMultiplier(apiKey *APIKey, billingModel string, base float64) float64 {
-	if apiKey == nil || apiKey.Group == nil || billingModel == "" {
+//
+// 包级函数：Claude/通用计费、OpenAI 计费、预扣估算、批量生图四条路径共用同一实现，避免
+// 语义漂移（历史上模型级倍率只接入了通用计费路径，OpenAI 路径漏接导致线上不生效）。
+func applyModelRateMultiplier(apiKey *APIKey, billingModel string, base float64) float64 {
+	if apiKey == nil {
 		return base
 	}
-	entry := matchGroupModelPricing(apiKey.Group, billingModel)
+	return applyModelRateMultiplierToGroup(apiKey.Group, billingModel, base)
+}
+
+// applyModelRateMultiplierToGroup 是 applyModelRateMultiplier 的「直接持有 Group」形式，
+// 供不经过 APIKey 的计费路径（如批量生图仅持有 group）复用同一匹配与「替代」语义。
+func applyModelRateMultiplierToGroup(group *Group, billingModel string, base float64) float64 {
+	if group == nil || billingModel == "" {
+		return base
+	}
+	entry := matchGroupModelPricing(group, billingModel)
 	if entry == nil || entry.RateMultiplier == nil {
 		return base
 	}
@@ -1002,6 +1014,11 @@ func (s *GatewayService) applyModelRateMultiplier(apiKey *APIKey, billingModel s
 		return v
 	}
 	return base
+}
+
+// applyModelRateMultiplier 保留 GatewayService 方法形式（既有调用点与测试），委托包级实现。
+func (s *GatewayService) applyModelRateMultiplier(apiKey *APIKey, billingModel string, base float64) float64 {
+	return applyModelRateMultiplier(apiKey, billingModel, base)
 }
 
 // compositeBillableModel 决定 composite 分组请求的计费模型：来源覆盖把计费模型

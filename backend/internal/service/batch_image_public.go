@@ -1344,6 +1344,10 @@ func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, ow
 				effectiveGroupMultiplier = *userRate
 			}
 		}
+		// 模型级计费倍率（隐式配置）：与主计费路径同源，「替代」分组/用户倍率，仅对命中的
+		// 计费模型生效。置于 image-independent 覆盖之前，与 computePeakAwareMultipliers 的
+		// resolveImageRateMultiplier 语义保持一致（分组独立图片倍率优先于模型级倍率）。
+		effectiveGroupMultiplier = applyModelRateMultiplierToGroup(group, req.Model, effectiveGroupMultiplier)
 		groupMultiplier = effectiveGroupMultiplier
 		if group.ImageRateIndependent {
 			groupMultiplier = group.ImageRateMultiplier
