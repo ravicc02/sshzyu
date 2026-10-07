@@ -3,7 +3,6 @@ package updater
 import (
 	"crypto/subtle"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -17,7 +16,7 @@ func decodeRequest(request *http.Request, value any) error {
 	decoder := json.NewDecoder(io.LimitReader(request.Body, 32769))
 	decoder.DisallowUnknownFields()
 	if decoder.Decode(value) != nil || decoder.Decode(new(any)) != io.EOF {
-		return errors.New("INVALID_REQUEST")
+		return CodeError("INVALID_REQUEST")
 	}
 	return nil
 }
@@ -83,6 +82,27 @@ func (manager *Manager) Handler(token string) http.Handler {
 	})
 	mux.HandleFunc("POST /v1/operations/{id}/cancel", func(response http.ResponseWriter, request *http.Request) {
 		operation, err := manager.Cancel(request.PathValue("id"))
+		if err != nil {
+			failure(response, err)
+			return
+		}
+		reply(response, 200, operation)
+	})
+	// Recovery is executed inside the daemon so that the in-memory manager and
+	// the on-disk state stay consistent. Running it as a separate CLI process
+	// rewrites disk only, leaving the daemon's `active` pointer stale.
+	mux.HandleFunc("POST /v1/operations/{id}/recover", func(response http.ResponseWriter, request *http.Request) {
+		var input RecoverRequest
+		if err := decodeRequest(request, &input); err != nil {
+			failure(response, err)
+			return
+		}
+		id := request.PathValue("id")
+		if err := manager.Recover(request.Context(), id, input.Decision); err != nil {
+			failure(response, err)
+			return
+		}
+		operation, err := manager.Status(id)
 		if err != nil {
 			failure(response, err)
 			return

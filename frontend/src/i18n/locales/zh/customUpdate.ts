@@ -49,10 +49,20 @@ export default {
       MANUAL_MIGRATION_REQUIRED: '数据库迁移需要单独维护，不能直接更新。',
       UPDATE_CONFIRMATION_REQUIRED: '请明确确认停机维护及待执行的数据库迁移。',
       STEP_UP_UNAVAILABLE: '双重验证暂不可用，不能激活更新。',
+      STEP_UP_TOTP_NOT_ENABLED: '激活更新需要双重验证，但当前账号尚未启用 2FA。请先前往「个人资料 → 安全」启用两步验证，然后重试。',
+      STEP_UP_ADMIN_API_KEY_FORBIDDEN: '通过管理员 API Key 发起的请求不能激活更新，请改用网页登录的会话操作。',
       SHARED_ASSET_COLLISION: '前端资源校验冲突，需运维人员核对。',
       DEPLOYMENT_DRIFT: '准备后部署状态发生变化，请取消并重新检查。',
       TARGET_CHANGED: '目标发布版本身份发生变化，请重新检查。',
-      ACTIVATION_FAILED: '激活未完成，请查看技术详情并联系运维。'
+      ACTIVATION_FAILED: '激活未完成，请查看技术详情并联系运维。',
+      INVALID_REQUEST: '请求格式无效，请刷新页面后重试。',
+      INVALID_UPDATE_REQUEST: '更新请求参数无效，请重新检查更新后重试。',
+      INVALID_OPERATION_KIND: '更新任务类型无效，请重新检查更新。',
+      IDEMPOTENCY_CONFLICT: '同一请求键对应了不同的更新目标，请重新检查更新。',
+      TARGET_VERIFICATION_FAILED: '目标版本校验失败，请稍后重试或联系运维。',
+      OPERATION_NOT_READY: '该更新任务尚未就绪，无法执行。',
+      OPERATION_CANNOT_BE_CANCELLED: '该任务当前状态不可取消。',
+      STATE_WRITE_FAILED: '更新状态写入失败，请联系运维。'
     },
     stages: {
       queued: '准备任务已排队', preflight: '正在校验和准备产物', ready: '准备完成，等待确认',

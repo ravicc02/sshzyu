@@ -92,6 +92,14 @@ type ActivateRequest struct {
 	ConfirmMigrations []string `json:"confirm_migrations"`
 }
 
+// RecoverRequest carries the operator's decision for an interrupted operation.
+// It is served over the daemon control socket so that recovery mutates the
+// running manager's in-memory state together with on-disk state; a separate CLI
+// invocation would only rewrite disk and leave the daemon unaware.
+type RecoverRequest struct {
+	Decision string `json:"decision"`
+}
+
 type Source interface {
 	List(context.Context) ([]Release, error)
 	Get(context.Context, string, string) (Release, error)
@@ -218,7 +226,7 @@ func (manager *Manager) Status(id string) (Operation, error) {
 	defer manager.mu.Unlock()
 	operation, exists := manager.operations[id]
 	if !exists || !operationPattern.MatchString(id) {
-		return Operation{}, errors.New("OPERATION_NOT_FOUND")
+		return Operation{}, CodeError("OPERATION_NOT_FOUND")
 	}
 	return operation, nil
 }
@@ -226,31 +234,31 @@ func (manager *Manager) Status(id string) (Operation, error) {
 func (manager *Manager) Prepare(ctx context.Context, request PrepareRequest) (Operation, error) {
 	if _, err := release.ParseVersion(request.Version); err != nil || !manifestHashPattern.MatchString(request.ManifestHash) ||
 		request.ActorID <= 0 || !keyPattern.MatchString(request.IdempotencyKey) {
-		return Operation{}, errors.New("INVALID_UPDATE_REQUEST")
+		return Operation{}, CodeError("INVALID_UPDATE_REQUEST")
 	}
 	kind := request.Kind
 	if kind == "" {
 		kind = "update"
 	}
 	if kind != "update" && kind != "rollback" {
-		return Operation{}, errors.New("INVALID_OPERATION_KIND")
+		return Operation{}, CodeError("INVALID_OPERATION_KIND")
 	}
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
 	for _, existing := range manager.operations {
 		if existing.IdempotencyKey == request.IdempotencyKey && existing.ActorID == request.ActorID {
 			if existing.ManifestHash != request.ManifestHash || existing.Target.Version != request.Version || existing.Kind != kind {
-				return Operation{}, errors.New("IDEMPOTENCY_CONFLICT")
+				return Operation{}, CodeError("IDEMPOTENCY_CONFLICT")
 			}
 			return existing, nil
 		}
 	}
 	if manager.active != "" {
-		return Operation{}, errors.New("UPDATE_IN_PROGRESS")
+		return Operation{}, CodeError("UPDATE_IN_PROGRESS")
 	}
 	target, err := manager.source.Get(ctx, request.Version, request.ManifestHash)
 	if err != nil {
-		return Operation{}, errors.New("TARGET_VERIFICATION_FAILED")
+		return Operation{}, CodeError("TARGET_VERIFICATION_FAILED")
 	}
 	random := make([]byte, 16)
 	if _, err := rand.Read(random); err != nil {
@@ -260,7 +268,7 @@ func (manager *Manager) Prepare(ctx context.Context, request PrepareRequest) (Op
 		IdempotencyKey: request.IdempotencyKey, ManifestHash: target.Hash, Target: target.Manifest,
 		Stage: "queued", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 	if err := manager.save(operation); err != nil {
-		return Operation{}, errors.New("STATE_WRITE_FAILED")
+		return Operation{}, CodeError("STATE_WRITE_FAILED")
 	}
 	manager.operations[operation.ID], manager.active = operation, operation.ID
 	go manager.prepare(operation, target)
@@ -295,29 +303,29 @@ func (manager *Manager) Activate(id string, request ActivateRequest) (Operation,
 	defer manager.mu.Unlock()
 	operation, exists := manager.operations[id]
 	if !exists || operation.Stage != "ready" || manager.active != id {
-		return Operation{}, errors.New("OPERATION_NOT_READY")
+		return Operation{}, CodeError("OPERATION_NOT_READY")
 	}
 	if !manager.config.ActivationEnabled {
-		return Operation{}, errors.New("ACTIVATION_DISABLED")
+		return Operation{}, CodeError("ACTIVATION_DISABLED")
 	}
 	if !manager.config.PaymentCallbacksReviewed {
-		return Operation{}, errors.New("PAYMENT_CALLBACK_REVIEW_REQUIRED")
+		return Operation{}, CodeError("PAYMENT_CALLBACK_REVIEW_REQUIRED")
 	}
 	expected := make([]string, 0, len(operation.Pending))
 	for _, migration := range operation.Pending {
 		if migration.Risk != "backward-compatible" || migration.NonTransactional {
-			return Operation{}, errors.New("MANUAL_MIGRATION_REQUIRED")
+			return Operation{}, CodeError("MANUAL_MIGRATION_REQUIRED")
 		}
 		expected = append(expected, migration.Filename)
 	}
 	confirmed := append([]string{}, request.ConfirmMigrations...)
 	sort.Strings(confirmed)
 	if !request.ConfirmDowntime || request.ManifestHash != operation.ManifestHash || !reflect.DeepEqual(expected, confirmed) {
-		return Operation{}, errors.New("UPDATE_CONFIRMATION_REQUIRED")
+		return Operation{}, CodeError("UPDATE_CONFIRMATION_REQUIRED")
 	}
 	operation.Stage, operation.UpdatedAt = "draining", time.Now().UTC()
 	if err := manager.save(operation); err != nil {
-		return Operation{}, errors.New("STATE_WRITE_FAILED")
+		return Operation{}, CodeError("STATE_WRITE_FAILED")
 	}
 	manager.operations[id] = operation
 	go func() {
@@ -348,7 +356,7 @@ func (manager *Manager) Cancel(id string) (Operation, error) {
 	defer manager.mu.Unlock()
 	operation, exists := manager.operations[id]
 	if !exists || operation.Stage != "ready" {
-		return Operation{}, errors.New("OPERATION_CANNOT_BE_CANCELLED")
+		return Operation{}, CodeError("OPERATION_CANNOT_BE_CANCELLED")
 	}
 	operation.Stage, operation.UpdatedAt = "cancelled", time.Now().UTC()
 	if err := manager.save(operation); err != nil {

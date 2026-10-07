@@ -49,10 +49,20 @@ export default {
       MANUAL_MIGRATION_REQUIRED: 'The database migration requires a separate maintenance procedure.',
       UPDATE_CONFIRMATION_REQUIRED: 'Confirm downtime and the exact pending migrations first.',
       STEP_UP_UNAVAILABLE: 'Two-factor verification is unavailable. Activation is blocked.',
+      STEP_UP_TOTP_NOT_ENABLED: 'Activating an update requires two-factor verification, but this account has not enabled 2FA. Enable two-step verification under Profile → Security, then retry.',
+      STEP_UP_ADMIN_API_KEY_FORBIDDEN: 'Requests authenticated with an admin API key cannot activate updates. Use a browser session instead.',
       SHARED_ASSET_COLLISION: 'Interface asset verification found a conflict. Operator review is required.',
       DEPLOYMENT_DRIFT: 'The deployment changed after preparation. Cancel and check again.',
       TARGET_CHANGED: 'The target release identity changed. Check again.',
-      ACTIVATION_FAILED: 'Activation did not complete. Inspect technical details and contact an operator.'
+      ACTIVATION_FAILED: 'Activation did not complete. Inspect technical details and contact an operator.',
+      INVALID_REQUEST: 'The request was malformed. Refresh the page and try again.',
+      INVALID_UPDATE_REQUEST: 'The update request parameters are invalid. Check for updates again.',
+      INVALID_OPERATION_KIND: 'The operation kind is invalid. Check for updates again.',
+      IDEMPOTENCY_CONFLICT: 'The same request key maps to a different update target. Check for updates again.',
+      TARGET_VERIFICATION_FAILED: 'The target release could not be verified. Try again later or contact an operator.',
+      OPERATION_NOT_READY: 'This operation is not ready yet and cannot run.',
+      OPERATION_CANNOT_BE_CANCELLED: 'This operation cannot be cancelled in its current state.',
+      STATE_WRITE_FAILED: 'The updater could not persist its state. Contact an operator.'
     },
     stages: {
       queued: 'Preparation queued', preflight: 'Verifying and preparing artifacts', ready: 'Prepared; awaiting your confirmation',
