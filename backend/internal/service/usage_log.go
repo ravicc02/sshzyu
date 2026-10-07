@@ -168,6 +168,10 @@ type UsageLog struct {
 	ActualCost                float64
 	RateMultiplier            float64
 	LongContextBillingApplied bool
+	// RateMultiplierWithoutModel 展示用倍率快照：不含「模型级计费倍率」这一隐式覆盖，
+	// 即 用户专属倍率（缺省取分组默认倍率）× 高峰因子。用量详情的「费率」展示该值，
+	// 从而只隐藏模型级倍率、保留其余因子。nil 表示该行早于本字段引入，展示侧回退 RateMultiplier。
+	RateMultiplierWithoutModel *float64
 	// AccountRateMultiplier 账号计费倍率快照（nil 表示历史数据，按 1.0 处理）
 	AccountRateMultiplier *float64
 	// AccountStatsCost 账号统计定价预计算费用（nil = 使用默认公式 total_cost × account_rate_multiplier）

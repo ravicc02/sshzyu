@@ -185,6 +185,10 @@ func TestRecordUsage_ModelRateMultiplierReplacesGroupRate(t *testing.T) {
 		require.Equal(t, "gpt-5.1", usageRepo.lastLog.Model)
 		require.InDelta(t, modelRate, usageRepo.lastLog.RateMultiplier, 1e-12,
 			"应使用模型级倍率 1.35 而非分组默认 1.0")
+		// 展示用倍率不含模型级覆盖（隐式配置）：应保持分组默认倍率。
+		require.NotNil(t, usageRepo.lastLog.RateMultiplierWithoutModel)
+		require.InDelta(t, groupRate, *usageRepo.lastLog.RateMultiplierWithoutModel, 1e-12,
+			"展示用倍率不得包含模型级覆盖")
 		// 实际扣费 = 基础成本 × 模型级倍率。
 		require.InDelta(t, usageRepo.lastLog.TotalCost*modelRate, usageRepo.lastLog.ActualCost, 1e-9)
 		require.InDelta(t, usageRepo.lastLog.ActualCost, userRepo.lastAmount, 1e-9)
@@ -198,6 +202,8 @@ func TestRecordUsage_ModelRateMultiplierReplacesGroupRate(t *testing.T) {
 		require.Equal(t, "gpt-5", usageRepo.lastLog.Model)
 		require.InDelta(t, groupRate, usageRepo.lastLog.RateMultiplier, 1e-12,
 			"同组其他模型不得受影响，应保持分组默认倍率")
+		require.NotNil(t, usageRepo.lastLog.RateMultiplierWithoutModel)
+		require.InDelta(t, groupRate, *usageRepo.lastLog.RateMultiplierWithoutModel, 1e-12)
 	})
 
 	t.Run("未配置独立倍率的分组行为与改动前一致", func(t *testing.T) {
@@ -216,6 +222,8 @@ func TestRecordUsage_ModelRateMultiplierReplacesGroupRate(t *testing.T) {
 		}))
 		require.NotNil(t, usageRepo.lastLog)
 		require.InDelta(t, groupRate, usageRepo.lastLog.RateMultiplier, 1e-12)
+		require.NotNil(t, usageRepo.lastLog.RateMultiplierWithoutModel)
+		require.InDelta(t, groupRate, *usageRepo.lastLog.RateMultiplierWithoutModel, 1e-12)
 	})
 }
 

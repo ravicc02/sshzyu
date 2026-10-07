@@ -121,6 +121,14 @@ func (UsageLog) Fields() []ent.Field {
 			Nillable().
 			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}),
 
+		// rate_multiplier_without_model: 展示用倍率快照，不含「模型级计费倍率」这一隐式覆盖，
+		// 即 用户专属倍率（缺省取分组默认）× 高峰因子。用量详情展示该列，使模型级倍率不对外暴露。
+		// NULL 表示该行早于本列引入（前端回退展示 rate_multiplier）。
+		field.Float("rate_multiplier_without_model").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}),
+
 		// 其他字段
 		field.Int8("billing_type").
 			Default(0),

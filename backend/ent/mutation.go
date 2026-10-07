@@ -48969,86 +48969,88 @@ func (m *UsageCleanupTaskMutation) ResetEdge(name string) error {
 // UsageLogMutation represents an operation that mutates the UsageLog nodes in the graph.
 type UsageLogMutation struct {
 	config
-	op                           Op
-	typ                          string
-	id                           *int64
-	request_id                   *string
-	model                        *string
-	requested_model              *string
-	upstream_model               *string
-	upstream_response_model      *string
-	upstream_model_mismatch      *bool
-	channel_id                   *int64
-	addchannel_id                *int64
-	model_mapping_chain          *string
-	billing_tier                 *string
-	billing_mode                 *string
-	input_tokens                 *int
-	addinput_tokens              *int
-	output_tokens                *int
-	addoutput_tokens             *int
-	cache_creation_tokens        *int
-	addcache_creation_tokens     *int
-	cache_read_tokens            *int
-	addcache_read_tokens         *int
-	cache_creation_5m_tokens     *int
-	addcache_creation_5m_tokens  *int
-	cache_creation_1h_tokens     *int
-	addcache_creation_1h_tokens  *int
-	input_cost                   *float64
-	addinput_cost                *float64
-	output_cost                  *float64
-	addoutput_cost               *float64
-	cache_creation_cost          *float64
-	addcache_creation_cost       *float64
-	cache_read_cost              *float64
-	addcache_read_cost           *float64
-	total_cost                   *float64
-	addtotal_cost                *float64
-	actual_cost                  *float64
-	addactual_cost               *float64
-	rate_multiplier              *float64
-	addrate_multiplier           *float64
-	long_context_billing_applied *bool
-	account_rate_multiplier      *float64
-	addaccount_rate_multiplier   *float64
-	billing_type                 *int8
-	addbilling_type              *int8
-	stream                       *bool
-	duration_ms                  *int
-	addduration_ms               *int
-	first_token_ms               *int
-	addfirst_token_ms            *int
-	user_agent                   *string
-	ip_address                   *string
-	image_count                  *int
-	addimage_count               *int
-	image_size                   *string
-	image_input_size             *string
-	image_output_size            *string
-	image_size_source            *string
-	image_size_breakdown         *map[string]int
-	video_count                  *int
-	addvideo_count               *int
-	video_resolution             *string
-	video_duration_seconds       *int
-	addvideo_duration_seconds    *int
-	cache_ttl_overridden         *bool
-	created_at                   *time.Time
-	clearedFields                map[string]struct{}
-	user                         *int64
-	cleareduser                  bool
-	api_key                      *int64
-	clearedapi_key               bool
-	account                      *int64
-	clearedaccount               bool
-	group                        *int64
-	clearedgroup                 bool
-	subscription                 *int64
-	clearedsubscription          bool
-	done                         bool
-	oldValue                     func(context.Context) (*UsageLog, error)
-	predicates                   []predicate.UsageLog
+	op                               Op
+	typ                              string
+	id                               *int64
+	request_id                       *string
+	model                            *string
+	requested_model                  *string
+	upstream_model                   *string
+	upstream_response_model          *string
+	upstream_model_mismatch          *bool
+	channel_id                       *int64
+	addchannel_id                    *int64
+	model_mapping_chain              *string
+	billing_tier                     *string
+	billing_mode                     *string
+	input_tokens                     *int
+	addinput_tokens                  *int
+	output_tokens                    *int
+	addoutput_tokens                 *int
+	cache_creation_tokens            *int
+	addcache_creation_tokens         *int
+	cache_read_tokens                *int
+	addcache_read_tokens             *int
+	cache_creation_5m_tokens         *int
+	addcache_creation_5m_tokens      *int
+	cache_creation_1h_tokens         *int
+	addcache_creation_1h_tokens      *int
+	input_cost                       *float64
+	addinput_cost                    *float64
+	output_cost                      *float64
+	addoutput_cost                   *float64
+	cache_creation_cost              *float64
+	addcache_creation_cost           *float64
+	cache_read_cost                  *float64
+	addcache_read_cost               *float64
+	total_cost                       *float64
+	addtotal_cost                    *float64
+	actual_cost                      *float64
+	addactual_cost                   *float64
+	rate_multiplier                  *float64
+	addrate_multiplier               *float64
+	long_context_billing_applied     *bool
+	account_rate_multiplier          *float64
+	addaccount_rate_multiplier       *float64
+	rate_multiplier_without_model    *float64
+	addrate_multiplier_without_model *float64
+	billing_type                     *int8
+	addbilling_type                  *int8
+	stream                           *bool
+	duration_ms                      *int
+	addduration_ms                   *int
+	first_token_ms                   *int
+	addfirst_token_ms                *int
+	user_agent                       *string
+	ip_address                       *string
+	image_count                      *int
+	addimage_count                   *int
+	image_size                       *string
+	image_input_size                 *string
+	image_output_size                *string
+	image_size_source                *string
+	image_size_breakdown             *map[string]int
+	video_count                      *int
+	addvideo_count                   *int
+	video_resolution                 *string
+	video_duration_seconds           *int
+	addvideo_duration_seconds        *int
+	cache_ttl_overridden             *bool
+	created_at                       *time.Time
+	clearedFields                    map[string]struct{}
+	user                             *int64
+	cleareduser                      bool
+	api_key                          *int64
+	clearedapi_key                   bool
+	account                          *int64
+	clearedaccount                   bool
+	group                            *int64
+	clearedgroup                     bool
+	subscription                     *int64
+	clearedsubscription              bool
+	done                             bool
+	oldValue                         func(context.Context) (*UsageLog, error)
+	predicates                       []predicate.UsageLog
 }
 
 var _ ent.Mutation = (*UsageLogMutation)(nil)
@@ -50674,6 +50676,76 @@ func (m *UsageLogMutation) ResetAccountRateMultiplier() {
 	delete(m.clearedFields, usagelog.FieldAccountRateMultiplier)
 }
 
+// SetRateMultiplierWithoutModel sets the "rate_multiplier_without_model" field.
+func (m *UsageLogMutation) SetRateMultiplierWithoutModel(f float64) {
+	m.rate_multiplier_without_model = &f
+	m.addrate_multiplier_without_model = nil
+}
+
+// RateMultiplierWithoutModel returns the value of the "rate_multiplier_without_model" field in the mutation.
+func (m *UsageLogMutation) RateMultiplierWithoutModel() (r float64, exists bool) {
+	v := m.rate_multiplier_without_model
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRateMultiplierWithoutModel returns the old "rate_multiplier_without_model" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldRateMultiplierWithoutModel(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRateMultiplierWithoutModel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRateMultiplierWithoutModel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRateMultiplierWithoutModel: %w", err)
+	}
+	return oldValue.RateMultiplierWithoutModel, nil
+}
+
+// AddRateMultiplierWithoutModel adds f to the "rate_multiplier_without_model" field.
+func (m *UsageLogMutation) AddRateMultiplierWithoutModel(f float64) {
+	if m.addrate_multiplier_without_model != nil {
+		*m.addrate_multiplier_without_model += f
+	} else {
+		m.addrate_multiplier_without_model = &f
+	}
+}
+
+// AddedRateMultiplierWithoutModel returns the value that was added to the "rate_multiplier_without_model" field in this mutation.
+func (m *UsageLogMutation) AddedRateMultiplierWithoutModel() (r float64, exists bool) {
+	v := m.addrate_multiplier_without_model
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearRateMultiplierWithoutModel clears the value of the "rate_multiplier_without_model" field.
+func (m *UsageLogMutation) ClearRateMultiplierWithoutModel() {
+	m.rate_multiplier_without_model = nil
+	m.addrate_multiplier_without_model = nil
+	m.clearedFields[usagelog.FieldRateMultiplierWithoutModel] = struct{}{}
+}
+
+// RateMultiplierWithoutModelCleared returns if the "rate_multiplier_without_model" field was cleared in this mutation.
+func (m *UsageLogMutation) RateMultiplierWithoutModelCleared() bool {
+	_, ok := m.clearedFields[usagelog.FieldRateMultiplierWithoutModel]
+	return ok
+}
+
+// ResetRateMultiplierWithoutModel resets all changes to the "rate_multiplier_without_model" field.
+func (m *UsageLogMutation) ResetRateMultiplierWithoutModel() {
+	m.rate_multiplier_without_model = nil
+	m.addrate_multiplier_without_model = nil
+	delete(m.clearedFields, usagelog.FieldRateMultiplierWithoutModel)
+}
+
 // SetBillingType sets the "billing_type" field.
 func (m *UsageLogMutation) SetBillingType(i int8) {
 	m.billing_type = &i
@@ -51721,7 +51793,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 47)
+	fields := make([]string, 0, 48)
 	if m.user != nil {
 		fields = append(fields, usagelog.FieldUserID)
 	}
@@ -51811,6 +51883,9 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.account_rate_multiplier != nil {
 		fields = append(fields, usagelog.FieldAccountRateMultiplier)
+	}
+	if m.rate_multiplier_without_model != nil {
+		fields = append(fields, usagelog.FieldRateMultiplierWithoutModel)
 	}
 	if m.billing_type != nil {
 		fields = append(fields, usagelog.FieldBillingType)
@@ -51931,6 +52006,8 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.LongContextBillingApplied()
 	case usagelog.FieldAccountRateMultiplier:
 		return m.AccountRateMultiplier()
+	case usagelog.FieldRateMultiplierWithoutModel:
+		return m.RateMultiplierWithoutModel()
 	case usagelog.FieldBillingType:
 		return m.BillingType()
 	case usagelog.FieldStream:
@@ -52034,6 +52111,8 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldLongContextBillingApplied(ctx)
 	case usagelog.FieldAccountRateMultiplier:
 		return m.OldAccountRateMultiplier(ctx)
+	case usagelog.FieldRateMultiplierWithoutModel:
+		return m.OldRateMultiplierWithoutModel(ctx)
 	case usagelog.FieldBillingType:
 		return m.OldBillingType(ctx)
 	case usagelog.FieldStream:
@@ -52287,6 +52366,13 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetAccountRateMultiplier(v)
 		return nil
+	case usagelog.FieldRateMultiplierWithoutModel:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRateMultiplierWithoutModel(v)
+		return nil
 	case usagelog.FieldBillingType:
 		v, ok := value.(int8)
 		if !ok {
@@ -52459,6 +52545,9 @@ func (m *UsageLogMutation) AddedFields() []string {
 	if m.addaccount_rate_multiplier != nil {
 		fields = append(fields, usagelog.FieldAccountRateMultiplier)
 	}
+	if m.addrate_multiplier_without_model != nil {
+		fields = append(fields, usagelog.FieldRateMultiplierWithoutModel)
+	}
 	if m.addbilling_type != nil {
 		fields = append(fields, usagelog.FieldBillingType)
 	}
@@ -52515,6 +52604,8 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedRateMultiplier()
 	case usagelog.FieldAccountRateMultiplier:
 		return m.AddedAccountRateMultiplier()
+	case usagelog.FieldRateMultiplierWithoutModel:
+		return m.AddedRateMultiplierWithoutModel()
 	case usagelog.FieldBillingType:
 		return m.AddedBillingType()
 	case usagelog.FieldDurationMs:
@@ -52641,6 +52732,13 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddAccountRateMultiplier(v)
 		return nil
+	case usagelog.FieldRateMultiplierWithoutModel:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRateMultiplierWithoutModel(v)
+		return nil
 	case usagelog.FieldBillingType:
 		v, ok := value.(int8)
 		if !ok {
@@ -52724,6 +52822,9 @@ func (m *UsageLogMutation) ClearedFields() []string {
 	if m.FieldCleared(usagelog.FieldAccountRateMultiplier) {
 		fields = append(fields, usagelog.FieldAccountRateMultiplier)
 	}
+	if m.FieldCleared(usagelog.FieldRateMultiplierWithoutModel) {
+		fields = append(fields, usagelog.FieldRateMultiplierWithoutModel)
+	}
 	if m.FieldCleared(usagelog.FieldDurationMs) {
 		fields = append(fields, usagelog.FieldDurationMs)
 	}
@@ -52803,6 +52904,9 @@ func (m *UsageLogMutation) ClearField(name string) error {
 		return nil
 	case usagelog.FieldAccountRateMultiplier:
 		m.ClearAccountRateMultiplier()
+		return nil
+	case usagelog.FieldRateMultiplierWithoutModel:
+		m.ClearRateMultiplierWithoutModel()
 		return nil
 	case usagelog.FieldDurationMs:
 		m.ClearDurationMs()
@@ -52934,6 +53038,9 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldAccountRateMultiplier:
 		m.ResetAccountRateMultiplier()
+		return nil
+	case usagelog.FieldRateMultiplierWithoutModel:
+		m.ResetRateMultiplierWithoutModel()
 		return nil
 	case usagelog.FieldBillingType:
 		m.ResetBillingType()

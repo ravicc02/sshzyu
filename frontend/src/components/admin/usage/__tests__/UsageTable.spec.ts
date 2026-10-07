@@ -557,7 +557,7 @@ describe('admin UsageTable tooltip', () => {
     expect(text).not.toContain('(2K)')
   })
 
-  it('shows the group default rate multiplier in cost details, keeping the model-level rate implicit', async () => {
+  it('hides only the model-level rate multiplier in cost details, keeping user/group multiplier and peak factor', async () => {
     const wrapper = mount(UsageTable, {
       props: {
         data: [
@@ -576,9 +576,11 @@ describe('admin UsageTable tooltip', () => {
             cache_read_tokens: 0,
             // 最终生效倍率（含模型级独立倍率），不应在费用详情中暴露
             rate_multiplier: 0.5,
+            // 展示用倍率（不含模型级覆盖），费用详情应展示这个值
+            rate_multiplier_without_model: 0.25,
             account_rate_multiplier: 1,
-            // 分组默认倍率，费用详情应展示这个值
-            group: { rate_multiplier: 0.25 },
+            // 分组默认倍率，故意与展示值不同：确认页面读的是展示字段而非 group
+            group: { rate_multiplier: 0.9 },
           },
         ],
         loading: false,
@@ -603,6 +605,48 @@ describe('admin UsageTable tooltip', () => {
     const text = wrapper.text()
     expect(text).toContain('0.25x')
     expect(text).not.toContain('0.5x')
+    expect(text).not.toContain('0.9x')
+  })
+
+  it('falls back to the effective rate multiplier when the display snapshot is absent (legacy rows)', async () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [
+          {
+            request_id: 'req-model-rate-legacy',
+            model: 'gpt-6.1-sol',
+            total_cost: 0.001,
+            actual_cost: 0.0005,
+            input_cost: 0.001,
+            output_cost: 0,
+            cache_creation_cost: 0,
+            cache_read_cost: 0,
+            input_tokens: 100,
+            output_tokens: 0,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
+            rate_multiplier: 0.3,
+            account_rate_multiplier: 1,
+          },
+        ],
+        loading: false,
+        columns: [],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStub,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    const triggers = wrapper.findAll('.group.relative')
+    await triggers[1].trigger('mouseenter')
+    await nextTick()
+
+    expect(wrapper.text()).toContain('0.30x')
   })
 })
 

@@ -1767,6 +1767,9 @@ export interface UsageLog {
   total_cost: number
   actual_cost: number
   rate_multiplier: number
+  /** 展示用倍率：不含模型级覆盖（隐式配置），即 用户专属/分组默认倍率 × 高峰因子。
+   *  历史行为 undefined，展示时回退 rate_multiplier。 */
+  rate_multiplier_without_model?: number
   long_context_billing_applied: boolean
   billing_type: number
 

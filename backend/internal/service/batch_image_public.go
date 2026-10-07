@@ -96,15 +96,18 @@ type BatchImagePublicService struct {
 }
 
 type BatchImagePricingSnapshot struct {
-	BaseUnitPrice           float64
-	GroupRateMultiplier     float64
-	AccountRateMultiplier   float64
-	BatchDiscountMultiplier float64
-	HoldMultiplier          float64
-	BillableUnitPrice       float64
-	HoldUnitPrice           float64
-	EstimatedCost           float64
-	HoldAmount              float64
+	BaseUnitPrice       float64
+	GroupRateMultiplier float64
+	// GroupRateMultiplierWithoutModel 「不含模型级覆盖」的分组/用户图片倍率，仅用于用量记录展示
+	// （模型级倍率属隐式配置，不对终端用户暴露）。计费仍按 GroupRateMultiplier。
+	GroupRateMultiplierWithoutModel float64
+	AccountRateMultiplier           float64
+	BatchDiscountMultiplier         float64
+	HoldMultiplier                  float64
+	BillableUnitPrice               float64
+	HoldUnitPrice                   float64
+	EstimatedCost                   float64
+	HoldAmount                      float64
 }
 
 type BatchImagePublicBatch struct {
@@ -302,35 +305,36 @@ func (s *BatchImagePublicService) Submit(ctx context.Context, owner BatchImageOw
 	holdID := BatchImageHoldRequestID(batchID)
 	holdAmount := pricingSnapshot.HoldAmount
 	job, err := s.Repo.CreateBatchImageJob(ctx, CreateBatchImageJobParams{
-		BatchID:                 batchID,
-		UserID:                  owner.UserID,
-		APIKeyID:                &apiKeyID,
-		AccountID:               &accountID,
-		Provider:                provider.Name(),
-		Model:                   normalized.Model,
-		TaskName:                normalized.TaskName,
-		CollectionID:            batchImageOptionalStringPtr(normalized.CollectionID),
-		ImageSize:               normalized.ImageSize,
-		AspectRatio:             normalized.AspectRatio,
-		ResponseMimeType:        normalized.ResponseMimeType,
-		ParentBatchID:           parentBatchID,
-		Status:                  BatchImageJobStatusCreated,
-		ItemCount:               len(normalized.Items),
-		EstimatedCost:           pricingSnapshot.EstimatedCost,
-		HoldAmount:              &holdAmount,
-		BaseUnitPrice:           pricingSnapshot.BaseUnitPrice,
-		GroupRateMultiplier:     pricingSnapshot.GroupRateMultiplier,
-		AccountRateMultiplier:   pricingSnapshot.AccountRateMultiplier,
-		BatchDiscountMultiplier: pricingSnapshot.BatchDiscountMultiplier,
-		HoldMultiplier:          pricingSnapshot.HoldMultiplier,
-		BillableUnitPrice:       pricingSnapshot.BillableUnitPrice,
-		HoldUnitPrice:           pricingSnapshot.HoldUnitPrice,
-		PricingSnapshotVersion:  1,
-		Currency:                "USD",
-		HoldID:                  &holdID,
-		IdempotencyKey:          batchImageOptionalStringPtr(idempotencyKey),
-		RequestHash:             batchImageStringPtr(requestHash),
-		SessionID:               normalized.SessionID,
+		BatchID:                         batchID,
+		UserID:                          owner.UserID,
+		APIKeyID:                        &apiKeyID,
+		AccountID:                       &accountID,
+		Provider:                        provider.Name(),
+		Model:                           normalized.Model,
+		TaskName:                        normalized.TaskName,
+		CollectionID:                    batchImageOptionalStringPtr(normalized.CollectionID),
+		ImageSize:                       normalized.ImageSize,
+		AspectRatio:                     normalized.AspectRatio,
+		ResponseMimeType:                normalized.ResponseMimeType,
+		ParentBatchID:                   parentBatchID,
+		Status:                          BatchImageJobStatusCreated,
+		ItemCount:                       len(normalized.Items),
+		EstimatedCost:                   pricingSnapshot.EstimatedCost,
+		HoldAmount:                      &holdAmount,
+		BaseUnitPrice:                   pricingSnapshot.BaseUnitPrice,
+		GroupRateMultiplier:             pricingSnapshot.GroupRateMultiplier,
+		GroupRateMultiplierWithoutModel: &pricingSnapshot.GroupRateMultiplierWithoutModel,
+		AccountRateMultiplier:           pricingSnapshot.AccountRateMultiplier,
+		BatchDiscountMultiplier:         pricingSnapshot.BatchDiscountMultiplier,
+		HoldMultiplier:                  pricingSnapshot.HoldMultiplier,
+		BillableUnitPrice:               pricingSnapshot.BillableUnitPrice,
+		HoldUnitPrice:                   pricingSnapshot.HoldUnitPrice,
+		PricingSnapshotVersion:          1,
+		Currency:                        "USD",
+		HoldID:                          &holdID,
+		IdempotencyKey:                  batchImageOptionalStringPtr(idempotencyKey),
+		RequestHash:                     batchImageStringPtr(requestHash),
+		SessionID:                       normalized.SessionID,
 	})
 	if err != nil {
 		// A concurrent request with the same idempotency key can win between the
@@ -1317,6 +1321,8 @@ func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, ow
 	}
 	unit := -1.0
 	groupMultiplier := 1.0
+	// 展示用倍率基准：不含模型级覆盖（隐式配置）的分组/用户图片倍率，仅用于用量记录展示。
+	groupMultiplierWithoutModel := 1.0
 	discountMultiplier := defaultBatchImageDiscountMultiplier
 	holdMultiplier := defaultBatchImageHoldMultiplier
 	if owner.GroupID != nil && *owner.GroupID > 0 {
@@ -1344,16 +1350,23 @@ func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, ow
 				effectiveGroupMultiplier = *userRate
 			}
 		}
+		// 展示用倍率基准：模型级覆盖之前的「分组/用户」图片倍率。
+		groupMultiplierWithoutModel = effectiveGroupMultiplier
 		// 模型级计费倍率（隐式配置）：与主计费路径同源，「替代」分组/用户倍率，仅对命中的
 		// 计费模型生效。置于 image-independent 覆盖之前，与 computePeakAwareMultipliers 的
 		// resolveImageRateMultiplier 语义保持一致（分组独立图片倍率优先于模型级倍率）。
 		effectiveGroupMultiplier = applyModelRateMultiplierToGroup(group, req.Model, effectiveGroupMultiplier)
 		groupMultiplier = effectiveGroupMultiplier
 		if group.ImageRateIndependent {
+			// 分组独立图片倍率优先，且其本身不受模型级倍率影响，展示值与计费值一致。
 			groupMultiplier = group.ImageRateMultiplier
+			groupMultiplierWithoutModel = group.ImageRateMultiplier
 		}
 		if groupMultiplier < 0 {
 			groupMultiplier = 0
+		}
+		if groupMultiplierWithoutModel < 0 {
+			groupMultiplierWithoutModel = 0
 		}
 		discountMultiplier = group.BatchImageDiscountMultiplier
 		if discountMultiplier < 0 {
@@ -1410,15 +1423,16 @@ func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, ow
 	billableUnitPrice := standardUnitPrice * discountMultiplier
 	holdUnitPrice := standardUnitPrice * holdMultiplier
 	return &BatchImagePricingSnapshot{
-		BaseUnitPrice:           unit,
-		GroupRateMultiplier:     groupMultiplier,
-		AccountRateMultiplier:   accountMultiplier,
-		BatchDiscountMultiplier: discountMultiplier,
-		HoldMultiplier:          holdMultiplier,
-		BillableUnitPrice:       billableUnitPrice,
-		HoldUnitPrice:           holdUnitPrice,
-		EstimatedCost:           billableUnitPrice * float64(len(req.Items)),
-		HoldAmount:              holdUnitPrice * float64(len(req.Items)),
+		BaseUnitPrice:                   unit,
+		GroupRateMultiplier:             groupMultiplier,
+		GroupRateMultiplierWithoutModel: groupMultiplierWithoutModel,
+		AccountRateMultiplier:           accountMultiplier,
+		BatchDiscountMultiplier:         discountMultiplier,
+		HoldMultiplier:                  holdMultiplier,
+		BillableUnitPrice:               billableUnitPrice,
+		HoldUnitPrice:                   holdUnitPrice,
+		EstimatedCost:                   billableUnitPrice * float64(len(req.Items)),
+		HoldAmount:                      holdUnitPrice * float64(len(req.Items)),
 	}, nil
 }
 

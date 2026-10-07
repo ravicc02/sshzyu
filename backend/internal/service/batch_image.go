@@ -125,19 +125,22 @@ type BatchImageJob struct {
 	FailCount      int
 	CancelledCount int
 
-	EstimatedCost           float64
-	HoldAmount              *float64
-	ActualCost              *float64
-	BaseUnitPrice           float64
-	GroupRateMultiplier     float64
-	AccountRateMultiplier   float64
-	BatchDiscountMultiplier float64
-	HoldMultiplier          float64
-	BillableUnitPrice       float64
-	HoldUnitPrice           float64
-	PricingSnapshotVersion  int
-	Currency                string
-	HoldID                  *string
+	EstimatedCost       float64
+	HoldAmount          *float64
+	ActualCost          *float64
+	BaseUnitPrice       float64
+	GroupRateMultiplier float64
+	// GroupRateMultiplierWithoutModel 提交时快照的「不含模型级覆盖」分组/用户图片倍率；
+	// nil 表示该任务早于本列引入（结算时回退 group_rate_multiplier，即引入前行为）。
+	GroupRateMultiplierWithoutModel *float64
+	AccountRateMultiplier           float64
+	BatchDiscountMultiplier         float64
+	HoldMultiplier                  float64
+	BillableUnitPrice               float64
+	HoldUnitPrice                   float64
+	PricingSnapshotVersion          int
+	Currency                        string
+	HoldID                          *string
 
 	IdempotencyKey *string
 	RequestHash    *string
@@ -189,19 +192,21 @@ type CreateBatchImageJobParams struct {
 	FailCount      int
 	CancelledCount int
 
-	EstimatedCost           float64
-	HoldAmount              *float64
-	ActualCost              *float64
-	BaseUnitPrice           float64
-	GroupRateMultiplier     float64
-	AccountRateMultiplier   float64
-	BatchDiscountMultiplier float64
-	HoldMultiplier          float64
-	BillableUnitPrice       float64
-	HoldUnitPrice           float64
-	PricingSnapshotVersion  int
-	Currency                string
-	HoldID                  *string
+	EstimatedCost       float64
+	HoldAmount          *float64
+	ActualCost          *float64
+	BaseUnitPrice       float64
+	GroupRateMultiplier float64
+	// GroupRateMultiplierWithoutModel 提交时快照的「不含模型级覆盖」分组/用户图片倍率。
+	GroupRateMultiplierWithoutModel *float64
+	AccountRateMultiplier           float64
+	BatchDiscountMultiplier         float64
+	HoldMultiplier                  float64
+	BillableUnitPrice               float64
+	HoldUnitPrice                   float64
+	PricingSnapshotVersion          int
+	Currency                        string
+	HoldID                          *string
 
 	IdempotencyKey *string
 	RequestHash    *string

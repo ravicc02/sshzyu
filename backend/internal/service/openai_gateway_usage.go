@@ -225,6 +225,8 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 	// 模型级计费倍率（隐式配置）：命中时「替代」上述分组/用户倍率，仅对命中的计费模型
 	// 生效。置于高峰叠加之前，使最终倍率 = 模型级倍率 × 高峰因子（与通用计费路径一致）。
+	// 先留存「模型级替代之前」的基准，供展示用倍率（不含模型级覆盖）复用。
+	multiplierWithoutModel := multiplier
 	multiplier = applyModelRateMultiplier(apiKey, billingModel, multiplier)
 	// token 倍率叠加高峰因子（token 计费含图片 token，图片按次倍率不受影响）。
 	// 高峰因子按请求级 PricingAt 现算（与利润门 D 同源同刻，跨峰谷请求不中途
@@ -234,6 +236,10 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	pricingAt := openAIUsagePricingAt(input)
 	multiplier, imageMultiplier := computePeakAwareMultipliers(apiKey, baseMultiplier, pricingAt)
 	videoMultiplier := resolveVideoRateMultiplier(apiKey, baseMultiplier)
+	// 展示用倍率：仅隐藏模型级覆盖（隐式配置），保留用户/分组倍率与高峰因子，
+	// 供用量详情的「费率」展示（见 usage_logs.rate_multiplier_without_model）。
+	displayMultiplier, displayImageMultiplier := computePeakAwareMultipliers(apiKey, multiplierWithoutModel, pricingAt)
+	displayVideoMultiplier := resolveVideoRateMultiplier(apiKey, multiplierWithoutModel)
 
 	var cost *CostBreakdown
 	billingModels = s.filterCNProviderBillingModelCandidates(ctx, account, apiKey, billingModels)
@@ -433,10 +439,13 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 	if isVideoUsage && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
 		usageLog.RateMultiplier = videoMultiplier
+		usageLog.RateMultiplierWithoutModel = &displayVideoMultiplier
 	} else if result.ImageCount > 0 && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
 		usageLog.RateMultiplier = imageMultiplier
+		usageLog.RateMultiplierWithoutModel = &displayImageMultiplier
 	} else {
 		usageLog.RateMultiplier = multiplier
+		usageLog.RateMultiplierWithoutModel = &displayMultiplier
 	}
 	usageLog.AccountRateMultiplier = &accountRateMultiplier
 	usageLog.BillingType = billingType

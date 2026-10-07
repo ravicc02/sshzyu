@@ -280,6 +280,12 @@ func (s *BatchImageSettlementService) recordUsageLog(ctx context.Context, job *B
 		SessionID:             job.SessionID,
 		CreatedAt:             createdAt,
 	}
+	// 展示用倍率：仅隐藏「模型级倍率」这一隐式覆盖，保留分组/用户图片倍率与批量折扣。
+	// 旧任务无该快照（nil）时不设置，展示侧回退 rate_multiplier，保持引入本列前的行为。
+	if job.GroupRateMultiplierWithoutModel != nil {
+		displayMultiplier := *job.GroupRateMultiplierWithoutModel * job.BatchDiscountMultiplier
+		usageLog.RateMultiplierWithoutModel = &displayMultiplier
+	}
 	writeUsageLogBestEffort(ctx, s.UsageLogRepo, usageLog, "service.batch_image_settlement")
 }
 

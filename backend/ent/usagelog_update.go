@@ -623,6 +623,33 @@ func (_u *UsageLogUpdate) ClearAccountRateMultiplier() *UsageLogUpdate {
 	return _u
 }
 
+// SetRateMultiplierWithoutModel sets the "rate_multiplier_without_model" field.
+func (_u *UsageLogUpdate) SetRateMultiplierWithoutModel(v float64) *UsageLogUpdate {
+	_u.mutation.ResetRateMultiplierWithoutModel()
+	_u.mutation.SetRateMultiplierWithoutModel(v)
+	return _u
+}
+
+// SetNillableRateMultiplierWithoutModel sets the "rate_multiplier_without_model" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableRateMultiplierWithoutModel(v *float64) *UsageLogUpdate {
+	if v != nil {
+		_u.SetRateMultiplierWithoutModel(*v)
+	}
+	return _u
+}
+
+// AddRateMultiplierWithoutModel adds value to the "rate_multiplier_without_model" field.
+func (_u *UsageLogUpdate) AddRateMultiplierWithoutModel(v float64) *UsageLogUpdate {
+	_u.mutation.AddRateMultiplierWithoutModel(v)
+	return _u
+}
+
+// ClearRateMultiplierWithoutModel clears the value of the "rate_multiplier_without_model" field.
+func (_u *UsageLogUpdate) ClearRateMultiplierWithoutModel() *UsageLogUpdate {
+	_u.mutation.ClearRateMultiplierWithoutModel()
+	return _u
+}
+
 // SetBillingType sets the "billing_type" field.
 func (_u *UsageLogUpdate) SetBillingType(v int8) *UsageLogUpdate {
 	_u.mutation.ResetBillingType()
@@ -1281,6 +1308,15 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.AccountRateMultiplierCleared() {
 		_spec.ClearField(usagelog.FieldAccountRateMultiplier, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.RateMultiplierWithoutModel(); ok {
+		_spec.SetField(usagelog.FieldRateMultiplierWithoutModel, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedRateMultiplierWithoutModel(); ok {
+		_spec.AddField(usagelog.FieldRateMultiplierWithoutModel, field.TypeFloat64, value)
+	}
+	if _u.mutation.RateMultiplierWithoutModelCleared() {
+		_spec.ClearField(usagelog.FieldRateMultiplierWithoutModel, field.TypeFloat64)
 	}
 	if value, ok := _u.mutation.BillingType(); ok {
 		_spec.SetField(usagelog.FieldBillingType, field.TypeInt8, value)
@@ -2137,6 +2173,33 @@ func (_u *UsageLogUpdateOne) ClearAccountRateMultiplier() *UsageLogUpdateOne {
 	return _u
 }
 
+// SetRateMultiplierWithoutModel sets the "rate_multiplier_without_model" field.
+func (_u *UsageLogUpdateOne) SetRateMultiplierWithoutModel(v float64) *UsageLogUpdateOne {
+	_u.mutation.ResetRateMultiplierWithoutModel()
+	_u.mutation.SetRateMultiplierWithoutModel(v)
+	return _u
+}
+
+// SetNillableRateMultiplierWithoutModel sets the "rate_multiplier_without_model" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableRateMultiplierWithoutModel(v *float64) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetRateMultiplierWithoutModel(*v)
+	}
+	return _u
+}
+
+// AddRateMultiplierWithoutModel adds value to the "rate_multiplier_without_model" field.
+func (_u *UsageLogUpdateOne) AddRateMultiplierWithoutModel(v float64) *UsageLogUpdateOne {
+	_u.mutation.AddRateMultiplierWithoutModel(v)
+	return _u
+}
+
+// ClearRateMultiplierWithoutModel clears the value of the "rate_multiplier_without_model" field.
+func (_u *UsageLogUpdateOne) ClearRateMultiplierWithoutModel() *UsageLogUpdateOne {
+	_u.mutation.ClearRateMultiplierWithoutModel()
+	return _u
+}
+
 // SetBillingType sets the "billing_type" field.
 func (_u *UsageLogUpdateOne) SetBillingType(v int8) *UsageLogUpdateOne {
 	_u.mutation.ResetBillingType()
@@ -2825,6 +2888,15 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if _u.mutation.AccountRateMultiplierCleared() {
 		_spec.ClearField(usagelog.FieldAccountRateMultiplier, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.RateMultiplierWithoutModel(); ok {
+		_spec.SetField(usagelog.FieldRateMultiplierWithoutModel, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedRateMultiplierWithoutModel(); ok {
+		_spec.AddField(usagelog.FieldRateMultiplierWithoutModel, field.TypeFloat64, value)
+	}
+	if _u.mutation.RateMultiplierWithoutModelCleared() {
+		_spec.ClearField(usagelog.FieldRateMultiplierWithoutModel, field.TypeFloat64)
 	}
 	if value, ok := _u.mutation.BillingType(); ok {
 		_spec.SetField(usagelog.FieldBillingType, field.TypeInt8, value)

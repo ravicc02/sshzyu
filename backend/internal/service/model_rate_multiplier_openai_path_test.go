@@ -66,6 +66,9 @@ func TestOpenAIRecordUsage_ModelRateMultiplierReplacesGroupRate(t *testing.T) {
 			require.Equal(t, "gpt-6.1-sol", usageRepo.lastLog.Model)
 			require.InDelta(t, modelRate, usageRepo.lastLog.RateMultiplier, 1e-12,
 				"命中模型级倍率应替代分组默认倍率（线上缺陷回归）")
+			// 展示用倍率只隐藏模型级覆盖：应保持分组默认倍率。
+			require.NotNil(t, usageRepo.lastLog.RateMultiplierWithoutModel)
+			require.InDelta(t, groupRate, *usageRepo.lastLog.RateMultiplierWithoutModel, 1e-12)
 			// 实际扣费 = 基础成本 × 模型级倍率。
 			require.InDelta(t, usageRepo.lastLog.TotalCost*modelRate, usageRepo.lastLog.ActualCost, 1e-9)
 			require.InDelta(t, usageRepo.lastLog.ActualCost, userRepo.lastAmount, 1e-9)
@@ -91,6 +94,8 @@ func TestOpenAIRecordUsage_ModelRateMultiplierIsolatesOtherModels(t *testing.T) 
 	require.Equal(t, "gpt-6.1", usageRepo.lastLog.Model)
 	require.InDelta(t, groupRate, usageRepo.lastLog.RateMultiplier, 1e-12,
 		"同组未命中模型不得受影响，应保持分组默认倍率")
+	require.NotNil(t, usageRepo.lastLog.RateMultiplierWithoutModel)
+	require.InDelta(t, groupRate, *usageRepo.lastLog.RateMultiplierWithoutModel, 1e-12)
 }
 
 func TestOpenAIRecordUsage_ModelRateMultiplierReplacesUserRate(t *testing.T) {
@@ -110,6 +115,10 @@ func TestOpenAIRecordUsage_ModelRateMultiplierReplacesUserRate(t *testing.T) {
 	require.NotNil(t, usageRepo.lastLog)
 	require.InDelta(t, 0.5, usageRepo.lastLog.RateMultiplier, 1e-12,
 		"模型级倍率为「替代」语义：命中时连用户专属倍率也一并替代")
+	// 但展示用倍率只隐藏模型级覆盖：用户专属倍率必须保留。
+	require.NotNil(t, usageRepo.lastLog.RateMultiplierWithoutModel)
+	require.InDelta(t, userRate, *usageRepo.lastLog.RateMultiplierWithoutModel, 1e-12,
+		"展示用倍率应保留用户专属倍率，只隐藏模型级覆盖")
 }
 
 func TestOpenAIRecordUsage_ModelRateMultiplierThenPeakMultiplier(t *testing.T) {
@@ -135,6 +144,10 @@ func TestOpenAIRecordUsage_ModelRateMultiplierThenPeakMultiplier(t *testing.T) {
 	require.NotNil(t, usageRepo.lastLog)
 	require.InDelta(t, modelRate*peakRate, usageRepo.lastLog.RateMultiplier, 1e-12,
 		"最终倍率 = 模型级倍率 × 高峰因子（模型级置于高峰叠加之前）")
+	// 展示用倍率只隐藏模型级：保留分组默认倍率 × 高峰因子。
+	require.NotNil(t, usageRepo.lastLog.RateMultiplierWithoutModel)
+	require.InDelta(t, 1.0*peakRate, *usageRepo.lastLog.RateMultiplierWithoutModel, 1e-12,
+		"展示用倍率 = 分组默认倍率 × 高峰因子，不含模型级覆盖")
 }
 
 func TestOpenAIRecordUsage_NoModelRateKeepsGroupRate(t *testing.T) {
@@ -151,4 +164,6 @@ func TestOpenAIRecordUsage_NoModelRateKeepsGroupRate(t *testing.T) {
 
 	require.NotNil(t, usageRepo.lastLog)
 	require.InDelta(t, groupRate, usageRepo.lastLog.RateMultiplier, 1e-12)
+	require.NotNil(t, usageRepo.lastLog.RateMultiplierWithoutModel)
+	require.InDelta(t, groupRate, *usageRepo.lastLog.RateMultiplierWithoutModel, 1e-12)
 }

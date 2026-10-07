@@ -638,6 +638,7 @@ import { apiIntervalsToForm, apiTimePricingToForm, createDefaultTimePricingForm,
 import type { AdminGroup, GroupPlatform } from '@/types'
 import type { Column } from '@/components/common/types'
 import { platformTextClass, platformBadgeLightClass } from '@/utils/platformColors'
+import { groupsForPlatform } from './channelPlatformGroups'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
@@ -763,9 +764,8 @@ const form = reactive({
 let abortController: AbortController | null = null
 
 // ── Platform config ──
-const platformOrder: GroupPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'typesafe']
-// Composite pricing/mapping may target every concrete schedulable provider.
-const compositePlatforms: GroupPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'typesafe']
+// 'composite' 是一等平台：聚合分组有自己的 tab，不再镜像到每个具体平台 tab。
+const platformOrder: GroupPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'typesafe', 'composite']
 
 // ── Helpers ──
 function formatDate(value: string): string {
@@ -804,9 +804,7 @@ function togglePlatform(platform: GroupPlatform) {
 }
 
 function getGroupsForPlatform(platform: GroupPlatform): AdminGroup[] {
-  return allGroups.value.filter(
-    g => g.platform === platform || (g.platform === 'composite' && compositePlatforms.includes(platform))
-  )
+  return groupsForPlatform(allGroups.value, platform)
 }
 
 // ── Group helpers ──
@@ -1202,9 +1200,7 @@ function apiToForm(channel: Channel): PlatformSection[] {
   const activePlatforms = new Set<GroupPlatform>()
   for (const gid of channel.group_ids || []) {
     const p = groupPlatformMap.get(gid)
-    if (p === 'composite') {
-      compositePlatforms.forEach(platform => activePlatforms.add(platform))
-    } else if (p) {
+    if (p) {
       activePlatforms.add(p)
     }
   }
@@ -1220,11 +1216,7 @@ function apiToForm(channel: Channel): PlatformSection[] {
   for (const platform of platformOrder) {
     if (!activePlatforms.has(platform)) continue
 
-    const groupIds = (channel.group_ids || []).filter(gid => {
-      const groupPlatform = groupPlatformMap.get(gid)
-      return groupPlatform === platform ||
-        (groupPlatform === 'composite' && compositePlatforms.includes(platform))
-    })
+    const groupIds = (channel.group_ids || []).filter(gid => groupPlatformMap.get(gid) === platform)
     const mapping = (channel.model_mapping || {})[platform] || {}
     const pricing = (channel.model_pricing || [])
       .filter(p => (p.platform || 'anthropic') === platform)

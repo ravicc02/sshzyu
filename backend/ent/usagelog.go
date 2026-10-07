@@ -83,6 +83,8 @@ type UsageLog struct {
 	LongContextBillingApplied bool `json:"long_context_billing_applied,omitempty"`
 	// AccountRateMultiplier holds the value of the "account_rate_multiplier" field.
 	AccountRateMultiplier *float64 `json:"account_rate_multiplier,omitempty"`
+	// RateMultiplierWithoutModel holds the value of the "rate_multiplier_without_model" field.
+	RateMultiplierWithoutModel *float64 `json:"rate_multiplier_without_model,omitempty"`
 	// BillingType holds the value of the "billing_type" field.
 	BillingType int8 `json:"billing_type,omitempty"`
 	// Stream holds the value of the "stream" field.
@@ -204,7 +206,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case usagelog.FieldUpstreamModelMismatch, usagelog.FieldLongContextBillingApplied, usagelog.FieldStream, usagelog.FieldCacheTTLOverridden:
 			values[i] = new(sql.NullBool)
-		case usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCacheCreationCost, usagelog.FieldCacheReadCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier, usagelog.FieldAccountRateMultiplier:
+		case usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCacheCreationCost, usagelog.FieldCacheReadCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier, usagelog.FieldAccountRateMultiplier, usagelog.FieldRateMultiplierWithoutModel:
 			values[i] = new(sql.NullFloat64)
 		case usagelog.FieldID, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldAccountID, usagelog.FieldChannelID, usagelog.FieldGroupID, usagelog.FieldSubscriptionID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheReadTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldBillingType, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldImageCount, usagelog.FieldVideoCount, usagelog.FieldVideoDurationSeconds:
 			values[i] = new(sql.NullInt64)
@@ -423,6 +425,13 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.AccountRateMultiplier = new(float64)
 				*_m.AccountRateMultiplier = value.Float64
+			}
+		case usagelog.FieldRateMultiplierWithoutModel:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_multiplier_without_model", values[i])
+			} else if value.Valid {
+				_m.RateMultiplierWithoutModel = new(float64)
+				*_m.RateMultiplierWithoutModel = value.Float64
 			}
 		case usagelog.FieldBillingType:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -708,6 +717,11 @@ func (_m *UsageLog) String() string {
 	builder.WriteString(", ")
 	if v := _m.AccountRateMultiplier; v != nil {
 		builder.WriteString("account_rate_multiplier=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.RateMultiplierWithoutModel; v != nil {
+		builder.WriteString("rate_multiplier_without_model=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

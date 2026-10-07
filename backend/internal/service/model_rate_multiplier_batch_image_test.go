@@ -60,11 +60,15 @@ func TestBatchImageResolvePricingSnapshot_ModelRateMultiplier(t *testing.T) {
 		require.InDelta(t, modelRate, snap.GroupRateMultiplier, 1e-12,
 			"批量生图须按模型级倍率而非分组默认倍率计价")
 		require.InDelta(t, imagePrice*modelRate*batchDiscount, snap.BillableUnitPrice, 1e-12)
+		// 展示用快照不含模型级覆盖：用量记录据此展示，模型级倍率保持隐式。
+		require.InDelta(t, groupRate, snap.GroupRateMultiplierWithoutModel, 1e-12,
+			"展示用倍率不得包含模型级覆盖")
 	})
 
 	t.Run("同组未命中模型仍用分组默认倍率", func(t *testing.T) {
 		snap := submit(t, newGroup(), "gemini-2.5-pro-image")
 		require.InDelta(t, groupRate, snap.GroupRateMultiplier, 1e-12)
+		require.InDelta(t, groupRate, snap.GroupRateMultiplierWithoutModel, 1e-12)
 	})
 
 	t.Run("分组独立图片倍率优先于模型级倍率", func(t *testing.T) {
@@ -74,5 +78,7 @@ func TestBatchImageResolvePricingSnapshot_ModelRateMultiplier(t *testing.T) {
 		snap := submit(t, group, "gemini-2.5-flash-image")
 		require.InDelta(t, 0.9, snap.GroupRateMultiplier, 1e-12,
 			"与主路径一致：分组独立图片倍率覆盖模型级倍率")
+		// 独立图片倍率本身不受模型级影响，展示值与计费值一致。
+		require.InDelta(t, 0.9, snap.GroupRateMultiplierWithoutModel, 1e-12)
 	})
 }

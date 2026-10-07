@@ -818,6 +818,8 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	}
 	// 模型级计费倍率（隐式配置）：命中时「替代」上述分组/用户倍率，仅对命中的计费模型生效。
 	// 置于高峰叠加之前，使最终倍率 = 模型级倍率 × 高峰因子（见 §5.1 替代语义）。
+	// 先留存「模型级替代之前」的基准，供展示用倍率（不含模型级覆盖）复用。
+	multiplierWithoutModel := multiplier
 	multiplier = s.applyModelRateMultiplier(apiKey, billingModel, multiplier)
 	// token 倍率叠加高峰因子（token 计费含图片 token，图片按次倍率不受影响）。高峰因子按请求时刻现算，
 	// 不并入上面的 getUserGroupRateMultiplier，以免污染 user:group 倍率缓存。
@@ -826,6 +828,9 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		pricingAt = timezone.Now()
 	}
 	multiplier, imageMultiplier := computePeakAwareMultipliers(apiKey, multiplier, pricingAt)
+	// 展示用倍率：仅隐藏「模型级倍率」这一隐式覆盖，保留用户专属/分组默认倍率与高峰因子，
+	// 供用量详情的「费率」展示（见 usage_logs.rate_multiplier_without_model）。
+	displayMultiplier, displayImageMultiplier := computePeakAwareMultipliers(apiKey, multiplierWithoutModel, pricingAt)
 
 	// 确定 RequestedModel（渠道映射前的原始模型）
 	requestedModel := result.Model
@@ -867,7 +872,8 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	// 创建使用日志
 	accountRateMultiplier := account.BillingRateMultiplier()
 	usageLog := s.buildRecordUsageLog(ctx, input, result, apiKey, user, account, subscription,
-		requestedModel, multiplier, imageMultiplier, accountRateMultiplier, billingType, cacheTTLOverridden, cost)
+		requestedModel, multiplier, imageMultiplier, displayMultiplier, displayImageMultiplier,
+		accountRateMultiplier, billingType, cacheTTLOverridden, cost)
 
 	// 计算账号统计定价费用（使用最终上游模型匹配自定义规则）
 	if apiKey.GroupID != nil {
@@ -1214,6 +1220,8 @@ func (s *GatewayService) buildRecordUsageLog(
 	requestedModel string,
 	multiplier float64,
 	imageMultiplier float64,
+	displayMultiplier float64,
+	displayImageMultiplier float64,
 	accountRateMultiplier float64,
 	billingType int8,
 	cacheTTLOverridden bool,
@@ -1255,30 +1263,33 @@ func (s *GatewayService) buildRecordUsageLog(
 		CacheCreation1hTokens:    result.Usage.CacheCreation1hTokens,
 		ImageOutputTokens:        result.Usage.ImageOutputTokens,
 		RateMultiplier:           multiplier,
-		AccountRateMultiplier:    &accountRateMultiplier,
-		BillingType:              billingType,
-		BillingMode:              resolveBillingMode(result, cost),
-		Stream:                   result.Stream,
-		DurationMs:               &durationMs,
-		FirstTokenMs:             result.FirstTokenMs,
-		ImageCount:               result.ImageCount,
-		ImageSize:                optionalTrimmedStringPtr(result.ImageSize),
-		ImageInputSize:           optionalTrimmedStringPtr(result.ImageInputSize),
-		ImageOutputSize:          optionalTrimmedStringPtr(result.ImageOutputSize),
-		ImageSizeSource:          optionalTrimmedStringPtr(result.ImageSizeSource),
-		ImageSizeBreakdown:       result.ImageSizeBreakdown,
-		CacheTTLOverridden:       cacheTTLOverridden,
-		ChannelID:                optionalInt64Ptr(input.ChannelID),
-		ModelMappingChain:        optionalTrimmedStringPtr(input.ModelMappingChain),
-		UserAgent:                optionalTrimmedStringPtr(input.UserAgent),
-		IPAddress:                optionalTrimmedStringPtr(input.IPAddress),
-		SessionID:                optionalTrimmedStringPtr(input.SessionID),
-		GroupID:                  apiKey.GroupID,
-		SubscriptionID:           optionalSubscriptionID(subscription),
-		CreatedAt:                time.Now(),
+		// 展示用倍率：不含模型级覆盖（隐式配置），仅保留用户/分组倍率 × 高峰因子。
+		RateMultiplierWithoutModel: &displayMultiplier,
+		AccountRateMultiplier:      &accountRateMultiplier,
+		BillingType:                billingType,
+		BillingMode:                resolveBillingMode(result, cost),
+		Stream:                     result.Stream,
+		DurationMs:                 &durationMs,
+		FirstTokenMs:               result.FirstTokenMs,
+		ImageCount:                 result.ImageCount,
+		ImageSize:                  optionalTrimmedStringPtr(result.ImageSize),
+		ImageInputSize:             optionalTrimmedStringPtr(result.ImageInputSize),
+		ImageOutputSize:            optionalTrimmedStringPtr(result.ImageOutputSize),
+		ImageSizeSource:            optionalTrimmedStringPtr(result.ImageSizeSource),
+		ImageSizeBreakdown:         result.ImageSizeBreakdown,
+		CacheTTLOverridden:         cacheTTLOverridden,
+		ChannelID:                  optionalInt64Ptr(input.ChannelID),
+		ModelMappingChain:          optionalTrimmedStringPtr(input.ModelMappingChain),
+		UserAgent:                  optionalTrimmedStringPtr(input.UserAgent),
+		IPAddress:                  optionalTrimmedStringPtr(input.IPAddress),
+		SessionID:                  optionalTrimmedStringPtr(input.SessionID),
+		GroupID:                    apiKey.GroupID,
+		SubscriptionID:             optionalSubscriptionID(subscription),
+		CreatedAt:                  time.Now(),
 	}
 	if result.ImageCount > 0 && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
 		usageLog.RateMultiplier = imageMultiplier
+		usageLog.RateMultiplierWithoutModel = &displayImageMultiplier
 	}
 	if cost != nil {
 		usageLog.InputCost = cost.InputCost
