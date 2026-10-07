@@ -13,5 +13,15 @@
     "checksum": "38f86900247b31e00df8e9168fb5af28e4b522e4826f8e17d2efaddf32d17bb5",
     "risk": "backward-compatible",
     "description": "Add batch collection and parameter snapshot columns plus an index."
+  },
+  "247_add_usage_logs_rate_multiplier_without_model.sql": {
+    "checksum": "a3b2a74e6ee9d59f1ce6fa477e43e0cd5a44a01d7b4bfc96d7cd707945fb6312",
+    "risk": "backward-compatible",
+    "description": "Add display-only rate multiplier snapshot column (model-level override excluded) to usage_logs; nullable ADD COLUMN IF NOT EXISTS, no backfill."
+  },
+  "248_add_batch_image_jobs_rate_multiplier_without_model.sql": {
+    "checksum": "695464324c9e59854893c3dc8a715d05d92f7306e4fe12ea1f124fa0861c2c46",
+    "risk": "backward-compatible",
+    "description": "Add display-only group rate multiplier snapshot column (model-level override excluded) to batch_image_jobs; nullable ADD COLUMN IF NOT EXISTS."
   }
 }
