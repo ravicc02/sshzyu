@@ -16,7 +16,7 @@
 | `Dockerfile`              | 仓库根多阶段 Dockerfile（前端 build → Go 编译 embed → 运行时）                     | 本地后端镜像构建                 |
 | `docker-compose.yml`      | 本地统一栈编排（sshzyu-ui + sub2api + postgres + redis）                     | 本地一键启动                   |
 | `nginx/`                  | 本地 nginx 配置（`default.conf` 等，与线上同构、无 TLS）                           | 本地站点入口                   |
-| `ui/`                     | UI 构建产物装配（`current/` + `shared/` + `releases/`）                     | 站点静态资源，nginx 直读          |
+| `ui/`                     | UI 构建产物装配（`current/` + `shared/` + `releases/`）；`current/`、`shared/` 已忽略，不入版本库 | 站点静态资源，nginx 直读          |
 | `docs/`                   | **线上文档站**（前端 nginx 挂到 `/docs/`）                                     | 对外公开                     |
 | `image-playground/`       | 生图工作台源码（React + TS + Vite，`npm run build` 产出 `dist`）                | 生图工作台源码（唯一源）              |
 | `playground/`             | 生图工作台构建产物（由 `image-playground/` 生成，nginx 挂到 `/image/`）            | 生图工作台产物，nginx 直读         |
@@ -34,6 +34,7 @@
 
 **构建链**：
 - UI：`frontend/`(源码) → `scripts/rebuild.sh` → `ui/current`、`ui/shared`（静态产物）
+- Git 只管理 UI 源码与构建脚本，不管理 `ui/current`、`ui/shared`；首次检出后运行本地重建生成静态目录。忽略或取消跟踪不删除本地资源，也不清理历史 release。
 - 生图工作台：`image-playground/`(源码) → `scripts/build-playground.sh` → `playground/`（静态产物）
 
 ---

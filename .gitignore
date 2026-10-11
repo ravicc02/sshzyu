@@ -9,6 +9,8 @@ deploy/redis_data/
 deploy/local-run-logs/
 
 # ---- 构建产物 ----
+ui/current/
+ui/shared/
 frontend/dist/
 frontend/node_modules/
 frontend/coverage/
