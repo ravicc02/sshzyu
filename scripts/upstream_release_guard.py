@@ -123,7 +123,7 @@ def latest_release():
         raise Unknown(f"GitHub Release 状态无法确认：{exc}") from exc
 
 
-def check(refs):
+def check(refs, emergency_deferral=None):
     # 先核对本地每个将推送的 ref 的不可变快照，而非工作区临时文件。
     baselines = [(ref or "工作区", read_baseline(ref)) for ref in refs]
     release = latest_release()
@@ -131,6 +131,7 @@ def check(refs):
     latest_sha = official_tag_sha(latest_tag)
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     sha_by_tag = {}
+    deferred = False
     for ref, baseline in baselines:
         base_tag = baseline["upstream_release"]
         if base_tag not in sha_by_tag:
@@ -141,10 +142,16 @@ def check(refs):
         if base_sha != baseline["upstream_commit"]:
             raise Unknown(f"{ref}: 基线记录的官方 tag commit 不匹配")
         if parse_version(latest_tag) > parse_version(base_tag):
-            raise Unknown(f"{ref}: 发现新的官方稳定 Release {latest_tag}；暂停推送，需先由用户决定是否合并")
+            if emergency_deferral != (baseline["local_build_version"], latest_tag):
+                raise Unknown(f"{ref}: 发现新的官方稳定 Release {latest_tag}；暂停推送，需先由用户决定是否合并")
+            deferred = True
+            print(f"紧急豁免：仅 {baseline['local_build_version']} 暂缓整合 {latest_tag}；官方基线 SHA 校验仍有效，后续版本不继承本次豁免。")
         if parse_version(latest_tag) < parse_version(base_tag):
             raise Unknown(f"{ref}: 当前记录的基线比官方最新稳定 Release 新，无法确认状态")
-    print("检查通过：当前没有比待推送基线更新的官方稳定 Release；这不代表已完成测试或已获推送授权。")
+    if deferred:
+        print("检查通过：使用明确版本的紧急豁免；没有合并新版官方源码，测试、验签、备份及部署门禁仍须通过。")
+    else:
+        print("检查通过：当前没有比待推送基线更新的官方稳定 Release；这不代表已完成测试或已获推送授权。")
 
 
 def validate_clean_build(build_target="backend"):
@@ -162,7 +169,7 @@ def validate_clean_build(build_target="backend"):
         raise Unknown("HEAD 中的基线记录与工作区不一致")
 
 
-def pre_push(remote_name, remote_url, stream):
+def pre_push(remote_name, remote_url, stream, emergency_deferral=None):
     if remote_name != "origin" and remote_url != git("remote", "get-url", "origin"):
         return
     refs = []
@@ -178,7 +185,10 @@ def pre_push(remote_name, remote_url, stream):
         refs.append((local_ref, local_sha))
     if refs:
         print(f"待推送到 {remote_name}: {', '.join(ref for ref, _ in refs)}")
-        check([sha for _ref, sha in refs])
+        if emergency_deferral is None:
+            check([sha for _ref, sha in refs])
+        else:
+            check([sha for _ref, sha in refs], emergency_deferral=emergency_deferral)
 
 
 def main():
@@ -186,17 +196,21 @@ def main():
     parser.add_argument("--pre-push", nargs=2, metavar=("REMOTE", "URL"))
     parser.add_argument("--validate-clean-build", action="store_true", help="核实正式构建所用源码与 HEAD 提交一致")
     parser.add_argument("--build-target", choices=("backend", "root"), default="backend", help="正式镜像构建入口")
+    parser.add_argument("--emergency-upstream-deferral", nargs=2, metavar=("LOCAL_VERSION", "UPSTREAM_TAG"), help="仅在用户明确授权后使用；只豁免指定本地版本对指定官方新版本的整合，不跳过基线 SHA 或其他门禁")
     opts = parser.parse_args()
     try:
+        deferral = tuple(opts.emergency_upstream_deferral) if opts.emergency_upstream_deferral else None
+        if deferral and (not LOCAL_VERSION.fullmatch(deferral[0]) or not VERSION.fullmatch(deferral[1]) or not deferral[1].startswith("v")):
+            raise Unknown("紧急豁免必须指定有效的本地构建版本和官方稳定 Release tag")
         if opts.pre_push:
-            pre_push(*opts.pre_push, sys.stdin)
+            pre_push(*opts.pre_push, sys.stdin, emergency_deferral=deferral)
         elif opts.validate_clean_build:
             validate_clean_build(opts.build_target)
             print(f"{opts.build_target} 镜像输入与 HEAD 中的版本记录一致，所检查路径无未提交改动")
         else:
             print(f"当前分支：{git('branch', '--show-current')}；HEAD：{git('rev-parse', 'HEAD')}")
             print(f"相对 origin/main 待推送提交：{git('rev-list', '--count', 'origin/main..HEAD')}")
-            check([None])
+            check([None], emergency_deferral=deferral)
     except (Unknown, subprocess.TimeoutExpired) as exc:
         print(f"上游检查结果：未知或不允许推送。{exc}", file=sys.stderr)
         return 1

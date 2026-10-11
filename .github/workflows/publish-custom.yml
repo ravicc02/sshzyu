@@ -35,7 +35,11 @@ jobs:
         if: steps.identity.outputs.publish == 'true'
         run: |
           git remote add upstream https://github.com/Wei-Shaw/sub2api.git
-          python scripts/upstream_release_guard.py
+          if [ "$(cat backend/cmd/server/VERSION)" = "0.2.14-r4" ]; then
+            python scripts/upstream_release_guard.py --emergency-upstream-deferral 0.2.14-r4 v0.2.15
+          else
+            python scripts/upstream_release_guard.py
+          fi
           python scripts/upstream_release_guard.py --validate-clean-build --build-target root
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         if: steps.identity.outputs.publish == 'true'

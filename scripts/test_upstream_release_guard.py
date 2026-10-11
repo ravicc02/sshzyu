@@ -64,6 +64,31 @@ class GuardTests(unittest.TestCase):
         with self.assertRaisesRegex(guard.Unknown, "新的官方稳定 Release"):
             guard.check(["b" * 40, "c" * 40])
 
+    @patch.object(guard, "official_tag_sha", return_value="a" * 40)
+    @patch.object(guard, "latest_release", return_value=release("v0.2.12"))
+    @patch.object(guard, "read_baseline", return_value=BASE)
+    def test_emergency_deferral_is_scoped_to_exact_local_and_upstream_versions(self, *_mocks):
+        with patch("sys.stdout", new_callable=io.StringIO) as output:
+            guard.check(["b" * 40], emergency_deferral=("0.2.11-r6", "v0.2.12"))
+        self.assertIn("紧急豁免", output.getvalue())
+        self.assertNotIn("当前没有比待推送基线更新", output.getvalue())
+        for deferral in (("0.2.11-r7", "v0.2.12"), ("0.2.11-r6", "v0.2.13")):
+            with self.subTest(deferral=deferral), self.assertRaises(guard.Unknown):
+                guard.check(["b" * 40], emergency_deferral=deferral)
+
+    @patch.object(guard, "official_tag_sha", return_value="b" * 40)
+    @patch.object(guard, "latest_release", return_value=release("v0.2.12"))
+    @patch.object(guard, "read_baseline", return_value=BASE)
+    def test_emergency_deferral_does_not_skip_official_baseline_sha(self, *_mocks):
+        with self.assertRaisesRegex(guard.Unknown, "commit 不匹配"):
+            guard.check(["b" * 40], emergency_deferral=("0.2.11-r6", "v0.2.12"))
+
+    @patch.object(guard, "latest_release", side_effect=guard.Unknown("HTTP 403"))
+    @patch.object(guard, "read_baseline", return_value=BASE)
+    def test_emergency_deferral_does_not_skip_unknown_upstream_state(self, *_mocks):
+        with self.assertRaises(guard.Unknown):
+            guard.check(["b" * 40], emergency_deferral=("0.2.11-r6", "v0.2.12"))
+
     @patch.object(guard, "official_tag_sha", return_value="b" * 40)
     @patch.object(guard, "latest_release", return_value=release())
     @patch.object(guard, "read_baseline", return_value=BASE)
