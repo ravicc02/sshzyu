@@ -33,6 +33,8 @@ jobs:
         run: python scripts/release/check_publish.py
       - name: Confirm official baseline and clean build
         if: steps.identity.outputs.publish == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           git remote add upstream https://github.com/Wei-Shaw/sub2api.git
           if [ "$(cat backend/cmd/server/VERSION)" = "0.2.14-r4" ]; then

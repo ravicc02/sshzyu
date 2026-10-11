@@ -111,6 +111,13 @@ class GuardTests(unittest.TestCase):
         with patch.object(guard.urllib.request, "urlopen", return_value=response):
             self.assertEqual(guard.latest_release()["tag_name"], "v0.2.12")
 
+    def test_latest_release_uses_optional_github_token_without_logging_it(self):
+        response = io.BytesIO(json.dumps([release()]).encode())
+        response.status = 200
+        with patch.dict("os.environ", {"GITHUB_TOKEN": "guard-test-token"}), patch.object(guard.urllib.request, "urlopen", return_value=response) as fetch:
+            guard.latest_release()
+        self.assertEqual(fetch.call_args.args[0].get_header("Authorization"), "Bearer guard-test-token")
+
     def test_latest_release_rejects_prerelease_and_invalid_json(self):
         for payload in ([dict(release(), prerelease=True)], [dict(release(), draft=True)],
                         [release("v0.2.12-rc1")], {"invalid": True}):

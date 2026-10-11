@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -92,6 +93,9 @@ def latest_release():
                 f"{RELEASE_API}?per_page=100&page={page}",
                 headers={"Accept": "application/vnd.github+json", "User-Agent": "sshzy-upstream-release-guard"},
             )
+            token = os.environ.get("GITHUB_TOKEN", "").strip()
+            if token:
+                req.add_header("Authorization", f"Bearer {token}")
             with urllib.request.urlopen(req, timeout=15) as resp:
                 if resp.status != 200:
                     raise Unknown(f"GitHub Release API 状态：{resp.status}")
