@@ -14,6 +14,7 @@
       </div>
 
       <template v-else>
+        <p v-if="feedback" role="status" class="text-sm text-gray-600 dark:text-dark-300">{{ feedback }}</p>
         <!-- 按平台分类：每个平台一节，节内是该平台的全部分组 -->
         <section v-for="sec in platformSections" :key="sec.platform" class="space-y-3">
           <header class="flex items-center gap-2.5">
@@ -94,6 +95,25 @@
               </div>
 
               <div v-if="isExpanded(g.id)">
+                <div v-if="g.models.length" class="flex flex-wrap items-center gap-3 border-t border-gray-100 px-4 py-3 dark:border-dark-700">
+                  <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-dark-200">
+                    <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      :data-testid="`select-all-${g.id}`"
+                      :checked="selectedModels(g).length === g.models.length"
+                      :indeterminate="selectedModels(g).length > 0 && selectedModels(g).length < g.models.length"
+                      :disabled="saving" @change="toggleAll(g)" />
+                    {{ t('admin.modelPrice.selectAll') }}
+                  </label>
+                  <span class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.modelPrice.selectedCount', { count: selectedModels(g).length }) }}</span>
+                  <button type="button" class="btn btn-primary btn-sm ml-auto" :data-testid="`batch-adjust-${g.id}`"
+                    :disabled="saving || selectedModels(g).length === 0" @click="openBatchDialog(g)">
+                    {{ t('admin.modelPrice.batchAdjust') }}
+                  </button>
+                  <button v-if="selectedModels(g).length" type="button" class="btn btn-secondary btn-sm"
+                    :data-testid="`clear-selection-${g.id}`" :disabled="saving" @click="clearSelection(g)">
+                    {{ t('admin.modelPrice.clearSelection') }}
+                  </button>
+                </div>
                 <div
                   v-if="g.models.length === 0"
                   class="border-t border-gray-100 px-4 py-6 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-dark-400"
@@ -110,6 +130,11 @@
                     class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5"
                   >
                     <div class="flex min-w-0 items-center gap-2">
+                      <input type="checkbox" class="h-4 w-4 shrink-0 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        :data-testid="`select-model-${g.id}-${m.model}`"
+                        :aria-label="t('admin.modelPrice.selectModel', { model: m.model, group: g.name })"
+                        :checked="selection.has(selectionKey(g.id, m.model))" :disabled="saving"
+                        @change="toggleModel(g.id, m.model)" />
                       <span class="truncate text-sm text-gray-900 dark:text-gray-100">{{
                         m.model
                       }}</span>
@@ -133,6 +158,7 @@
                     <div class="flex shrink-0 items-center gap-2">
                       <button
                         type="button"
+                        :disabled="saving"
                         class="rounded-md border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-dark-600 dark:text-dark-200 dark:hover:bg-dark-900"
                         @click="openDialog(g.id, m)"
                       >
@@ -141,6 +167,7 @@
                       <button
                         v-if="m.custom_rate"
                         type="button"
+                        :disabled="saving"
                         class="rounded-md border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-dark-600 dark:text-dark-200 dark:hover:bg-dark-900"
                         @click="clearRate(g.id, m)"
                       >
@@ -155,47 +182,48 @@
         </section>
       </template>
 
-      <div
-        v-if="dialog.visible"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        @click.self="dialog.visible = false"
-      >
-        <div class="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl dark:bg-dark-800">
-          <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
-            {{ t('admin.modelPrice.dialogTitle') }}
-          </h3>
-          <p class="mt-1 break-all text-sm text-gray-500 dark:text-dark-400">{{ dialog.model }}</p>
+      <BaseDialog :show="dialog.visible" :title="t(dialog.batch ? 'admin.modelPrice.batchDialogTitle' : 'admin.modelPrice.dialogTitle')"
+        width="narrow" :show-close-button="!saving" @close="closeDialog">
+          <p class="break-all text-sm text-gray-500 dark:text-dark-400">{{ dialog.groupName }}</p>
+          <p class="mt-1 break-all text-sm text-gray-500 dark:text-dark-400">{{ dialog.models.join('、') }}</p>
+          <label for="model-rate-input" class="mt-4 block text-sm text-gray-700 dark:text-dark-200">{{ t('admin.modelPrice.multiplier') }}</label>
           <input
+            id="model-rate-input"
             v-model.number="dialog.value"
             type="number"
             step="0.001"
             min="0.001"
-            class="input mt-4 w-full"
+            class="input mt-2 w-full"
+            :disabled="saving"
             :placeholder="t('admin.modelPrice.inputPlaceholder')"
             @keyup.enter="saveRate"
           />
           <p class="mt-2 text-xs text-gray-400 dark:text-dark-500">
-            {{ t('admin.modelPrice.inputHint') }}
+            {{ t(dialog.batch ? 'admin.modelPrice.batchInputHint' : 'admin.modelPrice.inputHint') }}
           </p>
+          <p v-if="dialog.error" role="alert" class="mt-3 text-sm text-red-600 dark:text-red-400">{{ dialog.error }}</p>
+          <p v-if="saving" role="status" class="mt-3 text-sm text-gray-500">{{ t('admin.modelPrice.progress', { done: progress, total: dialog.models.length }) }}</p>
           <div class="mt-5 flex justify-end gap-2">
             <button
               type="button"
+              data-testid="cancel-rate"
+              :disabled="saving"
               class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-dark-600 dark:text-dark-200 dark:hover:bg-dark-900"
-              @click="dialog.visible = false"
+              @click="closeDialog"
             >
               {{ t('admin.modelPrice.cancel') }}
             </button>
             <button
               type="button"
+              data-testid="save-rate"
               class="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               :disabled="saving"
               @click="saveRate"
             >
-              {{ t('admin.modelPrice.confirm') }}
+              {{ t(saving ? 'admin.modelPrice.saving' : 'admin.modelPrice.confirm') }}
             </button>
           </div>
-        </div>
-      </div>
+      </BaseDialog>
     </div>
   </AppLayout>
 </template>
@@ -204,6 +232,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { GROUP_PLATFORM_OPTIONS } from '@/constants/platforms'
 import {
@@ -227,6 +256,35 @@ const { t } = useI18n()
 const groups = ref<GroupModelPriceGroup[]>([])
 const loading = ref(false)
 const saving = ref(false)
+const feedback = ref('')
+const progress = ref(0)
+const selection = reactive(new Set<string>())
+
+function selectionKey(groupId: number, model: string) {
+  return JSON.stringify([groupId, model])
+}
+
+function selectedModels(group: GroupModelPriceGroup) {
+  return group.models.filter(model => selection.has(selectionKey(group.id, model.model)))
+}
+
+function toggleModel(groupId: number, model: string) {
+  if (saving.value) return
+  const key = selectionKey(groupId, model)
+  if (selection.has(key)) selection.delete(key)
+  else selection.add(key)
+}
+
+function clearSelection(group: GroupModelPriceGroup) {
+  if (saving.value) return
+  for (const model of group.models) selection.delete(selectionKey(group.id, model.model))
+}
+
+function toggleAll(group: GroupModelPriceGroup) {
+  if (saving.value) return
+  if (selectedModels(group).length === group.models.length) clearSelection(group)
+  else for (const model of group.models) selection.add(selectionKey(group.id, model.model))
+}
 
 /** 平台分节的顺序：沿用平台目录声明的顺序，未知平台排在最后。 */
 const PLATFORM_ORDER: readonly string[] = GROUP_PLATFORM_OPTIONS.map(
@@ -246,12 +304,18 @@ const expandedGroups = reactive(new Set<number>())
 const dialog = reactive<{
   visible: boolean
   groupId: number
-  model: string
-  value: number | undefined
+  models: string[]
+  groupName: string
+  batch: boolean
+  error: string
+  value: number | string | undefined
 }>({
   visible: false,
   groupId: 0,
-  model: '',
+  models: [],
+  groupName: '',
+  batch: false,
+  error: '',
   value: undefined
 })
 
@@ -283,30 +347,79 @@ async function loadGroups() {
 }
 
 function openDialog(groupId: number, m: GroupModelPriceEntry) {
+  if (saving.value) return
   dialog.visible = true
   dialog.groupId = groupId
-  dialog.model = m.model
+  dialog.models = [m.model]
+  dialog.groupName = groups.value.find(group => group.id === groupId)?.name ?? ''
+  dialog.batch = false
+  dialog.error = ''
   // 回显当前覆盖倍率；未配置时留空，提示将回落分组默认倍率。
   dialog.value = m.rate_multiplier ?? undefined
 }
 
+function openBatchDialog(group: GroupModelPriceGroup) {
+  if (saving.value) return
+  const models = selectedModels(group)
+  if (!models.length) return
+  Object.assign(dialog, { visible: true, groupId: group.id, groupName: group.name,
+    models: models.map(model => model.model), batch: true, error: '', value: undefined })
+}
+
+function closeDialog() {
+  if (!saving.value) dialog.visible = false
+}
+
 async function saveRate() {
-  if (!dialog.groupId || !dialog.model) return
+  if (saving.value || !dialog.groupId || !dialog.models.length) return
   const value = Number(dialog.value)
-  if (!Number.isFinite(value) || value <= 0) return
+  if (!Number.isFinite(value) || value <= 0) {
+    dialog.error = t('admin.modelPrice.invalidRate')
+    return
+  }
   saving.value = true
+  dialog.error = ''
+  feedback.value = ''
+  progress.value = 0
+  const failed: string[] = []
+  const models = [...dialog.models]
   try {
-    await setModelRateMultiplier(dialog.groupId, dialog.model, value)
-    dialog.visible = false
-    await loadGroups()
+    for (const model of models) {
+      try {
+        await setModelRateMultiplier(dialog.groupId, model, value)
+        const entry = groups.value.find(group => group.id === dialog.groupId)?.models.find(entry => entry.model === model)
+        if (entry) { entry.rate_multiplier = value; entry.custom_rate = true }
+        selection.delete(selectionKey(dialog.groupId, model))
+      } catch {
+        failed.push(model)
+      }
+      progress.value++
+    }
+    feedback.value = t('admin.modelPrice.savedCount', { count: models.length - failed.length })
+    if (failed.length) {
+      dialog.models = failed
+      dialog.error = t('admin.modelPrice.failedCount', { count: failed.length })
+    } else {
+      dialog.visible = false
+    }
   } finally {
     saving.value = false
   }
 }
 
 async function clearRate(groupId: number, m: GroupModelPriceEntry) {
-  await clearModelRateMultiplier(groupId, m.model)
-  await loadGroups()
+  if (saving.value) return
+  saving.value = true
+  try {
+    await clearModelRateMultiplier(groupId, m.model)
+    m.rate_multiplier = null
+    m.custom_rate = false
+    feedback.value = ''
+  } catch {
+    feedback.value = t('admin.modelPrice.resetFailed')
+  } finally {
+    saving.value = false
+  }
 }
 
 onMounted(loadGroups)

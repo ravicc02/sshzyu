@@ -1,7 +1,7 @@
 export default {
   modelPrice: {
     title: '模型价格',
-    description: '按分组列出全部模型，可为单个模型调整计费倍率。该倍率仅对命中模型生效，不影响同分组其他模型。',
+    description: '按分组查看模型，支持单项或多选批量调整计费倍率，仅影响选中的模型。',
     loading: '加载中…',
     empty: '暂无分组',
     emptyGroup: '该分组下暂无可配置的模型',
@@ -19,7 +19,21 @@ export default {
     dialogTitle: '调整模型计费倍率',
     inputPlaceholder: '输入倍率（如 1.35）',
     inputHint:
-      '倍率仅对该模型生效；输入框已回显当前覆盖值，留空即回落分组默认倍率。点「恢复默认」也可清除覆盖。',
+      '倍率仅对该模型生效，请输入大于 0 的数值。点「恢复默认」可清除覆盖。',
+    selectAll: '全选本组模型',
+    selectModel: '选择 {group} 的 {model}',
+    selectedCount: '已选 {count} 个',
+    batchAdjust: '批量调整倍率',
+    clearSelection: '取消选择',
+    batchDialogTitle: '批量调整模型倍率',
+    multiplier: '计费倍率',
+    batchInputHint: '为以上选中模型设置同一个独立倍率，不修改分组默认倍率或未选中的模型。保存逐项执行，失败项可重试。',
+    invalidRate: '请输入大于 0 的有效倍率。',
+    saving: '保存中…',
+    progress: '已处理 {done} / {total} 个模型',
+    savedCount: '已更新 {count} 个模型的倍率。',
+    failedCount: '{count} 个模型保存失败，已保留失败项，请重试。',
+    resetFailed: '恢复默认失败，请重试。',
     cancel: '取消',
     confirm: '确定'
   }

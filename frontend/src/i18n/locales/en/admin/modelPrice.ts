@@ -2,7 +2,7 @@ export default {
   modelPrice: {
     title: 'Model Pricing',
     description:
-      'Lists every model by group; adjust the billing multiplier for a single model. The multiplier applies only to the matched model and does not affect other models in the same group.',
+      'View models by group and adjust billing multipliers individually or in bulk. Only selected models are affected.',
     loading: 'Loading…',
     empty: 'No groups',
     emptyGroup: 'No configurable models in this group',
@@ -20,7 +20,21 @@ export default {
     dialogTitle: 'Adjust model billing multiplier',
     inputPlaceholder: 'Enter multiplier (e.g. 1.35)',
     inputHint:
-      'Applies only to this model. The input shows the current override; clear it to fall back to the group default. "Reset to default" also clears the override.',
+      'Applies only to this model. Enter a number greater than zero. "Reset to default" clears the override.',
+    selectAll: 'Select all models in this group',
+    selectModel: 'Select {model} in {group}',
+    selectedCount: '{count} selected',
+    batchAdjust: 'Adjust selected multipliers',
+    clearSelection: 'Clear selection',
+    batchDialogTitle: 'Adjust selected model multipliers',
+    multiplier: 'Billing multiplier',
+    batchInputHint: 'Sets the same override for the selected models only. Group defaults and unselected models stay unchanged. Saves run individually; failed items can be retried.',
+    invalidRate: 'Enter a valid multiplier greater than zero.',
+    saving: 'Saving…',
+    progress: 'Processed {done} / {total} models',
+    savedCount: 'Updated {count} model multipliers.',
+    failedCount: '{count} models failed to save. Failed items are retained for retry.',
+    resetFailed: 'Could not reset the multiplier. Please retry.',
     cancel: 'Cancel',
     confirm: 'Confirm'
   }
