@@ -14,6 +14,7 @@ const (
 	defaultBatchImageDownloadActivePrefix = "batch_image:download:active:"
 	defaultBatchImageDownloadActiveTTL    = 10 * time.Minute
 	defaultBatchImageDownloadConcurrency  = 2
+	batchImageDownloadReleaseTimeout      = 5 * time.Second
 )
 
 var batchImageDownloadAcquireScript = redis.NewScript(`
@@ -93,7 +94,9 @@ func (p *batchImageDownloadPermit) Release(ctx context.Context) error {
 		return nil
 	}
 	p.once.Do(func() {
-		_, p.err = batchImageDownloadReleaseScript.Run(ctx, p.rdb, []string{p.key}).Result()
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), batchImageDownloadReleaseTimeout)
+		defer cancel()
+		_, p.err = batchImageDownloadReleaseScript.Run(cleanupCtx, p.rdb, []string{p.key}).Result()
 	})
 	return p.err
 }
