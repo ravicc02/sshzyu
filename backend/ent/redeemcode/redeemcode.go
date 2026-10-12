@@ -22,6 +22,10 @@ const (
 	FieldValue = "value"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldMaxUses holds the string denoting the max_uses field in the database.
+	FieldMaxUses = "max_uses"
+	// FieldUsedCount holds the string denoting the used_count field in the database.
+	FieldUsedCount = "used_count"
 	// FieldUsedBy holds the string denoting the used_by field in the database.
 	FieldUsedBy = "used_by"
 	// FieldUsedAt holds the string denoting the used_at field in the database.
@@ -65,6 +69,8 @@ var Columns = []string{
 	FieldType,
 	FieldValue,
 	FieldStatus,
+	FieldMaxUses,
+	FieldUsedCount,
 	FieldUsedBy,
 	FieldUsedAt,
 	FieldNotes,
@@ -97,6 +103,14 @@ var (
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	StatusValidator func(string) error
+	// DefaultMaxUses holds the default value on creation for the "max_uses" field.
+	DefaultMaxUses int
+	// MaxUsesValidator is a validator for the "max_uses" field. It is called by the builders before save.
+	MaxUsesValidator func(int) error
+	// DefaultUsedCount holds the default value on creation for the "used_count" field.
+	DefaultUsedCount int
+	// UsedCountValidator is a validator for the "used_count" field. It is called by the builders before save.
+	UsedCountValidator func(int) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultValidityDays holds the default value on creation for the "validity_days" field.
@@ -129,6 +143,16 @@ func ByValue(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByMaxUses orders the results by the max_uses field.
+func ByMaxUses(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMaxUses, opts...).ToFunc()
+}
+
+// ByUsedCount orders the results by the used_count field.
+func ByUsedCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUsedCount, opts...).ToFunc()
 }
 
 // ByUsedBy orders the results by the used_by field.

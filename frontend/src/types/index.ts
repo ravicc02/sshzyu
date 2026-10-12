@@ -1878,6 +1878,8 @@ export interface RedeemCode {
   notes?: string
   group_id?: number | null // 订阅类型专用
   validity_days?: number // 订阅类型专用
+  max_uses?: number
+  used_count?: number
   user?: User
   group?: Group // 关联的分组
 }
@@ -1890,6 +1892,7 @@ export interface GenerateRedeemCodesRequest {
   validity_days?: number // 订阅类型专用
   expires_at?: string | null
   expires_in_days?: number
+  max_uses?: number
 }
 
 export interface BatchUpdateRedeemCodeFields {

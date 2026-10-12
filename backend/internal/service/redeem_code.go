@@ -12,6 +12,8 @@ type RedeemCode struct {
 	Type      string
 	Value     float64
 	Status    string
+	MaxUses   int
+	UsedCount int
 	UsedBy    *int64
 	UsedAt    *time.Time
 	Notes     string

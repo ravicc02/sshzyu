@@ -70,7 +70,8 @@ export async function generate(
   value: number,
   groupId?: number | null,
   validityDays?: number,
-  expiresInDays?: number | null
+  expiresInDays?: number | null,
+  maxUses = 1
 ): Promise<RedeemCode[]> {
   const payload: GenerateRedeemCodesRequest = {
     count,
@@ -88,6 +89,7 @@ export async function generate(
   if (expiresInDays && expiresInDays > 0) {
     payload.expires_in_days = expiresInDays
   }
+  if (maxUses > 1) payload.max_uses = maxUses
 
   const { data } = await apiClient.post<RedeemCode[]>('/admin/redeem-codes/generate', payload)
   return data

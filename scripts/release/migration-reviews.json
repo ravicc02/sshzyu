@@ -23,5 +23,10 @@
     "checksum": "695464324c9e59854893c3dc8a715d05d92f7306e4fe12ea1f124fa0861c2c46",
     "risk": "backward-compatible",
     "description": "Add display-only group rate multiplier snapshot column (model-level override excluded) to batch_image_jobs; nullable ADD COLUMN IF NOT EXISTS."
+  },
+  "249_multi_use_redeem_codes.sql": {
+    "checksum": "920953d79820cdbdd9747a64e45c833bb1173df8a54259ee27300ec13cf8ab78",
+    "risk": "manual",
+    "description": "Add bounded redeem-code usage counters and immutable per-user entitlement snapshots with account/email uniqueness. Existing codes remain single-use. Coordinated rollout required: older applications do not enforce multi-use claim deduplication, so rolling back after shared codes are issued is unsafe. No schema or data deletion."
   }
 }

@@ -528,6 +528,8 @@ type RedeemCode struct {
 // 注意：普通用户接口不得返回 notes 等内部信息。
 type AdminRedeemCode struct {
 	RedeemCode
+	MaxUses   int `json:"max_uses,omitempty"`
+	UsedCount int `json:"used_count,omitempty"`
 
 	Notes string `json:"notes"`
 }

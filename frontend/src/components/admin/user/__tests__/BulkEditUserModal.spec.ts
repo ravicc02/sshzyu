@@ -3,8 +3,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 
 import BulkEditUserModal from '../BulkEditUserModal.vue'
 
-const { batchUpdateLimits, showSuccess, showError } = vi.hoisted(() => ({
+const { batchUpdateLimits, batchUpdateBalance, showSuccess, showError } = vi.hoisted(() => ({
   batchUpdateLimits: vi.fn(),
+  batchUpdateBalance: vi.fn(),
   showSuccess: vi.fn(),
   showError: vi.fn()
 }))
@@ -12,7 +13,8 @@ const { batchUpdateLimits, showSuccess, showError } = vi.hoisted(() => ({
 vi.mock('@/api/admin', () => ({
   adminAPI: {
     users: {
-      batchUpdateLimits
+      batchUpdateLimits,
+      batchUpdateBalance
     }
   }
 }))
@@ -50,6 +52,7 @@ const mountModal = () => mount(BulkEditUserModal, {
 describe('BulkEditUserModal', () => {
   beforeEach(() => {
     batchUpdateLimits.mockReset()
+    batchUpdateBalance.mockReset()
     showSuccess.mockReset()
     showError.mockReset()
     batchUpdateLimits.mockResolvedValue({ affected: 2 })
@@ -128,5 +131,42 @@ describe('BulkEditUserModal', () => {
     await flushPromises()
 
     expect(batchUpdateLimits).not.toHaveBeenCalled()
+  })
+
+  it('keeps per-user results open and retries failed users only', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    batchUpdateBalance.mockResolvedValueOnce({ success: 1, failed: 1, items: [
+      { user_id: 4, success: true, retryable: false },
+      { user_id: 7, success: false, code: 'INSUFFICIENT_BALANCE', error: 'Insufficient balance', retryable: true },
+    ] }).mockResolvedValueOnce({ success: 1, failed: 0, items: [{ user_id: 7, success: true }] })
+    const wrapper = mountModal()
+    await wrapper.get('[data-test="enable-balance"]').trigger('click')
+    await wrapper.get('[data-test="balance-input"]').setValue('10')
+    await wrapper.get('[data-test="balance-operation"]').setValue('subtract')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('close')).toBeUndefined()
+    expect(wrapper.get('[data-test="balance-result-4"]').text()).toContain('bulkBalance.succeeded')
+    expect(wrapper.get('[data-test="balance-result-7"]').text()).toContain('Insufficient balance')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(batchUpdateBalance.mock.calls[1][0].user_ids).toEqual([7])
+    expect(batchUpdateLimits).not.toHaveBeenCalled()
+  })
+
+  it('reuses the same operation key and payload after an ambiguous network failure', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    batchUpdateBalance.mockRejectedValueOnce(new Error('network disconnected'))
+      .mockResolvedValueOnce({ success: 2, failed: 0, items: [{ user_id: 4, success: true }, { user_id: 7, success: true }] })
+    const wrapper = mountModal()
+    await wrapper.get('[data-test="enable-balance"]').trigger('click')
+    await wrapper.get('[data-test="balance-input"]').setValue('8')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.get('[data-test="balance-input"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(batchUpdateBalance.mock.calls[0]).toEqual(batchUpdateBalance.mock.calls[1])
+    expect(typeof batchUpdateBalance.mock.calls[0][1]).toBe('string')
   })
 })

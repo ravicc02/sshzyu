@@ -524,7 +524,12 @@ const handleRedeem = async () => {
     // Show success toast
     appStore.showSuccess(t('redeem.codeRedeemSuccess'))
   } catch (error: any) {
-    errorMessage.value = error.response?.data?.detail || t('redeem.failedToRedeem')
+    const reason = error.response?.data?.reason
+    errorMessage.value = reason === 'REDEEM_CODE_ALREADY_CLAIMED'
+      ? t('redeem.alreadyClaimed')
+      : reason === 'REDEEM_EMAIL_REQUIRED'
+        ? t('redeem.emailRequired')
+        : error.response?.data?.detail || error.response?.data?.message || t('redeem.failedToRedeem')
 
     appStore.showError(t('redeem.redeemFailed'))
   } finally {

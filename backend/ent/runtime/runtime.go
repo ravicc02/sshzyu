@@ -36,6 +36,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/promocodeusage"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
+	"github.com/Wei-Shaw/sub2api/ent/redeemcodeclaim"
 	"github.com/Wei-Shaw/sub2api/ent/schema"
 	"github.com/Wei-Shaw/sub2api/ent/securitysecret"
 	"github.com/Wei-Shaw/sub2api/ent/setting"
@@ -1931,14 +1932,44 @@ func init() {
 	redeemcode.DefaultStatus = redeemcodeDescStatus.Default.(string)
 	// redeemcode.StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	redeemcode.StatusValidator = redeemcodeDescStatus.Validators[0].(func(string) error)
+	// redeemcodeDescMaxUses is the schema descriptor for max_uses field.
+	redeemcodeDescMaxUses := redeemcodeFields[4].Descriptor()
+	// redeemcode.DefaultMaxUses holds the default value on creation for the max_uses field.
+	redeemcode.DefaultMaxUses = redeemcodeDescMaxUses.Default.(int)
+	// redeemcode.MaxUsesValidator is a validator for the "max_uses" field. It is called by the builders before save.
+	redeemcode.MaxUsesValidator = redeemcodeDescMaxUses.Validators[0].(func(int) error)
+	// redeemcodeDescUsedCount is the schema descriptor for used_count field.
+	redeemcodeDescUsedCount := redeemcodeFields[5].Descriptor()
+	// redeemcode.DefaultUsedCount holds the default value on creation for the used_count field.
+	redeemcode.DefaultUsedCount = redeemcodeDescUsedCount.Default.(int)
+	// redeemcode.UsedCountValidator is a validator for the "used_count" field. It is called by the builders before save.
+	redeemcode.UsedCountValidator = redeemcodeDescUsedCount.Validators[0].(func(int) error)
 	// redeemcodeDescCreatedAt is the schema descriptor for created_at field.
-	redeemcodeDescCreatedAt := redeemcodeFields[7].Descriptor()
+	redeemcodeDescCreatedAt := redeemcodeFields[9].Descriptor()
 	// redeemcode.DefaultCreatedAt holds the default value on creation for the created_at field.
 	redeemcode.DefaultCreatedAt = redeemcodeDescCreatedAt.Default.(func() time.Time)
 	// redeemcodeDescValidityDays is the schema descriptor for validity_days field.
-	redeemcodeDescValidityDays := redeemcodeFields[10].Descriptor()
+	redeemcodeDescValidityDays := redeemcodeFields[12].Descriptor()
 	// redeemcode.DefaultValidityDays holds the default value on creation for the validity_days field.
 	redeemcode.DefaultValidityDays = redeemcodeDescValidityDays.Default.(int)
+	redeemcodeclaimFields := schema.RedeemCodeClaim{}.Fields()
+	_ = redeemcodeclaimFields
+	// redeemcodeclaimDescEmail is the schema descriptor for email field.
+	redeemcodeclaimDescEmail := redeemcodeclaimFields[2].Descriptor()
+	// redeemcodeclaim.EmailValidator is a validator for the "email" field. It is called by the builders before save.
+	redeemcodeclaim.EmailValidator = redeemcodeclaimDescEmail.Validators[0].(func(string) error)
+	// redeemcodeclaimDescType is the schema descriptor for type field.
+	redeemcodeclaimDescType := redeemcodeclaimFields[3].Descriptor()
+	// redeemcodeclaim.TypeValidator is a validator for the "type" field. It is called by the builders before save.
+	redeemcodeclaim.TypeValidator = redeemcodeclaimDescType.Validators[0].(func(string) error)
+	// redeemcodeclaimDescValidityDays is the schema descriptor for validity_days field.
+	redeemcodeclaimDescValidityDays := redeemcodeclaimFields[6].Descriptor()
+	// redeemcodeclaim.DefaultValidityDays holds the default value on creation for the validity_days field.
+	redeemcodeclaim.DefaultValidityDays = redeemcodeclaimDescValidityDays.Default.(int)
+	// redeemcodeclaimDescClaimedAt is the schema descriptor for claimed_at field.
+	redeemcodeclaimDescClaimedAt := redeemcodeclaimFields[7].Descriptor()
+	// redeemcodeclaim.DefaultClaimedAt holds the default value on creation for the claimed_at field.
+	redeemcodeclaim.DefaultClaimedAt = redeemcodeclaimDescClaimedAt.Default.(func() time.Time)
 	securitysecretMixin := schema.SecuritySecret{}.Mixin()
 	securitysecretMixinFields0 := securitysecretMixin[0].Fields()
 	_ = securitysecretMixinFields0

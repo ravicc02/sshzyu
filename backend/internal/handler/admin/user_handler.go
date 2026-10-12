@@ -680,6 +680,57 @@ func (h *UserHandler) BatchUpdateLimits(c *gin.Context) {
 	response.Success(c, gin.H{"affected": affected})
 }
 
+type BatchUpdateBalanceRequest struct {
+	UserIDs   []int64 `json:"user_ids"`
+	Amount    float64 `json:"amount" binding:"required,gt=0"`
+	Operation string  `json:"operation" binding:"required,oneof=add subtract"`
+	Notes     string  `json:"notes"`
+}
+
+func (h *UserHandler) BatchUpdateBalance(c *gin.Context) {
+	key, keyErr := service.NormalizeIdempotencyKey(c.GetHeader("Idempotency-Key"))
+	if keyErr != nil {
+		response.ErrorFrom(c, keyErr)
+		return
+	}
+	if key == "" {
+		response.ErrorFrom(c, service.ErrIdempotencyKeyRequired)
+		return
+	}
+	if service.DefaultIdempotencyCoordinator() == nil {
+		response.ErrorFrom(c, service.ErrIdempotencyStoreUnavail)
+		return
+	}
+	var req BatchUpdateBalanceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if len(req.UserIDs) == 0 || len(req.UserIDs) > 500 {
+		response.BadRequest(c, "user_ids must contain between 1 and 500 users")
+		return
+	}
+	for _, userID := range req.UserIDs {
+		if userID <= 0 {
+			response.BadRequest(c, "user_ids must be positive")
+			return
+		}
+	}
+	if math.IsNaN(req.Amount) || math.IsInf(req.Amount, 0) || len(req.Notes) > 4000 {
+		response.BadRequest(c, "Invalid amount or notes")
+		return
+	}
+	batchService, ok := h.adminService.(service.BatchBalanceAdminService)
+	if !ok {
+		response.InternalError(c, "batch balance operation is unavailable")
+		return
+	}
+	notes := fmt.Sprintf("%s: %s", adminActorScope(c), strings.TrimSpace(req.Notes))
+	executeAdminIdempotentJSONWithTimeout(c, "admin.users.batch_balance", req, 24*time.Hour, 3*time.Minute, func(ctx context.Context) (any, error) {
+		return batchService.BatchUpdateBalance(ctx, req.UserIDs, req.Amount, req.Operation, notes), nil
+	})
+}
+
 // GetUserPlatformQuotas GET /admin/users/:id/platform-quotas
 // admin 视角：D14 lazy 归零 + 暴露 *_window_start 调试字段
 func (h *UserHandler) GetUserPlatformQuotas(c *gin.Context) {

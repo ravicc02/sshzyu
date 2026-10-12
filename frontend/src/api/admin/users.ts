@@ -55,6 +55,12 @@ export interface BatchUpdateUserLimitsResponse {
   affected: number
 }
 
+export interface BatchUpdateBalanceResponse {
+  items: Array<{ user_id: number; success: boolean; error?: string; code?: string; retryable?: boolean }>
+  success: number
+  failed: number
+}
+
 /**
  * List all users with pagination
  * @param page - Page number (default: 1)
@@ -205,6 +211,48 @@ export async function batchUpdateLimits(
     '/admin/users/batch-limits',
     request
   )
+  return data
+}
+
+export interface BatchUpdateBalanceRequest {
+  user_ids: number[]
+  amount: number
+  operation: 'add' | 'subtract'
+  notes?: string
+}
+
+const balanceAttemptKeys = new Map<string, { key: string; createdAt: number }>()
+
+async function balanceStorageKey(signature: string): Promise<string> {
+  if (globalThis.crypto?.subtle) {
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(signature))
+    return 'sshzy:batch-balance:' + Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+  }
+  let hash = 2166136261
+  for (const character of signature) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619) >>> 0
+  return 'sshzy:batch-balance:' + hash.toString(16)
+}
+
+export async function batchUpdateBalance(request: BatchUpdateBalanceRequest, operationKey?: string): Promise<BatchUpdateBalanceResponse> {
+  const normalized = { ...request, user_ids: [...new Set(request.user_ids)].sort((left,right) => left-right), notes: request.notes?.trim() || '' }
+  let owner = 'unknown'
+  try { owner = String(JSON.parse(globalThis.localStorage?.getItem('auth_user') || 'null')?.id ?? owner) } catch { owner = 'unknown' }
+  const signature = JSON.stringify({ owner, request: normalized })
+  const storageKey = await balanceStorageKey(signature)
+  let attempt = balanceAttemptKeys.get(signature)
+  if (!attempt) {
+    try {
+      const stored = JSON.parse(globalThis.sessionStorage?.getItem(storageKey) || 'null')
+      if (stored && typeof stored.key === 'string' && typeof stored.createdAt === 'number') attempt = stored
+    } catch { attempt = undefined }
+  }
+  if (attempt && Date.now() - attempt.createdAt > 23*60*60*1000) throw new Error('The previous balance request is unconfirmed and its safe retry window expired. Review balance history before making another adjustment.')
+  if (!attempt) attempt = { key: operationKey || 'balance-' + (globalThis.crypto?.randomUUID?.() || Date.now().toString(36) + '-' + Math.random().toString(36).slice(2)), createdAt: Date.now() }
+  balanceAttemptKeys.set(signature, attempt)
+  try { globalThis.sessionStorage?.setItem(storageKey, JSON.stringify(attempt)) } catch { balanceAttemptKeys.set(signature, attempt) }
+  const { data } = await apiClient.post<BatchUpdateBalanceResponse>('/admin/users/batch-balance', normalized, { headers: { 'Idempotency-Key': attempt.key }, timeout: 180000 })
+  balanceAttemptKeys.delete(signature)
+  try { globalThis.sessionStorage?.removeItem(storageKey) } catch { balanceAttemptKeys.delete(signature) }
   return data
 }
 
@@ -415,6 +463,7 @@ export const usersAPI = {
   updateBalance,
   updateConcurrency,
   batchUpdateLimits,
+  batchUpdateBalance,
   toggleStatus,
   getUserApiKeys,
   getUserUsageStats,

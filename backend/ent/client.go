@@ -46,6 +46,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/promocodeusage"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
+	"github.com/Wei-Shaw/sub2api/ent/redeemcodeclaim"
 	"github.com/Wei-Shaw/sub2api/ent/securitysecret"
 	"github.com/Wei-Shaw/sub2api/ent/setting"
 	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
@@ -129,6 +130,8 @@ type Client struct {
 	Proxy *ProxyClient
 	// RedeemCode is the client for interacting with the RedeemCode builders.
 	RedeemCode *RedeemCodeClient
+	// RedeemCodeClaim is the client for interacting with the RedeemCodeClaim builders.
+	RedeemCodeClaim *RedeemCodeClaimClient
 	// SecuritySecret is the client for interacting with the SecuritySecret builders.
 	SecuritySecret *SecuritySecretClient
 	// Setting is the client for interacting with the Setting builders.
@@ -195,6 +198,7 @@ func (c *Client) init() {
 	c.PromoCodeUsage = NewPromoCodeUsageClient(c.config)
 	c.Proxy = NewProxyClient(c.config)
 	c.RedeemCode = NewRedeemCodeClient(c.config)
+	c.RedeemCodeClaim = NewRedeemCodeClaimClient(c.config)
 	c.SecuritySecret = NewSecuritySecretClient(c.config)
 	c.Setting = NewSettingClient(c.config)
 	c.SubscriptionPlan = NewSubscriptionPlanClient(c.config)
@@ -330,6 +334,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PromoCodeUsage:                NewPromoCodeUsageClient(cfg),
 		Proxy:                         NewProxyClient(cfg),
 		RedeemCode:                    NewRedeemCodeClient(cfg),
+		RedeemCodeClaim:               NewRedeemCodeClaimClient(cfg),
 		SecuritySecret:                NewSecuritySecretClient(cfg),
 		Setting:                       NewSettingClient(cfg),
 		SubscriptionPlan:              NewSubscriptionPlanClient(cfg),
@@ -392,6 +397,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PromoCodeUsage:                NewPromoCodeUsageClient(cfg),
 		Proxy:                         NewProxyClient(cfg),
 		RedeemCode:                    NewRedeemCodeClient(cfg),
+		RedeemCodeClaim:               NewRedeemCodeClaimClient(cfg),
 		SecuritySecret:                NewSecuritySecretClient(cfg),
 		Setting:                       NewSettingClient(cfg),
 		SubscriptionPlan:              NewSubscriptionPlanClient(cfg),
@@ -441,9 +447,9 @@ func (c *Client) Use(hooks ...Hook) {
 		c.IdentityAdoptionDecision, c.LotteryActivity, c.LotteryDraw, c.LotteryPrize,
 		c.LotteryUserStats, c.PaymentAuditLog, c.PaymentOrder,
 		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.Proxy, c.RedeemCode, c.RedeemCodeClaim, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Use(hooks...)
@@ -462,9 +468,9 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.IdentityAdoptionDecision, c.LotteryActivity, c.LotteryDraw, c.LotteryPrize,
 		c.LotteryUserStats, c.PaymentAuditLog, c.PaymentOrder,
 		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.Proxy, c.RedeemCode, c.RedeemCodeClaim, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
@@ -536,6 +542,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Proxy.mutate(ctx, m)
 	case *RedeemCodeMutation:
 		return c.RedeemCode.mutate(ctx, m)
+	case *RedeemCodeClaimMutation:
+		return c.RedeemCodeClaim.mutate(ctx, m)
 	case *SecuritySecretMutation:
 		return c.SecuritySecret.mutate(ctx, m)
 	case *SettingMutation:
@@ -5417,6 +5425,139 @@ func (c *RedeemCodeClient) mutate(ctx context.Context, m *RedeemCodeMutation) (V
 	}
 }
 
+// RedeemCodeClaimClient is a client for the RedeemCodeClaim schema.
+type RedeemCodeClaimClient struct {
+	config
+}
+
+// NewRedeemCodeClaimClient returns a client for the RedeemCodeClaim from the given config.
+func NewRedeemCodeClaimClient(c config) *RedeemCodeClaimClient {
+	return &RedeemCodeClaimClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `redeemcodeclaim.Hooks(f(g(h())))`.
+func (c *RedeemCodeClaimClient) Use(hooks ...Hook) {
+	c.hooks.RedeemCodeClaim = append(c.hooks.RedeemCodeClaim, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `redeemcodeclaim.Intercept(f(g(h())))`.
+func (c *RedeemCodeClaimClient) Intercept(interceptors ...Interceptor) {
+	c.inters.RedeemCodeClaim = append(c.inters.RedeemCodeClaim, interceptors...)
+}
+
+// Create returns a builder for creating a RedeemCodeClaim entity.
+func (c *RedeemCodeClaimClient) Create() *RedeemCodeClaimCreate {
+	mutation := newRedeemCodeClaimMutation(c.config, OpCreate)
+	return &RedeemCodeClaimCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of RedeemCodeClaim entities.
+func (c *RedeemCodeClaimClient) CreateBulk(builders ...*RedeemCodeClaimCreate) *RedeemCodeClaimCreateBulk {
+	return &RedeemCodeClaimCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *RedeemCodeClaimClient) MapCreateBulk(slice any, setFunc func(*RedeemCodeClaimCreate, int)) *RedeemCodeClaimCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &RedeemCodeClaimCreateBulk{err: fmt.Errorf("calling to RedeemCodeClaimClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*RedeemCodeClaimCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &RedeemCodeClaimCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for RedeemCodeClaim.
+func (c *RedeemCodeClaimClient) Update() *RedeemCodeClaimUpdate {
+	mutation := newRedeemCodeClaimMutation(c.config, OpUpdate)
+	return &RedeemCodeClaimUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *RedeemCodeClaimClient) UpdateOne(_m *RedeemCodeClaim) *RedeemCodeClaimUpdateOne {
+	mutation := newRedeemCodeClaimMutation(c.config, OpUpdateOne, withRedeemCodeClaim(_m))
+	return &RedeemCodeClaimUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *RedeemCodeClaimClient) UpdateOneID(id int64) *RedeemCodeClaimUpdateOne {
+	mutation := newRedeemCodeClaimMutation(c.config, OpUpdateOne, withRedeemCodeClaimID(id))
+	return &RedeemCodeClaimUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for RedeemCodeClaim.
+func (c *RedeemCodeClaimClient) Delete() *RedeemCodeClaimDelete {
+	mutation := newRedeemCodeClaimMutation(c.config, OpDelete)
+	return &RedeemCodeClaimDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *RedeemCodeClaimClient) DeleteOne(_m *RedeemCodeClaim) *RedeemCodeClaimDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *RedeemCodeClaimClient) DeleteOneID(id int64) *RedeemCodeClaimDeleteOne {
+	builder := c.Delete().Where(redeemcodeclaim.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &RedeemCodeClaimDeleteOne{builder}
+}
+
+// Query returns a query builder for RedeemCodeClaim.
+func (c *RedeemCodeClaimClient) Query() *RedeemCodeClaimQuery {
+	return &RedeemCodeClaimQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeRedeemCodeClaim},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a RedeemCodeClaim entity by its id.
+func (c *RedeemCodeClaimClient) Get(ctx context.Context, id int64) (*RedeemCodeClaim, error) {
+	return c.Query().Where(redeemcodeclaim.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *RedeemCodeClaimClient) GetX(ctx context.Context, id int64) *RedeemCodeClaim {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *RedeemCodeClaimClient) Hooks() []Hook {
+	return c.hooks.RedeemCodeClaim
+}
+
+// Interceptors returns the client interceptors.
+func (c *RedeemCodeClaimClient) Interceptors() []Interceptor {
+	return c.inters.RedeemCodeClaim
+}
+
+func (c *RedeemCodeClaimClient) mutate(ctx context.Context, m *RedeemCodeClaimMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&RedeemCodeClaimCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&RedeemCodeClaimUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&RedeemCodeClaimUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&RedeemCodeClaimDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown RedeemCodeClaim mutation op: %q", m.Op())
+	}
+}
+
 // SecuritySecretClient is a client for the SecuritySecret schema.
 type SecuritySecretClient struct {
 	config
@@ -7446,9 +7587,10 @@ type (
 		Group, IdempotencyRecord, IdentityAdoptionDecision, LotteryActivity,
 		LotteryDraw, LotteryPrize, LotteryUserStats, PaymentAuditLog, PaymentOrder,
 		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
-		RedeemCode, SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
-		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
-		UserAttributeValue, UserPlatformQuota, UserSubscription []ent.Hook
+		RedeemCode, RedeemCodeClaim, SecuritySecret, Setting, SubscriptionPlan,
+		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
+		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
+		UserSubscription []ent.Hook
 	}
 	inters struct {
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
@@ -7458,9 +7600,10 @@ type (
 		Group, IdempotencyRecord, IdentityAdoptionDecision, LotteryActivity,
 		LotteryDraw, LotteryPrize, LotteryUserStats, PaymentAuditLog, PaymentOrder,
 		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
-		RedeemCode, SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
-		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
-		UserAttributeValue, UserPlatformQuota, UserSubscription []ent.Interceptor
+		RedeemCode, RedeemCodeClaim, SecuritySecret, Setting, SubscriptionPlan,
+		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
+		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
+		UserSubscription []ent.Interceptor
 	}
 )
 

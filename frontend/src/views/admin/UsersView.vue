@@ -764,6 +764,7 @@
       :selected-ids="selectedIds"
       @close="showBulkEditModal = false"
       @success="handleBulkLimitsSuccess"
+      @balance-result="handleBulkBalanceResult"
     />
     <UserPlatformQuotaModal
       :show="showPlatformQuotaModal"
@@ -1651,6 +1652,11 @@ const loadUsers = async () => {
 
 const handleBulkLimitsSuccess = async () => {
   clearSelection()
+  await loadUsers()
+}
+
+const handleBulkBalanceResult = async (result: import('@/api/admin/users').BatchUpdateBalanceResponse) => {
+  setSelectedIds(result.items.filter(item => !item.success && item.retryable !== false).map(item => item.user_id))
   await loadUsers()
 }
 

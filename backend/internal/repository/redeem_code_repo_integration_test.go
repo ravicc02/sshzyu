@@ -72,6 +72,32 @@ func (s *RedeemCodeRepoSuite) TestCreate() {
 	s.Require().WithinDuration(expiresAt, *got.ExpiresAt, time.Second)
 }
 
+func (s *RedeemCodeRepoSuite) TestClaimMultiUseByUserAndEmail() {
+	code := &service.RedeemCode{Code: "MULTI-CLAIM", Type: service.RedeemTypeBalance, Value: 10, Status: service.StatusUnused, MaxUses: 2}
+	s.Require().NoError(s.repo.Create(s.ctx, code))
+	stored, err := s.repo.GetByID(s.ctx, code.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(2, stored.MaxUses)
+	s.Require().Equal(0, stored.UsedCount)
+	firstUser := s.createUser("multi-first@example.com")
+	secondUser := s.createUser("multi-second@example.com")
+	s.Require().NotEqual(firstUser.ID, secondUser.ID)
+	s.Require().NotEqual(firstUser.Email, secondUser.Email)
+	s.Require().NoError(s.repo.Claim(s.ctx, code.ID, firstUser.ID, firstUser.Email))
+	afterFirst, err := s.repo.GetByID(s.ctx, code.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(1, afterFirst.UsedCount)
+	s.Require().Equal(2, afterFirst.MaxUses)
+	s.Require().Equal(service.StatusUnused, afterFirst.Status)
+	s.Require().ErrorIs(s.repo.Claim(s.ctx, code.ID, firstUser.ID, firstUser.Email), service.ErrRedeemCodeAlreadyClaimed)
+	s.Require().NoError(s.repo.Claim(s.ctx, code.ID, secondUser.ID, secondUser.Email))
+	s.Require().ErrorIs(s.repo.Claim(s.ctx, code.ID, secondUser.ID+10000, secondUser.Email), service.ErrRedeemCodeUsed)
+	got, err := s.repo.GetByID(s.ctx, code.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(2, got.UsedCount)
+	s.Require().Equal(service.StatusUsed, got.Status)
+}
+
 func (s *RedeemCodeRepoSuite) TestCreateBatch() {
 	codes := []service.RedeemCode{
 		{Code: "BATCH-1", Type: service.RedeemTypeBalance, Value: 10, Status: service.StatusUnused},

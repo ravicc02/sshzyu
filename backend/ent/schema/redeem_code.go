@@ -48,6 +48,12 @@ func (RedeemCode) Fields() []ent.Field {
 		field.String("status").
 			MaxLen(20).
 			Default(domain.StatusUnused),
+		field.Int("max_uses").
+			Positive().
+			Default(1),
+		field.Int("used_count").
+			NonNegative().
+			Default(0),
 		field.Int64("used_by").
 			Optional().
 			Nillable(),

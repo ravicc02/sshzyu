@@ -7,6 +7,7 @@ import (
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
+	"github.com/Wei-Shaw/sub2api/ent/redeemcodeclaim"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -23,11 +24,13 @@ func NewRedeemCodeRepository(client *dbent.Client) service.RedeemCodeRepository 
 }
 
 func (r *redeemCodeRepository) Create(ctx context.Context, code *service.RedeemCode) error {
-	created, err := r.client.RedeemCode.Create().
+	created, err := clientFromContext(ctx, r.client).RedeemCode.Create().
 		SetCode(code.Code).
 		SetType(code.Type).
 		SetValue(code.Value).
 		SetStatus(code.Status).
+		SetMaxUses(maxInt(code.MaxUses)).
+		SetUsedCount(code.UsedCount).
 		SetNotes(code.Notes).
 		SetValidityDays(code.ValidityDays).
 		SetNillableExpiresAt(code.ExpiresAt).
@@ -42,6 +45,13 @@ func (r *redeemCodeRepository) Create(ctx context.Context, code *service.RedeemC
 	return err
 }
 
+func maxInt(value int) int {
+	if value <= 0 {
+		return 1
+	}
+	return value
+}
+
 func (r *redeemCodeRepository) CreateBatch(ctx context.Context, codes []service.RedeemCode) error {
 	if len(codes) == 0 {
 		return nil
@@ -50,11 +60,13 @@ func (r *redeemCodeRepository) CreateBatch(ctx context.Context, codes []service.
 	builders := make([]*dbent.RedeemCodeCreate, 0, len(codes))
 	for i := range codes {
 		c := &codes[i]
-		b := r.client.RedeemCode.Create().
+		b := clientFromContext(ctx, r.client).RedeemCode.Create().
 			SetCode(c.Code).
 			SetType(c.Type).
 			SetValue(c.Value).
 			SetStatus(c.Status).
+			SetMaxUses(maxInt(c.MaxUses)).
+			SetUsedCount(c.UsedCount).
 			SetNotes(c.Notes).
 			SetValidityDays(c.ValidityDays).
 			SetNillableExpiresAt(c.ExpiresAt).
@@ -64,11 +76,11 @@ func (r *redeemCodeRepository) CreateBatch(ctx context.Context, codes []service.
 		builders = append(builders, b)
 	}
 
-	return r.client.RedeemCode.CreateBulk(builders...).Exec(ctx)
+	return clientFromContext(ctx, r.client).RedeemCode.CreateBulk(builders...).Exec(ctx)
 }
 
 func (r *redeemCodeRepository) GetByID(ctx context.Context, id int64) (*service.RedeemCode, error) {
-	m, err := r.client.RedeemCode.Query().
+	m, err := clientFromContext(ctx, r.client).RedeemCode.Query().
 		Where(redeemcode.IDEQ(id)).
 		Only(ctx)
 	if err != nil {
@@ -94,7 +106,14 @@ func (r *redeemCodeRepository) GetByCode(ctx context.Context, code string) (*ser
 }
 
 func (r *redeemCodeRepository) Delete(ctx context.Context, id int64) error {
-	_, err := r.client.RedeemCode.Delete().Where(redeemcode.IDEQ(id)).Exec(ctx)
+	exists, err := clientFromContext(ctx, r.client).RedeemCodeClaim.Query().Where(redeemcodeclaim.RedeemCodeIDEQ(id)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return service.ErrRedeemCodeHasClaims
+	}
+	_, err = clientFromContext(ctx, r.client).RedeemCode.Delete().Where(redeemcode.IDEQ(id)).Exec(ctx)
 	return err
 }
 
@@ -327,6 +346,7 @@ func (r *redeemCodeRepository) Use(ctx context.Context, id, userID int64) error 
 	affected, err := client.RedeemCode.Update().
 		Where(redeemcode.IDEQ(id), redeemcode.StatusEQ(service.StatusUnused)).
 		SetStatus(service.StatusUsed).
+		SetUsedCount(1).
 		SetUsedBy(userID).
 		SetUsedAt(now).
 		Save(ctx)
@@ -339,73 +359,149 @@ func (r *redeemCodeRepository) Use(ctx context.Context, id, userID int64) error 
 	return nil
 }
 
+func (r *redeemCodeRepository) Claim(ctx context.Context, codeID, userID int64, email string) error {
+	if dbent.TxFromContext(ctx) == nil {
+		tx, err := r.client.Tx(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err = r.Claim(dbent.NewTxContext(ctx, tx), codeID, userID, email); err != nil {
+			return err
+		}
+		return tx.Commit()
+	}
+	client := clientFromContext(ctx, r.client)
+	code, err := client.RedeemCode.Query().Where(redeemcode.IDEQ(codeID)).ForUpdate().Only(ctx)
+	if err != nil {
+		return translatePersistenceError(err, service.ErrRedeemCodeNotFound, nil)
+	}
+	if code.Status != service.StatusUnused || code.UsedCount >= code.MaxUses {
+		return service.ErrRedeemCodeUsed
+	}
+	if code.ExpiresAt != nil && !code.ExpiresAt.After(time.Now()) {
+		return service.ErrRedeemCodeExpired
+	}
+	owner, err := client.User.Query().Where(user.IDEQ(userID), user.DeletedAtIsNil()).ForUpdate().Only(ctx)
+	if err != nil {
+		return translatePersistenceError(err, service.ErrUserNotFound, nil)
+	}
+	email = strings.ToLower(strings.TrimSpace(owner.Email))
+	if email == "" {
+		return service.ErrRedeemEmailRequired
+	}
+	exists, err := client.RedeemCodeClaim.Query().Where(redeemcodeclaim.RedeemCodeIDEQ(codeID), redeemcodeclaim.Or(redeemcodeclaim.UserIDEQ(userID), redeemcodeclaim.EmailEQ(email))).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return service.ErrRedeemCodeAlreadyClaimed
+	}
+	_, err = client.RedeemCodeClaim.Create().SetRedeemCodeID(codeID).SetUserID(userID).SetEmail(email).
+		SetType(code.Type).SetValue(code.Value).SetNillableGroupID(code.GroupID).SetValidityDays(code.ValidityDays).Save(ctx)
+	if err != nil {
+		return translatePersistenceError(err, nil, service.ErrRedeemCodeAlreadyClaimed)
+	}
+	update := client.RedeemCode.UpdateOneID(codeID).SetUsedCount(code.UsedCount + 1)
+	if code.UsedCount+1 >= code.MaxUses {
+		update.SetStatus(service.StatusUsed)
+	}
+	if code.UsedBy == nil {
+		update.SetUsedBy(userID)
+	}
+	if code.UsedAt == nil {
+		update.SetUsedAt(time.Now())
+	}
+	_, err = update.Save(ctx)
+	return err
+}
+
+const redeemUserHistorySQL = `WITH history AS (
+ SELECT rc.id, rc.code, rc.type, rc.value, rc.status, rc.used_by, rc.used_at, COALESCE(rc.notes,'') AS notes, rc.created_at, rc.expires_at, rc.group_id, rc.validity_days, rc.max_uses, rc.used_count
+ FROM redeem_codes rc WHERE rc.used_by=$1 AND NOT EXISTS (SELECT 1 FROM redeem_code_claims claims WHERE claims.redeem_code_id=rc.id)
+ UNION ALL
+ SELECT rc.id, rc.code, claims.type, claims.value, 'used', claims.user_id, claims.claimed_at, COALESCE(rc.notes,''), rc.created_at, rc.expires_at, claims.group_id, claims.validity_days, rc.max_uses, rc.used_count
+ FROM redeem_code_claims claims JOIN redeem_codes rc ON rc.id=claims.redeem_code_id WHERE claims.user_id=$1
+)
+`
+
 func (r *redeemCodeRepository) ListByUser(ctx context.Context, userID int64, limit int) ([]service.RedeemCode, error) {
 	if limit <= 0 {
 		limit = 10
 	}
-
-	codes, err := r.client.RedeemCode.Query().
-		Where(redeemcode.UsedByEQ(userID)).
-		WithGroup().
-		Order(dbent.Desc(redeemcode.FieldUsedAt), dbent.Desc(redeemcode.FieldID)).
-		Limit(limit).
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return redeemCodeEntitiesToService(codes), nil
+	codes, _, err := r.ListByUserPaginated(ctx, userID, pagination.PaginationParams{Page: 1, PageSize: limit}, "")
+	return codes, err
 }
 
-// ListByUserPaginated returns paginated balance/concurrency history for a user.
-// Supports optional type filter (e.g. "balance", "admin_balance", "concurrency", "admin_concurrency", "subscription").
 func (r *redeemCodeRepository) ListByUserPaginated(ctx context.Context, userID int64, params pagination.PaginationParams, codeType string) ([]service.RedeemCode, *pagination.PaginationResult, error) {
-	q := r.client.RedeemCode.Query().
-		Where(redeemcode.UsedByEQ(userID))
-
-	// Optional type filter
-	if codeType != "" {
-		q = q.Where(redeemcode.TypeEQ(codeType))
-	}
-
-	total, err := q.Count(ctx)
+	client := clientFromContext(ctx, r.client)
+	countRows, err := client.QueryContext(ctx, redeemUserHistorySQL+"SELECT COUNT(*) FROM history WHERE ($2='' OR type=$2)", userID, codeType)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	codes, err := q.
-		WithGroup().
-		Offset(params.Offset()).
-		Limit(params.Limit()).
-		Order(dbent.Desc(redeemcode.FieldUsedAt), dbent.Desc(redeemcode.FieldID)).
-		All(ctx)
+	var total int64
+	if !countRows.Next() {
+		_ = countRows.Close()
+		return nil, nil, service.ErrRedeemCodeNotFound
+	}
+	if err = countRows.Scan(&total); err != nil {
+		_ = countRows.Close()
+		return nil, nil, err
+	}
+	_ = countRows.Close()
+	rows, err := client.QueryContext(ctx, redeemUserHistorySQL+"SELECT id,code,type,value,status,used_by,used_at,notes,created_at,expires_at,group_id,validity_days,max_uses,used_count FROM history WHERE ($2='' OR type=$2) ORDER BY used_at DESC NULLS LAST,id DESC OFFSET $3 LIMIT $4", userID, codeType, params.Offset(), params.Limit())
 	if err != nil {
 		return nil, nil, err
 	}
-
-	return redeemCodeEntitiesToService(codes), paginationResultFromTotal(int64(total), params), nil
+	defer func() { _ = rows.Close() }()
+	codes := make([]service.RedeemCode, 0, params.Limit())
+	for rows.Next() {
+		var code service.RedeemCode
+		if err = rows.Scan(&code.ID, &code.Code, &code.Type, &code.Value, &code.Status, &code.UsedBy, &code.UsedAt, &code.Notes, &code.CreatedAt, &code.ExpiresAt, &code.GroupID, &code.ValidityDays, &code.MaxUses, &code.UsedCount); err != nil {
+			return nil, nil, err
+		}
+		codes = append(codes, code)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, nil, err
+	}
+	_ = rows.Close()
+	groups := make(map[int64]*service.Group)
+	for index := range codes {
+		if codes[index].GroupID == nil {
+			continue
+		}
+		groupID := *codes[index].GroupID
+		group, loaded := groups[groupID]
+		if !loaded {
+			entity, lookupErr := client.Group.Get(ctx, groupID)
+			if lookupErr != nil && !dbent.IsNotFound(lookupErr) {
+				return nil, nil, lookupErr
+			}
+			if entity != nil {
+				group = groupEntityToService(entity)
+			}
+			groups[groupID] = group
+		}
+		codes[index].Group = group
+	}
+	return codes, paginationResultFromTotal(total, params), nil
 }
 
-// SumPositiveBalanceByUser returns total recharged amount (sum of value > 0 where type is balance/admin_balance).
 func (r *redeemCodeRepository) SumPositiveBalanceByUser(ctx context.Context, userID int64) (float64, error) {
-	var result []struct {
-		Sum float64 `json:"sum"`
-	}
-	err := r.client.RedeemCode.Query().
-		Where(
-			redeemcode.UsedByEQ(userID),
-			redeemcode.ValueGT(0),
-			redeemcode.TypeIn("balance", "admin_balance"),
-		).
-		Aggregate(dbent.As(dbent.Sum(redeemcode.FieldValue), "sum")).
-		Scan(ctx, &result)
+	rows, err := clientFromContext(ctx, r.client).QueryContext(ctx, redeemUserHistorySQL+"SELECT COALESCE(SUM(value),0) FROM history WHERE value > 0 AND type IN ('balance','admin_balance')", userID)
 	if err != nil {
 		return 0, err
 	}
-	if len(result) == 0 {
-		return 0, nil
+	defer func() { _ = rows.Close() }()
+	var sum float64
+	if rows.Next() {
+		err = rows.Scan(&sum)
 	}
-	return result[0].Sum, nil
+	if err != nil {
+		return 0, err
+	}
+	return sum, rows.Err()
 }
 
 func redeemCodeEntityToService(m *dbent.RedeemCode) *service.RedeemCode {
@@ -418,6 +514,8 @@ func redeemCodeEntityToService(m *dbent.RedeemCode) *service.RedeemCode {
 		Type:         m.Type,
 		Value:        m.Value,
 		Status:       m.Status,
+		MaxUses:      m.MaxUses,
+		UsedCount:    m.UsedCount,
 		UsedBy:       m.UsedBy,
 		UsedAt:       m.UsedAt,
 		Notes:        derefString(m.Notes),

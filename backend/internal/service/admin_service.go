@@ -148,6 +148,24 @@ type AdminService interface {
 	ResetAccountQuota(ctx context.Context, id int64) error
 }
 
+type BatchBalanceUpdateItem struct {
+	UserID    int64  `json:"user_id"`
+	Success   bool   `json:"success"`
+	Error     string `json:"error,omitempty"`
+	Code      string `json:"code,omitempty"`
+	Retryable bool   `json:"retryable"`
+}
+
+type BatchBalanceUpdateResult struct {
+	Items   []BatchBalanceUpdateItem `json:"items"`
+	Success int                      `json:"success"`
+	Failed  int                      `json:"failed"`
+}
+
+type BatchBalanceAdminService interface {
+	BatchUpdateBalance(ctx context.Context, userIDs []int64, amount float64, operation string, notes string) BatchBalanceUpdateResult
+}
+
 type AdminGroupOperation string
 
 const (
@@ -567,6 +585,7 @@ type GenerateRedeemCodesInput struct {
 	GroupID      *int64 // 订阅类型专用：关联的分组ID
 	ValidityDays int    // 订阅类型专用：有效天数
 	ExpiresAt    *time.Time
+	MaxUses      int
 }
 
 type ProxyBatchDeleteResult struct {

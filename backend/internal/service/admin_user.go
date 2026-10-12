@@ -1253,6 +1253,12 @@ func (s *adminServiceImpl) GetRedeemCode(ctx context.Context, id int64) (*Redeem
 }
 
 func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error) {
+	if input.Count < 1 || input.Count > 100 || input.MaxUses < 0 || input.MaxUses > 100000 {
+		return nil, errors.New("invalid redeem-code count or usage limit")
+	}
+	if input.Type == RedeemTypeInvitation && input.MaxUses > 1 {
+		return nil, errors.New("invitation codes remain single-use; multi-use is supported for balance, concurrency and subscription")
+	}
 	if input.ExpiresAt != nil && !input.ExpiresAt.After(time.Now()) {
 		return nil, ErrRedeemCodeExpired
 	}
@@ -1284,6 +1290,10 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 			Value:     input.Value,
 			Status:    StatusUnused,
 			ExpiresAt: input.ExpiresAt,
+			MaxUses:   input.MaxUses,
+		}
+		if code.MaxUses <= 0 {
+			code.MaxUses = 1
 		}
 		// 订阅类型专用字段
 		if input.Type == RedeemTypeSubscription {

@@ -16,12 +16,15 @@ import (
 )
 
 var (
-	ErrRedeemCodeNotFound  = infraerrors.NotFound("REDEEM_CODE_NOT_FOUND", "redeem code not found")
-	ErrRedeemCodeUsed      = infraerrors.Conflict("REDEEM_CODE_USED", "redeem code already used")
-	ErrRedeemCodeExpired   = infraerrors.Conflict("REDEEM_CODE_EXPIRED", "redeem code expired")
-	ErrInsufficientBalance = infraerrors.BadRequest("INSUFFICIENT_BALANCE", "insufficient balance")
-	ErrRedeemRateLimited   = infraerrors.TooManyRequests("REDEEM_RATE_LIMITED", "too many failed attempts, please try again later")
-	ErrRedeemCodeLocked    = infraerrors.Conflict("REDEEM_CODE_LOCKED", "redeem code is being processed, please try again")
+	ErrRedeemCodeNotFound       = infraerrors.NotFound("REDEEM_CODE_NOT_FOUND", "redeem code not found")
+	ErrRedeemCodeUsed           = infraerrors.Conflict("REDEEM_CODE_USED", "redeem code already used")
+	ErrRedeemCodeAlreadyClaimed = infraerrors.Conflict("REDEEM_CODE_ALREADY_CLAIMED", "this account or its bound email has already redeemed this code")
+	ErrRedeemCodeHasClaims      = infraerrors.Conflict("REDEEM_CODE_HAS_CLAIMS", "this code has redemption history; disable it instead of deleting it")
+	ErrRedeemEmailRequired      = infraerrors.BadRequest("REDEEM_EMAIL_REQUIRED", "bind an email before redeeming this code")
+	ErrRedeemCodeExpired        = infraerrors.Conflict("REDEEM_CODE_EXPIRED", "redeem code expired")
+	ErrInsufficientBalance      = infraerrors.BadRequest("INSUFFICIENT_BALANCE", "insufficient balance")
+	ErrRedeemRateLimited        = infraerrors.TooManyRequests("REDEEM_RATE_LIMITED", "too many failed attempts, please try again later")
+	ErrRedeemCodeLocked         = infraerrors.Conflict("REDEEM_CODE_LOCKED", "redeem code is being processed, please try again")
 )
 
 const (
@@ -72,6 +75,10 @@ type RedeemCodeRepository interface {
 	ListByUserPaginated(ctx context.Context, userID int64, params pagination.PaginationParams, codeType string) ([]RedeemCode, *pagination.PaginationResult, error)
 	// SumPositiveBalanceByUser returns the total recharged amount (sum of positive balance values) for a user.
 	SumPositiveBalanceByUser(ctx context.Context, userID int64) (float64, error)
+}
+
+type MultiUseRedeemRepository interface {
+	Claim(ctx context.Context, codeID, userID int64, email string) error
 }
 
 // GenerateCodesRequest 生成兑换码请求
@@ -462,7 +469,7 @@ func (s *RedeemService) redeem(ctx context.Context, userID int64, code string, r
 	}
 
 	// 获取用户信息
-	_, err = s.userRepo.GetByID(ctx, userID)
+	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
 	}
@@ -479,7 +486,19 @@ func (s *RedeemService) redeem(ctx context.Context, userID int64, code string, r
 
 	// 【关键】先标记兑换码为已使用，确保并发安全
 	// 利用数据库乐观锁（WHERE status = 'unused'）保证原子性
-	if err := s.redeemRepo.Use(txCtx, redeemCode.ID, userID); err != nil {
+	claimRepo, supportsMultiUse := s.redeemRepo.(MultiUseRedeemRepository)
+	if redeemCode.MaxUses > 1 {
+		if !supportsMultiUse {
+			return nil, errors.New("multi-use redemption is unavailable")
+		}
+		err = claimRepo.Claim(txCtx, redeemCode.ID, userID, user.Email)
+		if err == nil {
+			redeemCode, err = s.redeemRepo.GetByID(txCtx, redeemCode.ID)
+		}
+	} else {
+		err = s.redeemRepo.Use(txCtx, redeemCode.ID, userID)
+	}
+	if err != nil {
 		if errors.Is(err, ErrRedeemCodeNotFound) || errors.Is(err, ErrRedeemCodeUsed) {
 			return nil, ErrRedeemCodeUsed
 		}
@@ -558,6 +577,12 @@ func (s *RedeemService) redeem(ctx context.Context, userID int64, code string, r
 	redeemCode, err = s.redeemRepo.GetByID(ctx, redeemCode.ID)
 	if err != nil {
 		return nil, fmt.Errorf("get updated redeem code: %w", err)
+	}
+	if redeemCode.MaxUses > 1 {
+		redeemCode.Status = StatusUsed
+		redeemCode.UsedBy = &userID
+		now := time.Now().UTC()
+		redeemCode.UsedAt = &now
 	}
 
 	return redeemCode, nil

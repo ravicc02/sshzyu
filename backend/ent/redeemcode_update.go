@@ -93,6 +93,48 @@ func (_u *RedeemCodeUpdate) SetNillableStatus(v *string) *RedeemCodeUpdate {
 	return _u
 }
 
+// SetMaxUses sets the "max_uses" field.
+func (_u *RedeemCodeUpdate) SetMaxUses(v int) *RedeemCodeUpdate {
+	_u.mutation.ResetMaxUses()
+	_u.mutation.SetMaxUses(v)
+	return _u
+}
+
+// SetNillableMaxUses sets the "max_uses" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableMaxUses(v *int) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetMaxUses(*v)
+	}
+	return _u
+}
+
+// AddMaxUses adds value to the "max_uses" field.
+func (_u *RedeemCodeUpdate) AddMaxUses(v int) *RedeemCodeUpdate {
+	_u.mutation.AddMaxUses(v)
+	return _u
+}
+
+// SetUsedCount sets the "used_count" field.
+func (_u *RedeemCodeUpdate) SetUsedCount(v int) *RedeemCodeUpdate {
+	_u.mutation.ResetUsedCount()
+	_u.mutation.SetUsedCount(v)
+	return _u
+}
+
+// SetNillableUsedCount sets the "used_count" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableUsedCount(v *int) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetUsedCount(*v)
+	}
+	return _u
+}
+
+// AddUsedCount adds value to the "used_count" field.
+func (_u *RedeemCodeUpdate) AddUsedCount(v int) *RedeemCodeUpdate {
+	_u.mutation.AddUsedCount(v)
+	return _u
+}
+
 // SetUsedBy sets the "used_by" field.
 func (_u *RedeemCodeUpdate) SetUsedBy(v int64) *RedeemCodeUpdate {
 	_u.mutation.SetUsedBy(v)
@@ -299,6 +341,16 @@ func (_u *RedeemCodeUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.MaxUses(); ok {
+		if err := redeemcode.MaxUsesValidator(v); err != nil {
+			return &ValidationError{Name: "max_uses", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.max_uses": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.UsedCount(); ok {
+		if err := redeemcode.UsedCountValidator(v); err != nil {
+			return &ValidationError{Name: "used_count", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.used_count": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -328,6 +380,18 @@ func (_u *RedeemCodeUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(redeemcode.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.MaxUses(); ok {
+		_spec.SetField(redeemcode.FieldMaxUses, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedMaxUses(); ok {
+		_spec.AddField(redeemcode.FieldMaxUses, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.UsedCount(); ok {
+		_spec.SetField(redeemcode.FieldUsedCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedUsedCount(); ok {
+		_spec.AddField(redeemcode.FieldUsedCount, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.UsedAt(); ok {
 		_spec.SetField(redeemcode.FieldUsedAt, field.TypeTime, value)
@@ -491,6 +555,48 @@ func (_u *RedeemCodeUpdateOne) SetNillableStatus(v *string) *RedeemCodeUpdateOne
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetMaxUses sets the "max_uses" field.
+func (_u *RedeemCodeUpdateOne) SetMaxUses(v int) *RedeemCodeUpdateOne {
+	_u.mutation.ResetMaxUses()
+	_u.mutation.SetMaxUses(v)
+	return _u
+}
+
+// SetNillableMaxUses sets the "max_uses" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableMaxUses(v *int) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetMaxUses(*v)
+	}
+	return _u
+}
+
+// AddMaxUses adds value to the "max_uses" field.
+func (_u *RedeemCodeUpdateOne) AddMaxUses(v int) *RedeemCodeUpdateOne {
+	_u.mutation.AddMaxUses(v)
+	return _u
+}
+
+// SetUsedCount sets the "used_count" field.
+func (_u *RedeemCodeUpdateOne) SetUsedCount(v int) *RedeemCodeUpdateOne {
+	_u.mutation.ResetUsedCount()
+	_u.mutation.SetUsedCount(v)
+	return _u
+}
+
+// SetNillableUsedCount sets the "used_count" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableUsedCount(v *int) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetUsedCount(*v)
+	}
+	return _u
+}
+
+// AddUsedCount adds value to the "used_count" field.
+func (_u *RedeemCodeUpdateOne) AddUsedCount(v int) *RedeemCodeUpdateOne {
+	_u.mutation.AddUsedCount(v)
 	return _u
 }
 
@@ -713,6 +819,16 @@ func (_u *RedeemCodeUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.MaxUses(); ok {
+		if err := redeemcode.MaxUsesValidator(v); err != nil {
+			return &ValidationError{Name: "max_uses", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.max_uses": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.UsedCount(); ok {
+		if err := redeemcode.UsedCountValidator(v); err != nil {
+			return &ValidationError{Name: "used_count", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.used_count": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -759,6 +875,18 @@ func (_u *RedeemCodeUpdateOne) sqlSave(ctx context.Context) (_node *RedeemCode, 
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(redeemcode.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.MaxUses(); ok {
+		_spec.SetField(redeemcode.FieldMaxUses, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedMaxUses(); ok {
+		_spec.AddField(redeemcode.FieldMaxUses, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.UsedCount(); ok {
+		_spec.SetField(redeemcode.FieldUsedCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedUsedCount(); ok {
+		_spec.AddField(redeemcode.FieldUsedCount, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.UsedAt(); ok {
 		_spec.SetField(redeemcode.FieldUsedAt, field.TypeTime, value)

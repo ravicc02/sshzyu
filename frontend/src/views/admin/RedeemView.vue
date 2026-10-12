@@ -157,7 +157,9 @@
           </template>
 
           <template #cell-used_by="{ value, row }">
-            <span class="text-sm text-gray-500 dark:text-dark-400">
+            <span v-if="(row.max_uses || 1) > 1" class="text-sm text-gray-600 dark:text-dark-300">{{ t('admin.redeem.usageCount', { used: row.used_count || 0, max: row.max_uses }) }}</span>
+            <span v-else
+              class="text-sm text-gray-500 dark:text-dark-400">
               {{ row.user?.email || (value ? t('admin.redeem.userPrefix', { id: value }) : '-') }}
             </span>
           </template>
@@ -395,6 +397,11 @@
                 required
                 class="input"
               />
+            </div>
+            <div v-if="generateForm.type !== 'invitation'">
+              <label class="input-label">{{ t('admin.redeem.maxUses') }}</label>
+              <input v-model.number="generateForm.max_uses" type="number" min="1" max="100000" required class="input" />
+              <p class="input-hint">{{ t('admin.redeem.maxUsesHint') }}</p>
             </div>
             <div class="flex justify-end gap-3 pt-2">
               <button type="button" @click="showGenerateDialog = false" class="btn btn-secondary">
@@ -842,7 +849,8 @@ const generateForm = reactive({
   group_id: null as number | null,
   validity_days: 30,
   expiry_option: 'never' as RedeemCodeExpiryOption,
-  custom_expiry_days: 7
+  custom_expiry_days: 7,
+  max_uses: 1
 })
 
 // 监听类型变化，邀请码类型时自动设置 value 为 0
@@ -1046,7 +1054,8 @@ const handleGenerateCodes = async () => {
       generateForm.value,
       generateForm.type === 'subscription' ? generateForm.group_id : undefined,
       generateForm.type === 'subscription' ? generateForm.validity_days : undefined,
-      expiresInDays
+      expiresInDays,
+      generateForm.type === 'invitation' ? 1 : generateForm.max_uses
     )
     showGenerateDialog.value = false
     generatedCodes.value = result
@@ -1056,6 +1065,7 @@ const handleGenerateCodes = async () => {
     generateForm.validity_days = 30
     generateForm.expiry_option = 'never'
     generateForm.custom_expiry_days = 7
+    generateForm.max_uses = 1
     loadCodes()
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.redeem.failedToGenerate'))
