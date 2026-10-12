@@ -3,9 +3,9 @@
   "upstream_release": "v0.2.15",
   "upstream_commit": "f2669c8cf62555cd92389b3f55920e9e6e7c6ff2",
   "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.15",
-  "local_build_version": "0.2.15-r1",
+  "local_build_version": "0.2.15-r2",
   "integration_commit": "0a903cd6355968929523859406ea00463a5c053d",
   "integrated_at": "2026-10-12",
-  "verified_at": "2026-10-12",
-  "note": "Three-way integration of official v0.2.15 with sshzy customizations, including Cline and Command Code catalog-driven account, group and protocol support. Preserves composite groups as independent channel tabs and model-level rate multiplier display snapshots. Includes safe batch balance adjustments, bounded multi-use redemption and the fixed PPT image prompt template. Official 242_drop_platform_check_constraints.sql coexists unchanged with historical 242_lottery.sql by the approved filename-keyed migration policy. Both new migration 242 and local migration 249 require manual coordinated activation; publication does not authorize production migration. Removed the old v0.2.14-r4 emergency upstream deferral."
+  "verified_at": "2026-10-13",
+  "note": "Three-way integration of official v0.2.15 with sshzy customizations, including Cline and Command Code catalog-driven account, group and protocol support. Preserves composite groups as independent channel tabs and model-level rate multiplier display snapshots. Includes safe batch balance adjustments, bounded multi-use redemption and the fixed PPT image prompt template. Official 242_drop_platform_check_constraints.sql coexists unchanged with historical 242_lottery.sql by the approved filename-keyed migration policy. Both new migration 242 and local migration 249 require manual coordinated activation; publication does not authorize production migration. Removed the old v0.2.14-r4 emergency upstream deferral. Custom r2 adds an admin lottery sidebar pending-action indicator using globally filtered draw counts, immediate refresh after review/retry, and cancellable admin-only polling. No additional migrations; does not include the rejected Anthropic account-catalog fallback."
 }
