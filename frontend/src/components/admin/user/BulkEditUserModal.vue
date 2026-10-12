@@ -79,6 +79,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
+import { extractApiErrorMessage } from '@/utils/apiError'
 import type { BatchUpdateBalanceRequest, BatchUpdateBalanceResponse, BatchUpdateUserLimitsRequest } from '@/api/admin/users'
 import { useAppStore } from '@/stores/app'
 import BaseDialog from '@/components/common/BaseDialog.vue'
@@ -171,10 +172,18 @@ async function handleSubmit() {
   if (!window.confirm(t('admin.users.bulkLimits.confirm',{ count:props.selectedIds.length, fields:fields.join(', ') }))) return
   submitting.value=true
   try {
-    const result=await adminAPI.users.batchUpdateLimits(request)
-    appStore.showSuccess(t('admin.users.bulkLimits.success',{ count:result.affected }))
-    emit('success',result.affected); emit('close')
-  } catch (error: any) { appStore.showError(error?.response?.data?.message || error?.response?.data?.detail || t('admin.users.bulkLimits.failed')) }
-  finally { submitting.value=false }
+    const result = await adminAPI.users.batchUpdateLimits(request)
+    appStore.showSuccess(
+      t('admin.users.bulkLimits.success', { count: result.affected })
+    )
+    emit('success', result.affected)
+    emit('close')
+  } catch (error: any) {
+    appStore.showError(
+      extractApiErrorMessage(error, t('admin.users.bulkLimits.failed'))
+    )
+  } finally {
+    submitting.value = false
+  }
 }
 </script>

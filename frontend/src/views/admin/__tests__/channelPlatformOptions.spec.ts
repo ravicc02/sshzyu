@@ -1,28 +1,20 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { listPlatformIds } from '@/constants/platformCatalog'
 
-describe('Composite channel platform options', () => {
-  it('exposes composite as a first-class platform option', () => {
+describe('channel platform options', () => {
+  it('derives concrete providers from the catalog and preserves the composite tab', () => {
     const source = readFileSync(resolve('src/views/admin/ChannelsView.vue'), 'utf8')
-    const declaration = source.match(/const platformOrder:[^=]+=[^\n]+/)?.[0]
-
-    // composite 必须出现在平台选择列表里，聚合分组才能被选中创建渠道。
-    expect(declaration).toContain("'composite'")
+    expect(source).toContain("const platformOrder = computed<GroupPlatform[]>(() => [...listPlatformIds(), 'composite'])")
+    expect(listPlatformIds()).toEqual(expect.arrayContaining([
+      'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'command_code', 'cline'
+    ]))
   })
 
-  it('keeps the CN concrete providers available for pricing and model mapping', () => {
+  it('does not mirror composite groups into concrete provider tabs', () => {
     const source = readFileSync(resolve('src/views/admin/ChannelsView.vue'), 'utf8')
-    const declaration = source.match(/const platformOrder:[^=]+=[^\n]+/)?.[0]
-
-    expect(declaration).toContain("'kimi'")
-    expect(declaration).toContain("'zhipu'")
-    expect(declaration).toContain("'deepseek'")
-  })
-
-  it('does not mirror composite groups into every concrete platform tab', () => {
-    const source = readFileSync(resolve('src/views/admin/ChannelsView.vue'), 'utf8')
-    // 旧的 compositePlatforms 镜像逻辑已移除，聚合分组只在 composite tab 出现。
-    expect(source).not.toMatch(/const compositePlatforms:/)
+    expect(source).toContain('return groupsForPlatform(allGroups.value, platform)')
+    expect(source).not.toContain('const compositePlatforms')
   })
 })

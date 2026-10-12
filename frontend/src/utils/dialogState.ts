@@ -15,3 +15,9 @@ export function setDialogScrollLock(owner: symbol, active: boolean): void {
   else owners.delete(owner)
   document.body.classList.toggle('modal-open', owners.size > 0)
 }
+
+/** Only the most recently opened dialog may react to Escape. */
+export function isTopDialog(owner: symbol): boolean {
+  const owners = scrollLocks.get(document)
+  return owners != null && Array.from(owners).at(-1) === owner
+}

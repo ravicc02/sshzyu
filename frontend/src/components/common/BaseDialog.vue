@@ -45,7 +45,7 @@
 <script setup lang="ts">
 import { computed, watch, onMounted, onUnmounted, ref, nextTick } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
-import { nextDialogId, setDialogScrollLock } from '@/utils/dialogState'
+import { isTopDialog, nextDialogId, setDialogScrollLock } from '@/utils/dialogState'
 
 // 生成唯一ID以避免多个对话框时ID冲突
 const dialogId = nextDialogId()
@@ -108,7 +108,7 @@ const handleClose = () => {
 }
 
 const handleEscape = (event: KeyboardEvent) => {
-  if (props.show && props.closeOnEscape && event.key === 'Escape') {
+  if (props.show && props.closeOnEscape && event.key === 'Escape' && isTopDialog(scrollLockOwner)) {
     emit('close')
   }
 }

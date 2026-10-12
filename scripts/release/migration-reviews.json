@@ -25,8 +25,13 @@
     "description": "Add display-only group rate multiplier snapshot column (model-level override excluded) to batch_image_jobs; nullable ADD COLUMN IF NOT EXISTS."
   },
   "249_multi_use_redeem_codes.sql": {
-    "checksum": "920953d79820cdbdd9747a64e45c833bb1173df8a54259ee27300ec13cf8ab78",
+    "checksum": "b741b5fa2b9e84da43d2f9de0279c8246361d203747a358f58ae5e368217c790",
     "risk": "manual",
     "description": "Add bounded redeem-code usage counters and immutable per-user entitlement snapshots with account/email uniqueness. Existing codes remain single-use. Coordinated rollout required: older applications do not enforce multi-use claim deduplication, so rolling back after shared codes are issued is unsafe. No schema or data deletion."
+  },
+  "242_drop_platform_check_constraints.sql": {
+    "checksum": "a7725f31f637208d200e0f37d5270e9f263743d99fa9e4f1bb9a7387e8be5a61",
+    "risk": "manual",
+    "description": "Official v0.2.15 removes two platform CHECK constraints; validation moves to the application catalog. Keep original filename alongside the existing 242_lottery.sql as approved on 2026-10-12. No data deletion. Coordinated application rollout required; do not auto-migrate production."
   }
 }
