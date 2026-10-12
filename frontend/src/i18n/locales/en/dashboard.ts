@@ -809,6 +809,8 @@ export default {
     days: ' days',
     codeRedeemSuccess: 'Code redeemed successfully!',
     failedToRedeem: 'Failed to redeem code. Please check the code and try again.',
+    alreadyClaimed: 'This account or its bound email has already redeemed this code.',
+    emailRequired: 'Bind an email before redeeming this code.',
     subscriptionRefreshFailed: 'Redeemed successfully, but failed to refresh subscription status.',
     pleaseEnterCode: 'Please enter a redeem code'
   },

@@ -216,7 +216,7 @@ describe('AppSidebar Dock navigation', () => {
     await wrapper.get('button[aria-label="个人空间"]').trigger('click')
     const personalPaths = navigationPaths(wrapper)
     // image-studio has no feature flag by design: the canvas stays available.
-    for (const path of ['/monitor', '/available-channels', '/purchase', '/orders', '/affiliate', '/batch-image']) {
+    for (const path of ['/monitor', '/available-channels', '/purchase', '/orders', '/affiliate']) {
       expect(personalPaths).not.toContain(path)
     }
     expect(personalPaths).toContain('/subscriptions')
@@ -246,7 +246,7 @@ describe('AppSidebar Dock navigation', () => {
     const wrapper = await renderSidebar('/keys')
     // Simple mode keeps flag-free primary entries: image-studio (no flag by
     // design) and lottery (engagement entry, visible in both run modes).
-    expect(navigationPaths(wrapper)).toEqual(['/dashboard', '/keys', '/model-plaza?embedded=1', '/image-studio', '/lottery', '/monitor', '/profile'].sort())
+    expect(navigationPaths(wrapper)).toEqual(['/dashboard', '/keys', '/model-plaza?embedded=1', '/image-studio', '/batch-image', '/lottery', '/monitor', '/profile'].sort())
     appStore.backendModeEnabled = true
     await nextTick()
     expect(navigationPaths(wrapper)).toEqual([])
@@ -302,7 +302,7 @@ describe('AppSidebar Dock navigation', () => {
     expect(wrapper.find('a[href="/model-plaza?embedded=1"]').exists()).toBe(true)
   })
 
-  it('adds Creative canvas without replacing Batch Image and applies the same image access permission', async () => {
+  it('keeps batch image accessible before a user creates a batch key', async () => {
     const wrapper = await renderSidebar('/image-studio')
     expect(wrapper.get('button[aria-label="个人空间"]').attributes('aria-pressed')).toBe('true')
     expect(wrapper.get('a[href="/image-studio"]').text()).toBe('创作画布')
@@ -316,7 +316,7 @@ describe('AppSidebar Dock navigation', () => {
     await wrapper.get('button[aria-label="Personal"]').trigger('click')
     // The canvas has no batch-access flag: it remains visible without a key.
     expect(wrapper.find('a[href="/image-studio"]').exists()).toBe(true)
-    expect(wrapper.find('a[href="/batch-image"]').exists()).toBe(false)
+    expect(wrapper.find('a[href="/batch-image"]').exists()).toBe(true)
     batchAccess.value = true
     await nextTick()
     expect(wrapper.find('a[href="/image-studio"]').exists()).toBe(true)
@@ -324,9 +324,8 @@ describe('AppSidebar Dock navigation', () => {
     authStore.isAdmin = false
     authStore.isSimpleMode = true
     await nextTick()
-    // image-studio is flag-free and not hidden in simple mode; batch-image is.
     expect(wrapper.find('a[href="/image-studio"]').exists()).toBe(true)
-    expect(wrapper.find('a[href="/batch-image"]').exists()).toBe(false)
+    expect(wrapper.find('a[href="/batch-image"]').exists()).toBe(true)
   })
 
   it('keeps expand-only groups on the current route and permits collapsing an active group', async () => {

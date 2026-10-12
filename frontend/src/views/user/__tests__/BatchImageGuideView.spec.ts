@@ -245,19 +245,21 @@ describe('OpenAI local config conversion', () => {
   })
 
   it('requires one shared reference when consistency is enabled and maps it to every item', async () => {
+    listModels.mockResolvedValue({ data: [{ id: 'gpt-image-1' }, { id: 'gpt-image-2.5-sunburst' }] })
     const wrapper = mountGuide()
     try {
       await openConfig(wrapper)
       await wrapper.get('[data-testid="config-input"]').setValue('灯塔;港口,1K,1:1,')
       await wrapper.get('[data-testid="convert-config"]').trigger('click')
       await wrapper.get('[data-testid="config-consistency"]').trigger('click')
-      expect(wrapper.text()).not.toContain('gpt-image-2.5-sunburst')
+      expect(wrapper.text()).toContain('gpt-image-2.5-sunburst')
       expect(wrapper.get('[data-testid="submit-config"]').attributes('disabled')).toBeDefined()
       const input = wrapper.get('[data-testid="config-reference"]')
       Object.defineProperty(input.element, 'files', { configurable: true, value: [new File(['reference'], 'shared.png', { type: 'image/png' })] })
       await input.trigger('change')
       await vi.waitFor(() => expect(wrapper.get('[data-testid="submit-config"]').attributes('disabled')).toBeUndefined())
       const groups = previewGroups(wrapper)
+      expect(groups[0].model).toBe('gpt-image-2.5-sunburst')
       expect(groups[0].items).toHaveLength(2)
       for (const item of groups[0].items) {
         expect(item.reference_images).toEqual([{ mime_type: 'image/png', data: '[统一参考图 base64 已省略]' }])
@@ -741,6 +743,7 @@ describe('OpenAI local config conversion', () => {
   })
 
   it('persists reference metadata only and requires re-upload when recovering', async () => {
+    listModels.mockResolvedValue({ data: [{ id: 'gpt-image-1' }, { id: 'gpt-image-2.5-sunburst' }] })
     const wrapper = mountGuide()
     submitJob.mockRejectedValueOnce(new Error('response lost'))
     try {
@@ -1120,5 +1123,29 @@ describe('OpenAI local config conversion', () => {
       expect(listModels).toHaveBeenCalledWith(openai.key)
       expect(submitJob).not.toHaveBeenCalled()
     } finally { wrapper.unmount() }
+  })
+})
+
+describe('batch image PPT usage guide', () => {
+  it('opens the guide and copies the same fixed PPT template shown in the dialog', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('isSecureContext', true)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const wrapper = mountGuide()
+    try {
+      await flushPromises()
+      await wrapper.findAll('button').find(button => button.text().includes('batchImage.actions.usageGuide'))!.trigger('click')
+      const textarea = wrapper.get('textarea[readonly]').element as HTMLTextAreaElement
+      expect(textarea.value).toContain('请根据以下 PPT 内容')
+      expect(textarea.value).toContain('每条提示词必须以“根据参考图的风格以及背景”开头。')
+      expect(textarea.value.trim().split('\n').at(-1)).toBe('prompt1;prompt2;prompt3;prompt4,4K,16:9,gpt-image-2.5-sunburst')
+      await wrapper.findAll('button').find(button => button.text().includes('batchImage.actions.copyInstruction'))!.trigger('click')
+      await flushPromises()
+      expect(writeText).toHaveBeenCalledWith(textarea.value)
+      expect(submitJob).not.toHaveBeenCalled()
+    } finally {
+      wrapper.unmount()
+      Reflect.deleteProperty(navigator, 'clipboard')
+    }
   })
 })

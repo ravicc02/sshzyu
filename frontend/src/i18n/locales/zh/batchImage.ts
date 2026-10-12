@@ -222,12 +222,12 @@ export default {
     guide: {
       title: '批量生图使用说明',
       uiTitle: '当前界面如何使用',
-      step1: '1. 选择已开启批量生图的 OpenAI 或 Gemini API Key，模型列表会按该 Key 所属分组可用模型展示。',
-      step2: '2. 输入提示词及参数后点击转换，在配置中确认模型、规格和生成张数。参考图可统一使用或逐项设置；Gemini 可按模型上限上传多张。任务名称可留空。',
-      step3: '3. 提交后任务会先排队，明细会展示已提交的 Prompt；图片预览默认不加载，点击明细里的预览按钮才会加载单张图。',
-      step4: '4. 完成后可以下载 ZIP；部分失败时，更多菜单里可以只重试失败项。当前结算仍按成功输出图张数计算，不单独对参考图加价。',
-      skillTitle: '给 Codex 的 Skill 说明',
-      skillDesc: '用于告诉 Codex 如何代替用户整理 prompt、提交任务和下载结果。',
+      step1: '1. 复制下方 PPT 提示词，将四页占位内容替换为你的主题、标题和核心要点，再交给 Agent。',
+      step2: '2. 复制 Agent 输出的一行配置，保留固定参数 4K、16:9 和 gpt-image-2.5-sunburst。',
+      step3: '3. 选择支持该模型的 OpenAI 批量生图 Key，粘贴配置并转换，检查四张卡片，再上传风格与背景参考图。',
+      step4: '4. 确认后由你提交任务；完成后下载 ZIP，失败时仅重试失败项。下方提示词不让 Agent 自动提交，也不需要提供 Key。',
+      skillTitle: '整页 PPT 生图提示词',
+      skillDesc: '替换四页内容后使用；固定 OpenAI 模型参数，不随平台切换。',
     },
     messages: {
       loadKeysFailed: '加载 API Key 失败',

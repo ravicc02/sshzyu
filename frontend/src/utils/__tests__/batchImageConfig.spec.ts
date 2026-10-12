@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { batchImageConfigPixels, batchImageConfigReferenceLimit, buildBatchImageConfigPreview, parseBatchImageConfigInput } from '../batchImageConfig'
+import { batchImageConfigPixels, batchImageConfigReferenceLimit, buildBatchImageConfigPreview, parseBatchImageConfigInput, resolveBatchImageConfigModel } from '../batchImageConfig'
 
 describe('batch image config input validation', () => {
   it('preserves item references while a shared reference overrides every submitted item', () => {
@@ -141,5 +141,31 @@ describe('Gemini config capabilities', () => {
     }))
     const preview = buildBatchImageConfigPreview(cards, models, '', 'image/png', undefined, 'gemini')
     expect(preview.errors['card-0']).toContain('参考图按生成张数展开后超过 1000 张，请拆分任务')
+  })
+})
+
+describe('OpenAI consistency model default', () => {
+  it('prefers gpt-image-2.5-sunburst when auto is used and the model is available', () => {
+    expect(resolveBatchImageConfigModel({ model: 'auto' } as any, [{ value: 'gpt-image-2' }, { value: 'gpt-image-2.5-sunburst' }], true)).toBe('gpt-image-2.5-sunburst')
+  })
+
+  it('keeps an explicit user model unchanged', () => {
+    expect(resolveBatchImageConfigModel({ model: 'gpt-image-2' } as any, [{ value: 'gpt-image-2.5-sunburst' }])).toBe('gpt-image-2')
+  })
+
+  it('keeps normal auto selection when consistency is off', () => {
+    expect(resolveBatchImageConfigModel({ model: 'auto' } as any, [{ value: 'gpt-image-2' }, { value: 'gpt-image-2.5-sunburst' }])).toBe('gpt-image-2')
+  })
+
+  it('does not replace Gemini models with the OpenAI consistency default', () => {
+    expect(resolveBatchImageConfigModel({ model: 'auto' } as any, [{ value: 'gemini-3-pro-image-preview' }], true, 'gemini')).toBe('gemini-3-pro-image-preview')
+  })
+
+  it('blocks unavailable consistency defaults instead of silently using another model', () => {
+    const parsed = parseBatchImageConfigInput('主角,1K,1:1,')
+    if (!parsed.ok) throw new Error(parsed.error)
+    const preview = buildBatchImageConfigPreview(parsed.cards, [{ value: 'gpt-image-2' }], '', 'image/png', undefined, 'openai', true)
+    expect(preview.groups).toEqual([])
+    expect(preview.errors['config-1']).toBeDefined()
   })
 })

@@ -123,8 +123,10 @@ export function parseBatchImageConfigInput(input: string, platform: BatchImageCo
   }
 }
 
-export function resolveBatchImageConfigModel(card: BatchImageConfigCard, availableModels: BatchImageConfigModel[]) {
-  return card.model === BATCH_IMAGE_AUTO_MODEL ? (availableModels[0]?.value || '') : card.model
+export function resolveBatchImageConfigModel(card: BatchImageConfigCard, availableModels: BatchImageConfigModel[], consistency = false, platform: BatchImageConfigPlatform = 'openai') {
+  if (card.model !== BATCH_IMAGE_AUTO_MODEL) return card.model
+  if (consistency && platform === 'openai') return 'gpt-image-2.5-sunburst'
+  return availableModels[0]?.value || ''
 }
 
 export function batchImageConfigPixels(card: Pick<BatchImageConfigCard, 'image_size' | 'aspect_ratio'>, platform: BatchImageConfigPlatform = 'openai') {
@@ -139,6 +141,7 @@ export function buildBatchImageConfigPreview(
   responseMimeType: string,
   referenceImage?: BatchImageReferenceImage | BatchImageReferenceImage[],
   platform: BatchImageConfigPlatform = 'openai',
+  consistency = false,
 ): BatchImageConfigPreview {
   const matrix = batchImageConfigMatrix(platform)
   const platformLabel = platform === 'gemini' ? 'Gemini' : 'OpenAI'
@@ -155,7 +158,7 @@ export function buildBatchImageConfigPreview(
     }
     if (!card.custom_id.trim() || seenIds.has(card.custom_id)) issues.push('custom_id 不能为空或重复')
     seenIds.add(card.custom_id)
-    const model = resolveBatchImageConfigModel(card, models)
+    const model = resolveBatchImageConfigModel(card, models, consistency, platform)
     const modelSpecs = models.find(option => option.value === model)
     if (!card.prompt.trim()) issues.push('prompt 不能为空')
     if (new TextEncoder().encode(card.prompt.trim()).length > MAX_PROMPT_BYTES) issues.push('prompt 超过 8000 字节')

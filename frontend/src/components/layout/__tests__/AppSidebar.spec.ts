@@ -58,7 +58,7 @@ describe('AppSidebar creative canvas access', () => {
     // users can organize prompts there and create a key when ready.
     expect(canvasItem?.[0]).not.toContain("hideInSimpleMode: true")
     expect(canvasItem?.[0]).not.toContain('featureFlag')
-    expect(componentSource).toContain("{ path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess }")
+    expect(componentSource).toContain("{ path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon }")
   })
 })
 

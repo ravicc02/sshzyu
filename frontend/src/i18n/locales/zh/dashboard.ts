@@ -813,6 +813,8 @@ export default {
     days: '天',
     codeRedeemSuccess: '兑换成功！',
     failedToRedeem: '兑换失败，请检查兑换码后重试。',
+    alreadyClaimed: '该账号或绑定邮箱已经兑换过这个兑换码，不能重复领取。',
+    emailRequired: '请先绑定邮箱后再兑换。',
     subscriptionRefreshFailed: '兑换成功，但订阅状态刷新失败。',
     pleaseEnterCode: '请输入兑换码'
   },

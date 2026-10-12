@@ -222,12 +222,12 @@ export default {
     guide: {
       title: 'Batch Image Generation Guide',
       uiTitle: 'How to use this page',
-      step1: '1. Select an OpenAI or Gemini API key with batch image generation enabled. The model list shows the models available to that key’s group.',
-      step2: '2. Convert your prompts and parameters, then review the model, size and image count in each configuration. Set shared or per-item references; Gemini supports multiple references within model limits. The task name is optional.',
-      step3: '3. After submitting, the job is queued first and the item list shows the submitted prompts. Image previews are not loaded by default; click the preview button on an item to load a single image.',
-      step4: '4. Once completed you can download the ZIP. If some items failed, the More menu lets you retry only the failed items. Billing is still based on the number of successfully generated images; reference images are not billed separately.',
-      skillTitle: 'Skill instructions for Codex',
-      skillDesc: 'Tells Codex how to organize prompts, submit jobs, and download results on behalf of the user.',
+      step1: '1. Copy the PPT template below, replace the four page placeholders with your topics, titles and key points, and send it to an agent.',
+      step2: '2. Copy the single-line configuration from the agent, keeping 4K, 16:9 and gpt-image-2.5-sunburst unchanged.',
+      step3: '3. Select an OpenAI batch key that supports this model, paste and convert the configuration, review the four cards and upload a style/background reference.',
+      step4: '4. Submit the job yourself and download the ZIP when ready. Retry failed items only. The agent prompt does not submit jobs or require your key.',
+      skillTitle: 'Full-slide PPT image prompt',
+      skillDesc: 'Replace the four page placeholders. Fixed OpenAI parameters do not change with the selected platform.',
     },
     messages: {
       loadKeysFailed: 'Failed to load API keys.',
