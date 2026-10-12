@@ -705,6 +705,14 @@ func (r *lotteryRepository) ListDrawsAdmin(ctx context.Context, filter service.L
 		q = q.Where(lotterydraw.UserIDEQ(*filter.UserID))
 	}
 
+	if filter.NeedsAttention {
+		q = q.Where(lotterydraw.FulfillmentStatusIn(
+			service.LotteryFulfillmentPending,
+			service.LotteryFulfillmentPendingReview,
+			service.LotteryFulfillmentFailed,
+		))
+	}
+
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
 		return nil, nil, err

@@ -48,6 +48,8 @@ let tourDriver = shallowRef<object | null>(null)
 const nextStep = vi.fn()
 const currentStep = vi.fn(() => false)
 const refreshBatchImageAccess = vi.fn()
+const lotteryAPI = vi.hoisted(() => ({ getPendingDrawCount: vi.fn() }))
+vi.mock('@/api/admin/lottery', () => lotteryAPI)
 
 vi.mock('@/stores', () => ({
   useAppStore: () => appStore,
@@ -106,6 +108,7 @@ function customMenu(id: string, visibility: 'admin' | 'user', sort_order = 0): C
 }
 
 beforeEach(() => {
+  lotteryAPI.getPendingDrawCount.mockReset().mockResolvedValue(0)
   vi.clearAllMocks()
   appStore = createAppState()
   authStore = reactive({ isAdmin: true, isSimpleMode: false })
@@ -127,6 +130,27 @@ afterEach(() => {
 })
 
 describe('AppSidebar Dock navigation', () => {
+  it('marks only admin lottery, including collapsed mode, and clears after processing', async () => {
+    lotteryAPI.getPendingDrawCount.mockResolvedValueOnce(2).mockResolvedValueOnce(0)
+    const wrapper = await renderSidebar()
+    const link = wrapper.get('a[href="/admin/lottery"]')
+    expect(link.get('.dock-pending-dot').attributes('aria-label')).toBe('nav.lotteryPending')
+    expect(wrapper.findAll('.dock-pending-dot')).toHaveLength(1)
+    appStore.sidebarCollapsed = true
+    await nextTick()
+    expect(link.find('.dock-pending-dot').exists()).toBe(true)
+    expect(link.attributes('aria-label')).toContain('nav.lotteryPending')
+    window.dispatchEvent(new Event('lottery-draws-updated'))
+    await flushPromises()
+    expect(link.find('.dock-pending-dot').exists()).toBe(false)
+  })
+  it('never queries or marks lottery for ordinary users', async () => {
+    authStore.isAdmin = false
+    const wrapper = await renderSidebar('/dashboard')
+    expect(lotteryAPI.getPendingDrawCount).not.toHaveBeenCalled()
+    expect(wrapper.find('.dock-pending-dot').exists()).toBe(false)
+  })
+
   it.each([false, true])('keeps the canvas and normal shortcuts while retiring the legacy image entry (admin=%s)', async (isAdmin) => {
     authStore.isAdmin = isAdmin
     const legacy = customMenu('4ac01eacf764b20a', 'user', 2)

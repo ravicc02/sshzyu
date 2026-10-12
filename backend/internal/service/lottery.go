@@ -532,6 +532,8 @@ type LotteryPrizeWeightUpdate struct {
 // LotteryDrawListFilter 管理端流水查询过滤条件。
 type LotteryDrawListFilter struct {
 	UserID *int64
+	// NeedsAttention selects the full admin approval/retry queue, before pagination.
+	NeedsAttention bool
 }
 
 // LotteryUserStatus 用户抽奖状态聚合视图(用户端 status 接口的领域结果)。

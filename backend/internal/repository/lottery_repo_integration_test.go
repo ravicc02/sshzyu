@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/lotterydraw"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/suite"
 )
@@ -338,4 +340,39 @@ func (s *LotteryRepoSuite) TestConcurrentDrawsDoNotDoubleSpend() {
 	count, err := s.repo.CountDraws(s.ctx, user.ID)
 	s.Require().NoError(err)
 	s.Equal(1, count, "并发后流水只有 1 条")
+}
+
+// Pending work must be counted across all history, not just the first visible page.
+func (s *LotteryRepoSuite) TestNeedsAttentionFullQueue() {
+	// Use a rollback-only fixture and account for pre-existing suite records.
+	tx := testEntTx(s.T())
+	s.client = tx.Client()
+	s.repo = NewLotteryRepository(s.client).(*lotteryRepository)
+	filter := service.LotteryDrawListFilter{NeedsAttention: true}
+	_, baseline, err := s.repo.ListDrawsAdmin(s.ctx, filter, pagination.PaginationParams{Page: 1, PageSize: 1})
+	s.Require().NoError(err)
+	u := s.createUser("lottery-attention@test.local", service.StatusActive)
+	activity := s.createActiveActivity("attention queue")
+	statuses := []string{"pending", "pending_review", "failed", "granted", "rejected", "revoked", "granted"}
+	for i, status := range statuses {
+		_, err := s.client.LotteryDraw.Create().SetUserID(u.ID).SetActivityID(activity.ID).
+			SetPrizeName("attention fixture").SetPrizeType(service.LotteryPrizeTypeBalanceBonus).
+			SetRulesVersion(1).SetSource("manual").SetIdempotencyKey(fmt.Sprintf("attention-%d", i)).
+			SetFulfillmentStatus(status).Save(s.ctx)
+		s.Require().NoError(err)
+	}
+	rows, page, err := s.repo.ListDrawsAdmin(s.ctx, filter, pagination.PaginationParams{Page: 1, PageSize: 1})
+	s.Require().NoError(err)
+	s.EqualValues(baseline.Total+3, page.Total)
+	s.Len(rows, 1)
+	filter.UserID = &u.ID
+	_, page, err = s.repo.ListDrawsAdmin(s.ctx, filter, pagination.PaginationParams{Page: 2, PageSize: 1})
+	s.Require().NoError(err)
+	s.EqualValues(3, page.Total)
+	_, err = s.client.LotteryDraw.Update().Where(lotterydraw.UserIDEQ(u.ID), lotterydraw.FulfillmentStatusIn("pending", "pending_review", "failed")).SetFulfillmentStatus("granted").Save(s.ctx)
+	s.Require().NoError(err)
+	rows, page, err = s.repo.ListDrawsAdmin(s.ctx, filter, pagination.PaginationParams{Page: 1, PageSize: 1})
+	s.Require().NoError(err)
+	s.EqualValues(0, page.Total)
+	s.Empty(rows)
 }

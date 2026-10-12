@@ -191,6 +191,7 @@ export default {
     plugins: '插件管理',
     proxies: 'IP管理',
     redeemCodes: '兑换码',
+    lotteryPending: '有抽奖记录待处理',
     lotteryManage: '抽奖管理',
     ops: '运维监控',
     promoCodes: '优惠码',

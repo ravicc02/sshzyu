@@ -80,6 +80,14 @@ type AdminSetSpendOffsetRequest struct {
 // AdminListDraws GET /admin/lottery/draws?user_id=&page=&page_size=
 func (h *AdminLotteryHandler) AdminListDraws(c *gin.Context) {
 	filter := service.LotteryDrawListFilter{}
+	if raw, provided := c.GetQuery("needs_attention"); provided {
+		needsAttention, err := strconv.ParseBool(raw)
+		if err != nil {
+			response.BadRequest(c, "Invalid needs_attention")
+			return
+		}
+		filter.NeedsAttention = needsAttention
+	}
 	if raw := c.Query("user_id"); raw != "" {
 		uid, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || uid <= 0 {

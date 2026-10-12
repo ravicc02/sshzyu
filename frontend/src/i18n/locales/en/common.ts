@@ -191,6 +191,7 @@ export default {
     plugins: 'Plugins',
     proxies: 'Proxies',
     redeemCodes: 'Redeem Codes',
+    lotteryPending: 'Lottery draws need attention',
     lotteryManage: 'Lottery',
     ops: 'Ops',
     promoCodes: 'Promo Codes',

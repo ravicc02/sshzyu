@@ -469,3 +469,21 @@
     animation: none;
   }
 }
+
+/* A quiet status marker, kept visible even when the dock is collapsed. */
+.dock-sidebar .dock-nav-item:has(.dock-pending-dot) {
+  position: relative;
+}
+.dock-sidebar .dock-pending-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: #ef4444;
+}
+.dock-sidebar.dock-is-collapsed .dock-pending-dot {
+  position: absolute;
+  right: 7px;
+  top: 9px;
+}

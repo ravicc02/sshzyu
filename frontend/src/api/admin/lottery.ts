@@ -12,6 +12,7 @@
  */
 
 import { apiClient } from '../client'
+import { notifyLotteryDrawsUpdated } from '@/utils/lotteryEvents'
 import type { BasePaginationResponse } from '@/types'
 
 /** 管理端中奖记录附带的中奖人标识(后端 dto.LotteryDrawUserRef) */
@@ -142,6 +143,15 @@ export async function listDraws(
   return data
 }
 
+/** Query the whole pending queue with a single-row page, not the currently visible draws. */
+export async function getPendingDrawCount(options?: { signal?: AbortSignal }): Promise<number> {
+  const { data } = await apiClient.get<BasePaginationResponse<AdminLotteryDraw>>(
+    '/admin/lottery/draws',
+    { params: { page: 1, page_size: 1, needs_attention: true }, signal: options?.signal }
+  )
+  return data.total
+}
+
 /** 查询全部活动 */
 export async function getActivities(options?: {
   signal?: AbortSignal
@@ -202,6 +212,7 @@ export async function retryFulfillment(
   const { data } = await apiClient.post<{ draw: AdminLotteryDraw }>(
     `/admin/lottery/draws/${drawId}/retry-fulfillment`
   )
+  notifyLotteryDrawsUpdated()
   return data
 }
 
@@ -224,6 +235,7 @@ export async function approveDraw(
   const { data } = await apiClient.post<{ draw: AdminLotteryDraw }>(
     `/admin/lottery/draws/${drawId}/approve`
   )
+  notifyLotteryDrawsUpdated()
   return data
 }
 
@@ -236,6 +248,7 @@ export async function rejectDraw(
     `/admin/lottery/draws/${drawId}/reject`,
     reason ? { reason } : {}
   )
+  notifyLotteryDrawsUpdated()
   return data
 }
 
@@ -246,11 +259,13 @@ export async function reverseGrant(
   const { data } = await apiClient.post<{ draw: AdminLotteryDraw }>(
     `/admin/lottery/draws/${drawId}/reverse-grant`
   )
+  notifyLotteryDrawsUpdated()
   return data
 }
 
 export const adminLotteryAPI = {
   listDraws,
+  getPendingDrawCount,
   getActivities,
   getPrizes,
   updateActivity,

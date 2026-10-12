@@ -111,8 +111,8 @@
               :to="item.query ? { path: item.path, query: item.query } : item.path"
               class="sidebar-link dock-nav-item"
               :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': isDockCollapsed }"
-              :title="isDockCollapsed ? item.label : undefined"
-              :aria-label="isDockCollapsed ? item.label : undefined"
+              :title="isDockCollapsed ? collapsedItemLabel(item) : undefined"
+              :aria-label="isDockCollapsed ? collapsedItemLabel(item) : undefined"
               :aria-current="isActive(item.path) ? 'page' : undefined"
               :id="
                 item.path === '/admin/accounts'
@@ -129,6 +129,13 @@
               <span v-if="item.iconSvg" class="sidebar-svg-icon dock-custom-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
               <component v-else :is="item.icon" class="dock-nav-icon" />
               <span v-if="!isDockCollapsed" class="sidebar-label">{{ item.label }}</span>
+              <span
+                v-if="item.path === '/admin/lottery' && hasPendingLotteryDraws"
+                class="dock-pending-dot"
+                role="img"
+                :aria-label="t('nav.lotteryPending')"
+                :title="t('nav.lotteryPending')"
+              ></span>
             </router-link>
           </template>
         </div>
@@ -168,6 +175,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useLotteryPendingIndicator } from '@/composables/useLotteryPendingIndicator'
 import { useI18n } from 'vue-i18n'
 import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import VersionBadge from '@/components/common/VersionBadge.vue'
@@ -234,6 +242,14 @@ const isMobileViewport = ref(window.innerWidth < 1024)
 const isDockCollapsed = computed(() => sidebarCollapsed.value && !isMobileViewport.value)
 const isMobileDrawerOpen = computed(() => mobileOpen.value && isMobileViewport.value)
 const isAdmin = computed(() => authStore.isAdmin)
+const { hasPending: hasPendingLotteryDraws } = useLotteryPendingIndicator(
+  isAdmin, computed(() => route.path)
+)
+function collapsedItemLabel(item: NavItem): string {
+  return item.path === '/admin/lottery' && hasPendingLotteryDraws.value
+    ? `${item.label} — ${t('nav.lotteryPending')}`
+    : item.label
+}
 const sidebarRef = ref<HTMLElement | null>(null)
 const sidebarNavRef = ref<HTMLElement | null>(null)
 let mobileReturnFocus: HTMLElement | null = null
