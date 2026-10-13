@@ -255,6 +255,7 @@ function cancelSearch() {
   searchSequence++
   showDropdown.value = false
 }
+let loadVersion = 0
 
 const platformColorClass = computed(() => {
   switch (props.group?.platform) {
@@ -282,16 +283,22 @@ const cloneEntries = (entries: GroupRPMOverrideEntry[]): LocalEntry[] => {
 
 const loadEntries = async () => {
   if (!props.group) return
+  const version = loadVersion
   loading.value = true
+  serverEntries.value = []
+  localEntries.value = []
   try {
-    serverEntries.value = await adminAPI.groups.getGroupRPMOverrides(props.group.id)
+    const entries = await adminAPI.groups.getGroupRPMOverrides(props.group.id)
+    if (version !== loadVersion) return
+    serverEntries.value = entries
     localEntries.value = cloneEntries(serverEntries.value)
     adjustPage()
   } catch (error) {
+    if (version !== loadVersion) return
     appStore.showError(t('admin.groups.failedToLoad'))
     console.error('Error loading RPM overrides:', error)
   } finally {
-    loading.value = false
+    if (version === loadVersion) loading.value = false
   }
 }
 
@@ -300,9 +307,10 @@ const adjustPage = () => {
   if (currentPage.value > totalPages) currentPage.value = totalPages
 }
 
-watch(() => props.show, (val) => {
+watch([() => props.show, () => props.group?.id], ([show]) => {
   cancelSearch()
-  if (val && props.group) {
+  loadVersion++
+  if (show && props.group) {
     currentPage.value = 1
     searchQuery.value = ''
     searchResults.value = []
@@ -440,8 +448,8 @@ const handleClickOutside = () => { showDropdown.value = false }
 if (typeof document !== 'undefined') {
   document.addEventListener('click', handleClickOutside)
 }
-
 onBeforeUnmount(() => {
+  loadVersion++
   cancelSearch()
   document.removeEventListener('click', handleClickOutside)
 })

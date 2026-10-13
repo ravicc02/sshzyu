@@ -33,5 +33,25 @@
     "checksum": "a7725f31f637208d200e0f37d5270e9f263743d99fa9e4f1bb9a7387e8be5a61",
     "risk": "manual",
     "description": "Official v0.2.15 removes two platform CHECK constraints; validation moves to the application catalog. Keep original filename alongside the existing 242_lottery.sql as approved on 2026-10-12. No data deletion. Coordinated application rollout required; do not auto-migrate production."
+  },
+  "242_group_i18n.sql": {
+    "checksum": "e81c6818cc806bc54365c993f4cec1634f16a311451faf5cb1a875a1358774cd",
+    "risk": "backward-compatible",
+    "description": "Add optional per-locale group display text; existing names and descriptions remain unchanged. Official filename retained alongside local migrations with the same numeric prefix; ledger keys use complete filenames."
+  },
+  "243_gemini_cached_contents.sql": {
+    "checksum": "2d345cff5c64b01e705f04ec972e5d5ec3d618fe71dc7d45bc80fdd38c6a89d5",
+    "risk": "backward-compatible",
+    "description": "Add isolated Gemini explicit cache resource bindings and indexes; no existing data deletion. Official filename retained alongside local migrations with the same numeric prefix; ledger keys use complete filenames."
+  },
+  "244_gemini_cached_contents_channel_usage.sql": {
+    "checksum": "9072cb37752a23c3a29cc0330a69837f09c5102375ee053d7bccf14634d3da29",
+    "risk": "backward-compatible",
+    "description": "Add cached-content billing context with an empty JSON default; no existing data deletion. Official filename retained alongside local migrations with the same numeric prefix; ledger keys use complete filenames."
+  },
+  "245_gemini_cached_contents_mutation_lease.sql": {
+    "checksum": "75434a7beeb8aad09b3339708ed520604d153e99c7fe680a376e8c958aadb1e8",
+    "risk": "backward-compatible",
+    "description": "Add optional explicit cache mutation lease fields and index; no existing data deletion. Official filename retained alongside local migrations with the same numeric prefix; ledger keys use complete filenames."
   }
 }

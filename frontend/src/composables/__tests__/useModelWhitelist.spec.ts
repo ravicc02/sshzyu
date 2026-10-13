@@ -87,6 +87,25 @@ describe('useModelWhitelist', () => {
     expect(getModelsByPlatform('antigravity')).toContain('claude-opus-4-8')
   })
 
+  it('Claude Sonnet 5.5 预设使用各平台的官方模型 ID', () => {
+    expect(getPresetMappingsByPlatform('claude')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Sonnet 5.5', from: 'claude-sonnet-5-5', to: 'claude-sonnet-5-5' })
+    ]))
+    expect(getPresetMappingsByPlatform('bedrock')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Sonnet 5.5', from: 'claude-sonnet-5-5', to: 'global.anthropic.claude-sonnet-5-5' })
+    ]))
+  })
+
+  it('Claude 默认白名单保存后允许 Haiku 5.5，预设使用同一模型 ID', () => {
+    const models: string[] = getModelsByPlatform('anthropic')
+    const mapping: Record<string, string> | null = buildModelMappingObject('whitelist', models, [])
+
+    expect(mapping?.['claude-haiku-5-5']).toBe('claude-haiku-5-5')
+    expect(getPresetMappingsByPlatform('anthropic')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Haiku 5.5', from: 'claude-haiku-5-5', to: 'claude-haiku-5-5' })
+    ]))
+  })
+
   it('xAI 模型列表包含 Grok 4.5 官方模型和别名', () => {
     const models = getModelsByPlatform('grok')
 
