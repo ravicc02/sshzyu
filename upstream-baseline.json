@@ -1,11 +1,12 @@
 {
   "upstream_repository": "Wei-Shaw/sub2api",
-  "upstream_release": "v0.2.15",
-  "upstream_commit": "f2669c8cf62555cd92389b3f55920e9e6e7c6ff2",
-  "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.15",
-  "local_build_version": "0.2.15-r2",
-  "integration_commit": "0a903cd6355968929523859406ea00463a5c053d",
-  "integrated_at": "2026-10-12",
-  "verified_at": "2026-10-13",
-  "note": "Three-way integration of official v0.2.15 with sshzy customizations, including Cline and Command Code catalog-driven account, group and protocol support. Preserves composite groups as independent channel tabs and model-level rate multiplier display snapshots. Includes safe batch balance adjustments, bounded multi-use redemption and the fixed PPT image prompt template. Official 242_drop_platform_check_constraints.sql coexists unchanged with historical 242_lottery.sql by the approved filename-keyed migration policy. Both new migration 242 and local migration 249 require manual coordinated activation; publication does not authorize production migration. Removed the old v0.2.14-r4 emergency upstream deferral. Custom r2 adds an admin lottery sidebar pending-action indicator using globally filtered draw counts, immediate refresh after review/retry, and cancellable admin-only polling. No additional migrations; does not include the rejected Anthropic account-catalog fallback."
+  "upstream_release": "v0.2.16",
+  "upstream_commit": "01842576b3d5c1e2545b5a99ad555d36e28ed306",
+  "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.16",
+  "local_build_version": "0.2.16-r1",
+  "integration_commit": "3e4a07db285aa456750f83e4ca74209399af7e77",
+  "integrated_at": "2026-10-13",
+  "verified_at": "2026-10-14",
+  "note": "Three-way local integration of official v0.2.16 over v0.2.15, preserving sshzy lottery attention indicator, batch image flows, custom model multiplier and display snapshots, composite routing, bounded redemption and signed updater. Gemini explicit cache preflight quotes apply the same custom model multiplier as actual billing. Four additive official migrations retain original filenames alongside historical custom prefixes. Local tests, actual root Dockerfile source image build, isolated database migration/301-to-305 upgrade tests and temporary-container API/UI asset smoke validation passed on 2026-10-14 after Docker recovery. Integration commit recorded in this baseline; no push, publication or production deployment performed by the integration itself. Production migrations remain separately controlled.",
+  "integration_status": "committed"
 }
