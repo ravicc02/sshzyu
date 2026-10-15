@@ -461,7 +461,7 @@ func (s *OpenAIGatewayService) handleNativeAnthropicStreamingResponse(
 				if anthropicStreamEventIsTerminal("", trimmed) {
 					sawTerminalEvent = true
 				}
-				if firstTokenMs == nil && trimmed != "" && trimmed != "[DONE]" {
+				if firstTokenMs == nil && openAIAnthropicDataHasContent(trimmed) {
 					ms := int(time.Since(startTime).Milliseconds())
 					firstTokenMs = &ms
 				}

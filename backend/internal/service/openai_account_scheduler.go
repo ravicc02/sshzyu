@@ -196,6 +196,8 @@ type openAIAccountRuntimeStats struct {
 type openAIAccountRuntimeStat struct {
 	errorRateEWMABits atomic.Uint64
 	ttftEWMABits      atomic.Uint64
+	modelMu           sync.Mutex
+	models            map[string]*openAIModelRuntimeStat
 }
 
 func newOpenAIAccountRuntimeStats() *openAIAccountRuntimeStats {
@@ -561,8 +563,11 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 		clearBinding()
 		return nil, false, nil
 	}
+	if selection := s.tryLatencyAwareChatStickyEscape(ctx, req, account); selection != nil {
+		return selection, true, nil
+	}
 	escapeCfg := s.service.openAIStickyEscapeConfig()
-	if reason, errorRate, ttft, shouldEscape := s.shouldEscapeStickyAccount(accountID, escapeCfg); shouldEscape && !req.DisableStickyEscape {
+	if reason, errorRate, ttft, shouldEscape := s.shouldEscapeStickyAccount(accountID, escapeCfg, ResolveOpenAIAccountUpstreamModelForRequest(account, req.RequestedModel, req.RequireCompact)); shouldEscape && !req.DisableStickyEscape {
 		slog.Info("sticky_escape_triggered",
 			"account_id", accountID,
 			"reason", reason,
@@ -639,11 +644,15 @@ func openAIAccountSchedulingPriority(account *Account) int {
 	return account.Priority
 }
 
-func (s *defaultOpenAIAccountScheduler) shouldEscapeStickyAccount(accountID int64, cfg openAIStickyEscapeConfig) (reason string, errorRate float64, ttft float64, shouldEscape bool) {
+func (s *defaultOpenAIAccountScheduler) shouldEscapeStickyAccount(accountID int64, cfg openAIStickyEscapeConfig, model ...string) (reason string, errorRate float64, ttft float64, shouldEscape bool) {
 	if !cfg.enabled || s == nil || s.stats == nil || accountID <= 0 {
 		return "", 0, 0, false
 	}
-	errorRate, ttft, hasTTFT := s.stats.snapshot(accountID)
+	requestedModel := ""
+	if len(model) > 0 {
+		requestedModel = model[0]
+	}
+	errorRate, ttft, hasTTFT := s.runtimeSnapshot(accountID, requestedModel)
 	if hasTTFT && ttft > cfg.ttftMs {
 		return "ttft", errorRate, ttft, true
 	}
@@ -654,14 +663,15 @@ func (s *defaultOpenAIAccountScheduler) shouldEscapeStickyAccount(accountID int6
 }
 
 type openAIAccountCandidateScore struct {
-	account   *Account
-	loadInfo  *AccountLoadInfo
-	loadKnown bool
-	score     float64
-	priority  int
-	errorRate float64
-	ttft      float64
-	hasTTFT   bool
+	account       *Account
+	loadInfo      *AccountLoadInfo
+	loadKnown     bool
+	score         float64
+	priority      int
+	errorRate     float64
+	ttft          float64
+	hasTTFT       bool
+	estimatedTTFT float64
 }
 
 type openAIAccountCandidateHeap []openAIAccountCandidateScore
@@ -871,7 +881,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 		}
 		errorRate, ttft, hasTTFT := 0.0, 0.0, false
 		if s.stats != nil {
-			errorRate, ttft, hasTTFT = s.stats.snapshot(account.ID)
+			errorRate, ttft, hasTTFT = s.runtimeSnapshot(account.ID, ResolveOpenAIAccountUpstreamModelForRequest(account, req.RequestedModel, req.RequireCompact))
 		}
 		allCandidates = append(allCandidates, openAIAccountCandidateScore{
 			account:   account,
@@ -883,6 +893,13 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 		})
 	}
 
+	// Estimate pressure before ranking, not only after a hard slot limit is hit.
+	if s.latencyAwareEnabled() {
+		for i := range allCandidates {
+			candidate := &allCandidates[i]
+			candidate.estimatedTTFT = s.estimateFirstOutput(candidate.account, candidate.loadInfo, candidate.ttft, candidate.hasTTFT)
+		}
+	}
 	candidates := allCandidates
 	staleSnapshotCompactRetry := make([]openAIAccountCandidateScore, 0, len(allCandidates))
 	if req.RequireCompact {
@@ -925,16 +942,22 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 		if candidate.loadInfo.WaitingCount > maxWaiting {
 			maxWaiting = candidate.loadInfo.WaitingCount
 		}
-		if candidate.hasTTFT && candidate.ttft > 0 {
+		sample := candidate.ttft
+		known := candidate.hasTTFT
+		if s.latencyAwareEnabled() {
+			sample = candidate.estimatedTTFT
+			known = true
+		}
+		if known && sample > 0 {
 			if !hasTTFTSample {
-				minTTFT, maxTTFT = candidate.ttft, candidate.ttft
+				minTTFT, maxTTFT = sample, sample
 				hasTTFTSample = true
 			} else {
-				if candidate.ttft < minTTFT {
-					minTTFT = candidate.ttft
+				if sample < minTTFT {
+					minTTFT = sample
 				}
-				if candidate.ttft > maxTTFT {
-					maxTTFT = candidate.ttft
+				if sample > maxTTFT {
+					maxTTFT = sample
 				}
 			}
 		}
@@ -997,8 +1020,12 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 		queueFactor := 1 - clamp01(float64(item.loadInfo.WaitingCount)/float64(maxWaiting))
 		errorFactor := 1 - clamp01(item.errorRate)
 		ttftFactor := 0.5
-		if item.hasTTFT && hasTTFTSample && maxTTFT > minTTFT {
-			ttftFactor = 1 - clamp01((item.ttft-minTTFT)/(maxTTFT-minTTFT))
+		sample, known := item.ttft, item.hasTTFT
+		if s.latencyAwareEnabled() {
+			sample, known = item.estimatedTTFT, true
+		}
+		if known && hasTTFTSample && maxTTFT > minTTFT {
+			ttftFactor = 1 - clamp01((sample-minTTFT)/(maxTTFT-minTTFT))
 		}
 		resetFactor := 0.0
 		if weights.Reset > 0 && hasResetSample {
@@ -1047,6 +1074,9 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 		plan.topK = 1
 	}
 
+	if s.latencyAwareEnabled() {
+		plan.includeOverflowFallback = true
+	}
 	plan.selectionOrder = s.buildOpenAISelectionOrder(req, plan)
 	return plan
 }
@@ -1084,6 +1114,10 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionOrder(
 		}
 		if len(primary) == 0 {
 			primary = buildOpenAIWeightedSelectionOrder(ranked, req)
+			if s.latencyAwareEnabled() {
+				// Randomize ties, then prefer score without discarding capacity fallback.
+				primary = s.orderLatencyAwareCandidates(primary, req)
+			}
 		}
 		if !plan.includeOverflowFallback || groupTopK >= len(pool) {
 			return primary
@@ -1181,16 +1215,26 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrderWithBudget
 		}
 	}
 	for i := 0; i < len(selectionOrder); i++ {
+		releaseReservation := func() {}
+		if s.latencyAwareEnabled() && !req.StickyWeighted {
+			chosen, release := s.reserveDispatchCandidate(selectionOrder[i:])
+			chosen += i
+			selectionOrder[i], selectionOrder[chosen] = selectionOrder[chosen], selectionOrder[i]
+			releaseReservation = release
+		}
 		candidate := selectionOrder[i]
 		if candidate.account == nil {
+			releaseReservation()
 			continue
 		}
 		if candidate.loadKnown && candidate.account.Concurrency > 0 &&
 			candidate.loadInfo.CurrentConcurrency >= candidate.account.Concurrency {
+			releaseReservation()
 			continue
 		}
 
 		result, attempted, acquireErr := s.tryAcquireOpenAIAccountSlot(ctx, candidate.account.ID, candidate.account.Concurrency, budget)
+		releaseReservation()
 		if !attempted {
 			break
 		}
@@ -2534,6 +2578,9 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleResult(account *Accoun
 		return healthTripped
 	}
 	scheduler.ReportResult(accountID, success, firstTokenMs)
+	if scoped, ok := scheduler.(*defaultOpenAIAccountScheduler); ok && scoped.latencyAwareEnabled() {
+		scoped.stats.reportModel(accountID, model, success, firstTokenMs, time.Now())
+	}
 	return healthTripped
 }
 

@@ -1874,6 +1874,22 @@ func TestValidateConfigErrors(t *testing.T) {
 			mutate:  func(c *Config) { c.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds = 1801 },
 			wantErr: "gateway.openai_high_effort_first_output_timeout_seconds",
 		},
+
+		{
+			name:    "gateway raw chat first output timeout",
+			mutate:  func(c *Config) { c.Gateway.RawChatFirstOutputTimeoutSeconds = -1 },
+			wantErr: "gateway.raw_chat_first_output_timeout_seconds",
+		},
+		{
+			name:    "gateway raw chat high effort first output timeout",
+			mutate:  func(c *Config) { c.Gateway.RawChatHighEffortFirstOutputTimeoutSeconds = 1801 },
+			wantErr: "gateway.raw_chat_high_effort_first_output_timeout_seconds",
+		},
+		{
+			name:    "gateway user concurrency wait timeout",
+			mutate:  func(c *Config) { c.Gateway.UserConcurrencyWaitTimeoutSeconds = 121 },
+			wantErr: "gateway.user_concurrency_wait_timeout_seconds",
+		},
 		{
 			name:    "gateway max idle conns",
 			mutate:  func(c *Config) { c.Gateway.MaxIdleConns = 0 },

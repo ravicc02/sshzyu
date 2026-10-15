@@ -844,7 +844,6 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 
 	var usage OpenAIUsage
 	var firstTokenMs *int
-	firstChunk := true
 	clientDisconnected := false
 	clientOutputStarted := false
 	pendingSSE := make([]string, 0, 4)
@@ -900,11 +899,6 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 
 	processDataLine := func(payload string) bool {
 		payload = string(restoreCodexToolNamesFromContext(c, []byte(payload)))
-		if firstChunk {
-			firstChunk = false
-			ms := int(time.Since(startTime).Milliseconds())
-			firstTokenMs = &ms
-		}
 		if countSearch {
 			searchCount += countGrokNativeSearchCallsInSSEDataDedup([]byte(payload), streamSearchSeen)
 		}
@@ -1011,6 +1005,13 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 		}
 
 		chunks := apicompat.ResponsesEventToChatChunks(&event, state)
+		for _, chunk := range chunks {
+			if firstTokenMs == nil && openAIChatChunkHasSemanticOutput(chunk) {
+				ms := int(time.Since(startTime).Milliseconds())
+				firstTokenMs = &ms
+				break
+			}
+		}
 		if !clientDisconnected {
 			for _, chunk := range chunks {
 				refusalDetector.ObserveChatChunk(chunk)
@@ -1070,6 +1071,10 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 		}
 		if finalChunks := apicompat.FinalizeResponsesChatStream(state); len(finalChunks) > 0 && !clientDisconnected {
 			for _, chunk := range finalChunks {
+				if firstTokenMs == nil && openAIChatChunkHasSemanticOutput(chunk) {
+					ms := int(time.Since(startTime).Milliseconds())
+					firstTokenMs = &ms
+				}
 				refusalDetector.ObserveChatChunk(chunk)
 				sse, err := apicompat.ChatChunkToSSE(chunk)
 				if err != nil {
@@ -1344,4 +1349,24 @@ func buildChatStreamErrorSSE(code, message string) string {
 		return "data: {\"error\":{\"type\":\"invalid_request_error\",\"code\":\"" + code + "\",\"message\":\"upstream error\"}}\n\n"
 	}
 	return "data: " + string(payload) + "\n\n"
+}
+
+// Match the content actually emitted by the Responses-to-Chat converter.
+// Creation/role/usage events and empty tool metadata must not make a stalled
+// provider look fast in scheduling feedback.
+func openAIChatChunkHasSemanticOutput(chunk apicompat.ChatCompletionsChunk) bool {
+	for _, choice := range chunk.Choices {
+		d := choice.Delta
+		for _, text := range []*string{d.Content, d.ReasoningContent, d.Reasoning, d.Refusal} {
+			if text != nil && *text != "" {
+				return true
+			}
+		}
+		for _, tool := range d.ToolCalls {
+			if tool.Function.Arguments != "" {
+				return true
+			}
+		}
+	}
+	return false
 }

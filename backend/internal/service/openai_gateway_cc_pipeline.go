@@ -251,7 +251,37 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
+	budget, guarded := rawChatFirstOutputBudget{}, false
+	if ctx != nil {
+		budget, guarded = ctx.Value(rawChatFirstOutputBudgetKey{}).(rawChatFirstOutputBudget)
+	}
+	var headerGuard *openAIFirstOutputHeaderGuard
+	if stream && guarded && budget.timeout > 0 {
+		var guardedCtx context.Context
+		guardedCtx, headerGuard = newOpenAIFirstOutputHeaderGuard(upstreamReq.Context(), func() {}, budget.start.Add(budget.timeout))
+		upstreamReq = upstreamReq.WithContext(guardedCtx)
+	}
 	resp, err := s.doOpenAIUpstream(upstreamReq, proxyURL, account)
+	if headerGuard != nil {
+		timedOut := headerGuard.stopHeaderWait()
+		if timedOut {
+			if resp != nil && resp.Body != nil {
+				_ = resp.Body.Close()
+			}
+			headerGuard.close()
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			return nil, s.newOpenAIFirstOutputTimeoutError(ctx, c, account, opsUpstreamProxyID(account), opsUpstreamProxyName(account), budget.start, budget.model, budget.effort, budget.timeout, "raw_chat_headers", nil)
+		}
+		if err != nil {
+			headerGuard.close()
+		} else if resp != nil && resp.Body != nil {
+			resp.Body = &openAIRequestContextReadCloser{ReadCloser: resp.Body, cleanup: headerGuard.close}
+		} else {
+			headerGuard.close()
+		}
+	}
 	if err != nil {
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
 	}

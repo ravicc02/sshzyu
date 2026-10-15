@@ -1,7 +1,9 @@
 /** Channel Monitor V2 (user + admin passive monitor UI) */
 export default {
   channelMonitorV2: {
+    aggregationStale: 'Aggregation is stale; check monitoring mode and aggregation jobs',
     title: 'Channel Monitor',
+    latencyAggregationHint: 'First output from usage records; bucket-estimated percentiles, aggregated about every {seconds}s',
     updating: 'Updating data',
     updatedTo: 'Updated to {time}',
     partialCoverage: 'Partial historical coverage',

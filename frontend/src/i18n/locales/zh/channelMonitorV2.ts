@@ -1,7 +1,9 @@
 /** Channel Monitor V2 (user + admin passive monitor UI) */
 export default {
   channelMonitorV2: {
+    aggregationStale: '聚合数据未更新，请检查监控模式与聚合任务',
     title: '渠道监控',
+    latencyAggregationHint: '首输出来自用量记录；分位数为分桶估算，约每 {seconds} 秒聚合',
     updating: '正在更新数据',
     updatedTo: '更新至 {time}',
     partialCoverage: '部分历史覆盖',

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -213,6 +214,13 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletionsWithStartTime(
 	// the outbound request (for example GLM xhigh is forwarded as max).
 	reasoningEffort := extractOpenAIReasoningEffortFromBody(upstreamBody, upstreamModel, billingModel, originalModel)
 	reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, upstreamBody, upstreamModel)
+	if timeout := s.rawChatFirstOutputTimeout(reasoningEffort); clientStream && timeout > 0 {
+		effort := ""
+		if reasoningEffort != nil {
+			effort = *reasoningEffort
+		}
+		ctx = context.WithValue(ctx, rawChatFirstOutputBudgetKey{}, rawChatFirstOutputBudget{start: startTime, timeout: timeout, model: originalModel, effort: effort})
+	}
 	resp, err := s.sendCCUpstreamRequest(ctx, c, account, targetURL, upstreamBody, clientStream, token, customUA, grokCacheIdentity)
 	if err != nil {
 		return nil, err
@@ -325,12 +333,33 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	refusalDetector := newOpenAIChatSilentRefusalDetector(requestBodyLen)
 	var terminal openAIRawStreamTerminalState
 
+	// Withhold metadata until output so a timed-out attempt can fail over safely.
+	var firstOutputState atomic.Int32 // 0 waiting, 1 committed, 2 timed out
+	var firstOutputTimer *time.Timer
+	firstOutputTimeout := s.rawChatFirstOutputTimeout(reasoningEffort)
+	guardFirstOutput := firstOutputTimeout > 0
+	if guardFirstOutput {
+		remaining := time.Until(startTime.Add(firstOutputTimeout))
+		if remaining <= 0 {
+			remaining = time.Nanosecond
+		}
+		firstOutputTimer = time.AfterFunc(remaining, func() {
+			if firstOutputState.CompareAndSwap(0, 2) {
+				_ = resp.Body.Close()
+			}
+		})
+		defer firstOutputTimer.Stop()
+	}
+	pendingBytes := 0
+	var firstOutputFrame strings.Builder
+
 	writeLine := func(line string) {
 		if clientDisconnected {
 			return
 		}
-		if !clientOutputStarted && !refusalDetector.ShouldReleaseClientOutput() {
+		if !clientOutputStarted && ((guardFirstOutput && firstOutputState.Load() == 0) || !refusalDetector.ShouldReleaseClientOutput()) {
 			pendingLines = append(pendingLines, line)
+			pendingBytes += len(line) + 1
 			return
 		}
 		if !clientOutputStarted {
@@ -357,40 +386,6 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		}
 	}
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		refusalDetector.ObserveSSELine(line)
-		if payload, ok := extractOpenAISSEDataLine(line); ok {
-			trimmedPayload := strings.TrimSpace(payload)
-			terminal.ObserveDataLine(trimmedPayload)
-			if trimmedPayload != "[DONE]" {
-				observer.ObserveOpenAI([]byte(payload), strings.TrimSpace(gjson.Get(payload, "type").String()))
-				usageOnlyChunk := isOpenAIChatUsageOnlyStreamChunk(payload)
-				if u := extractCCStreamUsage(payload); u != nil {
-					usage = *u
-				}
-				if firstTokenMs == nil && !usageOnlyChunk {
-					elapsed := int(time.Since(startTime).Milliseconds())
-					firstTokenMs = &elapsed
-				}
-			}
-		}
-		line = applyOllamaCloudRawChatCompletionsSSELine(account, line)
-		line = stripEmptyChatToolCallIdentityFromSSELine(line)
-
-		line = s.replaceModelInSSELine(line, upstreamModel, originalModel)
-		writeLine(line)
-		if line == "" {
-			if !clientDisconnected && clientOutputStarted {
-				c.Writer.Flush()
-			}
-			continue
-		}
-		if !clientDisconnected && clientOutputStarted {
-			c.Writer.Flush()
-		}
-	}
-
 	resultWithUsage := func() *OpenAIForwardResult {
 		return &OpenAIForwardResult{
 			RequestID:                     requestID,
@@ -410,6 +405,91 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		}
 	}
 
+	for scanner.Scan() {
+		line := scanner.Text()
+		if guardFirstOutput && firstOutputState.Load() == 2 {
+			break
+		}
+		refusalDetector.ObserveSSELine(line)
+		if payload, ok := extractOpenAISSEDataLine(line); ok {
+			if guardFirstOutput && firstTokenMs == nil {
+				firstOutputFrame.WriteString(payload)
+				firstOutputFrame.WriteByte('\n')
+			}
+			trimmedPayload := strings.TrimSpace(payload)
+			terminal.ObserveDataLine(trimmedPayload)
+			if trimmedPayload != "[DONE]" {
+				observer.ObserveOpenAI([]byte(payload), strings.TrimSpace(gjson.Get(payload, "type").String()))
+
+				usageOnlyChunk := isOpenAIChatUsageOnlyStreamChunk(payload)
+				if u := extractCCStreamUsage(payload); u != nil {
+					usage = *u
+				}
+				if firstTokenMs == nil && !usageOnlyChunk && !guardFirstOutput && rawChatChunkHasSemanticOutput(trimmedPayload) {
+					elapsed := int(time.Since(startTime).Milliseconds())
+					firstTokenMs = &elapsed
+				}
+			}
+		}
+		// A complete SSE event, rather than a data line, is the client-visible
+		// output boundary. Partial and multiline events keep the deadline live.
+		if guardFirstOutput && line == "" && firstOutputFrame.Len() > 0 {
+			payload := strings.TrimSpace(firstOutputFrame.String())
+			semantic := rawChatChunkHasSemanticOutput(payload)
+			terminalEvent := payload == "[DONE]" || rawChatChunkEndsAttempt(payload)
+			refusalDetector.ObservePayload([]byte(payload))
+			terminal.ObserveDataLine(payload)
+			if u := extractCCStreamUsage(payload); u != nil {
+				usage = *u
+			}
+			observer.ObserveOpenAI([]byte(payload), strings.TrimSpace(gjson.Get(payload, "type").String()))
+			if (semantic || terminalEvent) && firstOutputState.Load() == 0 {
+				if !firstOutputState.CompareAndSwap(0, 1) {
+					break
+				}
+				firstOutputTimer.Stop()
+			}
+			if semantic && firstTokenMs == nil {
+				elapsed := int(time.Since(startTime).Milliseconds())
+				firstTokenMs = &elapsed
+			}
+			firstOutputFrame.Reset()
+		}
+		line = applyOllamaCloudRawChatCompletionsSSELine(account, line)
+		line = stripEmptyChatToolCallIdentityFromSSELine(line)
+
+		line = s.replaceModelInSSELine(line, upstreamModel, originalModel)
+		writeLine(line)
+		if guardFirstOutput && firstTokenMs == nil && pendingBytes > openAIFirstOutputStageMaxBytes {
+			if openAIUsageHasTokens(&usage) {
+				return resultWithUsage(), newOpenAIUpstreamStreamReadError(errOpenAIFirstOutputStageLimit)
+			}
+			return nil, newOpenAIRawStreamTruncatedFailoverError(c, account, requestID, errOpenAIFirstOutputStageLimit)
+		}
+		if line == "" {
+			if !clientDisconnected && clientOutputStarted {
+				c.Writer.Flush()
+			}
+			continue
+		}
+		if !clientDisconnected && clientOutputStarted {
+			c.Writer.Flush()
+		}
+	}
+
+	if guardFirstOutput && firstOutputState.Load() == 2 {
+		effort := ""
+		if reasoningEffort != nil {
+			effort = *reasoningEffort
+		}
+		timeoutErr := s.newOpenAIFirstOutputTimeoutError(c.Request.Context(), c, account, opsUpstreamProxyID(account), opsUpstreamProxyName(account), startTime, originalModel, effort, firstOutputTimeout, "raw_chat_stream", resp.Header)
+		if openAIUsageHasTokens(&usage) {
+			// A usage-only event is not output, but it is evidence of billing.
+			// Preserve partial usage and forbid replay on another account.
+			return resultWithUsage(), newOpenAIUpstreamStreamReadError(context.DeadlineExceeded)
+		}
+		return nil, timeoutErr
+	}
 	scanErr := scanner.Err()
 	if scanErr != nil && !errors.Is(scanErr, context.Canceled) && !errors.Is(scanErr, context.DeadlineExceeded) {
 		logger.L().Warn("openai chat_completions raw: stream read error",
@@ -589,4 +669,70 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 // 与 buildOpenAIResponsesURL 是姐妹函数。
 func buildOpenAIChatCompletionsURL(base string) string {
 	return buildOpenAIEndpointURL(base, "/v1/chat/completions")
+}
+
+func (s *OpenAIGatewayService) rawChatFirstOutputTimeout(effort *string) time.Duration {
+	if s == nil || s.cfg == nil || s.cfg.Gateway.RawChatFirstOutputTimeoutSeconds <= 0 {
+		return 0
+	}
+	seconds := s.cfg.Gateway.RawChatFirstOutputTimeoutSeconds
+	if effort != nil {
+		switch strings.ToLower(strings.TrimSpace(*effort)) {
+		case "high", "xhigh", "max":
+			if override := s.cfg.Gateway.RawChatHighEffortFirstOutputTimeoutSeconds; override > 0 {
+				seconds = override
+			}
+		}
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func rawChatChunkHasSemanticOutput(payload string) bool {
+	if !gjson.Valid(payload) {
+		return false
+	}
+	for _, choice := range gjson.Get(payload, "choices").Array() {
+		delta := choice.Get("delta")
+		for _, key := range []string{"content", "reasoning_content", "reasoning", "refusal"} {
+			if value := delta.Get(key); value.Exists() && value.String() != "" {
+				return true
+			}
+		}
+		for _, tool := range delta.Get("tool_calls").Array() {
+			for _, key := range []string{"function.name", "function.arguments", "custom.name", "custom.input"} {
+				if tool.Get(key).String() != "" {
+					return true
+				}
+			}
+		}
+		if call := delta.Get("function_call"); call.Get("name").String() != "" || call.Get("arguments").String() != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func rawChatChunkEndsAttempt(payload string) bool {
+	if !gjson.Valid(payload) {
+		return false
+	}
+	if gjson.Get(payload, "error").Exists() {
+		return true
+	}
+	for _, choice := range gjson.Get(payload, "choices").Array() {
+		if finish := choice.Get("finish_reason"); finish.Exists() && finish.Type != gjson.Null && finish.String() != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// Attempt-local deadlines survive billing's detached client context, but are
+// stopped once semantic output arrives so long healthy streams remain valid.
+type rawChatFirstOutputBudgetKey struct{}
+type rawChatFirstOutputBudget struct {
+	start   time.Time
+	timeout time.Duration
+	model   string
+	effort  string
 }

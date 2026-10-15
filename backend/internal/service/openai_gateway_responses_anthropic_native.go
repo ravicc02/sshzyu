@@ -337,7 +337,6 @@ func (s *OpenAIGatewayService) handleResponsesStreamingFromNativeAnthropic(
 
 	var usage ClaudeUsage
 	var firstTokenMs *int
-	firstChunk := true
 	clientDisconnected := false
 
 	scanner := bufio.NewScanner(resp.Body)
@@ -393,8 +392,7 @@ func (s *OpenAIGatewayService) handleResponsesStreamingFromNativeAnthropic(
 	// output_tokens 只在末尾 message_delta 携带，提前退出会把整段生成记成 ~1
 	// token，payg 上游照常计费而平台漏记。状态机照常推进以保证 finalize 一致。
 	processAnthropicEvent := func(event *apicompat.AnthropicStreamEvent) {
-		if firstChunk {
-			firstChunk = false
+		if firstTokenMs == nil && openAIAnthropicEventHasContent(event) {
 			ms := int(time.Since(startTime).Milliseconds())
 			firstTokenMs = &ms
 		}

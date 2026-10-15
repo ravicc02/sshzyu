@@ -516,3 +516,19 @@ func TestSetClaudeCodeClientContext_ParsedRequestProbeWithoutSystemPrompt(t *tes
 	SetClaudeCodeClientContext(c2, nil, &service.ParsedRequest{Model: "claude-sonnet-4-5", MaxTokens: 64})
 	require.False(t, service.IsClaudeCodeClient(c2.Request.Context()))
 }
+
+func TestAcquireUserSlotWithWait_ConfiguredTimeout(t *testing.T) {
+	cache := &helperConcurrencyCacheStub{userSeq: []bool{false}, waitAllowed: true}
+	helper := NewConcurrencyHelper(service.NewConcurrencyService(cache), SSEPingFormatNone, time.Second, 20*time.Millisecond)
+	c, _ := newHelperTestContext(http.MethodPost, "/v1/responses")
+	streamStarted := false
+	started := time.Now()
+	release, err := helper.AcquireUserSlotWithWait(c, 202, 3, false, &streamStarted)
+	require.Nil(t, release)
+	var concurrencyErr *ConcurrencyError
+	require.ErrorAs(t, err, &concurrencyErr)
+	require.True(t, concurrencyErr.IsTimeout)
+	require.Less(t, time.Since(started), 300*time.Millisecond)
+	require.Equal(t, 1, cache.waitDecrementCalls)
+	require.Equal(t, maxConcurrencyWait, NewConcurrencyHelper(nil, SSEPingFormatNone, time.Second).userWaitTimeout)
+}

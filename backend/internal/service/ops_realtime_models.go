@@ -38,14 +38,29 @@ type AccountConcurrencyInfo struct {
 }
 
 // UserConcurrencyInfo represents real-time concurrency usage for a single user.
+// OpsUserAPIKeyGroup is metadata only; API key credentials are never selected.
+type OpsUserAPIKeyGroup struct {
+	APIKeyID  int64
+	UserID    int64
+	GroupID   int64
+	GroupName string
+}
+
+type UserConcurrencyGroupInfo struct {
+	GroupID      int64  `json:"group_id"`
+	GroupName    string `json:"group_name"`
+	CurrentInUse int64  `json:"current_in_use"`
+}
+
 type UserConcurrencyInfo struct {
-	UserID         int64   `json:"user_id"`
-	UserEmail      string  `json:"user_email"`
-	Username       string  `json:"username"`
-	CurrentInUse   int64   `json:"current_in_use"`
-	MaxCapacity    int64   `json:"max_capacity"`
-	LoadPercentage float64 `json:"load_percentage"`
-	WaitingInQueue int64   `json:"waiting_in_queue"`
+	ActiveGroups   []UserConcurrencyGroupInfo `json:"active_groups"`
+	UserID         int64                      `json:"user_id"`
+	UserEmail      string                     `json:"user_email"`
+	Username       string                     `json:"username"`
+	CurrentInUse   int64                      `json:"current_in_use"`
+	MaxCapacity    int64                      `json:"max_capacity"`
+	LoadPercentage float64                    `json:"load_percentage"`
+	WaitingInQueue int64                      `json:"waiting_in_queue"`
 }
 
 // PlatformAvailability aggregates account availability by platform.

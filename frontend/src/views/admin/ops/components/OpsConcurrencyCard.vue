@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { opsAPI, type OpsAccountAvailabilityStatsResponse, type OpsConcurrencyStatsResponse, type OpsUserConcurrencyStatsResponse } from '@/api/admin/ops'
+import { opsAPI, type OpsAccountAvailabilityStatsResponse, type OpsConcurrencyStatsResponse, type UserConcurrencyGroupInfo, type OpsUserConcurrencyStatsResponse } from '@/api/admin/ops'
 
 interface Props {
   platformFilter?: string
@@ -89,6 +89,7 @@ interface AccountRow {
 
 // 用户行数据
 interface UserRow {
+  active_groups: UserConcurrencyGroupInfo[]
   key: string
   user_id: number
   user_email: string
@@ -235,6 +236,7 @@ const userRows = computed((): UserRow[] => {
         user_id: safeNumber(u.user_id),
         user_email: u.user_email || `User ${uid}`,
         username: u.username || '',
+        active_groups: u.active_groups || [],
         current_in_use: safeNumber(u.current_in_use),
         max_capacity: safeNumber(u.max_capacity),
         waiting_in_queue: safeNumber(u.waiting_in_queue),
@@ -425,6 +427,18 @@ watch(
               <span class="font-mono font-bold text-gray-900 dark:text-white"> {{ row.current_in_use }}/{{ row.max_capacity }} </span>
               <span :class="['font-bold', getLoadTextClass(row.load_percentage)]"> {{ Math.round(row.load_percentage) }}% </span>
             </div>
+          </div>
+
+          <div
+            :data-testid="`user-active-groups-${row.user_id}`"
+            class="mb-1.5 flex min-w-0 flex-wrap justify-end gap-x-2 gap-y-1 text-right text-[10px] text-gray-500 dark:text-gray-400"
+            :aria-label="t('admin.ops.concurrency.activeGroups')"
+          >
+            <span v-for="group in row.active_groups" :key="group.group_id" class="max-w-full truncate" :title="group.group_name || `Group ${group.group_id}`">
+              {{ group.group_name || `Group ${group.group_id}` }}
+              <span v-if="row.active_groups.length > 1" class="font-mono"> · {{ group.current_in_use }}</span>
+            </span>
+            <span v-if="row.active_groups.length === 0">{{ t('admin.ops.concurrency.noActiveGroups') }}</span>
           </div>
 
           <!-- 进度条 -->

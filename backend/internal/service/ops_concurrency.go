@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"log"
+	"sort"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -404,5 +405,80 @@ func (s *OpsService) GetUserConcurrencyStats(ctx context.Context) (map[int64]*Us
 		result[u.ID] = info
 	}
 
+	s.fillUserActiveGroups(ctx, result)
 	return result, &collectedAt, nil
+}
+
+type opsUserAPIKeyGroupsRepository interface {
+	ListOpsUserAPIKeyGroups(ctx context.Context, userIDs []int64) ([]OpsUserAPIKeyGroup, error)
+}
+
+// Keep the global user counters authoritative. Group metadata is best effort and
+// derived only from live key slots, never from permissions or completed usage.
+func (s *OpsService) fillUserActiveGroups(ctx context.Context, users map[int64]*UserConcurrencyInfo) {
+	ids := make([]int64, 0, len(users))
+	for id, user := range users {
+		user.ActiveGroups = []UserConcurrencyGroupInfo{}
+		if user.CurrentInUse > 0 {
+			ids = append(ids, id)
+		}
+	}
+	repo, ok := s.opsRepo.(opsUserAPIKeyGroupsRepository)
+	if !ok || s.concurrencyService == nil || len(ids) == 0 {
+		return
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	for start := 0; start < len(ids); start += opsConcurrencyBatchChunkSize {
+		end := start + opsConcurrencyBatchChunkSize
+		if end > len(ids) {
+			end = len(ids)
+		}
+		keys, err := repo.ListOpsUserAPIKeyGroups(ctx, ids[start:end])
+		if err != nil {
+			log.Printf("[Ops] active user group metadata unavailable: %v", err)
+			continue
+		}
+		groups := map[int64]map[int64]*UserConcurrencyGroupInfo{}
+		for offset := 0; offset < len(keys); offset += opsConcurrencyBatchChunkSize {
+			until := offset + opsConcurrencyBatchChunkSize
+			if until > len(keys) {
+				until = len(keys)
+			}
+			keyIDs := make([]int64, 0, until-offset)
+			for _, key := range keys[offset:until] {
+				keyIDs = append(keyIDs, key.APIKeyID)
+			}
+			counts, err := s.concurrencyService.GetAPIKeyConcurrencyBatch(ctx, keyIDs)
+			if err != nil {
+				continue
+			}
+			for _, key := range keys[offset:until] {
+				count := counts[key.APIKeyID]
+				if count <= 0 || key.GroupID <= 0 || users[key.UserID] == nil {
+					continue
+				}
+				if groups[key.UserID] == nil {
+					groups[key.UserID] = map[int64]*UserConcurrencyGroupInfo{}
+				}
+				group := groups[key.UserID][key.GroupID]
+				if group == nil {
+					group = &UserConcurrencyGroupInfo{GroupID: key.GroupID, GroupName: key.GroupName}
+					groups[key.UserID][key.GroupID] = group
+				}
+				group.CurrentInUse += int64(count)
+			}
+		}
+		for id, byGroup := range groups {
+			for _, group := range byGroup {
+				users[id].ActiveGroups = append(users[id].ActiveGroups, *group)
+			}
+			sort.Slice(users[id].ActiveGroups, func(i, j int) bool {
+				a, b := users[id].ActiveGroups[i], users[id].ActiveGroups[j]
+				if a.CurrentInUse != b.CurrentInUse {
+					return a.CurrentInUse > b.CurrentInUse
+				}
+				return a.GroupID < b.GroupID
+			})
+		}
+	}
 }

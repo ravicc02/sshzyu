@@ -1363,7 +1363,7 @@ func (a *metricAccumulator) metric(minutes float64, admin bool) service.ChannelM
 	return m
 }
 func latencyMetric(sum, count int64, hist map[int64]int64) service.ChannelMonitorV2Latency {
-	result := service.ChannelMonitorV2Latency{SampleCount: count}
+	result := service.ChannelMonitorV2Latency{SampleCount: count, PercentileMethod: "histogram_upper_bound"}
 	if count > 0 {
 		avg := float64(sum) / float64(count)
 		result.AvgMs = &avg

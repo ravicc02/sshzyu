@@ -111,6 +111,8 @@ type ChannelMonitorV2Metric struct {
 }
 
 type ChannelMonitorV2Latency struct {
+	PercentileMethod string `json:"percentile_method"` // histogram bucket upper bounds, not exact percentiles
+
 	SampleCount int64    `json:"sample_count"`
 	P50Ms       *int64   `json:"p50_ms"`
 	P90Ms       *int64   `json:"p90_ms"`

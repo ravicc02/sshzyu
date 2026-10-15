@@ -363,8 +363,12 @@ func NewOpenAIGatewayHandler(
 ) *OpenAIGatewayHandler {
 	pingInterval := time.Duration(0)
 	maxAccountSwitches := 3
+	userWaitTimeout := maxConcurrencyWait
 	if cfg != nil {
 		pingInterval = time.Duration(cfg.Concurrency.PingInterval) * time.Second
+		if cfg.Gateway.UserConcurrencyWaitTimeoutSeconds > 0 {
+			userWaitTimeout = time.Duration(cfg.Gateway.UserConcurrencyWaitTimeoutSeconds) * time.Second
+		}
 		if cfg.Gateway.MaxAccountSwitches > 0 {
 			maxAccountSwitches = cfg.Gateway.MaxAccountSwitches
 		}
@@ -377,7 +381,7 @@ func NewOpenAIGatewayHandler(
 		errorPassthroughService:  errorPassthroughService,
 		contentModerationService: contentModerationService,
 		opsService:               opsService,
-		concurrencyHelper:        NewConcurrencyHelper(concurrencyService, SSEPingFormatComment, pingInterval),
+		concurrencyHelper:        NewConcurrencyHelper(concurrencyService, SSEPingFormatComment, pingInterval, userWaitTimeout),
 		imageLimiter:             &imageConcurrencyLimiter{},
 		maxAccountSwitches:       maxAccountSwitches,
 		cfg:                      cfg,
@@ -2076,9 +2080,15 @@ func (h *OpenAIGatewayHandler) acquireResponsesUserSlot(
 	reqLog *zap.Logger,
 ) (func(), bool) {
 	ctx := c.Request.Context()
+	userWaitStart := time.Now()
 	userReleaseFunc, err := h.concurrencyHelper.AcquireUserSlotWithWait(c, userID, userConcurrency, reqStream, streamStarted)
+	userQueueMs := time.Since(userWaitStart).Milliseconds()
+	service.SetOpsLatencyMs(c, service.OpsUserQueueLatencyMsKey, userQueueMs)
+	if userQueueMs >= 100 {
+		reqLog.Info("openai.user_slot_wait_completed", zap.Int64("user_queue_ms", userQueueMs), zap.Bool("acquired", err == nil))
+	}
 	if err != nil {
-		reqLog.Warn("openai.user_slot_acquire_failed", zap.Error(err))
+		reqLog.Warn("openai.user_slot_acquire_failed", zap.Error(err), zap.Int64("user_queue_ms", userQueueMs))
 		h.handleConcurrencyError(c, err, "user", *streamStarted)
 		return nil, false
 	}

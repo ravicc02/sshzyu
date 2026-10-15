@@ -23,6 +23,7 @@ const (
 	OpsUpstreamModelKey        = "ops_upstream_model"
 
 	// Optional stage latencies (milliseconds) for troubleshooting and alerting.
+	OpsUserQueueLatencyMsKey = "ops_user_queue_latency_ms"
 	OpsAuthLatencyMsKey      = "ops_auth_latency_ms"
 	OpsRoutingLatencyMsKey   = "ops_routing_latency_ms"
 	OpsUpstreamLatencyMsKey  = "ops_upstream_latency_ms"

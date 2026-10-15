@@ -993,6 +993,11 @@ type GatewayConfig struct {
 	// OpenAIHighEffortFirstOutputTimeoutSeconds: high/xhigh/max 推理的首个语义输出超时（秒）。
 	// 0 表示回退到 OpenAIFirstOutputTimeoutSeconds。
 	OpenAIHighEffortFirstOutputTimeoutSeconds int `mapstructure:"openai_high_effort_first_output_timeout_seconds"`
+	// Raw ChatCompletions first semantic output deadline; zero preserves existing behavior.
+	RawChatFirstOutputTimeoutSeconds           int `mapstructure:"raw_chat_first_output_timeout_seconds"`
+	RawChatHighEffortFirstOutputTimeoutSeconds int `mapstructure:"raw_chat_high_effort_first_output_timeout_seconds"`
+	// Zero uses the historical 30 second user-slot wait.
+	UserConcurrencyWaitTimeoutSeconds int `mapstructure:"user_concurrency_wait_timeout_seconds"`
 	// 请求体最大字节数，用于网关请求体大小限制
 	MaxBodySize int64 `mapstructure:"max_body_size"`
 	// TextMaxBodySize limits endpoints that cannot carry inline image/video payloads.
@@ -1404,6 +1409,10 @@ func (w GatewayOpenAIWSSchedulerScoreWeights) IsValid() bool {
 
 // GatewayOpenAISchedulerConfig OpenAI 高级调度器配置。
 type GatewayOpenAISchedulerConfig struct {
+	// LatencyAwareEnabled uses fresh per-model observations and prefers higher scores.
+	LatencyAwareEnabled bool `mapstructure:"latency_aware_enabled"`
+	// LatencyConcurrencyTarget is a soft per-account dispatch target; Redis hard caps are unchanged.
+	LatencyConcurrencyTarget int `mapstructure:"latency_concurrency_target"`
 	// StickyEscapeEnabled: 是否允许 session_hash sticky 在账号健康度劣化时临时逃逸
 	StickyEscapeEnabled bool `mapstructure:"sticky_escape_enabled"`
 	// StickyEscapeTTFTMs: TTFT EWMA 超过该阈值时跳过 sticky
@@ -2423,6 +2432,9 @@ func setDefaults() {
 	viper.SetDefault("gateway.openai_response_header_timeout", 0)
 	viper.SetDefault("gateway.grok_response_header_timeout", 120)
 	viper.SetDefault("gateway.openai_first_output_timeout_seconds", 0)
+	viper.SetDefault("gateway.raw_chat_first_output_timeout_seconds", 0)
+	viper.SetDefault("gateway.raw_chat_high_effort_first_output_timeout_seconds", 0)
+	viper.SetDefault("gateway.user_concurrency_wait_timeout_seconds", 30)
 	viper.SetDefault("gateway.openai_high_effort_first_output_timeout_seconds", 0)
 	viper.SetDefault("gateway.log_upstream_error_body", true)
 	viper.SetDefault("gateway.log_upstream_error_body_max_bytes", 2048)
@@ -2484,6 +2496,8 @@ func setDefaults() {
 	viper.SetDefault("gateway.openai_ws.metadata_bridge_enabled", true)
 	viper.SetDefault("gateway.openai_ws.sticky_response_id_ttl_seconds", 3600)
 	viper.SetDefault("gateway.openai_ws.sticky_previous_response_ttl_seconds", 3600)
+	viper.SetDefault("gateway.openai_scheduler.latency_aware_enabled", false)
+	viper.SetDefault("gateway.openai_scheduler.latency_concurrency_target", 8)
 	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.priority", 1.0)
 	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.load", 1.0)
 	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.queue", 0.7)
@@ -3371,6 +3385,15 @@ func (c *Config) Validate() error {
 	if c.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds < 0 || c.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds > 1800 ||
 		(c.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds > 0 && c.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds < 30) {
 		return fmt.Errorf("gateway.openai_high_effort_first_output_timeout_seconds must be 0 or between 30-1800 seconds")
+	}
+	if c.Gateway.RawChatFirstOutputTimeoutSeconds < 0 || c.Gateway.RawChatFirstOutputTimeoutSeconds > 600 {
+		return fmt.Errorf("gateway.raw_chat_first_output_timeout_seconds must be between 0-600 seconds")
+	}
+	if c.Gateway.RawChatHighEffortFirstOutputTimeoutSeconds < 0 || c.Gateway.RawChatHighEffortFirstOutputTimeoutSeconds > 1800 {
+		return fmt.Errorf("gateway.raw_chat_high_effort_first_output_timeout_seconds must be between 0-1800 seconds")
+	}
+	if c.Gateway.UserConcurrencyWaitTimeoutSeconds < 0 || c.Gateway.UserConcurrencyWaitTimeoutSeconds > 120 {
+		return fmt.Errorf("gateway.user_concurrency_wait_timeout_seconds must be between 0-120 seconds")
 	}
 	if c.Gateway.Live.MaxSessionDurationSeconds <= 0 {
 		c.Gateway.Live.MaxSessionDurationSeconds = 3600

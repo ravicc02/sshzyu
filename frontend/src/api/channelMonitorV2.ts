@@ -26,6 +26,8 @@ export interface MonitorFilter {
 }
 
 export interface LatencyMetric {
+  percentile_method?: 'histogram_upper_bound'
+
   sample_count: number
   p50_ms: number | null
   p90_ms?: number | null

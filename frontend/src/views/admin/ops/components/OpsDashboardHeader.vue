@@ -1331,6 +1331,8 @@ function handleToolbarRefresh() {
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-1">
               <span class="text-[10px] font-bold uppercase text-gray-400">TTFT</span>
+              <span v-if="overview.ttft_sample_count != null" class="text-xs text-gray-500" data-testid="ttft-sample-count">{{ t('admin.ops.ttftSamples', { count: formatNumber(overview.ttft_sample_count) }) }}</span>
+              <span v-if="overview.latency_approximate" class="text-xs text-gray-500">{{ t('admin.ops.latencyApproximate') }}</span>
               <HelpTooltip v-if="!props.fullscreen" :content="t('admin.ops.tooltips.ttft')" />
             </div>
             <button

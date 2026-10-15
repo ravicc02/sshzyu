@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  monitorDataIsStale,
   formatLatencyKpiSecondary,
   formatLatencyPrivacy,
   formatMonitorMs,
@@ -115,5 +116,17 @@ describe('monitorFormat accuracy', () => {
     expect(formatLatencyPrivacy(100, 250, 120, 300)).toBe('AVG 120ms · P50 100ms · P90 250ms')
     expect(formatLatencyPrivacy(100, null, null, 300)).toBe('P50 100ms · P95 300ms')
     expect(formatLatencyPrivacy(null, null)).toBe('-')
+  })
+})
+
+describe('monitor aggregation freshness', () => {
+  const now = Date.parse('2026-10-15T03:00:00Z')
+  it('marks stopped or missing aggregation as stale', () => {
+    expect(monitorDataIsStale('2026-08-10T00:00:00Z', 300, now)).toBe(true)
+    expect(monitorDataIsStale('', 300, now)).toBe(true)
+  })
+  it('allows the configured cadence plus a minute bucket', () => {
+    expect(monitorDataIsStale('2026-10-15T02:55:00Z', 300, now)).toBe(false)
+    expect(monitorDataIsStale('2026-10-15T02:40:00Z', 300, now)).toBe(true)
   })
 })

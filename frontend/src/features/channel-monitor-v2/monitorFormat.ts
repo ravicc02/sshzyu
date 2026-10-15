@@ -171,3 +171,10 @@ export function formatLatencyKpiSecondary(
 export function monitorErrorCategoryLabel(category: string): string {
   return category
 }
+
+/** Aggregation time, not the browser's last HTTP refresh, determines freshness. */
+export function monitorDataIsStale(computedAt: string | null | undefined, refreshSeconds: number, now = Date.now()): boolean {
+  const computed = Date.parse(computedAt || '')
+  const cadence = Number.isFinite(refreshSeconds) && refreshSeconds > 0 ? refreshSeconds : 300
+  return !Number.isFinite(computed) || now - computed > (cadence * 2 + 60) * 1000
+}

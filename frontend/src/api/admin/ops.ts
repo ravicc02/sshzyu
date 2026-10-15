@@ -73,6 +73,8 @@ export interface OpsDashboardOverview {
 
   duration: OpsPercentiles
   ttft: OpsPercentiles
+  ttft_sample_count?: number
+  latency_approximate?: boolean
 }
 
 export interface OpsPercentiles {
@@ -331,7 +333,14 @@ export interface OpsConcurrencyStatsResponse {
   timestamp?: string
 }
 
+export interface UserConcurrencyGroupInfo {
+  group_id: number
+  group_name: string
+  current_in_use: number
+}
+
 export interface UserConcurrencyInfo {
+  active_groups?: UserConcurrencyGroupInfo[]
   user_id: number
   user_email: string
   username: string

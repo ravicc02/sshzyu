@@ -17,7 +17,7 @@
               <span class="relative flex h-2 w-2 shrink-0">
                 <span
                   class="relative inline-flex h-2 w-2 rounded-full"
-                  :class="loading || refreshing ? 'bg-gray-400' : 'bg-green-500'"
+                  :class="loading || refreshing ? 'bg-gray-400' : aggregationStale ? 'bg-amber-500' : 'bg-green-500'"
                 ></span>
               </span>
               <span v-if="refreshing" class="inline-flex items-center gap-1 text-primary-600 dark:text-primary-300">
@@ -26,8 +26,10 @@
               </span>
               <span v-else-if="snapshot?.coverage.data_through">
                 {{ t('channelMonitorV2.updatedTo', { time: formatTime(snapshot.coverage.data_through) }) }}
+                <span class="ml-2" data-testid="monitor-latency-method">{{ t('channelMonitorV2.latencyAggregationHint', { seconds: snapshot.config.refresh_interval_seconds }) }}</span>
               </span>
               <span v-else class="text-gray-400">{{ t('common.loading') }}</span>
+              <span v-if="aggregationStale" class="badge badge-warning" role="status" data-testid="monitor-stale">{{ t('channelMonitorV2.aggregationStale') }}</span>
               <span
                 v-if="snapshot && !snapshot.coverage.coverage_complete && !bootstrapActive"
                 class="badge badge-warning"
@@ -208,7 +210,7 @@
         />
         <MetricCell
           :label="t('channelMonitorV2.metrics.ttftP50')"
-          :value="formatMs(snapshot.metrics.ttft.p50_ms)"
+          :value="`${snapshot.metrics.ttft.percentile_method && snapshot.metrics.ttft.p50_ms != null ? '≈' : ''}${formatMs(snapshot.metrics.ttft.p50_ms)}`"
           :detail="latencyKpiSecondary(snapshot.metrics.ttft)"
           :title="latencyDetail(snapshot.metrics.ttft)"
           :state="snapshot.health.ttft"
@@ -489,6 +491,7 @@ import type {
   MonitorUserRow,
 } from '@/api/channelMonitorV2'
 import {
+  monitorDataIsStale,
   formatLatencyKpiSecondary,
   formatLatencyPrivacy,
   formatMonitorMs,
@@ -501,6 +504,8 @@ import {
 } from '@/features/channel-monitor-v2/monitorFormat'
 
 type Tab = 'models' | 'errors' | 'users'
+const aggregationStale = computed(() => snapshot.value != null && monitorDataIsStale(snapshot.value.coverage.computed_at, snapshot.value.config.refresh_interval_seconds))
+
 type HealthMode = 'overall' | 'success' | 'ttft' | 'cache'
 type TrendView = 'pulse' | 'line'
 
