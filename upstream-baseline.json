@@ -3,10 +3,10 @@
   "upstream_release": "v0.2.16",
   "upstream_commit": "01842576b3d5c1e2545b5a99ad555d36e28ed306",
   "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.16",
-  "local_build_version": "0.2.16-r1",
+  "local_build_version": "0.2.16-r2",
   "integration_commit": "3e4a07db285aa456750f83e4ca74209399af7e77",
   "integrated_at": "2026-10-13",
-  "verified_at": "2026-10-14",
+  "verified_at": "2026-10-16",
   "note": "Three-way local integration of official v0.2.16 over v0.2.15, preserving sshzy lottery attention indicator, batch image flows, custom model multiplier and display snapshots, composite routing, bounded redemption and signed updater. Gemini explicit cache preflight quotes apply the same custom model multiplier as actual billing. Four additive official migrations retain original filenames alongside historical custom prefixes. Local tests, actual root Dockerfile source image build, isolated database migration/301-to-305 upgrade tests and temporary-container API/UI asset smoke validation passed on 2026-10-14 after Docker recovery. Integration commit recorded in this baseline; no push, publication or production deployment performed by the integration itself. Production migrations remain separately controlled.",
   "integration_status": "committed"
 }
