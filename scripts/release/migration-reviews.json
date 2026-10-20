@@ -53,5 +53,45 @@
     "checksum": "75434a7beeb8aad09b3339708ed520604d153e99c7fe680a376e8c958aadb1e8",
     "risk": "backward-compatible",
     "description": "Add optional explicit cache mutation lease fields and index; no existing data deletion. Official filename retained alongside local migrations with the same numeric prefix; ledger keys use complete filenames."
+  },
+  "250_agent_workspace.sql": {
+    "checksum": "f549d2792e346db22d31a9a2d74958c58e80d45735f0f78c322881423769788f",
+    "risk": "backward-compatible",
+    "description": "Create private Agent conversations, runs, messages, operations, assets, events and outbox; keep existing gateway bills unchanged."
+  },
+  "251_agent_conversation_management.sql": {
+    "checksum": "c61ee63eec07355da3891c0648682f439d394633467334f6f2161b7674578062",
+    "risk": "backward-compatible",
+    "description": "Add archive and soft-delete metadata to Agent conversations only."
+  },
+  "252_agent_file_attachments.sql": {
+    "checksum": "6cbbd614d8b1d0f7e88a69debe55806f654e5a55a3c0b71bc4473072ac59665c",
+    "risk": "backward-compatible",
+    "description": "Add private Agent attachment filename metadata and widen attachment support."
+  },
+  "253_agent_attachment_mime.sql": {
+    "checksum": "0453630d2cbf1efc320b9e9836d56d8fbe224e4b91b985fc964f06837b2333eb",
+    "risk": "backward-compatible",
+    "description": "Widen Agent attachment MIME metadata for supported document types."
+  },
+  "254_agent_security_storage.sql": {
+    "checksum": "07f737da7cf27281ed1f53fbfdbd4bf3ffb43d6d419a80f30e4d6a9dabfb44b8",
+    "risk": "backward-compatible",
+    "description": "Add Agent checkpoint quota accounting and bounded event subscriptions; retain original billing operations."
+  },
+  "255_agent_work_plans.sql": {
+    "checksum": "201d8d9df2eee5f1c23f67dfe38b39a7f216f70af753bc5016a750d574a66e5d",
+    "risk": "backward-compatible",
+    "description": "Add versioned Agent visual work plans, operation reservations and per-item results."
+  },
+  "256_agent_adaptive_runtime.sql": {
+    "checksum": "977912320cd50fad9ed5e82dc0a09c76939fea9382e224c2d169477c8d840efd",
+    "risk": "manual",
+    "description": "Add 24-hour content expiry, holds, immutable execution grants and project operation associations; review existing Agent content expiry before applying."
+  },
+  "257_agent_storage_maintenance_indexes.sql": {
+    "checksum": "7fe44be16fb48c31284c3face57fa45ce0dc346c9000742bf5a863585aa24f49",
+    "risk": "backward-compatible",
+    "description": "Add partial indexes for bounded Agent file expiry and stale stream-event maintenance; no content deletion in this migration."
   }
 }
