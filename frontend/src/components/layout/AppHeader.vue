@@ -14,6 +14,7 @@
         <div class="min-w-0">
           <h1 class="workspace-page-title truncate font-semibold text-gray-900 dark:text-white" :title="pageTitle">
             {{ pageTitle }}
+            <span v-if="route.name === 'Agent'" class="ml-2 inline-flex align-middle rounded px-1.5 py-0.5 text-[10px] font-medium leading-none tracking-wide text-blue-700 bg-blue-50 dark:text-blue-300 dark:bg-blue-400/10" title="测试中" aria-label="Beta，测试中">Beta</span>
           </h1>
           <p v-if="pageDescription" class="workspace-page-description hidden truncate text-gray-500 dark:text-dark-400 lg:block" :title="pageDescription">
             {{ pageDescription }}

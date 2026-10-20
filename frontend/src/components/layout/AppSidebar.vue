@@ -343,6 +343,8 @@ const BatchImageIcon = {
     )
 }
 
+const AgentIcon = { render: () => h(Icon, { name: 'chat' }) }
+
 const ModelPlazaIcon = { render: () => h(Icon, { name: 'cube' }) }
 
 const ImageStudioIcon = {
@@ -801,6 +803,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/model-plaza', query: { embedded: '1' }, label: t('nav.modelPlaza'), icon: ModelPlazaIcon, featureFlag: flagModelPlaza },
     // A canvas is useful before a user has an eligible key: they can organize
     // prompts and references, then create or enable a key when ready to run it.
+    { path: '/agent', label: 'Agent', icon: AgentIcon },
     { path: '/image-playground', label: t('nav.imagePlayground'), icon: ImagePlaygroundIcon, hideInSimpleMode: true },
     { path: '/image-studio', label: dockText.value.imageStudio, icon: ImageStudioIcon },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon },
@@ -965,7 +968,7 @@ const managementSections = computed(() => groupNavigation(adminNavItems.value, [
 
 const personalSections = computed(() => groupNavigation(isAdmin.value ? personalNavItems.value : userNavItems.value, [
   { id: 'overview', label: dockText.value.overview, paths: ['/dashboard'] },
-  { id: 'work', label: dockText.value.work, paths: ['/model-plaza', '/keys', '/usage', '/available-channels', '/monitor'] },
+  { id: 'work', label: dockText.value.work, paths: ['/model-plaza', '/agent', '/keys', '/usage', '/available-channels', '/monitor'] },
   { id: 'image', label: dockText.value.image, paths: ['/image-playground', '/image-studio', '/batch-image'] },
   { id: 'account', label: dockText.value.account, paths: ['/purchase', '/subscriptions', '/orders', '/redeem', '/lottery', '/affiliate', '/profile'] }
 ], 'personal'))

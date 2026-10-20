@@ -1,0 +1,29 @@
+<template>
+  <section class="reference-materials" :aria-label="title">
+    <header><div><h4>{{ title }} <span>{{ ids.length }} 张</span></h4><p v-if="hint">{{ hint }}</p></div><label v-if="!readonly" class="reference-upload" :class="{ disabled: disabled || !uploadEnabled }"><input type="file" multiple :accept="agentReferenceAccept" :aria-label="`上传${title}`" :disabled="disabled || !uploadEnabled" @change="selectFiles" /><Icon name="plus" size="xs" /><span>{{ uploading ? '上传中…' : '上传图片' }}</span></label></header>
+    <div v-if="ids.length" class="selected-references"><div v-for="id in ids" :key="id" class="selected-reference"><button v-if="!asset(id).url && !readonly" type="button" class="missing-reference-remove" :disabled="disabled" :aria-label="`移除素材 ${asset(id).filename || id}`" @click="emit('toggle', id)">×</button><AgentAttachmentCard :asset="asset(id)" compact :removable="!readonly" :disabled="disabled" @preview="emit('preview', id)" @remove="emit('toggle', id)" @image-error="emit('imageError', id)" @retry="emit('retry', id)" /></div></div>
+    <p v-else class="reference-empty">参考图可选，支持 PNG、JPG、WebP，单张不超过 10 MiB。</p>
+    <details v-if="!readonly && available.length" class="existing-references"><summary>选择已有图片 <span>{{ available.length }}</span></summary><div class="reference-options"><label v-for="item in available" :key="item.id" :title="item.filename"><input type="checkbox" :aria-label="`${title}：${item.filename || item.id}`" :checked="ids.includes(item.id)" :disabled="disabled || (!ids.includes(item.id) && !canSelect(item.id))" @change="toggle(item.id, $event)" /><img v-if="item.url" :src="item.url" :alt="item.filename || '素材'" loading="lazy" /><span v-else>{{ item.filename || item.id }}</span></label></div></details>
+  </section>
+</template>
+<script setup lang="ts">
+import { computed } from 'vue'
+import Icon from '@/components/icons/Icon.vue'
+import AgentAttachmentCard from './AgentAttachmentCard.vue'
+import { agentReferenceAccept, type AgentAttachmentView } from '@/utils/agentAttachments'
+const props = withDefaults(defineProps<{ ids: string[]; assets: AgentAttachmentView[]; title: string; hint?: string; disabled?: boolean; readonly?: boolean; uploading?: boolean; uploadEnabled?: boolean; canSelect?: (id: string) => boolean }>(), { canSelect: () => true })
+const emit = defineEmits<{ upload: [files: File[]]; toggle: [id: string]; preview: [id: string]; imageError: [id: string]; retry: [id: string] }>()
+const available = computed(() => props.assets.filter(item => item.mime_type?.startsWith('image/') && item.content_available !== false && item.status !== 'expired'))
+function asset(id: string) { return props.assets.find(item => item.id === id) || { id } }
+function selectFiles(event: Event) { const input = event.target as HTMLInputElement, files = Array.from(input.files || []); input.value = ''; if (!props.disabled && files.length) emit('upload', files) }
+function toggle(id: string, event: Event) { if (props.disabled) return; const input = event.target as HTMLInputElement; if (input.checked && !props.canSelect(id)) { input.checked = false; return } emit('toggle', id) }
+</script>
+<style scoped>
+/* finesse · component: AgentReferenceMaterials · register=product · tokens: inherited */
+.reference-materials { min-width:0; }.reference-materials > header { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }.reference-materials h4 { font-size:12px; font-weight:550; }.reference-materials h4 span { font-size:10px; color:var(--workspace-muted); font-weight:400; margin-left:5px; }.reference-materials header p { color:var(--workspace-muted); font-size:10px; line-height:1.7; margin-top:4px; }
+.reference-upload { display:inline-flex; justify-content:center; align-items:center; gap:5px; min-width:96px; min-height:32px; padding:6px 8px; border-radius:7px; background:var(--workspace-soft); font-size:11px; cursor:pointer; white-space:nowrap; }.reference-upload input { position:absolute; width:1px; height:1px; opacity:0; overflow:hidden; }.reference-upload.disabled { opacity:.5; cursor:not-allowed; }.reference-upload:active:not(.disabled) { transform:translateY(1px); }.reference-upload:focus-within { outline:2px solid var(--workspace-accent); outline-offset:3px; }
+.selected-reference { position:relative; flex-shrink:0; }.missing-reference-remove { position:absolute; right:3px; top:3px; z-index:1; border-radius:50%; width:22px; height:22px; background:var(--workspace-soft); color:var(--workspace-ink); }.missing-reference-remove:disabled { opacity:.5; cursor:not-allowed; }
+.selected-references { display:flex; gap:8px; overflow-x:auto; padding:10px 2px 4px; }.selected-references :deep(.attachment-card) { flex-shrink:0; }.reference-empty { margin-top:9px; font-size:10px; line-height:1.7; color:var(--workspace-muted); }
+.existing-references { margin-top:10px; }.existing-references summary { cursor:pointer; color:var(--workspace-muted); font-size:11px; }.existing-references summary span { font-size:10px; margin-left:5px; }.reference-options { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; max-height:168px; overflow:auto; }.reference-options label { display:flex; align-items:center; gap:4px; max-width:180px; padding:4px; border:1px solid var(--workspace-divider); border-radius:7px; cursor:pointer; font-size:10px; }.reference-options input { width:13px; height:13px; accent-color:var(--workspace-accent); }.reference-options img { width:48px; height:42px; object-fit:cover; border-radius:4px; }.reference-options label:has(input:checked) { border-color:var(--workspace-accent); }.reference-options label:has(input:disabled) { opacity:.5; cursor:not-allowed; }
+:where(summary,input):focus-visible { outline:2px solid var(--workspace-accent); outline-offset:2px; }@media(hover:hover) { .reference-upload:hover:not(.disabled) { color:var(--workspace-accent); } }
+</style>

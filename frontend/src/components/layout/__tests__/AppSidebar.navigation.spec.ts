@@ -205,7 +205,7 @@ describe('AppSidebar Dock navigation', () => {
     await wrapper.get('button[aria-label="个人空间"]').trigger('click')
     expect(router.currentRoute.value.path).toBe('/admin/dashboard')
     expect(navigationPaths(wrapper)).toEqual([
-      '/keys', '/model-plaza?embedded=1', '/image-playground', '/image-studio', '/batch-image', '/usage', '/available-channels', '/monitor', '/subscriptions',
+      '/keys', '/model-plaza?embedded=1', '/agent', '/image-playground', '/image-studio', '/batch-image', '/usage', '/available-channels', '/monitor', '/subscriptions',
       '/purchase', '/orders', '/redeem', '/lottery', '/affiliate', '/profile', '/custom/user-help'
     ].sort())
     expect(wrapper.get('button[aria-label="个人空间"]').attributes('aria-pressed')).toBe('true')
@@ -251,6 +251,13 @@ describe('AppSidebar Dock navigation', () => {
     expect(navigationPaths(wrapper)).toContain('/batch-image')
   })
 
+  it('places the general Agent in the work section instead of the image section', async () => {
+    authStore.isAdmin = false
+    const wrapper = await renderSidebar('/agent')
+    expect(wrapper.get('section[aria-label="工作空间"]').find('a[href="/agent"]').exists()).toBe(true)
+    expect(wrapper.get('section[aria-label="生图"]').find('a[href="/agent"]').exists()).toBe(false)
+  })
+
   it('retains simple-mode admin keys and removes the hidden personal workspace', async () => {
     authStore.isSimpleMode = true
     const wrapper = await renderSidebar('/keys')
@@ -270,7 +277,7 @@ describe('AppSidebar Dock navigation', () => {
     const wrapper = await renderSidebar('/keys')
     // Simple mode keeps flag-free primary entries: image-studio (no flag by
     // design) and lottery (engagement entry, visible in both run modes).
-    expect(navigationPaths(wrapper)).toEqual(['/dashboard', '/keys', '/model-plaza?embedded=1', '/image-studio', '/batch-image', '/lottery', '/monitor', '/profile'].sort())
+    expect(navigationPaths(wrapper)).toEqual(['/dashboard', '/keys', '/model-plaza?embedded=1', '/agent', '/image-studio', '/batch-image', '/lottery', '/monitor', '/profile'].sort())
     appStore.backendModeEnabled = true
     await nextTick()
     expect(navigationPaths(wrapper)).toEqual([])

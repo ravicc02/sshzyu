@@ -216,6 +216,12 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/agent',
+    name: 'Agent',
+    component: () => import('@/views/user/AgentView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, title: 'Agent' }
+  },
+  {
     path: '/image-playground',
     name: 'ImagePlayground',
     component: () => import('@/views/user/ImagePlaygroundView.vue'),

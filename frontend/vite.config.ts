@@ -114,6 +114,9 @@ export default defineConfig(({ mode }) => {
          */
         manualChunks(id: string) {
           if (id.includes('node_modules')) {
+            // Agent motion is loaded with the Agent route, outside shared site vendors.
+            if (id.includes('/gsap/')) return 'vendor-agent-motion'
+
             // Vue 核心库
             if (
               id.includes('/vue/') ||
