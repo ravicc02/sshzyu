@@ -742,6 +742,16 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			zap.Float64("load_skew", scheduleDecision.LoadSkew),
 		)
 		account := selection.Account
+		if trace := service.AgentInvocationFromContext(c.Request.Context()); trace != nil {
+			if !trace.BindAccount(account.ID) {
+				if selection.ReleaseFunc != nil {
+					selection.ReleaseFunc()
+					selection.ReleaseFunc = nil
+				}
+				h.errorResponse(c, http.StatusConflict, "api_error", "Agent continuation account is unavailable")
+				return
+			}
+		}
 		if previousResponseID != "" && requestPlatform == service.PlatformOpenAI && !account.IsOpenAIApiKey() {
 			// The public Responses HTTP API supports previous_response_id on API-key
 			// accounts. OAuth/SetupToken upstreams do not, so keep searching instead
@@ -799,6 +809,13 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					accountReleaseFunc()
 				}
 			}()
+			if err := h.gatewayService.CheckAgentSelectedAccountPrice(c.Request.Context(), apiKey, account, reqModel, forwardModel, "text", len(attemptBody)); err != nil {
+				h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+				return nil, err
+			}
+			if trace := service.AgentInvocationFromContext(c.Request.Context()); trace != nil {
+				trace.MarkDispatched()
+			}
 			return h.gatewayService.Forward(c.Request.Context(), c, account, attemptBody)
 		}()
 		var cyberBlockBodyHTTP []byte
@@ -861,6 +878,13 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					).Error("openai.record_usage_failed", zap.Error(err))
 				}
 			})
+		}
+		if err != nil && service.AgentInvocationFromContext(c.Request.Context()) != nil {
+			if result != nil {
+				submitResponsesUsage(result)
+			}
+			h.ensureForwardErrorResponse(c, streamStarted)
+			return
 		}
 		if err != nil {
 			if result != nil && result.ClientDisconnect {
@@ -3474,6 +3498,10 @@ func (h *OpenAIGatewayHandler) submitUsageRecordTask(parent context.Context, tas
 }
 
 func (h *OpenAIGatewayHandler) submitOpenAIUsageRecordTask(parent context.Context, result *service.OpenAIForwardResult, task service.UsageRecordTask) {
+	if service.AgentInvocationFromContext(parent) != nil {
+		h.executeAgentUsage(parent, task)
+		return
+	}
 	// Money-critical bills never drop on pool overflow: media, search surcharge, voice.
 	if result != nil && (result.ImageCount > 0 || result.VideoCount > 0 ||
 		result.SearchCount > 0 || result.WebSearchCalls > 0 || result.AudioUsage != nil) {
@@ -3484,6 +3512,10 @@ func (h *OpenAIGatewayHandler) submitOpenAIUsageRecordTask(parent context.Contex
 }
 
 func (h *OpenAIGatewayHandler) submitMandatoryUsageRecordTask(parent context.Context, task service.UsageRecordTask) {
+	if service.AgentInvocationFromContext(parent) != nil {
+		h.executeAgentUsage(parent, task)
+		return
+	}
 	if task == nil {
 		return
 	}
@@ -4516,4 +4548,18 @@ func summarizeWSCloseErrorForLog(err error) (string, string) {
 		}
 	}
 	return closeStatus, closeReason
+}
+
+// Agent calls await the existing bill synchronously. A failed bill leaves the
+// operation in reconciliation; it must never cause another paid generation.
+func (h *OpenAIGatewayHandler) executeAgentUsage(parent context.Context, task service.UsageRecordTask) {
+	executeAgentUsage(parent, task)
+}
+func executeAgentUsage(parent context.Context, task service.UsageRecordTask) {
+	if task == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), 30*time.Second)
+	defer cancel()
+	task(ctx)
 }

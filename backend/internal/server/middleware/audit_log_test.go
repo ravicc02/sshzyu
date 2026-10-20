@@ -188,3 +188,38 @@ func TestOllamaCloudUsageSessionRouteOmitsAuditBody(t *testing.T) {
 	require.Equal(t, "<credential-bearing body omitted>", logs[0].RequestBody)
 	require.NotContains(t, logs[0].RequestBody, "audit-canary")
 }
+
+func TestAgentPrivateBodiesNeverReachAuditAndRemainReadable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repository := &auditCaptureRepository{}
+	auditService := service.NewAuditLogService(repository, nil)
+	auditService.Start()
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set(string(ContextKeyUser), AuthSubject{UserID: 77}); c.Next() })
+	router.Use(gin.HandlerFunc(NewAuditLogMiddleware(auditService)))
+	for _, path := range []string{"/api/v1/agent/conversations/:id/messages", "/api/v1/agent/runs/:id/answer", "/api/v1/agent/conversations/:id/assets"} {
+		router.POST(path, func(c *gin.Context) {
+			var body map[string]any
+			require.NoError(t, c.ShouldBindJSON(&body))
+			require.NotEmpty(t, body)
+			c.Status(201)
+		})
+	}
+	for _, path := range []string{"/api/v1/agent/conversations/c/messages", "/api/v1/agent/runs/r/answer", "/api/v1/agent/conversations/c/assets"} {
+		req := httptest.NewRequest("POST", path, bytes.NewBufferString(`{"content":"private-canary","answers":{"subject":"private-answer"}}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		require.Equal(t, 201, rec.Code)
+	}
+	auditService.Stop()
+	repository.mu.Lock()
+	defer repository.mu.Unlock()
+	require.Len(t, repository.logs, 3)
+	for _, entry := range repository.logs {
+		require.Equal(t, "<private agent body omitted>", entry.RequestBody)
+		require.NotEmpty(t, entry.Action)
+		require.NotContains(t, entry.RequestBody, "private-canary")
+		require.NotContains(t, entry.RequestBody, "private-answer")
+	}
+}

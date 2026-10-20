@@ -638,3 +638,18 @@ func TestClaude55BridgeUsesMappedModelBeforeThinkingConversion(t *testing.T) {
 		}
 	}
 }
+
+func TestAgentAnthropicTruncatedStreamPreservesUsageWithoutCompletedResult(t *testing.T) {
+	svc := &GatewayService{cfg: &config.Config{}}
+	body := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_test\",\"model\":\"claude-test\",\"role\":\"assistant\",\"content\":[],\"usage\":{\"input_tokens\":12,\"output_tokens\":0}}}\n\n"
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	ctx := WithAgentInvocation(context.Background(), &AgentInvocationTrace{})
+	c.Request = httptest.NewRequest("POST", "/v1/responses", nil).WithContext(ctx)
+	response := &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}
+	result, err := svc.handleResponsesStreamingResponse(response, c, "claude-test", "claude-test", nil, time.Now(), apicompat.ResponsesClientToolMapping{})
+	require.Error(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 12, result.Usage.InputTokens)
+	require.NotContains(t, rec.Body.String(), `"type":"response.completed"`)
+}

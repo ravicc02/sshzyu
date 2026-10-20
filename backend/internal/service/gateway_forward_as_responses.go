@@ -89,6 +89,7 @@ func (s *GatewayService) ForwardAsResponses(
 		return nil, fmt.Errorf("convert responses to anthropic: %w", err)
 	}
 
+	boundAgentThinkingTokens(ctx, anthropicReq)
 	// 3. Force upstream streaming (Anthropic works best with streaming)
 	anthropicReq.Stream = true
 	reqStream := true
@@ -545,6 +546,7 @@ func (s *GatewayService) handleResponsesStreamingResponse(
 	var usage ClaudeUsage
 	var firstTokenMs *int
 	firstChunk := true
+	receivedStop := false
 
 	scanner := bufio.NewScanner(resp.Body)
 	maxLineSize := defaultMaxLineSize
@@ -669,7 +671,13 @@ func (s *GatewayService) handleResponsesStreamingResponse(
 			continue
 		}
 
+		if event.Type == "message_stop" {
+			receivedStop = true
+		}
 		if processEvent(&event) {
+			if AgentInvocationFromContext(c.Request.Context()) != nil {
+				return resultWithUsage(), context.Canceled
+			}
 			return resultWithUsage(), nil
 		}
 	}
@@ -683,6 +691,9 @@ func (s *GatewayService) handleResponsesStreamingResponse(
 		}
 	}
 
+	if AgentInvocationFromContext(c.Request.Context()) != nil && (!receivedStop || scanner.Err() != nil) {
+		return resultWithUsage(), errors.New("AGENT_UPSTREAM_STREAM_INCOMPLETE")
+	}
 	return finalizeStream()
 }
 

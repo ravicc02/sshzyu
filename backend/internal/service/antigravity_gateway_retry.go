@@ -508,6 +508,23 @@ func (s *AntigravityGatewayService) antigravityRetryLoop(p antigravityRetryLoopP
 	if baseURL == "" {
 		return nil, errors.New("no antigravity forward base url configured")
 	}
+	if AgentInvocationFromContext(p.ctx) != nil {
+		req, err := antigravity.NewAPIRequestWithURL(p.ctx, baseURL, p.action, p.accessToken, p.body)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := p.httpUpstream.Do(req, p.proxyURL, p.account.ID, p.account.Concurrency)
+		if err != nil {
+			if resp != nil && resp.Body != nil {
+				resp.Body.Close()
+			}
+			return nil, err
+		}
+		if resp == nil {
+			return nil, errors.New("upstream returned nil response")
+		}
+		return &antigravityRetryLoopResult{resp: resp}, nil
+	}
 	availableURLs := []string{baseURL}
 
 	var resp *http.Response

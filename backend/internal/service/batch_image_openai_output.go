@@ -187,6 +187,9 @@ func classifyOpenAIBatchDownloadError(err error) error {
 }
 
 func (p *OpenAIBatchImageProvider) downloadOpenAIBatchImage(ctx context.Context, raw string) ([]byte, string, error) {
+	return p.downloadOpenAIImageWithLimit(ctx, raw, openAIBatchMaxImageBytes)
+}
+func (p *OpenAIBatchImageProvider) downloadOpenAIImageWithLimit(ctx context.Context, raw string, maxBytes int64) ([]byte, string, error) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
 		return nil, "", openAIBatchDownloadFailure("URL_DENIED", "image URL is not allowed")
@@ -234,11 +237,11 @@ func (p *OpenAIBatchImageProvider) downloadOpenAIBatchImage(ctx context.Context,
 			_ = resp.Body.Close()
 			return nil, "", openAIBatchDownloadFailure("HTTP_FAILED", fmt.Sprintf("image retrieval returned HTTP %d", resp.StatusCode))
 		}
-		if resp.ContentLength > openAIBatchMaxImageBytes {
+		if resp.ContentLength > maxBytes {
 			_ = resp.Body.Close()
 			return nil, "", openAIBatchDownloadFailure("TOO_LARGE", "image exceeds size limit")
 		}
-		data, readErr := io.ReadAll(io.LimitReader(resp.Body, openAIBatchMaxImageBytes+1))
+		data, readErr := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
 		_ = resp.Body.Close()
 		if readErr != nil {
 			if ctx.Err() != nil {
@@ -246,7 +249,7 @@ func (p *OpenAIBatchImageProvider) downloadOpenAIBatchImage(ctx context.Context,
 			}
 			return nil, "", openAIBatchDownloadFailure("READ_FAILED", "image response body could not be read")
 		}
-		if len(data) > openAIBatchMaxImageBytes {
+		if int64(len(data)) > maxBytes {
 			return nil, "", openAIBatchDownloadFailure("TOO_LARGE", "image exceeds size limit")
 		}
 		return data, resp.Header.Get("Content-Type"), nil

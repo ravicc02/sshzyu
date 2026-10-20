@@ -72,6 +72,37 @@ func RegisterUserRoutes(
 			}
 		}
 
+		// Platform-owned Agent routes use JWT; key secrets never reach the client.
+		if h.Agent != nil {
+			a := authenticated.Group("/agent")
+			a.GET("/info", h.Agent.Info)
+			a.GET("/usage", panelRateLimiter.Heavy(), h.Agent.Usage)
+			a.GET("/key-options", h.Agent.Options)
+			a.GET("/capabilities", h.Agent.Capabilities)
+			a.GET("/conversations", h.Agent.List)
+			a.POST("/conversations", h.Agent.Create)
+			a.POST("/conversations/manage", h.Agent.ManageConversations)
+			a.GET("/conversations/:conversation_id", h.Agent.Detail)
+			a.PATCH("/conversations/:conversation_id/config", h.Agent.Configure)
+			a.POST("/conversations/:conversation_id/messages", h.Agent.Submit)
+			a.POST("/conversations/:conversation_id/assets", h.Agent.Upload)
+			a.GET("/runs/:run_id", h.Agent.GetRun)
+			a.GET("/runs/:run_id/events", h.Agent.Events)
+			a.POST("/runs/:run_id/cancel", h.Agent.Cancel)
+			a.POST("/runs/:run_id/retry", h.Agent.Retry)
+			a.POST("/runs/:run_id/recover-image", h.Agent.RecoverImage)
+			a.POST("/runs/:run_id/answer", h.Agent.Answer)
+			a.PUT("/work-plans/:plan_id/draft", h.Agent.SaveDraft)
+			a.POST("/work-plans/:plan_id/grants", h.Agent.CreateGrant)
+			a.DELETE("/grants/:grant_id", h.Agent.RevokeGrant)
+			a.POST("/work-plans/:plan_id/review", h.Agent.ReviewWork)
+			a.POST("/work-plans/:plan_id/submit", h.Agent.SubmitWork)
+			a.GET("/assets/:asset_id", h.Agent.Asset)
+			a.GET("/assets/:asset_id/meta", h.Agent.AssetMeta)
+			a.GET("/assets/:asset_id/thumbnail", h.Agent.Thumbnail)
+			a.DELETE("/assets/:asset_id", h.Agent.DeleteAsset)
+		}
+
 		// API Key管理
 		keys := authenticated.Group("/keys")
 		{

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/agent"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -226,6 +227,13 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			}
 		}
 		account := selection.Account
+		if trace := service.AgentInvocationFromContext(c.Request.Context()); trace != nil && !trace.BindAccount(account.ID) {
+			if selection.ReleaseFunc != nil {
+				selection.ReleaseFunc()
+			}
+			c.AbortWithStatusJSON(http.StatusConflict, gin.H{"code": "AGENT_CONTINUATION_ACCOUNT_UNAVAILABLE"})
+			return
+		}
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 
 		// 4. Acquire account concurrency slot
@@ -288,6 +296,16 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		if channelMapping.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
+		if err := h.gatewayService.CheckAgentSelectedAccountPrice(c.Request.Context(), apiKey, account, reqModel, gjson.GetBytes(forwardBody, "model").String(), "text", len(forwardBody)); err != nil {
+			if accountReleaseFunc != nil {
+				accountReleaseFunc()
+			}
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"code": agent.SafeCode(err)})
+			return
+		}
+		if trace := service.AgentInvocationFromContext(c.Request.Context()); trace != nil {
+			trace.MarkDispatched()
+		}
 		var result *service.ForwardResult
 		setActualUpstreamEndpoint(c, "")
 		if account.Platform == service.PlatformGemini {
@@ -317,7 +335,13 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			accountReleaseFunc()
 		}
 
-		if err != nil {
+		if err != nil && service.AgentInvocationFromContext(c.Request.Context()) != nil {
+			if result == nil || result.Usage.InputTokens+result.Usage.OutputTokens+result.Usage.CacheReadInputTokens+result.Usage.CacheCreationInputTokens == 0 {
+				h.ensureForwardErrorResponse(c, streamStarted)
+				return
+			}
+		}
+		if err != nil && service.AgentInvocationFromContext(c.Request.Context()) == nil {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
 				if c.Writer.Size() != writerSizeBeforeForward {

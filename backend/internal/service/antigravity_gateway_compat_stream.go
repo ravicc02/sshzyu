@@ -115,6 +115,7 @@ type antigravityCompatStreamSession struct {
 	firstTokenMs                *int
 	startTime                   time.Time
 	meaningfulData              bool
+	upstreamStopped             bool
 	preContentKeepaliveSent     bool
 	preContentKeepaliveInterval time.Duration
 }
@@ -213,6 +214,9 @@ func (s *antigravityCompatStreamSession) consumeClaudeData(eventType, payload st
 	}
 	if event.Type == "" {
 		event.Type = eventType
+	}
+	if event.Type == "message_stop" {
+		s.upstreamStopped = true
 	}
 	if event.Usage != nil {
 		mergeAnthropicUsage(s.usage, *event.Usage)
@@ -346,6 +350,9 @@ func (s *AntigravityGatewayService) handleAntigravityCompatStreamWithKeepaliveIn
 			if !open {
 				if !session.hasMeaningfulData() && !writer.Disconnected() {
 					return handleAntigravityCompatEmptyStream(c, session)
+				}
+				if AgentInvocationFromContext(c.Request.Context()) != nil && !session.upstreamStopped {
+					return session.collectResult(false), errors.New("AGENT_UPSTREAM_STREAM_INCOMPLETE")
 				}
 				return session.finish()
 			}
@@ -494,6 +501,9 @@ func (s *AntigravityGatewayService) handleAntigravityCompatReadError(
 		return session.result(false), err
 	}
 	writeAntigravityCompatStreamError(c, session.adapter, session.writer, "stream_read_error")
+	if AgentInvocationFromContext(c.Request.Context()) != nil {
+		return session.collectResult(false), fmt.Errorf("stream read error: %w", err)
+	}
 	return nil, fmt.Errorf("stream read error: %w", err)
 }
 

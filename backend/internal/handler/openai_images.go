@@ -260,6 +260,14 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 					accountReleaseFunc()
 				}
 			}()
+			if err := h.gatewayService.CheckAgentSelectedAccountPrice(requestCtx, apiKey, account, requestModel, channelMapping.MappedModel, "image", len(body)); err != nil {
+				h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+				return nil, err
+			}
+			if trace := service.AgentInvocationFromContext(c.Request.Context()); trace != nil {
+				trace.BindAccount(account.ID)
+				trace.MarkDispatched()
+			}
 			return h.gatewayService.ForwardImages(requestCtx, c, account, body, parsed, channelMapping.MappedModel)
 		}()
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
@@ -273,6 +281,12 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 			service.SetOpsLatencyMs(c, service.OpsTimeToFirstTokenMsKey, int64(*result.FirstTokenMs))
 		}
 		if err != nil {
+			if service.AgentInvocationFromContext(c.Request.Context()) != nil && (result == nil || result.ImageCount <= 0) {
+				// A paid POST may have executed even on 5xx or timeout.
+				// The durable Agent layer reconciles; never fail over blindly.
+				h.ensureForwardErrorResponse(c, streamStarted)
+				return
+			}
 			if result != nil && result.ImageCount > 0 {
 				reqLog.Warn("openai.images.forward_partial_error_with_image_result",
 					zap.Int64("account_id", account.ID),

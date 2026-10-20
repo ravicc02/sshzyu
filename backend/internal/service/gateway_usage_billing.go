@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/Wei-Shaw/sub2api/pkg/billingid"
 	"log/slog"
 	"strings"
 	"time"
@@ -215,6 +216,9 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 }
 
 func resolveUsageBillingRequestID(ctx context.Context, upstreamRequestID string) string {
+	if trace := AgentInvocationFromContext(ctx); trace != nil {
+		return billingid.AgentOperation(trace.OperationID)
+	}
 	// Forced durable money-event IDs must win over client/local context IDs so
 	// standalone web_search / async video cannot collapse under a reused client id.
 	if requestID := strings.TrimSpace(upstreamRequestID); requestID != "" {
@@ -918,7 +922,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		return billingErr
 	}
 	writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.gateway")
-
+	RecordAgentCharge(ctx, cost.ActualCost)
 	return nil
 }
 
