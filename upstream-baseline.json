@@ -1,12 +1,12 @@
 {
   "upstream_repository": "Wei-Shaw/sub2api",
-  "upstream_release": "v0.2.16",
-  "upstream_commit": "01842576b3d5c1e2545b5a99ad555d36e28ed306",
-  "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.16",
-  "local_build_version": "0.2.16-r2",
-  "integration_commit": "3e4a07db285aa456750f83e4ca74209399af7e77",
-  "integrated_at": "2026-10-13",
-  "verified_at": "2026-10-16",
-  "note": "Three-way local integration of official v0.2.16 over v0.2.15, preserving sshzy lottery attention indicator, batch image flows, custom model multiplier and display snapshots, composite routing, bounded redemption and signed updater. Gemini explicit cache preflight quotes apply the same custom model multiplier as actual billing. Four additive official migrations retain original filenames alongside historical custom prefixes. Local tests, actual root Dockerfile source image build, isolated database migration/301-to-305 upgrade tests and temporary-container API/UI asset smoke validation passed on 2026-10-14 after Docker recovery. Integration commit recorded in this baseline; no push, publication or production deployment performed by the integration itself. Production migrations remain separately controlled.",
+  "upstream_release": "v0.2.17",
+  "upstream_commit": "060d0160417782cd962a0c7f460f6cd4565d4916",
+  "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.17",
+  "local_build_version": "0.2.17-r1",
+  "integration_commit": "2592bc1ad5d6d1421e2318b09439809ed6408cea",
+  "integrated_at": "2026-10-20",
+  "verified_at": "2026-10-20",
+  "note": "Three-way local integration of official v0.2.17 over v0.2.16, preserving sshzy brand UI, custom model multipliers and billing, composite routing, batch images, Agent private workspaces and controlled tools, and signed updater. Official Gemini reasoning/model metadata, GPT-5.5 subscription retirement and payment/refund fixes are included. All 305 previously signed migrations remain unchanged; eight reviewed Agent migrations are new and 256 retains manual risk. Local validation passed 3314 frontend tests, Linux frontend typecheck/build, 196 reachable asset checks, corrected lifecycle/stream/backup tests, and five isolated PostgreSQL migration checks including the exact 301-file historical baseline upgraded to 313 files. Full Linux CI gates signed publication. No production activation or production database migration is performed by this integration.",
   "integration_status": "committed"
 }
