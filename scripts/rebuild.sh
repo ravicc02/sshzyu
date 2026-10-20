@@ -21,19 +21,7 @@ echo "== 3/4 生成 fw-cachebust.js + 修正 index.html =="
 node "$ROOT/scripts/build-online-equivalent.mjs"
 
 echo "== 4/4 装配到 ui/ =="
-mkdir -p "$ROOT/ui/current/assets" "$ROOT/ui/shared/assets"
-cp "$DIST/index.html" "$DIST/logo.svg" "$ROOT/ui/current/"
-cp "$DIST/assets/"* "$ROOT/ui/current/assets/"
-# fw-cachebust.js 使用固定文件名，但 Nginx 从 shared/assets 提供它；必须每次覆盖，
-# 否则入口仍会加载上一版 immutable chunk，导致新页面逻辑或 i18n 未生效。
-cp "$DIST/assets/fw-cachebust.js" "$ROOT/ui/shared/assets/fw-cachebust.js"
-# shared 累积所有版本（保持与线上部署的版本命名习惯一致）
-for f in "$DIST/assets/"*; do
-  name="$(basename "$f")"
-  if [ ! -f "$ROOT/ui/shared/assets/$name" ]; then
-    cp "$f" "$ROOT/ui/shared/assets/"
-  fi
-done
+node "$ROOT/scripts/assemble-ui.mjs"
 
 echo "== 校验 =="
 node "$ROOT/scripts/check-chunks.mjs"
