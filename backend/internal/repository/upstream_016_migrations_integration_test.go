@@ -16,6 +16,7 @@ import (
 	"time"
 
 	dbmigrations "github.com/Wei-Shaw/sub2api/migrations"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 )
 
@@ -60,10 +61,19 @@ func TestMigrationsUpgradeOfficial016From015PreservesCustomData(t *testing.T) {
 	uri.Path = "/" + name
 	db, err = openSQLWithRetry(ctx, uri.String(), 10*time.Second)
 	require.NoError(t, err)
-	added := map[string]bool{"242_group_i18n.sql": true, "243_gemini_cached_contents.sql": true, "244_gemini_cached_contents_channel_usage.sql": true, "245_gemini_cached_contents_mutation_lease.sql": true}
+	// Keep the exact published 0.2.15-r2 baseline, excluding all later additions.
+	added := map[string]bool{
+		"242_group_i18n.sql": true, "243_gemini_cached_contents.sql": true,
+		"244_gemini_cached_contents_channel_usage.sql": true, "245_gemini_cached_contents_mutation_lease.sql": true,
+		"250_agent_workspace.sql": true, "251_agent_conversation_management.sql": true,
+		"252_agent_file_attachments.sql": true, "253_agent_attachment_mime.sql": true,
+		"254_agent_security_storage.sql": true, "255_agent_work_plans.sql": true,
+		"256_agent_adaptive_runtime.sql": true, "257_agent_storage_maintenance_indexes.sql": true,
+	}
 	files, err := fs.Glob(dbmigrations.FS, "*.sql")
 	require.NoError(t, err)
 	baseline := fstest.MapFS{}
+	var baselineNames []string
 	for _, file := range files {
 		if added[file] {
 			continue
@@ -71,6 +81,7 @@ func TestMigrationsUpgradeOfficial016From015PreservesCustomData(t *testing.T) {
 		body, err := dbmigrations.FS.ReadFile(file)
 		require.NoError(t, err)
 		baseline[file] = &fstest.MapFile{Data: body}
+		baselineNames = append(baselineNames, file)
 	}
 	require.Len(t, baseline, 301, "published r2 migrations must all be retained")
 	require.NoError(t, applyMigrationsFS(ctx, db, baseline))
@@ -84,9 +95,9 @@ func TestMigrationsUpgradeOfficial016From015PreservesCustomData(t *testing.T) {
 	require.NoError(t, applyMigrationsFS(ctx, db, dbmigrations.FS), "upgrade is idempotent")
 	var count int
 	require.NoError(t, db.QueryRowContext(ctx, `SELECT count(*) FROM schema_migrations`).Scan(&count))
-	require.Equal(t, 305, count)
+	require.Equal(t, len(files), count, "every current migration must be applied")
 	var sameLedger string
-	require.NoError(t, db.QueryRowContext(ctx, `SELECT md5(string_agg(filename||':'||checksum,'|' ORDER BY filename)) FROM schema_migrations WHERE filename NOT IN ('242_group_i18n.sql','243_gemini_cached_contents.sql','244_gemini_cached_contents_channel_usage.sql','245_gemini_cached_contents_mutation_lease.sql')`).Scan(&sameLedger))
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT md5(string_agg(filename||':'||checksum,'|' ORDER BY filename)) FROM schema_migrations WHERE filename = ANY($1)`, pq.Array(baselineNames)).Scan(&sameLedger))
 	require.Equal(t, oldLedger, sameLedger, "all prior ledger entries remain unchanged")
 	var description string
 	var rate float64

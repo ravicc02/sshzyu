@@ -11,6 +11,7 @@
     {"name": "model-policy", "paths": ["backend/internal/service", "frontend/src/views/admin"], "preserve": "Custom model catalog and quota policy"},
     {"name": "lottery", "paths": ["backend/internal/service/lottery_service.go", "frontend/src/views/admin/LotteryManageView.vue"], "preserve": "Lottery operations and rewards"},
     {"name": "batch-image", "paths": ["backend/internal/service/batch_image_public.go", "frontend/src/components/batch-image", "frontend/src/views/user/BatchImageGuideView.vue"], "preserve": "OpenAI/Gemini configuration, collections and ZIP downloads"},
+    {"name": "agent", "paths": ["backend/internal/agent", "backend/internal/handler/agent_handler.go", "backend/internal/handler/agent_platform.go", "backend/internal/service/agent_invocation.go", "frontend/src/components/agent", "frontend/src/views/user/AgentView.vue"], "preserve": "Private per-user workspaces, approved visual workflows, native provider tools, durable billing and bounded 24-hour storage"},
     {"name": "custom-update", "paths": ["backend/pkg/release", "tools/sshzy-updater", "frontend/src/components/common/CustomUpdateBadge.vue"], "preserve": "Signed custom source, manual activation and recovery"}
   ]
 }
