@@ -1,0 +1,8 @@
+# Local Agent backend with the existing nginx/static frontend.
+# Start: docker compose -f docker-compose.yml -f deploy/docker-compose.agent-local.yml up -d --no-build sub2api
+services:
+  sub2api:
+    image: local/sshzyu:agent-v1-dev
+    environment:
+      AGENT_ENABLED: "true"
+      AGENT_STORAGE_DIR: /app/data/agent

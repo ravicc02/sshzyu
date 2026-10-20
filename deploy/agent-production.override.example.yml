@@ -1,0 +1,14 @@
+# Example only. Merge after reviewing the complete production stack and migrations.
+# Existing gateway traffic shares this process; validate the memory limit before activation.
+services:
+  sub2api:
+    mem_limit: 2g
+    mem_reservation: 512m
+    stop_grace_period: 90s
+    environment:
+      AGENT_ENABLED: "false"
+      AGENT_STORAGE_DIR: /app/data/agent
+      AGENT_STORAGE_MAX_BYTES: "6442450944"
+      AGENT_MIN_FREE_DISK_BYTES: "8589934592"
+      GOMEMLIMIT: 1400MiB
+      GOMAXPROCS: "2"
