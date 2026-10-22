@@ -93,5 +93,10 @@
     "checksum": "7fe44be16fb48c31284c3face57fa45ce0dc346c9000742bf5a863585aa24f49",
     "risk": "backward-compatible",
     "description": "Add partial indexes for bounded Agent file expiry and stale stream-event maintenance; no content deletion in this migration."
+  },
+  "258_upstream_balance_monitor.sql": {
+    "checksum": "20e6b40d13efc1f077016a14ce6ac0f3f96564288c179fa3e24946bcf4aa685d",
+    "risk": "backward-compatible",
+    "description": "Add four admin-only upstream account balance monitoring, event, delivery and encrypted Feishu configuration tables plus indexes. No existing rows are changed or deleted; account bindings reuse existing accounts. Default alert threshold is 5 in application validation. Production configuration and activation remain manual."
   }
 }
