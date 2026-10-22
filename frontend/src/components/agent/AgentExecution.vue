@@ -28,7 +28,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 import AgentTrace from './AgentTrace.vue'
 import { useAgentMotion } from '@/composables/useAgentMotion'
-import { renderAgentMarkdown } from '@/utils/agentPresentation'
+import { agentToolLabel, renderAgentMarkdown } from '@/utils/agentPresentation'
 import type { AgentMessage, AgentTraceStep } from '@/api/agent'
 const props = defineProps<{ steps: AgentTraceStep[]; status?: string; answers?: AgentMessage[] }>()
 const motion = useAgentMotion()
@@ -54,7 +54,7 @@ const phases = computed(() => {
   }
   return result.filter(phase => phase.tools.length || phase.model?.summary?.trim() || (phase.model?.commentary && !finished.value) || (phase.model && active(phase.model)))
 })
-function toolLabel(step: AgentTraceStep) { return ({ ask_user: '询问用户', generate_image: '生成图片', save_work_plan: '保存草稿', update_draft: '更新草稿', present_review: '展示配置卡', inspect_assets: '查看素材', get_job: '查看任务', finish_task: '结束任务' } as Record<string, string>)[step.name] || step.name }
+function toolLabel(step: AgentTraceStep) { return agentToolLabel(step.name) }
 function toolNames(steps: AgentTraceStep[]) {
   const counts = new Map<string, number>()
   for (const step of steps) { const name = toolLabel(step); counts.set(name, (counts.get(name) || 0) + 1) }

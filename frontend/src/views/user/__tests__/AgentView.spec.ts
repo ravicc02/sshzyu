@@ -24,6 +24,38 @@ describe('Agent workspace', () => {
     vi.mocked(agentAPI.upload).mockImplementation(async (_id, file) => ({ id: file.name, filename: file.name, mime_type: file.type, byte_size: file.size, width: 1, height: 1 }))
     const w = make(); await flushPromises(); await w.get('.agent-conversation').trigger('click'); await flushPromises(); return w
   }
+  it('shows a direct single-image result without creating or approving a review card', async () => {
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:direct-image'), revokeObjectURL: vi.fn() })
+    const cfg = { ...config, image_api_key_id: 2, image_model: 'image-model' }
+    const visual = { ...conversation, config: cfg }
+    const queued = { ...run, config: cfg, asset_ids: [] as string[] }
+    let onEvent!: (event: import('@/api/agent').AgentEvent) => void
+    vi.mocked(agentAPI.list).mockResolvedValue([visual])
+    vi.mocked(agentAPI.detail).mockResolvedValue({ conversation: visual, messages: [], work_plans: [] })
+    vi.mocked(agentAPI.submit).mockResolvedValue(queued)
+    vi.mocked(agentAPI.assetMeta).mockResolvedValue({ id: 'direct-cat', filename: 'cat.png', mime_type: 'image/png', width: 3840, height: 2160, byte_size: 4 })
+    vi.mocked(agentAPI.asset).mockResolvedValue(new Blob(['image'], { type: 'image/png' }))
+    vi.mocked(watchAgentRun).mockImplementation((_id, _after, _signal, receive) => { onEvent = receive; return new Promise(() => undefined) })
+    const w = make(); await flushPromises(); await w.get('.agent-conversation').trigger('click'); await flushPromises()
+    await w.get('#agent-message').setValue('我想生成一只小猫图片 16:9 4k')
+    await w.get('.agent-composer').trigger('submit'); await flushPromises()
+    onEvent({ sequence: 1, type: 'asset.created', data: { id: 'direct-cat', filename: 'cat.png', mime_type: 'image/png' } }); await flushPromises()
+    const complete = { ...queued, status: 'completed', asset_ids: ['direct-cat'], text: '图片已生成。' }
+    vi.mocked(agentAPI.run).mockResolvedValue(complete)
+    vi.mocked(agentAPI.detail).mockResolvedValue({ conversation: visual, messages: [{ id: 'direct-result', role: 'assistant', text: complete.text, run_id: run.id, asset_ids: complete.asset_ids }], work_plans: [] })
+    onEvent({ sequence: 2, type: 'run.completed', data: complete }); await flushPromises()
+    expect(w.get('.from-assistant').text()).toContain('图片已生成')
+    expect(w.get('.agent-artifact-panel .image-preview').exists()).toBe(true)
+    expect(w.find('.work-plan-editor').exists()).toBe(false)
+    expect(w.find('.plan-open').exists()).toBe(false)
+    expect(agentAPI.submit).toHaveBeenCalledTimes(1)
+    expect(agentAPI.reviewWork).not.toHaveBeenCalled()
+    expect(agentAPI.submitWork).not.toHaveBeenCalled()
+    expect(agentAPI.createGrant).not.toHaveBeenCalled(); w.unmount()
+    vi.mocked(agentAPI.run).mockReset()
+    vi.mocked(agentAPI.assetMeta).mockReset()
+    vi.mocked(agentAPI.asset).mockReset()
+  })
   it('pastes clipboard images once, shows a thumbnail and preserves the message draft', async () => {
     const w = await fileWorkspace(), file = new File(['png'], 'screenshot.png', { type: 'image/png' })
     await w.get('#agent-message').setValue('请分析这张图')
@@ -313,7 +345,7 @@ describe('Agent workspace', () => {
   it('opens configuration only through settings, with conversational entry points', async () => { const w=make(); await flushPromises(); expect(w.find('[data-test=settings]').exists()).toBe(false); expect(w.text()).toContain('今天想一起做点什么'); expect(w.text()).toContain('一起想一想'); await w.get('.toolbar-actions button[aria-haspopup=dialog]').trigger('click'); expect(w.find('[data-test=settings]').exists()).toBe(true); w.unmount() })
   it('supports a text-only run and respects IME composition', async () => { const w=make(); await flushPromises(); await w.get('.agent-conversation').trigger('click'); await flushPromises(); await w.get('textarea').setValue('你好'); await w.get('textarea').trigger('keydown', { key:'Enter',isComposing:true }); expect(agentAPI.submit).not.toHaveBeenCalled(); await w.get('textarea').trigger('keydown', {key:'Enter'}); await flushPromises(); expect(agentAPI.submit).toHaveBeenCalledTimes(1); expect(vi.mocked(agentAPI.submit).mock.calls[0]?.slice(0,4)).toEqual(['conversation-1','你好',[],1]); expect(w.get('[data-status=queued]').text()).toContain('等待执行'); expect(w.get('[aria-label="停止生成"]').exists()).toBe(true); w.unmount() })
   it('keeps the same idempotency key after a transient submission failure', async () => { vi.mocked(agentAPI.submit).mockRejectedValueOnce(new Error('temporary network failure')); const w=make(); await flushPromises(); await w.get('.agent-conversation').trigger('click'); await flushPromises(); await w.get('textarea').setValue('一次请求'); await w.get('form.agent-composer').trigger('submit'); await flushPromises(); await w.get('form.agent-composer').trigger('submit'); await flushPromises(); const calls=vi.mocked(agentAPI.submit).mock.calls; expect(calls).toHaveLength(2); expect(calls[0]?.[5]).toBe(calls[1]?.[5]); w.unmount() })
-  it('does not offer replay or stop for a reconciling paid operation', async () => { vi.mocked(agentAPI.detail).mockResolvedValue({ conversation, messages:[{id:'m',role:'user',text:'test'}],active_run:{...run,status:'reconciling',error_code:'UPSTREAM_RESULT_UNKNOWN'} }); const w=make(); await flushPromises(); await w.get('.agent-conversation').trigger('click'); await flushPromises(); expect(w.text()).toContain('不会自动重发'); expect(w.find('[aria-label="停止生成"]').exists()).toBe(false); expect(w.get('textarea').attributes('disabled')).toBeDefined(); w.unmount() })
+  it('does not offer replay or stop for a reconciling paid operation', async () => { vi.mocked(agentAPI.detail).mockResolvedValue({ conversation, messages:[{id:'m',role:'user',text:'test'}],active_run:{...run,status:'reconciling',error_code:'UPSTREAM_RESULT_UNKNOWN'} }); const w=make(); await flushPromises(); await w.get('.agent-conversation').trigger('click'); await flushPromises(); expect(w.text()).toContain('已保存的响应'); expect(w.find('[aria-label="停止生成"]').exists()).toBe(false); expect(w.get('textarea').attributes('disabled')).toBeDefined(); w.unmount() })
   it('shows the reconciliation deadline and frees the composer when the timeout event arrives', async () => {
     let onEvent!: Parameters<typeof watchAgentRun>[3]
     vi.mocked(watchAgentRun).mockImplementation((_id, _after, signal, callback) => {
@@ -325,13 +357,13 @@ describe('Agent workspace', () => {
     await flushPromises()
     await w.get('.agent-conversation').trigger('click')
     await flushPromises()
-    expect(w.text()).toContain('核对截止')
+    expect(w.text()).toContain('恢复截止')
     expect(w.get('textarea').attributes('disabled')).toBeDefined()
     onEvent({ sequence: 2, type: 'run.failed', data: { ...run, status: 'failed', error_code: 'AGENT_RECONCILIATION_TIMEOUT' } })
     await flushPromises()
-    expect(w.get('[data-status=failed]').text()).toContain('结果核对超时')
-    expect(w.text()).toContain('执行名额已释放')
-    expect(w.text()).toContain('费用以最终账单为准')
+    expect(w.get('[data-status=failed]').text()).toContain('请求未完成')
+    expect(w.text()).toContain('本次调用已结束')
+    expect(w.text()).toContain('本次调用已结束')
     expect(w.get('textarea').attributes('disabled')).toBeUndefined()
     expect(agentAPI.submit).not.toHaveBeenCalled()
     await w.get('textarea').setValue('新的请求')
@@ -824,7 +856,7 @@ describe('Agent workspace', () => {
     if (event === 'visibilitychange') { const visible = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible'); document.dispatchEvent(new Event(event)); visible.mockRestore() } else window.dispatchEvent(new Event(event))
     await flushPromises()
     expect(w.get('[data-status=failed]').exists()).toBe(true)
-    expect(w.text()).toContain('结果核对超时')
+    expect(w.text()).toContain('请求未完成')
     expect(w.get('textarea').attributes('disabled')).toBeUndefined()
     expect(agentAPI.submit).not.toHaveBeenCalled(); w.unmount()
   })
@@ -880,7 +912,7 @@ describe('Agent visual planning flow', () => {
     expect(w.get('.workspace-resources').text()).toContain(plan.title)
     await w.get('.resource-plan').trigger('click'); await flushPromises()
     expect(w.get('.work-plan-editor').isVisible()).toBe(true)
-    expect(w.get('.editor-approval-actions').text()).toContain('批准方案配置')
+    expect(w.get('.editor-approval-actions').text()).toContain('批准配置')
     await w.get('[aria-label="返回工作区"]').trigger('click'); await flushPromises()
     expect(w.find('.workspace-resources').exists()).toBe(true)
     expect(agentAPI.submitWork).not.toHaveBeenCalled(); expect(agentAPI.submit).not.toHaveBeenCalled(); w.unmount()
@@ -1083,6 +1115,40 @@ describe('Agent visual planning flow', () => {
     onEvent({ sequence: 2, type: 'work.plan.updated', data: { ...run, status: 'running', trace: [] } }); await flushPromises()
     expect(w.find('.work-plan-editor').exists()).toBe(false); w.unmount()
   })
+  it('reopens an existing review target, leaves job queries passive and deduplicates replayed requests', async () => {
+    let onEvent!: (event: import('@/api/agent').AgentEvent) => void
+    vi.mocked(watchAgentRun).mockImplementation((_id, _after, _signal, receive) => { onEvent = receive; return new Promise(() => undefined) })
+    const w = await open()
+    await w.get('#agent-message').setValue('没看到，请重新展示原配置卡')
+    await w.get('.agent-composer').trigger('submit'); await flushPromises()
+    vi.mocked(agentAPI.detail).mockResolvedValue({ conversation: visualConversation, messages: [{ id: 'plan-message', role: 'assistant', text: '原提交结果', run_id: plan.source_run_id }], work_plans: [{ ...plan, status: 'submitted', execution_status: 'failed' }] })
+    const read = { id: 'read-existing', kind: 'tool' as const, name: 'get_job', status: 'completed', started_at: '2026-10-21T06:55:00Z' }
+    onEvent({ sequence: 1, type: 'work.plan.updated', data: { ...run, status: 'running', trace: [read] } }); await flushPromises()
+    expect(w.find('.work-plan-editor').exists()).toBe(false)
+    const review = { ...read, id: 'review-existing', name: 'present_review', review_plan_id: plan.id }
+    onEvent({ sequence: 2, type: 'work.plan.updated', data: { ...run, status: 'running', trace: [read, review] } }); await flushPromises()
+    expect(w.get('.work-plan-editor').isVisible()).toBe(true)
+    expect(w.get('.work-plan-editor').text()).toContain('任务目标')
+    await w.get('[aria-label="关闭右侧面板"]').trigger('click')
+    onEvent({ sequence: 3, type: 'work.plan.updated', data: { ...run, status: 'running', trace: [read, review] } }); await flushPromises()
+    expect(w.find('.work-plan-editor').exists()).toBe(false)
+    onEvent({ sequence: 4, type: 'work.plan.updated', data: { ...run, status: 'running', trace: [read, review, { ...review, id: 'review-again' }] } }); await flushPromises()
+    expect(w.get('.work-plan-editor').isVisible()).toBe(true)
+    expect(agentAPI.reviewWork).not.toHaveBeenCalled(); expect(agentAPI.submitWork).not.toHaveBeenCalled()
+    w.unmount()
+  })
+  it('uses the persisted review target after a missed live event instead of choosing another new plan', async () => {
+    let onEvent!: (event: import('@/api/agent').AgentEvent) => void
+    vi.mocked(watchAgentRun).mockImplementation((_id, _after, _signal, receive) => { onEvent = receive; return new Promise(() => undefined) })
+    const w = await open()
+    await w.get('#agent-message').setValue('重新打开旧方案'); await w.get('.agent-composer').trigger('submit'); await flushPromises()
+    const other = { ...plan, id: 'another-plan', title: '不要打开的另一个方案', source_run_id: run.id }
+    vi.mocked(agentAPI.detail).mockResolvedValue({ conversation: visualConversation, messages: [{ id: 'latest', role: 'assistant', text: '已请求展示', run_id: run.id }], work_plans: [plan, other] })
+    onEvent({ sequence: 1, type: 'run.completed', data: { ...run, status: 'completed', trace: [{ id: 'show-old', kind: 'tool', name: 'present_review', status: 'completed', started_at: '2026-10-21T06:57:00Z', review_plan_id: plan.id }] } }); await flushPromises()
+    expect(w.get('.work-plan-editor').isVisible()).toBe(true)
+    expect(w.get('.work-plan-editor input').element).toHaveProperty('value', plan.title)
+    expect(agentAPI.submitWork).not.toHaveBeenCalled(); w.unmount()
+  })
   it('keeps the right draft open while ordinary chat adjusts an approved configuration', async () => {
     const w = await open('ready'); await w.get('.plan-open').trigger('click'); await flushPromises()
     expect(w.find('.plan-actions').exists()).toBe(false)
@@ -1210,4 +1276,74 @@ it('shows document metadata without eagerly retrieving the document body', async
   vi.mocked(agentAPI.detail).mockResolvedValue({ conversation, messages: [{ id: 'file-message', role: 'user', text: 'file', asset_ids: ['document'] }] })
   const w=make(); await flushPromises(); await w.get('.agent-conversation').trigger('click'); await flushPromises()
   expect(w.get('.document-preview').text()).toContain('report.pdf'); expect(agentAPI.asset).not.toHaveBeenCalled(); expect(agentAPI.assetThumbnail).not.toHaveBeenCalled();w.unmount()
+})
+
+describe('Agent original invocation failures', () => {
+  it('shows upstream 403 immediately and keeps the composer available after the terminal event', async () => {
+    let onEvent!: Parameters<typeof watchAgentRun>[3]
+    vi.mocked(watchAgentRun).mockImplementation((_id, _after, signal, receive) => { onEvent = receive; return new Promise(resolve => signal.addEventListener('abort', () => resolve(), { once: true })) })
+    vi.mocked(agentAPI.submit).mockResolvedValue({ ...run, asset_ids: [] })
+    const w = make(); await flushPromises(); await w.get('.agent-conversation').trigger('click'); await flushPromises()
+    await w.get('#agent-message').setValue('生成一张猫图'); await w.get('.agent-composer').trigger('submit'); await flushPromises()
+    const failure = { message: 'Insufficient balance', status_code: 502, upstream_status_code: 403 }
+    const done = { ...run, status: 'failed', asset_ids: [], error_code: 'AGENT_UPSTREAM_REJECTED', failure }
+    vi.mocked(agentAPI.run).mockResolvedValue(done)
+    vi.mocked(agentAPI.detail).mockResolvedValue({ conversation, messages: [{ id: 'failed-result', role: 'assistant', text: '', run_id: run.id, run_status: 'failed', error_code: done.error_code, failure }], work_plans: [] })
+    onEvent({ sequence: 1, type: 'run.failed', data: done }); await flushPromises()
+    expect(w.get('.run-error').text()).toBe('HTTP 403 · Insufficient balance')
+    expect(w.find('[data-status=reconciling]').exists()).toBe(false)
+    expect(w.text()).not.toMatch(/结果核对超时|等待确认|正在核对/)
+    await w.get('#agent-message').setValue('新的消息')
+    expect(w.get('#agent-message').attributes('disabled')).toBeUndefined()
+    expect(w.get('.send-button').attributes('disabled')).toBeUndefined()
+    expect(agentAPI.submit).toHaveBeenCalledTimes(1)
+    w.unmount(); vi.mocked(agentAPI.run).mockReset()
+  })
+})
+
+
+describe('Agent timeout and stop completion', () => {
+  it.each(['AGENT_MODEL_FIRST_RESPONSE_TIMEOUT', 'AGENT_MODEL_IDLE_TIMEOUT', 'AGENT_MODEL_TIMEOUT'])('ends %s and retains partial text with an available composer', async errorCode => {
+    let onEvent!: Parameters<typeof watchAgentRun>[3]
+    vi.mocked(watchAgentRun).mockImplementation((_id, _after, signal, receive) => { onEvent = receive; return new Promise(resolve => signal.addEventListener('abort', () => resolve(), { once: true })) })
+    vi.mocked(agentAPI.submit).mockResolvedValue({ ...run, asset_ids: [] })
+    const w = make(); await flushPromises(); await w.get('.agent-conversation').trigger('click'); await flushPromises()
+    await w.get('#agent-message').setValue('test timeout'); await w.get('.agent-composer').trigger('submit'); await flushPromises()
+    const done = { ...run, status: 'failed', asset_ids: [], text: '已返回的部分内容', error_code: errorCode }
+    vi.mocked(agentAPI.run).mockResolvedValue(done)
+    vi.mocked(agentAPI.detail).mockResolvedValue({ conversation, messages: [{ id: 'timeout-result', role: 'assistant', text: done.text, run_id: run.id, run_status: 'failed', error_code: errorCode }], work_plans: [] })
+    onEvent({ sequence: 1, type: 'run.failed', data: done }); await flushPromises()
+    expect(w.get('.run-error').text()).toContain('超时结束')
+    expect(w.text()).toContain(done.text)
+    expect(w.text()).not.toMatch(/正在停止|正在核对|结果核对超时/)
+    expect(w.find('.stop-button').exists()).toBe(false)
+    await w.get('#agent-message').setValue('继续对话')
+    expect(w.get('.send-button').attributes('disabled')).toBeUndefined()
+    expect(agentAPI.submit).toHaveBeenCalledTimes(1)
+    w.unmount(); vi.mocked(agentAPI.run).mockReset()
+  })
+
+  it('clears stopping after server cancellation and retains the partial reply', async () => {
+    let onEvent!: Parameters<typeof watchAgentRun>[3]
+    vi.mocked(watchAgentRun).mockImplementation((_id, _after, signal, receive) => { onEvent = receive; return new Promise(resolve => signal.addEventListener('abort', () => resolve(), { once: true })) })
+    vi.mocked(agentAPI.submit).mockResolvedValue({ ...run, asset_ids: [] })
+    const w = make(); await flushPromises(); await w.get('.agent-conversation').trigger('click'); await flushPromises()
+    await w.get('#agent-message').setValue('test stop'); await w.get('.agent-composer').trigger('submit'); await flushPromises()
+    const active = { ...run, status: 'running', asset_ids: [], text: '已有回复', cancel_requested: true }
+    vi.mocked(agentAPI.cancel).mockResolvedValue(active)
+    await w.get('.stop-button').trigger('click'); await flushPromises()
+    expect(w.text()).toContain('正在停止')
+    const done = { ...active, status: 'cancelled' }
+    vi.mocked(agentAPI.run).mockResolvedValue(done)
+    vi.mocked(agentAPI.detail).mockResolvedValue({ conversation, messages: [{ id: 'stopped-result', role: 'assistant', text: done.text, run_id: run.id, run_status: 'cancelled' }], work_plans: [] })
+    onEvent({ sequence: 2, type: 'run.cancelled', data: done }); await flushPromises()
+    expect(w.text()).not.toContain('正在停止')
+    expect(w.text()).toContain(done.text)
+    expect(w.find('.stop-button').exists()).toBe(false)
+    await w.get('#agent-message').setValue('新消息')
+    expect(w.get('.send-button').attributes('disabled')).toBeUndefined()
+    expect(agentAPI.cancel).toHaveBeenCalledTimes(1)
+    expect(agentAPI.submit).toHaveBeenCalledTimes(1)
+    w.unmount(); vi.mocked(agentAPI.run).mockReset()
+  })
 })

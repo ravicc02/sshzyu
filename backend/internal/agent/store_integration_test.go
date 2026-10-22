@@ -246,14 +246,12 @@ func TestPostgresUnknownDoesNotRegenerate(t *testing.T) {
 		t.Fatal(e)
 	}
 	s.process(ctx, r)
-	if r.Status != "reconciling" || f.images != 1 {
-		t.Fatalf("expected unknown result: %+v %d", r, f.images)
+	if r.Status != "failed" || f.images != 1 || r.ReconcileDeadline != nil {
+		t.Fatal("unknown request still active", r.Status, f.images)
 	}
 	_ = st.Release(ctx, r)
-	_, _ = st.DB.Exec(`UPDATE agent_runs SET lease_until=now()-interval '1 second';UPDATE agent_task_outbox SET ready_at=now()`)
-	r, e = st.Claim(ctx, "worker2")
-	if e != nil {
-		t.Fatal(e)
+	if _, e = st.Claim(ctx, "worker2"); !errors.Is(e, ErrNotFound) {
+		t.Fatal("failed run was reclaimed", e)
 	}
 	s.process(ctx, r)
 	if f.images != 1 {
@@ -265,8 +263,8 @@ func TestPostgresUnknownDoesNotRegenerate(t *testing.T) {
 	r.Cancel = true
 	s.finishStopped(r, true)
 	check, e := st.Run(ctx, 1, created.ID)
-	if e != nil || check.Status != "reconciling" {
-		t.Fatal("cancel incorrectly finalized unknown", e)
+	if e != nil || check.Status != "failed" {
+		t.Fatal("cancel erased an unresolved operation", e)
 	}
 }
 func TestPostgresLeaseFencing(t *testing.T) {
@@ -613,22 +611,24 @@ func TestPostgresBillingRecoveryUsesOriginalResponse(t *testing.T) {
 		t.Fatal(e)
 	}
 	svc.process(ctx, run)
-	if run.Status != "reconciling" || f.calls != 1 {
-		t.Fatal("billing pending did not protect dispatch")
+	if run.Status != "failed" || f.calls != 1 || run.ReconcileDeadline != nil {
+		t.Fatal("billing failure still waiting")
+	}
+	saved, err := svc.readOutcome(run.ID + "_model_0")
+	if err != nil || len(saved.Body) == 0 {
+		t.Fatal("accepted response lost", err)
 	}
 	f.settled = true
-	_ = st.Release(ctx, run)
-	_, _ = st.DB.Exec(`UPDATE agent_task_outbox SET ready_at=now()`)
-	run, e = st.Claim(ctx, "w2")
-	if e != nil {
-		t.Fatal(e)
+	recovered, err := f.Recover(ctx, Invocation{Kind: "text"}, saved)
+	if err != nil || recovered.BillingPending || len(recovered.Body) == 0 || f.calls != 1 {
+		t.Fatal("stored evidence needs redispatch", err)
 	}
-	svc.process(ctx, run)
-	done, e := st.Run(ctx, 1, created.ID)
-	if e != nil || done.Status != "completed" || f.calls != 3 || f.images != 1 {
-		t.Fatalf("billing recovery replayed request or lost response: %v %+v calls=%d", e, done, f.calls)
+	_ = st.Release(ctx, run)
+	if _, err = st.Claim(ctx, "w2"); !errors.Is(err, ErrNotFound) {
+		t.Fatal("failure kept a polling worker", err)
 	}
 }
+
 func TestPostgresAssetIntegrityAndLimit(t *testing.T) {
 	st := isolatedStore(t)
 	svc, run := setupRun(t, st, &testExecutor{})
@@ -792,7 +792,7 @@ func TestPostgresCancelAfterPaidTextAndMissingResult(t *testing.T) {
 				t.Fatal(e)
 			}
 			if missing {
-				if done.Status != "reconciling" {
+				if done.Status != "failed" || done.ErrorCode != "AGENT_RESULT_STORAGE_FAILED" {
 					t.Fatal("missing result treated as complete")
 				}
 			} else if done.Status != "cancelled" || done.ModelCost != "0.01000000" {

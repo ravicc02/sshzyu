@@ -52,6 +52,8 @@ type WorkPlan struct {
 	RunID          string     `json:"run_id,omitempty"`
 }
 type WorkResult struct {
+	Failure *FailureDetail `json:"failure,omitempty"`
+
 	ItemID    string `json:"item_id"`
 	Status    string `json:"status"`
 	AssetID   string `json:"asset_id,omitempty"`
@@ -534,9 +536,7 @@ func (s *Service) processWork(ctx context.Context, r *Run) {
 		if err != nil {
 			w.Results[index].Status = "failed"
 			w.Results[index].ErrorCode = SafeCode(err)
-			if errors.Is(err, ErrUnknown) {
-				w.Results[index].Status = "reconciling"
-			}
+			w.Results[index].Failure = FailureFor(err)
 			s.operationFailure(r, op, err)
 			return
 		}

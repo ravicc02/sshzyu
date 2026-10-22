@@ -161,7 +161,7 @@ func TestPostgresTraceReconciliationAndTimeoutDoNotReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.process(ctx, r)
-	if len(r.Trace) != 2 || r.Trace[0].Status != "completed" || r.Trace[1].Status != "reconciling" || r.Trace[1].Cost != "" {
+	if len(r.Trace) != 2 || r.Trace[0].Status != "completed" || r.Trace[1].Status != "failed" || r.Trace[1].Cost != "" {
 		t.Fatal("pending state is misleading")
 	}
 	start, calls := r.Trace[1].StartedAt, f.calls
@@ -184,7 +184,7 @@ func TestPostgresTraceReconciliationAndTimeoutDoNotReplay(t *testing.T) {
 	}
 	expireTestReconciliation(t, st, r)
 	svc.process(ctx, r)
-	if r.Trace[0].Status != "completed" || r.Trace[1].Status != "failed" || r.Trace[1].ErrorCode != ReconciliationTimeoutCode || r.Trace[1].EndedAt == nil || f.calls != calls {
+	if r.Trace[0].Status != "completed" || r.Trace[1].Status != "failed" || r.Trace[1].ErrorCode != "UPSTREAM_RESULT_UNKNOWN" || r.Trace[1].EndedAt == nil || f.calls != calls {
 		t.Fatal("timeout lost the tool audit trail")
 	}
 }

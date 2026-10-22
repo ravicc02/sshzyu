@@ -124,7 +124,7 @@ func agentErrorText(code string) string {
 	case "AGENT_RETRY_NOT_LATEST":
 		return "此回复之后已有新消息，请重试最新一轮。"
 	case "AGENT_RETRY_UNSETTLED":
-		return "原请求仍有待核对的调用，请确认其结果后再发起新请求。"
+		return "原调用未取得完整结果，无法直接重试。请发送新消息明确发起新的请求。"
 	case "AGENT_RETRY_CONTEXT_UNAVAILABLE":
 		return "该历史请求缺少可恢复的上下文，请重新发送消息。"
 	case "AGENT_MODEL_VISION_UNSUPPORTED":
@@ -150,7 +150,7 @@ func agentErrorText(code string) string {
 	case "AGENT_IMAGE_RECOVERY_UNAVAILABLE":
 		return "没有可恢复的已保存图片响应；本次操作不会重新生成图片。"
 	case "AGENT_IMAGE_AUTHORIZATION_REQUIRED":
-		return "正在核对已有结果。只有明确要求重新生成，才会发起新的生图请求。"
+		return "请明确需要生成或修改的图片，状态查询不会发起新的生图请求。"
 	case "AGENT_FILE_SIZE_LIMIT":
 		return "文件不能为空，且不能超过 10 MiB。"
 	case "AGENT_INVALID_FILE":
@@ -160,15 +160,15 @@ func agentErrorText(code string) string {
 	case "AGENT_DISABLED":
 		return "Agent 尚未启用，请联系管理员。"
 	case agent.ReconciliationTimeoutCode:
-		return "结果核对超时，任务已结束。你可以继续发送新消息；原请求不会自动重发，费用以最终账单为准。"
+		return "请求未完成，本次调用已结束。"
 	case "AGENT_UPSTREAM_CONNECTION_FAILED":
-		return "上游连接失败，请检查当前账号的出站代理或网络。请求未发送到模型服务，无需等待核对。"
+		return "上游连接失败，请检查当前账号的出站代理或网络。请求未发送到模型服务。"
 	case "AGENT_QUESTION_REQUIRED":
 		return "当前请求明确要求先提问，但模型没有返回可交互的问题，请重试。"
 	case "AGENT_RUN_BUSY":
-		return "已有运行中或待对账任务，请先完成该任务。"
+		return "已有任务正在执行，请先完成或停止该任务。"
 	case "WORK_RESULT_UNKNOWN":
-		return "该方案还有已发送但未确认的图片，请先核对原结果，避免重复生成。"
+		return "部分图片调用未取得完整结果，已阻止重复生成。请发送新消息明确发起新的生成请求。"
 	case "AGENT_CONFLICT":
 		return "配置已变化或重复请求的内容不同，请刷新。"
 	case "AGENT_UNBOUNDED_PRICING":

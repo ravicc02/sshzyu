@@ -367,7 +367,15 @@ func (s *Service) adaptiveTool(ctx context.Context, r *Run, call Call) (any, err
 				p = plan
 			}
 		}
-		return map[string]any{"ok": true, "plan": p, "missing_fields": p.MissingFields(), "approval": "human_required", "observed_by_model": false}, nil
+		approval := "human_required"
+		if p.Status != "draft" && p.Status != "ready" {
+			approval = "not_pending"
+		}
+		presentation := "not_requested"
+		if call.Name == "present_review" {
+			presentation = "requested"
+		}
+		return map[string]any{"ok": true, "plan": p, "missing_fields": p.MissingFields(), "approval": approval, "presentation": presentation, "dispatched": false, "observed_by_model": false}, nil
 	case "inspect_assets":
 		var in struct {
 			IDs []string `json:"asset_ids"`

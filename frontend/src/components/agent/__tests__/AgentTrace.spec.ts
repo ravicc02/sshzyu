@@ -19,6 +19,14 @@ describe('Agent process trace', () => {
     expect(w.text()).toContain('5 秒')
     w.unmount()
   })
+  it.each([['get_job', '查看任务'], ['present_review', '展示配置卡'], ['future_tool', 'future_tool']])('does not describe %s as image generation', async (name, label) => {
+    const w = mount(AgentTrace, { props: { steps: [{ ...tool, name, arguments: undefined }] } })
+    expect(w.get('.step-title').text()).toBe(label)
+    expect(w.text()).toContain(name)
+    expect(w.text()).not.toContain('生成图片')
+    expect(w.text()).not.toContain('已生成')
+    w.unmount()
+  })
   it('shows the actual tool name, verified inputs and results', async () => {
     const w = mount(AgentTrace, { props: { steps: [tool] } })
     expect(w.get('button').attributes('aria-expanded')).toBe('true')
@@ -52,8 +60,8 @@ describe('Agent process trace', () => {
     if (w.get('button').attributes('aria-expanded') === 'false') await w.get('button').trigger('click')
     expect(w.get('.tool-prompt').text()).toBe(tool.arguments!.prompt)
     expect(w.get('.step-state').text()).not.toBe('处理中')
-    if (status === 'reconciling') expect(w.text()).toContain('不会自动重新调用')
-    if (status === 'failed') expect(w.text()).toContain('费用以最终账单为准')
+    if (status === 'reconciling') expect(w.text()).toContain('正在读取已保存的响应')
+    if (status === 'failed') expect(w.text()).toContain('本次调用已结束')
     w.unmount()
   })
   it('updates a live duration but freezes it at the confirmed end time', async () => {
@@ -77,4 +85,13 @@ describe('Agent process trace', () => {
     expect(w.get('.reasoning-summary strong').text()).toBe('摘要')
     w.unmount()
   })
+})
+
+it('renders the original failure as text without an error-confirmation waiting phase', async () => {
+  const w = mount(AgentTrace, { props: { steps: [{ ...tool, status: 'failed', error_code: 'AGENT_UPSTREAM_REJECTED', failure: { upstream_status_code: 403, status_code: 502, message: 'Insufficient balance <img src=x onerror=alert(1)>' } }] } })
+  await w.get('.step-toggle').trigger('click')
+  expect(w.get('.step-error').text()).toContain('HTTP 403 · Insufficient balance')
+  expect(w.find('.step-error img').exists()).toBe(false)
+  expect(w.text()).not.toContain('核对')
+  w.unmount()
 })

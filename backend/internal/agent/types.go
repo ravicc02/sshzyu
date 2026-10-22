@@ -106,6 +106,8 @@ type ReplyMetrics struct {
 	GenerationMS *int64 `json:"generation_ms,omitempty"`
 }
 type Message struct {
+	Failure *FailureDetail `json:"failure,omitempty"`
+
 	RunStatus       string           `json:"run_status,omitempty"`
 	ErrorCode       string           `json:"error_code,omitempty"`
 	CanRecoverImage bool             `json:"can_recover_image,omitempty"`
@@ -127,6 +129,10 @@ type ConversationDetail struct {
 	ActiveRun *Run      `json:"active_run,omitempty"`
 }
 type Run struct {
+	Failure *FailureDetail `json:"failure,omitempty"`
+
+	DirectImage *DirectImageRequest `json:"direct_image_request,omitempty"`
+
 	TaskID             string         `json:"task_id,omitempty"`
 	RuntimeVersion     int            `json:"runtime_version,omitempty"`
 	ToolErrors         int            `json:"tool_errors,omitempty"`
@@ -210,6 +216,7 @@ func (r Run) Public() map[string]any {
 	delete(m, "answer_hash")
 	delete(m, "force_ask_user")
 	delete(m, "answered_question")
+	delete(m, "direct_image_request")
 	return m
 }
 
@@ -266,6 +273,8 @@ type Response struct {
 	Calls   []Call
 }
 type Invocation struct {
+	DirectImageAllowed bool `json:"-"`
+
 	LegacyContract bool   `json:"-"`
 	ProjectID      string `json:"-"`
 	GrantID        string `json:"-"`
@@ -295,6 +304,8 @@ type Invocation struct {
 	RunID                 string
 }
 type Outcome struct {
+	Failure *FailureDetail `json:"failure,omitempty"`
+
 	ImageFromBody  bool `json:"image_from_body,omitempty"`
 	AccountID      int64
 	Body           json.RawMessage
@@ -492,7 +503,7 @@ func ParseResponse(raw json.RawMessage) (Response, error) {
 	return out, nil
 }
 func ToolDefinition() json.RawMessage {
-	return json.RawMessage(`{"type":"function","name":"generate_image","description":"建议或执行一张生图/改图，可用于风格样张、模板或成品。task_id=null时展示配置卡等待真人审批；已有明确任务范围许可时传真实task_id和purpose(sample/output)。模型不能自批或扩大许可。无需参考图。","strict":true,"parameters":{"type":"object","additionalProperties":false,"properties":{"prompt":{"type":"string"},"model":{"type":["string","null"]},"image_size":{"type":["string","null"],"enum":["1K","2K","4K",null]},"aspect_ratio":{"type":["string","null"],"enum":["1:1","16:9","9:16","4:3","3:4",null]},"reference_asset_ids":{"type":["array","null"],"items":{"type":"string"},"maxItems":1},"task_id":{"type":["string","null"]},"purpose":{"type":["string","null"],"enum":["sample","output",null]}},"required":["prompt","model","image_size","aspect_ratio","reference_asset_ids","task_id","purpose"]}}`)
+	return json.RawMessage(`{"type":"function","name":"generate_image","description":"建议或执行一张生图/改图，可用于风格样张、模板或成品。明确的简单单张生图/改图请求可直接执行，task_id与purpose均传null，不需要配置卡或再次确认；缺少必要信息先ask_user。复杂、多图或用户要求先审方案时使用save_work_plan和present_review；已有任务范围许可时传真实task_id和purpose(sample/output)。不得擅自多生成、重试或扩大许可。无需参考图。","strict":true,"parameters":{"type":"object","additionalProperties":false,"properties":{"prompt":{"type":"string"},"model":{"type":["string","null"]},"image_size":{"type":["string","null"],"enum":["1K","2K","4K",null]},"aspect_ratio":{"type":["string","null"],"enum":["1:1","16:9","9:16","4:3","3:4",null]},"reference_asset_ids":{"type":["array","null"],"items":{"type":"string"},"maxItems":1},"task_id":{"type":["string","null"]},"purpose":{"type":["string","null"],"enum":["sample","output",null]}},"required":["prompt","model","image_size","aspect_ratio","reference_asset_ids","task_id","purpose"]}}`)
 }
 
 // Keep the old parameter contract for persisted v1 checkpoints.
@@ -529,6 +540,9 @@ func Invalid(code string) error { return fmt.Errorf("%s", code) }
 func HashBytes(b []byte) string { sum := sha256.Sum256(b); return hex.EncodeToString(sum[:]) }
 
 type InvocationFailure struct {
+	Detail      *FailureDetail
+	ResultKnown bool
+
 	Code       string
 	Dispatched bool
 }

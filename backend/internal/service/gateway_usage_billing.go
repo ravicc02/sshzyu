@@ -579,7 +579,10 @@ func detachStreamUpstreamContext(ctx context.Context, stream bool) (context.Cont
 	if ctx == nil {
 		return context.Background(), func() {}
 	}
-	if !stream {
+	// Agent cancellation is a server-side execution limit, not a browser
+	// disconnect. Preserve it through every provider adapter; billing still
+	// uses detachedBillingContext to retain confirmed usage.
+	if !stream || AgentInvocationFromContext(ctx) != nil {
 		return ctx, func() {}
 	}
 	return context.WithoutCancel(ctx), func() {}
@@ -588,6 +591,9 @@ func detachStreamUpstreamContext(ctx context.Context, stream bool) (context.Cont
 func detachUpstreamContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	if ctx == nil {
 		return context.Background(), func() {}
+	}
+	if AgentInvocationFromContext(ctx) != nil {
+		return ctx, func() {}
 	}
 	return context.WithoutCancel(ctx), func() {}
 }

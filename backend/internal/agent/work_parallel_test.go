@@ -205,7 +205,7 @@ func TestPostgresParallelUnknownResultsDoNotReplayOrPermitRedo(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		if snapshot.Status == "reconciling" && snapshot.ReconcileDeadline != nil {
+		if snapshot.Work.Results[0].Status == "failed" && snapshot.ReconcileDeadline == nil {
 			break
 		}
 		if time.Now().After(until) {
@@ -215,7 +215,7 @@ func TestPostgresParallelUnknownResultsDoNotReplayOrPermitRedo(t *testing.T) {
 	}
 	close(release)
 	waitWork(t, done)
-	if r.Status != "reconciling" || f.calls.Load() != 3 || len(r.AssetIDs) != 2 {
+	if r.Status != "partial_success" || f.calls.Load() != 3 || len(r.AssetIDs) != 2 {
 		t.Fatal("unknown outcome not isolated", r.Status, f.calls.Load(), len(r.AssetIDs))
 	}
 	s.process(context.Background(), r)

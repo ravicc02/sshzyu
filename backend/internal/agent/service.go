@@ -230,9 +230,15 @@ func (s *Service) submit(ctx context.Context, user int64, conv, key, ip, text st
 		return nil, e
 	}
 	r.StatusInquiry = ImageStatusInquiry(text)
+	r.DirectImage = directImageRequest(text)
 	r.History = history
 	r.Memory = memory
 	if retry != nil {
+		r.DirectImage = nil
+		if retry.DirectImage != nil {
+			permission := *retry.DirectImage
+			r.DirectImage = &permission
+		}
 		end := 0
 		for i, raw := range retry.History {
 			var item struct {
@@ -313,8 +319,9 @@ func (s *Service) process(parent context.Context, r *Run) {
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
-		t := time.NewTicker(10 * time.Second)
+		t := time.NewTicker(time.Second)
 		defer t.Stop()
+		nextHeartbeat := time.Now().Add(10 * time.Second)
 		for {
 			select {
 			case <-done:
@@ -322,14 +329,23 @@ func (s *Service) process(parent context.Context, r *Run) {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				if e := s.Store.Heartbeat(ctx, r); e != nil {
-					cancel()
-					return
-				}
-				c, e := s.Store.Cancelled(ctx, r)
+				// Cancellation is checked each second; lease writes remain at 10s.
+				checkCtx, stopCheck := context.WithTimeout(ctx, 3*time.Second)
+				c, e := s.Store.Cancelled(checkCtx, r)
+				stopCheck()
 				if e != nil || c {
 					cancel()
 					return
+				}
+				if !time.Now().Before(nextHeartbeat) {
+					heartbeatCtx, stopHeartbeat := context.WithTimeout(ctx, 3*time.Second)
+					e = s.Store.Heartbeat(heartbeatCtx, r)
+					stopHeartbeat()
+					if e != nil {
+						cancel()
+						return
+					}
+					nextHeartbeat = time.Now().Add(10 * time.Second)
 				}
 			}
 		}
@@ -442,6 +458,7 @@ func (s *Service) process(parent context.Context, r *Run) {
 				return
 			}
 			args.Model = stringPtr(r.Config.ImageModel)
+			r.directImageArgs(&args)
 			if args.Size == nil {
 				args.Size = stringPtr("1K")
 			}
@@ -487,7 +504,7 @@ func (s *Service) process(parent context.Context, r *Run) {
 			}
 			in := Invocation{OperationID: r.ID + "_image_" + fmt.Sprint(r.ToolCount), RunID: r.ID, Kind: "image", Binding: Binding{UserID: r.UserID, KeyID: r.Config.ImageKeyID, GroupID: r.ImageGroupID, IP: r.IP}, Model: r.Config.ImageModel, Args: &args, References: refs}
 			if r.RuntimeVersion >= 2 {
-				if args.TaskID != nil {
+				if args.TaskID != nil && *args.TaskID != "" {
 					if err := s.attachProject(ctx, r, *args.TaskID); err != nil {
 						if !s.returnToolFeedback(ctx, r, call, err) {
 							return
@@ -495,9 +512,13 @@ func (s *Service) process(parent context.Context, r *Run) {
 						continue
 					}
 				}
-				grant, e := s.imageGrant(ctx, r, args)
-				if e != nil {
-					if !s.returnToolFeedback(ctx, r, call, e) {
+				var grant string
+				var grantErr error
+				if r.DirectImage == nil || (args.TaskID != nil && *args.TaskID != "") {
+					grant, grantErr = s.imageGrant(ctx, r, args)
+				}
+				if grantErr != nil {
+					if !s.returnToolFeedback(ctx, r, call, grantErr) {
 						return
 					}
 					continue
@@ -548,6 +569,7 @@ func (s *Service) process(parent context.Context, r *Run) {
 			return
 		}
 		in.WorkContext = workContext
+		in.DirectImageAllowed = r.DirectImage != nil && r.ToolCount == 0
 		in.WorkPlanning = r.WorkPlanning
 		in.LegacyContract = r.RuntimeVersion < 2
 		stepStatus, eventType := "running", "model.started"
@@ -670,6 +692,11 @@ func (s *Service) process(parent context.Context, r *Run) {
 // the run paused for a user, terminated, or lost its persistence fence.
 func (s *Service) processToolCall(ctx context.Context, r *Run, parentOperation string, call Call) bool {
 	var e error
+	if routed, err := directImagePlanningCall(r, call); err != nil {
+		return s.returnToolFeedback(ctx, r, call, err)
+	} else {
+		call = routed
+	}
 	if r.RuntimeVersion >= 2 && oneOf(call.Name, "update_draft", "present_review", "inspect_assets", "get_job", "finish_task") {
 		value, err := s.adaptiveTool(ctx, r, call)
 		if err != nil {
@@ -681,8 +708,22 @@ func (s *Service) processToolCall(ctx context.Context, r *Run, parentOperation s
 		if err = s.Store.Tool(ctx, r, parentOperation, call, json.RawMessage(call.Arguments)); err != nil {
 			return false
 		}
-		r.startStep(call.ToolID, "tool", call.Name, "running", nil)
-		r.completeStep(call.ToolID, "0.00000000", "工具结果已返回模型。", nil)
+		step := r.startStep(call.ToolID, "tool", call.Name, "running", nil)
+		summary := "工具结果已返回模型。"
+		if call.Name == "present_review" {
+			// adaptiveTool has already checked this plan's user and conversation.
+			var request struct {
+				PlanID string `json:"plan_id"`
+			}
+			_ = json.Unmarshal([]byte(call.Arguments), &request)
+			step.ReviewPlanID = request.PlanID
+			r.DirectImage = nil
+			summary = "已请求打开配置卡，未派发新的生图。"
+		}
+		r.completeStep(call.ToolID, "0.00000000", summary, nil)
+		if call.Name == "update_draft" {
+			r.DirectImage = nil
+		}
 		r.History = append(r.History, toolResult(call, value))
 		r.Status = "resuming_model"
 		if err = s.Store.Save(ctx, r, "work.plan.updated", r.Public()); err != nil {
@@ -710,8 +751,10 @@ func (s *Service) processToolCall(ctx context.Context, r *Run, parentOperation s
 		if err = s.Store.Tool(ctx, r, parentOperation, call, p.WorkDraft); err != nil {
 			return false
 		}
-		r.startStep(call.ToolID, "tool", "save_work_plan", "running", nil)
-		r.completeStep(call.ToolID, "0.00000000", "方案已保存，等待用户审核配置卡。", nil)
+		step := r.startStep(call.ToolID, "tool", "save_work_plan", "running", nil)
+		step.ReviewPlanID = p.ID
+		r.DirectImage = nil
+		r.completeStep(call.ToolID, "0.00000000", "配置卡已保存，等待用户审核。", nil)
 		r.History = append(r.History, jsonBytes(map[string]any{"type": "function_call_output", "call_id": call.ID, "output": string(jsonBytes(map[string]string{"plan_id": p.ID, "status": "draft", "approval": "human_required"}))}))
 		if r.RuntimeVersion >= 2 {
 			r.Status = "resuming_model"
@@ -720,7 +763,7 @@ func (s *Service) processToolCall(ctx context.Context, r *Run, parentOperation s
 			}
 			return true
 		}
-		r.Text = "方案已整理成配置卡。你可以修改内容、规格和参考图，核价后确认生成，也可以继续沟通。"
+		r.Text = "已整理成配置卡。你可以修改内容、规格和参考图，核价后确认生成，也可以继续沟通。"
 		r.Status = "completed"
 		r.ErrorCode = ""
 		_ = s.Store.Save(context.WithoutCancel(ctx), r, "work.plan.created", r.Public())
@@ -800,7 +843,7 @@ func (s *Service) processToolCall(ctx context.Context, r *Run, parentOperation s
 		s.fail(r, e)
 		return false
 	}
-	if r.RuntimeVersion >= 2 && (args.TaskID == nil || *args.TaskID == "") {
+	if r.RuntimeVersion >= 2 && (args.TaskID == nil || *args.TaskID == "") && r.DirectImage == nil {
 		p, err := s.imageReviewCard(ctx, r, call, args)
 		if err != nil {
 			if !s.returnToolFeedback(ctx, r, call, err) {
@@ -808,9 +851,10 @@ func (s *Service) processToolCall(ctx context.Context, r *Run, parentOperation s
 			}
 			return true
 		}
-		r.startStep(call.ToolID, "tool", call.Name, "running", traceArguments(args, r.Config.ImageModel))
-		r.completeStep(call.ToolID, "0.00000000", "已提供生成配置卡，等待用户授权。", nil)
-		r.History = append(r.History, toolResult(call, map[string]any{"ok": true, "dispatched": false, "approval": "human_required", "plan_id": p.ID, "revision": p.Revision, "note": "已展示配置卡，核价后批准或为本任务授予限额样张许可。尚未生图。"}))
+		step := r.startStep(call.ToolID, "tool", call.Name, "running", traceArguments(args, r.Config.ImageModel))
+		step.ReviewPlanID = p.ID
+		r.completeStep(call.ToolID, "0.00000000", "已保存生成配置卡并请求展示，等待用户授权。", nil)
+		r.History = append(r.History, toolResult(call, map[string]any{"ok": true, "dispatched": false, "approval": "human_required", "plan_id": p.ID, "revision": p.Revision, "note": "已保存配置卡并请求展示，核价后批准或为本任务授予限额样张许可。尚未生图。"}))
 		r.Status = "resuming_model"
 		if e = s.Store.Save(ctx, r, "work.plan.created", r.Public()); e != nil {
 			return false
@@ -849,6 +893,9 @@ func (s *Service) operation(ctx context.Context, r *Run, in Invocation, step int
 	var empty Outcome
 	if existing, err := s.Store.LookupOperation(ctx, in.OperationID); err == nil {
 		if existing.Status == "failed" {
+			if saved, readErr := s.readOutcome(existing.ID); readErr == nil && saved.Failure != nil {
+				return existing, saved, &InvocationFailure{Code: existing.ErrorCode, Dispatched: true, ResultKnown: true, Detail: saved.Failure}
+			}
 			return existing, empty, Invalid(existing.ErrorCode)
 		}
 		if existing.Status != "prepared" && !matchesExistingRequest(r, in, existing) {
@@ -894,7 +941,10 @@ func (s *Service) operation(ctx context.Context, r *Run, in Invocation, step int
 			return existing, evidence, err
 		}
 		if err != nil || ctx.Err() != nil || evidence.BillingPending || evidence.Unknown {
-			return existing, empty, ErrUnknown
+			if err != nil {
+				return existing, evidence, err
+			}
+			return existing, evidence, &InvocationFailure{Code: "UPSTREAM_RESULT_UNKNOWN", Dispatched: true, Detail: evidence.Failure}
 		}
 		if err = s.writeOutcome(existing.ID, evidence); err != nil {
 			return existing, empty, ErrUnknown
@@ -959,20 +1009,31 @@ prepareNew:
 		}
 	}
 	if e != nil {
-		out.Unknown = true
-		_ = s.writeOutcome(op.ID, out)
 		var failure *InvocationFailure
-		if errors.As(e, &failure) && !failure.Dispatched {
+		known := errors.As(e, &failure) && (!failure.Dispatched || failure.ResultKnown)
+		out.Unknown = !known
+		if failure != nil {
+			out.Failure = failure.Detail
+		}
+		_ = s.writeOutcome(op.ID, out)
+		if known {
 			op.Status = "failed"
-			op.Cost = "0.00000000"
+			op.Cost = out.Cost
+			if !failure.Dispatched && op.Cost == "" {
+				op.Cost = "0.00000000"
+			}
 			op.ErrorCode = failure.Code
 			_ = s.Store.FinishOperation(context.WithoutCancel(ctx), r, op)
 			return op, out, e
 		}
+		if failure == nil {
+			e = &InvocationFailure{Code: "UPSTREAM_RESULT_UNKNOWN", Dispatched: true, Detail: out.Failure}
+		}
 		op.Status = "result_unknown"
+		op.Cost = out.Cost
 		op.ErrorCode = SafeCode(e)
 		_ = s.Store.FinishOperation(context.WithoutCancel(ctx), r, op)
-		return op, out, ErrUnknown
+		return op, out, e
 	}
 	if e = s.writeOutcome(op.ID, out); e != nil {
 		return op, out, ErrUnknown
@@ -996,7 +1057,10 @@ prepareNew:
 				_ = s.Store.FinishOperation(context.WithoutCancel(ctx), r, op)
 				return op, out, e
 			}
-			return op, out, ErrUnknown
+			if detail := FailureFor(e); detail != nil {
+				out.Failure = detail
+			}
+			return op, out, e
 		}
 		if e = s.writeOutcome(op.ID, out); e != nil {
 			return op, out, ErrUnknown
@@ -1019,13 +1083,25 @@ prepareNew:
 	return op, out, e
 }
 func (s *Service) operationFailure(r *Run, op Operation, e error) {
-	if errors.Is(e, ErrUnknown) || op.Status == "dispatching" || op.Status == "result_unknown" {
-		s.beginReconciliation(r, "UPSTREAM_RESULT_UNKNOWN")
+	// An interrupted paid operation stays unsettled in the audit ledger. A
+	// user stop must still end the run, without entering reconciliation UI.
+	checkCtx, stopCheck := context.WithTimeout(context.Background(), 3*time.Second)
+	cancelled, checkErr := s.Store.Cancelled(checkCtx, r)
+	stopCheck()
+	if checkErr == nil && cancelled {
+		s.finishStopped(r, true)
 		return
+	}
+	if detail := FailureFor(e); detail != nil {
+		r.Failure = detail
 	}
 	s.fail(r, e)
 }
 func (s *Service) fail(r *Run, e error) {
+	if detail := FailureFor(e); detail != nil {
+		r.Failure = detail
+	}
+	r.ReconcileDeadline = nil
 	s.syncCosts(r)
 	r.Status = "failed"
 	if len(r.AssetIDs) > 0 {
@@ -1047,7 +1123,7 @@ func (s *Service) finishStopped(r *Run, cancelled bool) {
 	}
 	s.syncCosts(r)
 	unsettled, err := s.Store.Unsettled(context.Background(), r.ID)
-	if err != nil || unsettled {
+	if err != nil || (unsettled && !cancelled) {
 		s.beginReconciliation(r, "UPSTREAM_RESULT_UNKNOWN")
 		return
 	}
@@ -1116,7 +1192,7 @@ func (s *Service) writeOutcome(id string, out Outcome) error {
 		return Invalid("AGENT_INVALID_CHECKPOINT")
 	}
 	// Serialize small metadata, then stream large JSON/Base64 without a duplicate encoder buffer.
-	header, err := json.Marshal(map[string]any{"image_from_body": out.ImageFromBody, "AccountID": out.AccountID, "Cost": out.Cost, "BillingPending": out.BillingPending, "Unknown": out.Unknown, "MIME": out.MIME, "Width": out.Width, "Height": out.Height})
+	header, err := json.Marshal(map[string]any{"image_from_body": out.ImageFromBody, "AccountID": out.AccountID, "Cost": out.Cost, "BillingPending": out.BillingPending, "Unknown": out.Unknown, "MIME": out.MIME, "Width": out.Width, "Height": out.Height, "failure": out.Failure})
 	if err != nil {
 		return err
 	}

@@ -1,16 +1,16 @@
 <template>
   <section id="agent-workspace-resources" class="workspace-resources" aria-label="工作区内容">
-    <p class="resource-intro">当前对话的方案配置与生成结果</p>
+    <p class="resource-intro">当前对话的配置卡与生成结果</p>
     <section class="resource-group" aria-labelledby="workspace-plans-heading">
-      <header><h4 id="workspace-plans-heading">方案配置</h4><span>{{ plans.length }}</span></header>
+      <header><h4 id="workspace-plans-heading">配置卡</h4><span>{{ plans.length }}</span></header>
       <div v-if="plans.length" class="resource-list">
         <button v-for="plan in plans" :key="plan.id" type="button" class="resource-plan" @click="emit('plan', plan.id)">
           <span class="resource-kind"><Icon name="document" size="sm" /></span>
-          <span class="resource-copy"><strong>{{ plan.title || '未命名方案' }}</strong><small>{{ plan.items.length }} 项 · v{{ plan.revision }} · {{ planLabel(plan.status) }}</small></span>
+          <span class="resource-copy"><strong>{{ agentConfigCardTitle(plan.title) }}</strong><small>{{ plan.items.length }} 项 · v{{ plan.revision }} · {{ planLabel(plan.status) }}</small></span>
           <Icon name="chevronRight" size="sm" />
         </button>
       </div>
-      <p v-else class="resource-empty">还没有方案草稿，可在对话中与 Agent 一起创建。</p>
+      <p v-else class="resource-empty">还没有配置卡草稿，可在对话中与 Agent 一起创建。</p>
     </section>
     <section class="resource-group" aria-labelledby="workspace-images-heading">
       <header><h4 id="workspace-images-heading">生成图片</h4><span>{{ images.length }}</span></header>
@@ -26,6 +26,7 @@
 </template>
 <script setup lang="ts">
 import Icon from '@/components/icons/Icon.vue'
+import { agentConfigCardTitle } from '@/utils/agentPresentation'
 import { useAgentAssetVisibility } from '@/composables/useAgentAssetVisibility'
 import type { AgentWorkPlan } from '@/api/agent'
 import type { AgentAttachmentView } from '@/utils/agentAttachments'

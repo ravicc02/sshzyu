@@ -39,7 +39,7 @@ func TestPostgresSecurityChargedFailureSurvivesMissingCheckpointAndTimeout(t *te
 	}
 	s.process(ctx, r)
 	got, err := st.Run(ctx, 1, created.ID)
-	if err != nil || got.Status != "reconciling" || AddAmount(got.Spent, "0") != "0.01000000" {
+	if err != nil || got.Status != "failed" || AddAmount(got.Spent, "0") != "0.01000000" {
 		t.Fatal("charge lost on stream failure", got, err)
 	}
 	checkpoint := filepath.Join(s.Root, r.ID+"_model_0.result.json")
@@ -47,7 +47,7 @@ func TestPostgresSecurityChargedFailureSurvivesMissingCheckpointAndTimeout(t *te
 		t.Fatal(err)
 	}
 	s.process(ctx, r)
-	if f.recoveries != 1 || f.calls != 1 || AddAmount(r.Spent, "0") != "0.01000000" {
+	if f.recoveries != 0 || f.calls != 1 || AddAmount(r.Spent, "0") != "0.01000000" {
 		t.Fatal("recovery must read ledger without replay", f.calls, f.recoveries, r.Spent)
 	}
 	deadline := time.Now().Add(-time.Second)

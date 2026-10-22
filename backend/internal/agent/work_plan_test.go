@@ -284,7 +284,7 @@ func TestPostgresWorkPlanUnknownDoesNotRegenerate(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.process(ctx, r)
-	if r.Status != "reconciling" || f.images != 1 {
+	if r.Status != "failed" || f.images != 1 || r.ReconcileDeadline != nil {
 		t.Fatalf("%s %s %d", r.Status, r.ErrorCode, f.images)
 	}
 	s.process(ctx, r)

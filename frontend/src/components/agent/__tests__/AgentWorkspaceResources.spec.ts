@@ -6,7 +6,7 @@ const plan: AgentWorkPlan = { id: 'p1', title: '演示方案', brief: '', style:
 describe('Agent workspace resources', () => {
   it('provides useful empty states without fabricating resources', () => {
     const w = mount(AgentWorkspaceResources, { props: { plans: [], images: [] } })
-    expect(w.text()).toContain('还没有方案草稿'); expect(w.text()).toContain('生成的图片会保存在这里')
+    expect(w.text()).toContain('还没有配置卡草稿'); expect(w.text()).toContain('生成的图片会保存在这里')
     expect(w.findAll('button')).toHaveLength(0); w.unmount()
   })
   it('opens the exact draft or generated image selected by the user', async () => {

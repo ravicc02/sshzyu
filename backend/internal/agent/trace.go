@@ -8,18 +8,21 @@ import (
 // TraceStep is a public projection, never a copy of protocol history or a
 // provider response. Only user-visible summaries and verified tool fields enter it.
 type TraceStep struct {
-	Commentary string          `json:"commentary,omitempty"`
-	ID         string          `json:"id"`
-	Kind       string          `json:"kind"`
-	Name       string          `json:"name"`
-	Status     string          `json:"status"`
-	StartedAt  time.Time       `json:"started_at"`
-	EndedAt    *time.Time      `json:"ended_at,omitempty"`
-	Summary    string          `json:"summary,omitempty"`
-	Arguments  *TraceArguments `json:"arguments,omitempty"`
-	AssetIDs   []string        `json:"asset_ids,omitempty"`
-	Cost       string          `json:"cost_usd,omitempty"`
-	ErrorCode  string          `json:"error_code,omitempty"`
+	Failure *FailureDetail `json:"failure,omitempty"`
+
+	Commentary   string          `json:"commentary,omitempty"`
+	ID           string          `json:"id"`
+	Kind         string          `json:"kind"`
+	Name         string          `json:"name"`
+	Status       string          `json:"status"`
+	StartedAt    time.Time       `json:"started_at"`
+	EndedAt      *time.Time      `json:"ended_at,omitempty"`
+	Summary      string          `json:"summary,omitempty"`
+	Arguments    *TraceArguments `json:"arguments,omitempty"`
+	AssetIDs     []string        `json:"asset_ids,omitempty"`
+	ReviewPlanID string          `json:"review_plan_id,omitempty"`
+	Cost         string          `json:"cost_usd,omitempty"`
+	ErrorCode    string          `json:"error_code,omitempty"`
 }
 type TraceArguments struct {
 	Prompt         string `json:"prompt"`
@@ -90,6 +93,9 @@ func (r *Run) pendingSteps(status, code string) {
 			continue
 		}
 		step.Status, step.ErrorCode = status, code
+		if status == "failed" {
+			step.Failure = r.Failure
+		}
 		if traceTerminal(status) {
 			step.EndedAt = &now
 		}

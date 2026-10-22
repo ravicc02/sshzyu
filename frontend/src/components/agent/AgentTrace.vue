@@ -3,8 +3,8 @@
     <summary v-if="!inline" class="process-heading"><Icon name="chevronRight" size="xs" class="process-chevron" /><span class="process-label">{{ processLabel }}</span><span class="process-counts">{{ processCounts }}</span><span v-if="totalDuration" class="process-duration">{{ totalDuration }}</span></summary>
     <div v-for="step in steps" :key="step.id" class="process-step" :data-step-id="step.id" :data-step-status="step.status">
       <button type="button" class="step-toggle" :aria-expanded="isOpen(step)" :aria-controls="panelId(step)" @click="toggle(step)">
-        <span class="step-icon" :class="{ working: active(step), failed: step.status === 'failed' }"><Icon :name="step.name === 'ask_user' ? 'chat' : step.kind === 'tool' ? 'photograph' : 'sparkles'" size="xs" /></span>
-        <span class="step-title" :title="step.arguments?.prompt || step.name">{{ step.name === 'save_work_plan' ? '配置卡已整理' : step.name === 'ask_user' ? (step.status === 'completed' ? '已确认回答' : '询问用户') : step.kind === 'tool' ? `生成图片${inline && step.arguments?.prompt ? ' · ' + step.arguments.prompt : ''}` : active(step) ? '正在思考' : step.summary ? '思考摘要' : '模型思考' }}</span>
+        <span class="step-icon" :class="{ working: active(step), failed: step.status === 'failed' }"><Icon :name="step.kind !== 'tool' ? 'sparkles' : step.name === 'generate_image' ? 'photograph' : step.name === 'ask_user' ? 'chat' : 'document'" size="xs" /></span>
+        <span class="step-title" :title="step.arguments?.prompt || step.name">{{ step.name === 'ask_user' && step.status === 'completed' ? '已确认回答' : step.kind === 'tool' ? `${agentToolLabel(step.name)}${step.name === 'generate_image' && inline && step.arguments?.prompt ? ' · ' + step.arguments.prompt : ''}` : active(step) ? '正在思考' : step.summary ? '思考摘要' : '模型思考' }}</span>
         <span class="step-state" :class="[`state-${step.status}`, { 'sr-only': inline }]">{{ statusLabel(step) }}</span>
         <Icon v-if="inline && step.status === 'completed'" name="check" size="sm" class="tool-check" /><span v-else-if="inline && active(step)" class="tool-spinner" aria-hidden="true" /><Icon v-else-if="inline && step.status === 'failed'" name="x" size="sm" class="tool-failed" />
         <time v-if="elapsed(step)" class="step-duration" :title="'本阶段耗时'">{{ elapsed(step) }}</time>
@@ -16,17 +16,18 @@
           <p v-else class="step-note">{{ active(step) ? '正在接收模型公开的思考摘要…' : '该模型未返回可展示的思考摘要。' }}</p>
           <div class="step-metadata"><span>模型 {{ step.name }}</span><span v-if="step.summary">模型提供的公开摘要</span></div>
         </template>
-        <template v-else-if="step.name === 'save_work_plan'"><p class="step-note">已保存待审核方案，确认配置卡后才会执行生图。</p><code>save_work_plan</code></template>
+        <template v-else-if="step.name === 'save_work_plan'"><p class="step-note">已保存配置卡，批准后才会执行生图。</p><code>save_work_plan</code></template>
         <template v-else-if="step.name === 'ask_user'"><p class="step-note question-result">{{ step.summary }}</p><div class="step-metadata"><code>ask_user</code></div></template>
+        <template v-else-if="step.name !== 'generate_image'"><p class="step-note">{{ step.summary || (step.status === 'running' ? '工具正在执行。' : step.status === 'queued' ? '已创建工具调用，等待执行。' : '工具结果已返回。') }}</p><div class="step-metadata"><code>{{ step.name }}</code></div></template>
         <template v-else>
           <div v-if="step.arguments" class="tool-input"><h4>工具输入 <code>{{ step.name }}</code></h4><p class="tool-prompt">{{ step.arguments.prompt }}</p><dl class="tool-specs"><div><dt>模型</dt><dd>{{ step.arguments.model }}</dd></div><div><dt>规格</dt><dd>{{ step.arguments.image_size }} · {{ step.arguments.aspect_ratio }}</dd></div><div><dt>参考图</dt><dd>{{ step.arguments.reference_count }} 张</dd></div></dl></div>
           <p v-if="step.asset_ids?.length" class="tool-output">已生成 {{ step.asset_ids.length }} 张图片，结果已附在本条回复中。</p>
           <p v-else-if="step.status === 'running'" class="step-note">工具正在生成图片，结果返回后会显示在对话中。</p>
           <p v-else-if="step.status === 'queued'" class="step-note">已创建工具调用，等待执行。</p>
         </template>
-        <p v-if="step.error_code" class="step-error" role="status">{{ agentError(step.error_code) }}</p>
+        <p v-if="step.error_code" class="step-error" role="status">{{ agentError(step.error_code, step.failure) }}</p>
         <p v-if="step.cost_usd" class="step-cost">已确认费用 ${{ step.cost_usd }}</p>
-        <p v-else-if="step.status === 'reconciling'" class="step-note">结果与费用仍在核对，不会自动重新调用。</p>
+        <p v-else-if="step.status === 'reconciling'" class="step-note">正在读取已保存的响应。</p>
       </div></Transition>
     </div>
   </component>
@@ -36,7 +37,7 @@ import { computed, onBeforeUnmount, ref, useId, watch } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useAgentMotion } from '@/composables/useAgentMotion'
 import type { AgentTraceStep } from '@/api/agent'
-import { agentError, renderAgentMarkdown } from '@/utils/agentPresentation'
+import { agentError, agentToolLabel, renderAgentMarkdown } from '@/utils/agentPresentation'
 const props = defineProps<{ steps: AgentTraceStep[]; inline?: boolean }>()
 const motion = useAgentMotion()
 const expanded = ref<Record<string, boolean>>({})
@@ -48,7 +49,7 @@ const isOpen = (step: AgentTraceStep) => expanded.value[step.id] ?? (!props.inli
 const toggle = (step: AgentTraceStep) => { expanded.value[step.id] = !isOpen(step) }
 const panelId = (step: AgentTraceStep) => `${instanceId}-${step.id}`
 function statusLabel(step: AgentTraceStep) {
-  return ({ waiting_user: '等待回答', queued: '待执行', running: step.kind === 'tool' ? '执行中' : '思考中', reconciling: '待核对', completed: '已完成', failed: '失败', cancelled: '已停止', expired: '已超时', skipped: '未执行' } as Record<string, string>)[step.status] || '处理中'
+  return ({ waiting_user: '等待回答', queued: '待执行', running: step.kind === 'tool' ? '执行中' : '思考中', reconciling: '恢复中', completed: '已完成', failed: '失败', cancelled: '已停止', expired: '已超时', skipped: '未执行' } as Record<string, string>)[step.status] || '处理中'
 }
 const processLabel = computed(() => {
   const step = props.steps.find(active)

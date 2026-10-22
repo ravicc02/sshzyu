@@ -102,7 +102,7 @@ describe('Compact visual work card and right-side editor', () => {
   it('keeps exactly two editor actions and approves the current draft without a left footer', async () => {
     const w = make({ ...plan, status: 'ready', revision: 3 })
     expect(w.find('.plan-footer').exists()).toBe(false)
-    expect(w.findAll('.editor-approval-actions button').map(button => button.text())).toEqual(['保存草稿', '批准方案配置'])
+    expect(w.findAll('.editor-approval-actions button').map(button => button.text())).toEqual(['保存草稿', '批准配置'])
     await w.get('.primary').trigger('click')
     expect(w.emitted('approve')![0]![0]).toEqual(expect.objectContaining({ title: plan.title }))
     await item(w); await w.get('.plan-item textarea').setValue('新内容')
@@ -124,7 +124,7 @@ describe('Compact visual work card and right-side editor', () => {
   })
   it('requires new pricing after a model binding changes', async () => {
     const w = make({ ...plan, status: 'ready' }); await w.setProps({ configVersion: 2 })
-    expect(w.get('.primary').text()).toBe('批准方案配置'); expect(w.text()).toContain('重新核价'); w.unmount()
+    expect(w.get('.primary').text()).toBe('批准配置'); expect(w.text()).toContain('重新核价'); w.unmount()
   })
   it('retains incomplete ten-page content without enabling execution', async () => {
     const w = make({ ...plan, image_size: '', items: Array.from({ length: 10 }, (_, n) => ({ ...plan.items[0]!, id: `p${n}`, prompt: '' })) })

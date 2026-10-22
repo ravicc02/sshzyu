@@ -272,7 +272,7 @@ func TestAgentHTTPTraceContract(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &cv); err != nil {
 		t.Fatal(err)
 	}
-	w = call(http.MethodPost, "/api/v1/agent/conversations/"+cv.ID+"/messages", []byte(`{"content":"generate a poster","config_version":1,"max_cost_usd":"1"}`))
+	w = call(http.MethodPost, "/api/v1/agent/conversations/"+cv.ID+"/messages", []byte(`{"content":"先展示海报配置卡，批准后再生成","config_version":1,"max_cost_usd":"1"}`))
 	if w.Code != 202 {
 		t.Fatal("submit", w.Code, w.Body.String())
 	}
@@ -567,5 +567,59 @@ func TestAgentHTTPExpiredMetadataAndBinaryHaveSeparateContracts(t *testing.T) {
 	}
 	if meta = call("/meta"); meta.Code != 200 {
 		t.Fatal("cleanup lost history")
+	}
+}
+
+type rejectedHTTPExecutor struct {
+	smokeAgentExecutor
+	calls atomic.Int32
+}
+
+func (f *rejectedHTTPExecutor) Execute(context.Context, agent.Invocation) (agent.Outcome, error) {
+	f.calls.Add(1)
+	detail := &agent.FailureDetail{Message: "Insufficient balance", StatusCode: 502, UpstreamStatusCode: 403}
+	return agent.Outcome{BillingPending: true, Failure: detail}, &agent.InvocationFailure{Code: "AGENT_UPSTREAM_REJECTED", Dispatched: true, ResultKnown: true, Detail: detail}
+}
+func TestAgentHTTPOriginalRejectionReturnsWithoutWaiting(t *testing.T) {
+	executor := &rejectedHTTPExecutor{}
+	h := agentTestHandler(t, executor)
+	router := agentTestRouter(h)
+	call := func(method, path, key string, body []byte) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer agent-local-smoke-token")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Idempotency-Key", key)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w
+	}
+	w := call(http.MethodPost, "/api/v1/agent/conversations", "", []byte(`{"title":"rejection","config":{"model_api_key_id":1,"model":"text-demo"}}`))
+	var cv agent.Conversation
+	if w.Code >= 300 || json.Unmarshal(w.Body.Bytes(), &cv) != nil {
+		t.Fatal("create failed")
+	}
+	message := []byte(`{"content":"hello","config_version":1}`)
+	w = call(http.MethodPost, "/api/v1/agent/conversations/"+cv.ID+"/messages", "rejection", message)
+	var r agent.Run
+	if w.Code != 202 || json.Unmarshal(w.Body.Bytes(), &r) != nil {
+		t.Fatal("submit failed")
+	}
+	start := time.Now()
+	w = call(http.MethodGet, "/api/v1/agent/runs/"+r.ID+"/events", "", nil)
+	if time.Since(start) > 5*time.Second || w.Code != 200 || bytes.Contains(w.Body.Bytes(), []byte("operation.reconciling")) || !bytes.Contains(w.Body.Bytes(), []byte("Insufficient balance")) {
+		t.Fatal("original rejection not delivered immediately")
+	}
+	w = call(http.MethodGet, "/api/v1/agent/runs/"+r.ID, "", nil)
+	var done agent.Run
+	if json.Unmarshal(w.Body.Bytes(), &done) != nil || done.Status != "failed" || done.Failure == nil || done.Failure.UpstreamStatusCode != 403 || done.Failure.Message != "Insufficient balance" || executor.calls.Load() != 1 {
+		t.Fatal("failure contract or dispatch count changed")
+	}
+	w = call(http.MethodGet, "/api/v1/agent/conversations/"+cv.ID, "", nil)
+	if !bytes.Contains(w.Body.Bytes(), []byte("Insufficient balance")) {
+		t.Fatal("history dropped the error")
+	}
+	w = call(http.MethodPost, "/api/v1/agent/conversations/"+cv.ID+"/messages", "new-message", message)
+	if w.Code != 202 {
+		t.Fatal("failure still blocks conversation", w.Code)
 	}
 }

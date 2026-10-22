@@ -47,7 +47,11 @@ func (w *agentResponseWriter) consumeStream(chunk []byte) {
 			}
 			var chunk apicompat.ChatCompletionsChunk
 			if json.Unmarshal(raw, &chunk) != nil || gjson.GetBytes(raw, "error").Exists() {
-				w.streamErr = agent.ErrUnknown
+				message := agentErrorBodyMessage(raw)
+				if message == "" {
+					message = "上游返回了无效的流式响应。"
+				}
+				w.streamErr = agentIncompleteFailure("AGENT_RESPONSE_INCOMPLETE", message, true)
 				return
 			}
 			for _, event := range apicompat.ChatCompletionsChunkToResponsesEvents(&chunk, w.chatState) {
@@ -104,8 +108,17 @@ func (w *agentResponseWriter) consumeResponseData(raw []byte) {
 	if json.Unmarshal(raw, &event) != nil {
 		return
 	}
+	if agentMeaningfulStreamEvent(kind.Type, event.Delta) {
+		w.activity()
+	}
 	changed := false
 	switch event.Type {
+	case "error":
+		message := agentErrorBodyMessage(raw)
+		if message == "" {
+			message = "上游流式调用失败。"
+		}
+		w.streamErr = agentIncompleteFailure("AGENT_UPSTREAM_REJECTED", message, true)
 	case "response.output_text.delta":
 		w.streamText += event.Delta
 		changed = true

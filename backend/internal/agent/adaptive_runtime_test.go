@@ -270,7 +270,7 @@ func TestPostgresAdaptiveImageRequiresHumanApprovalAndScopedGrant(t *testing.T) 
 		}
 		return adaptiveReply("请在配置卡确认，尚未生成。")
 	}
-	run := adaptiveTurn(t, s, c, "card", "生成一张蓝白风格样张")
+	run := adaptiveTurn(t, s, c, "card", "先展示一张蓝白风格样张的方案，批准后再生成")
 	if f.images != 0 || len(run.AssetIDs) != 0 || run.Status != "completed" {
 		t.Fatal("unapproved generation")
 	}
@@ -675,5 +675,129 @@ func TestPostgresAdaptiveFinishTaskClosesRemainingScopeWithoutSpending(t *testin
 	p, err = s.Store.WorkPlan(ctx, 1, p.ID)
 	if err != nil || p.TaskState != "closed" || len(p.Items) != 1 || r.Status != "completed" {
 		t.Fatal("finish erased project", err)
+	}
+}
+
+func TestPostgresAdaptivePresentReviewTargetsExistingPlanWithoutDispatch(t *testing.T) {
+	s, f, c := newAdaptive(t)
+	ctx := context.Background()
+	f.choose = func(_ Invocation, n int) Outcome {
+		if n == 1 {
+			return adaptiveCall("create", "save_work_plan", workDraft(1))
+		}
+		return adaptiveReply("草稿已保存")
+	}
+	first := adaptiveTurn(t, s, c, "create-review", "先整理方案")
+	plans, err := s.Store.WorkPlans(ctx, 1, c.ID)
+	if err != nil || len(plans) != 1 {
+		t.Fatal("missing original plan", err)
+	}
+	p := plans[0]
+	if _, err = s.Store.DB.ExecContext(ctx, `UPDATE agent_work_plans SET status='submitted' WHERE id=$1`, p.ID); err != nil {
+		t.Fatal(err)
+	}
+	f.turns = 0
+	f.choose = func(_ Invocation, n int) Outcome {
+		if n == 1 {
+			return adaptiveCall("read", "get_job", map[string]string{"plan_id": p.ID})
+		}
+		if n == 2 {
+			return adaptiveCall("show", "present_review", map[string]string{"plan_id": p.ID})
+		}
+		return adaptiveReply("已请求重新展示原配置卡")
+	}
+	r := adaptiveTurn(t, s, c, "show-review", "没看到，请再展示原配置卡")
+	if r.Status != "completed" || f.images != 0 {
+		t.Fatalf("unexpected execution: status=%s images=%d", r.Status, f.images)
+	}
+	found := false
+	for _, step := range r.Trace {
+		if step.Name == "get_job" && step.ReviewPlanID != "" {
+			t.Fatal("read-only job query requested presentation")
+		}
+		if step.Name == "present_review" {
+			found = step.ReviewPlanID == p.ID && step.Status == "completed"
+		}
+	}
+	if !found {
+		t.Fatal("existing plan presentation target missing")
+	}
+	for _, item := range r.History {
+		var record map[string]any
+		_ = json.Unmarshal(item, &record)
+		if record["type"] == "function_call_output" && record["call_id"] == "show" {
+			var result map[string]any
+			_ = json.Unmarshal([]byte(record["output"].(string)), &result)
+			if result["approval"] != "not_pending" || result["presentation"] != "requested" || result["dispatched"] != false {
+				t.Fatal("submitted result was advertised as new approval", result)
+			}
+		}
+	}
+	after, err := s.Store.WorkPlans(ctx, 1, c.ID)
+	if err != nil || len(after) != 1 || after[0].SourceRunID != first.ID || after[0].Revision != p.Revision || after[0].Status != "submitted" {
+		t.Fatal("presentation duplicated or rewrote the original plan", err)
+	}
+	var public map[string]any
+	if json.Unmarshal(jsonBytes(r.Public()), &public) != nil || !strings.Contains(string(jsonBytes(public["trace"])), p.ID) {
+		t.Fatal("review target was not persisted in the public snapshot")
+	}
+}
+
+func TestPostgresAdaptiveImageProposalRequestsReviewWithoutDispatch(t *testing.T) {
+	s, f, c := newAdaptive(t)
+	f.choose = func(_ Invocation, n int) Outcome {
+		if n == 1 {
+			return adaptiveCall("propose", "generate_image", map[string]any{"prompt": "cat", "model": nil, "image_size": "1K", "aspect_ratio": "1:1", "reference_asset_ids": nil, "task_id": nil, "purpose": nil})
+		}
+		return adaptiveReply("请先审核配置卡")
+	}
+	r := adaptiveTurn(t, s, c, "image-review", "先展示生图方案")
+	plans, err := s.Store.WorkPlans(context.Background(), 1, c.ID)
+	if err != nil || len(plans) != 1 || f.images != 0 {
+		t.Fatal("proposal dispatched or lost its plan", f.images, err)
+	}
+	found := false
+	for _, step := range r.Trace {
+		if step.Name == "generate_image" && step.ReviewPlanID == plans[0].ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("image proposal omitted its explicit review target")
+	}
+}
+
+func TestPostgresAdaptiveReviewTargetCannotCrossConversation(t *testing.T) {
+	s, f, c := newAdaptive(t)
+	f.choose = func(_ Invocation, n int) Outcome {
+		if n == 1 {
+			return adaptiveCall("create", "save_work_plan", workDraft(1))
+		}
+		return adaptiveReply("已保存")
+	}
+	adaptiveTurn(t, s, c, "private-plan", "保存方案")
+	plans, err := s.Store.WorkPlans(context.Background(), 1, c.ID)
+	if err != nil || len(plans) != 1 {
+		t.Fatal(err)
+	}
+	other, err := s.Create(context.Background(), 1, "另一会话", c.Config, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.turns = 0
+	f.choose = func(_ Invocation, n int) Outcome {
+		if n == 1 {
+			return adaptiveCall("foreign", "present_review", map[string]string{"plan_id": plans[0].ID})
+		}
+		return adaptiveReply("该方案不属于本会话")
+	}
+	r := adaptiveTurn(t, s, other, "foreign-review", "展示方案")
+	for _, step := range r.Trace {
+		if step.ReviewPlanID != "" {
+			t.Fatal("foreign plan leaked into a presentation request")
+		}
+	}
+	if f.images != 0 {
+		t.Fatal("foreign review dispatched an image")
 	}
 }

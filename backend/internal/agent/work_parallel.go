@@ -129,13 +129,16 @@ func (s *Service) releaseWorkReserve(r *Run, index int) error {
 	_, err := s.Store.DB.ExecContext(context.Background(), `UPDATE agent_checkpoints SET reserved_bytes=byte_size WHERE operation_id=$1`, fmt.Sprintf("%s_work_%d", r.ID, index))
 	return err
 }
-func (r *Run) markWorkStep(index int, status, code string) {
+func (r *Run) markWorkStep(index int, status, code string, detail ...*FailureDetail) {
 	id := fmt.Sprintf("%s_work_%d", r.ID, index)
 	for i := range r.Trace {
 		if r.Trace[i].ID == id {
 			now := time.Now().UTC()
 			r.Trace[i].Status = status
 			r.Trace[i].ErrorCode = code
+			if len(detail) > 0 {
+				r.Trace[i].Failure = detail[0]
+			}
 			r.Trace[i].EndedAt = &now
 			return
 		}
@@ -192,6 +195,14 @@ func (s *Service) processParallelWork(ctx context.Context, r *Run) {
 			r.Status = "partial_success"
 		}
 		r.ErrorCode = "AGENT_WORK_ITEMS_FAILED"
+		if r.Failure != nil {
+			for _, item := range r.Work.Results {
+				if item.Failure != nil {
+					r.ErrorCode = item.ErrorCode
+					break
+				}
+			}
+		}
 	}
 	if failures == 0 {
 		r.Text += " 请在对应内容下预览，或单独重新生成。"
@@ -213,13 +224,6 @@ func (s *Service) runWorkWave(ctx context.Context, r *Run, indices []int) bool {
 	results := make(chan workItemOutcome, limit)
 	cursor, active := 0, 0
 	stopped, unknown, cancelled := false, false, false
-	var reconcileTimer *time.Timer
-	var reconcileDeadline <-chan time.Time
-	defer func() {
-		if reconcileTimer != nil {
-			reconcileTimer.Stop()
-		}
-	}()
 	checkState := func() error {
 		value, err := s.Store.Cancelled(context.WithoutCancel(ctx), r)
 		if err != nil {
@@ -242,6 +246,7 @@ func (s *Service) runWorkWave(ctx context.Context, r *Run, indices []int) bool {
 			item := &r.Work.Results[index]
 			item.Status = "running"
 			item.ErrorCode = ""
+			item.Failure = nil
 			r.Status = "executing_tool"
 			r.startStep(fmt.Sprintf("%s_work_%d", r.ID, index), "tool", "generate_image", "running", traceArguments(workArgs(r.Work.Plan, r.Work.Plan.Items[index]), r.Config.ImageModel))
 			if err := s.Store.Save(ctx, r, "work.item.started", r.Public()); err != nil {
@@ -287,17 +292,14 @@ func (s *Service) runWorkWave(ctx context.Context, r *Run, indices []int) bool {
 			}
 			if result.Err != nil {
 				code := SafeCode(result.Err)
+				item.Failure = FailureFor(result.Err)
+				if r.Failure == nil {
+					r.Failure = item.Failure
+				}
 				if errors.Is(result.Err, ErrUnknown) || oneOf(result.Op.Status, "dispatching", "accepted", "result_unknown") {
-					item.Status = "reconciling"
+					item.Status = "failed"
 					item.ErrorCode = code
-					r.markWorkStep(index, "reconciling", code)
-					if !unknown {
-						s.beginReconciliation(r, "UPSTREAM_RESULT_UNKNOWN")
-						if r.ReconcileDeadline != nil {
-							reconcileTimer = time.NewTimer(time.Until(*r.ReconcileDeadline))
-							reconcileDeadline = reconcileTimer.C
-						}
-					}
+					r.markWorkStep(index, "failed", code, item.Failure)
 					unknown = true
 					stopped = true
 				} else {
@@ -306,12 +308,15 @@ func (s *Service) runWorkWave(ctx context.Context, r *Run, indices []int) bool {
 					if cancelled || ctx.Err() != nil {
 						item.Status = "cancelled"
 					}
-					r.markWorkStep(index, item.Status, code)
+					r.markWorkStep(index, item.Status, code, item.Failure)
 					if result.Op.ID != "" && result.Op.Status == "prepared" {
 						result.Op.Status = "failed"
 						result.Op.Cost = "0.00000000"
 						result.Op.ErrorCode = code
 						_ = s.Store.FinishOperation(persistCtx, r, result.Op)
+					}
+					if code == "AGENT_UPSTREAM_REJECTED" {
+						stopped = true
 					}
 					if oneOf(code, "AGENT_PRICING_CHANGED", "AGENT_KEY_BINDING_CHANGED", "AGENT_STORAGE_QUOTA_EXCEEDED", "AGENT_AUTHORIZATION_DENIED") {
 						stopped = true
@@ -327,9 +332,6 @@ func (s *Service) runWorkWave(ctx context.Context, r *Run, indices []int) bool {
 			if err := s.Store.Save(context.WithoutCancel(ctx), r, event, r.Public()); err != nil {
 				return false
 			}
-		case <-reconcileDeadline:
-			cancel()
-			reconcileDeadline = nil
 		case <-time.After(250 * time.Millisecond):
 			// The loop observes cancellation and stops admitting more work promptly.
 		}
@@ -338,7 +340,14 @@ func (s *Service) runWorkWave(ctx context.Context, r *Run, indices []int) bool {
 		return false
 	}
 	if unknown {
-		s.beginReconciliation(r, "UPSTREAM_RESULT_UNKNOWN")
+		code := "UPSTREAM_RESULT_UNKNOWN"
+		for _, item := range r.Work.Results {
+			if item.Status == "failed" && item.ErrorCode != "" {
+				code = item.ErrorCode
+				break
+			}
+		}
+		s.fail(r, Invalid(code))
 		return false
 	}
 	if cancelled || ctx.Err() != nil {
@@ -352,6 +361,14 @@ func (s *Service) runWorkWave(ctx context.Context, r *Run, indices []int) bool {
 			r.Status = "partial_success"
 		}
 		r.ErrorCode = "AGENT_WORK_ITEMS_FAILED"
+		if r.Failure != nil {
+			for _, item := range r.Work.Results {
+				if item.Failure != nil {
+					r.ErrorCode = item.ErrorCode
+					break
+				}
+			}
+		}
 		_ = s.Store.Save(context.WithoutCancel(ctx), r, "run."+r.Status, r.Public())
 		return false
 	}

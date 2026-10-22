@@ -79,6 +79,7 @@ func (s *Service) QueueImageRecovery(ctx context.Context, user int64, id string)
 	r.Deadline = deadline
 	r.Status = "reconciling"
 	r.ErrorCode = ""
+	r.Failure = nil
 	r.Cancel = false
 	r.Owner = ""
 	r.Fence++

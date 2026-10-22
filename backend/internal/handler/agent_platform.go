@@ -14,7 +14,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/agent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -55,7 +54,7 @@ func newPlatformAgentExecutor(keys *service.APIKeyService, gateway *service.Gate
 	if openai != nil {
 		ops = openai.opsService
 	}
-	e.Use(middleware.ClientRequestID(), agentOpsMiddleware(ops), gin.HandlerFunc(auth), middleware.GroupModelAllowlist())
+	e.Use(middleware.ClientRequestID(), agentOpsMiddleware(ops), agentFailureMiddleware(), gin.HandlerFunc(auth), middleware.GroupModelAllowlist())
 	e.POST("/v1/responses", p.routeInvocation)
 	e.POST("/v1/images/generations", p.routeInvocation)
 	e.POST("/v1/images/edits", p.routeInvocation)
@@ -305,12 +304,9 @@ func (p *platformAgentExecutor) Quote(ctx context.Context, in agent.Invocation) 
 	return p.openai.gatewayService.AgentCostBound(ctx, k, in.Model, kind, size)
 }
 func (p *platformAgentExecutor) Execute(ctx context.Context, in agent.Invocation) (agent.Outcome, error) {
-	timeout := 120 * time.Second
-	if in.Kind == "image" {
-		timeout = 600 * time.Second
-	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	watchdog := newAgentInvocationWatchdog(ctx, in.Kind, defaultAgentInvocationLimits(in.Kind))
+	defer watchdog.close()
+	ctx = context.WithValue(watchdog.ctx, agentActivityKey{}, watchdog.activity)
 	var out agent.Outcome
 	k, e := p.key(ctx, in.Binding)
 	if e != nil {
@@ -335,8 +331,12 @@ func (p *platformAgentExecutor) Execute(ctx context.Context, in agent.Invocation
 	if recorded {
 		out.Cost = decimal.NewFromFloat(cost).StringFixed(8)
 	}
+	if failure := agentInvocationContextFailure(ctx, trace.Dispatched); failure != nil {
+		out.Failure = failure.Detail
+		return out, failure
+	}
 	if w.overflow {
-		return out, agent.ErrUnknown
+		return out, agentIncompleteFailure("AGENT_RESPONSE_TOO_LARGE", "上游响应超过可接收的大小限制。", trace.Dispatched)
 	}
 	if w.code < 200 || w.code >= 300 {
 		if !trace.Dispatched {
@@ -348,11 +348,41 @@ func (p *platformAgentExecutor) Execute(ctx context.Context, in agent.Invocation
 				return out, &agent.InvocationFailure{Code: code, Dispatched: false}
 			}
 		}
-		return out, agentGatewayFailure(trace)
+		if trace.ConnectionFailedBeforeWrite() {
+			return out, &agent.InvocationFailure{Code: "AGENT_UPSTREAM_CONNECTION_FAILED", Dispatched: false, ResultKnown: true, Detail: &agent.FailureDetail{Message: "连接上游服务失败，请检查服务或出站代理。"}}
+		}
+		failure := agentHTTPFailure(w, trace.Dispatched, k.Key)
+		out.Failure = failure.Detail
+		return out, failure
 	}
 	raw := w.resultBody()
 	if w.streamErr != nil || !json.Valid(raw) {
-		return out, agentGatewayFailure(trace)
+		var streamFailure *agent.InvocationFailure
+		if errors.As(w.streamErr, &streamFailure) {
+			if streamFailure.Detail != nil {
+				streamFailure.Detail.Message = agentFailureMessage(streamFailure.Detail.Message, k.Key)
+			}
+			out.Failure = streamFailure.Detail
+			return out, streamFailure
+		}
+		if failure, ok := agentGatewayFailure(trace).(*agent.InvocationFailure); ok {
+			return out, failure
+		}
+		message := "上游响应中断，未收到完整结果。"
+		if ctx.Err() != nil {
+			message = "上游请求超时或连接已中断，未收到完整结果。"
+		}
+		return out, agentIncompleteFailure("AGENT_RESPONSE_INCOMPLETE", message, trace.Dispatched)
+	}
+	if status := gjson.GetBytes(raw, "status").String(); status == "failed" || status == "incomplete" || gjson.GetBytes(raw, "error").Exists() {
+		message := agentErrorBodyMessage(raw)
+		if message == "" {
+			message = "上游未完成本次请求。"
+		}
+		failure := agentIncompleteFailure("AGENT_MODEL_INCOMPLETE", message, trace.Dispatched)
+		failure.ResultKnown = true
+		out.Body, out.Failure, out.Unknown = raw, failure.Detail, false
+		return out, failure
 	}
 	out.Unknown = false
 	if in.Kind == "text" {
@@ -376,11 +406,14 @@ func agentGatewayFailure(trace *service.AgentInvocationTrace) error {
 }
 
 func (p *platformAgentExecutor) Recover(ctx context.Context, in agent.Invocation, out agent.Outcome) (agent.Outcome, error) {
+	if out.Unknown || (len(out.Body) == 0 && len(out.Image) == 0) {
+		return out, &agent.InvocationFailure{Code: "AGENT_RESPONSE_INCOMPLETE", Dispatched: true, Detail: out.Failure}
+	}
 	if out.BillingPending {
 		var cost string
 		err := p.db.QueryRowContext(ctx, `SELECT l.actual_cost::text FROM usage_logs l JOIN usage_billing_dedup d ON d.request_id=l.request_id AND d.api_key_id=l.api_key_id WHERE l.request_id=$1 AND l.api_key_id=$2 LIMIT 1`, billingid.AgentOperation(in.OperationID), in.Binding.KeyID).Scan(&cost)
 		if err != nil {
-			return out, err
+			return out, agentIncompleteFailure("AGENT_BILLING_UNCONFIRMED", "接口调用已结束，但费用记录暂未返回。", true)
 		}
 		if _, err = agent.Amount(cost); err != nil {
 			return out, err
@@ -388,7 +421,7 @@ func (p *platformAgentExecutor) Recover(ctx context.Context, in agent.Invocation
 		out.Cost = cost
 		out.BillingPending = false
 	}
-	if out.Unknown || len(out.Body) == 0 {
+	if out.Unknown || (len(out.Body) == 0 && len(out.Image) == 0) {
 		return out, agent.ErrUnknown
 	}
 	if in.Kind == "image" && len(out.Image) == 0 {
@@ -408,7 +441,7 @@ func (p *platformAgentExecutor) Recover(ctx context.Context, in agent.Invocation
 			if errors.Is(err, service.ErrAgentImageResultTooLarge) || errors.Is(err, service.ErrAgentImageResultInvalid) {
 				return out, &agent.ResultFailure{Code: err.Error()}
 			}
-			return out, err
+			return out, agentIncompleteFailure("AGENT_IMAGE_DOWNLOAD_FAILED", agentFailureMessage(err.Error()), true)
 		}
 		out.ImageFromBody = embedded
 		out.Image = data
@@ -445,6 +478,9 @@ func (p *platformAgentExecutor) invoke(ctx context.Context, k *service.APIKey, c
 }
 
 type agentResponseWriter struct {
+	failure                 *agent.FailureDetail
+	ambiguousFailureAttempt bool
+
 	ctx           context.Context
 	headers       http.Header
 	code          int
@@ -463,6 +499,9 @@ type agentResponseWriter struct {
 func (w *agentResponseWriter) Header() http.Header { return w.headers }
 func (w *agentResponseWriter) WriteHeader(c int)   { w.code = c }
 func (w *agentResponseWriter) Write(b []byte) (int, error) {
+	if w.ctx != nil && w.ctx.Err() != nil {
+		return 0, w.ctx.Err()
+	}
 	if len(b) > agentlimits.ImageResponseBytes-w.receivedBytes {
 		w.overflow = true
 		return 0, io.ErrShortBuffer
@@ -475,6 +514,9 @@ func (w *agentResponseWriter) Write(b []byte) (int, error) {
 			return len(b), w.streamErr
 		}
 		return len(b), nil
+	}
+	if len(b) > 0 {
+		w.activity()
 	}
 	return w.body.Write(b)
 }
@@ -500,6 +542,7 @@ func (w *agentResponseWriter) releaseBuffers() {
 	w.completed = nil
 	w.streamText = ""
 	w.streamSummary = ""
+	w.failure = nil
 	w.onProgress = nil
 	w.chatState = nil
 	w.ctx = nil

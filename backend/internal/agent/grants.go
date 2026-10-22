@@ -165,7 +165,7 @@ func reserveGrant(ctx context.Context, tx *sql.Tx, r *Run, op Operation) error {
 		return nil
 	}
 	if op.GrantID == "" {
-		return Invalid("AGENT_GRANT_REQUIRED")
+		return reserveDirectImage(ctx, tx, r, op)
 	}
 	var existing string
 	err := tx.QueryRowContext(ctx, `SELECT grant_id FROM agent_grant_operations WHERE operation_id=$1`, op.ID).Scan(&existing)
@@ -200,7 +200,7 @@ func (s *Service) imageReviewCard(ctx context.Context, r *Run, call Call, args T
 	if args.Aspect != nil {
 		aspect = *args.Aspect
 	}
-	draft := WorkDraft{Title: "图片生成方案", Brief: r.Input, Size: size, Aspect: aspect, SharedReferences: []string{}, Items: []WorkItem{{ID: "image1", Title: "图片", Prompt: args.Prompt, References: args.References}}}
+	draft := WorkDraft{Title: "配置卡", Brief: r.Input, Size: size, Aspect: aspect, SharedReferences: []string{}, Items: []WorkItem{{ID: "image1", Title: "图片", Prompt: args.Prompt, References: args.References}}}
 	if len(draft.Brief) > 4000 {
 		draft.Brief = "按用户已沟通的需求生成图片"
 	}

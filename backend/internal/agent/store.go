@@ -67,7 +67,7 @@ func (s *Store) Configure(ctx context.Context, user int64, id string, version in
 	return nil
 }
 func (s *Store) Messages(ctx context.Context, user int64, conv string) ([]Message, error) {
-	rows, e := s.DB.QueryContext(ctx, `SELECT content,is_answer FROM (SELECT CASE WHEN m.role='assistant' THEN m.content || jsonb_build_object('run_status',r.status,'error_code',coalesce(r.snapshot->>'error_code',''),'can_recover_image',r.status IN ('failed','expired','partial_success','cancelled') AND r.snapshot->'pending_call'->>'name'='generate_image' AND EXISTS(SELECT 1 FROM agent_operations recovery_op JOIN agent_checkpoints cp ON cp.operation_id=recovery_op.id WHERE recovery_op.run_id=r.id AND recovery_op.kind='image' AND recovery_op.status IN ('succeeded','dispatching','accepted','result_unknown') AND cp.user_id=c.user_id AND cp.purged_at IS NULL AND cp.byte_size>0 AND cp.content_expires_at>now())) ELSE m.content END content,m.created_at,m.id,
+	rows, e := s.DB.QueryContext(ctx, `SELECT content,is_answer FROM (SELECT CASE WHEN m.role='assistant' THEN m.content || jsonb_build_object('run_status',r.status,'error_code',coalesce(r.snapshot->>'error_code',''),'failure',r.snapshot->'failure','can_recover_image',r.status IN ('failed','expired','partial_success','cancelled') AND r.snapshot->'pending_call'->>'name'='generate_image' AND EXISTS(SELECT 1 FROM agent_operations recovery_op JOIN agent_checkpoints cp ON cp.operation_id=recovery_op.id WHERE recovery_op.run_id=r.id AND recovery_op.kind='image' AND recovery_op.status IN ('succeeded','dispatching','accepted','result_unknown') AND cp.user_id=c.user_id AND cp.purged_at IS NULL AND cp.byte_size>0 AND cp.content_expires_at>now())) ELSE m.content END content,m.created_at,m.id,
  (m.role='user' AND EXISTS(SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(r.snapshot->'trace')='array' THEN r.snapshot->'trace' ELSE '[]'::jsonb END) t WHERE t->>'kind'='tool' AND t->>'name'='ask_user' AND t->>'status'='completed' AND t->>'summary'=m.content->>'text')) AS is_answer
  FROM agent_messages m JOIN agent_conversations c ON c.id=m.conversation_id LEFT JOIN agent_runs r ON r.id=m.run_id AND r.user_id=c.user_id WHERE c.user_id=$1 AND c.id=$2 AND c.deleted_at IS NULL
  AND NOT(m.role='assistant' AND EXISTS(SELECT 1 FROM agent_runs replacement WHERE replacement.user_id=c.user_id AND replacement.conversation_id=c.id AND replacement.snapshot->>'retry_of'=m.run_id AND replacement.status IN ('completed','partial_success')))
@@ -309,7 +309,7 @@ func (s *Store) Save(ctx context.Context, r *Run, typ string, data any) error {
 		if _, e = tx.ExecContext(ctx, `UPDATE agent_checkpoints SET reserved_bytes=byte_size WHERE operation_id IN(SELECT id FROM agent_operations WHERE run_id=$1)`, r.ID); e != nil {
 			return e
 		}
-		m := Message{ID: "msg_" + r.ID, Role: "assistant", Text: r.Text, Assets: r.AssetIDs, RunID: r.ID, Trace: r.Trace, RunStatus: r.Status, ErrorCode: r.ErrorCode, CreatedAt: time.Now().UTC()}
+		m := Message{ID: "msg_" + r.ID, Role: "assistant", Text: r.Text, Assets: r.AssetIDs, RunID: r.ID, Trace: r.Trace, RunStatus: r.Status, ErrorCode: r.ErrorCode, Failure: r.Failure, CreatedAt: time.Now().UTC()}
 		mb, _ := json.Marshal(m)
 		if _, e = tx.ExecContext(ctx, `INSERT INTO agent_messages(id,conversation_id,run_id,role,content) VALUES($1,$2,$3,$4,$5) ON CONFLICT(id) DO NOTHING`, m.ID, r.ConversationID, r.ID, m.Role, mb); e != nil {
 			return e
@@ -435,7 +435,7 @@ func (s *Store) Dispatch(ctx context.Context, r *Run, op Operation) error {
 	return nil
 }
 func (s *Store) FinishOperation(ctx context.Context, r *Run, op Operation) error {
-	res, e := s.DB.ExecContext(ctx, `UPDATE agent_operations o SET status=$1,cost=$2,output=$3,asset_id=nullif($4,''),error_code=$5,updated_at=now() FROM agent_runs r WHERE o.id=$6 AND r.id=o.run_id AND r.owner=$7 AND r.fence_token=$8`, op.Status, op.Cost, nullableJSON(op.Output), op.AssetID, op.ErrorCode, op.ID, r.Owner, r.Fence)
+	res, e := s.DB.ExecContext(ctx, `UPDATE agent_operations o SET status=$1,cost=$2,output=$3,asset_id=nullif($4,''),error_code=$5,updated_at=now() FROM agent_runs r WHERE o.id=$6 AND r.id=o.run_id AND r.owner=$7 AND r.fence_token=$8`, op.Status, nullableCost(op.Cost), nullableJSON(op.Output), op.AssetID, op.ErrorCode, op.ID, r.Owner, r.Fence)
 	if e != nil {
 		return e
 	}
@@ -447,6 +447,12 @@ func (s *Store) FinishOperation(ctx context.Context, r *Run, op Operation) error
 		_, e = s.DB.ExecContext(ctx, `UPDATE agent_checkpoints SET reserved_bytes=byte_size WHERE operation_id=$1`, op.ID)
 	}
 	return e
+}
+func nullableCost(cost string) any {
+	if cost == "" {
+		return nil
+	}
+	return cost
 }
 func nullableJSON(b json.RawMessage) any {
 	if len(b) == 0 {

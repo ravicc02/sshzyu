@@ -80,7 +80,7 @@ func regexpFieldID(s string) bool {
 	return true
 }
 func AskUserDefinition() json.RawMessage {
-	return json.RawMessage(`{"type":"function","name":"ask_user","description":"请求含糊、缺少生图主题或关键参数时先询问用户。一次收集主题、分辨率、比例、风格等缺失信息，等待回答后才执行付费工具。用户已提供或明确授权默认值的字段不重复询问。","strict":true,"parameters":{"type":"object","additionalProperties":false,"properties":{"question":{"type":"string"},"fields":{"type":"array","minItems":1,"maxItems":6,"items":{"type":"object","additionalProperties":false,"properties":{"id":{"type":"string"},"label":{"type":"string"},"options":{"type":"array","items":{"type":"string"},"maxItems":8},"required":{"type":"boolean"}},"required":["id","label","options","required"]}}},"required":["question","fields"]}}`)
+	return json.RawMessage(`{"type":"function","name":"ask_user","description":"仅在缺失信息确实阻碍执行或用户明确要求先提问时询问用户，等待回答后继续原请求。只收集必要的缺失信息；已知字段不重复询问，简单单张生图的非必要风格等字段可合理默认，不为凑齐表单而反复追问。","strict":true,"parameters":{"type":"object","additionalProperties":false,"properties":{"question":{"type":"string"},"fields":{"type":"array","minItems":1,"maxItems":6,"items":{"type":"object","additionalProperties":false,"properties":{"id":{"type":"string"},"label":{"type":"string"},"options":{"type":"array","items":{"type":"string"},"maxItems":8},"required":{"type":"boolean"}},"required":["id","label","options","required"]}}},"required":["question","fields"]}}`)
 }
 
 // Answer resumes the same run under a fresh fence. A duplicate submission cannot
@@ -164,6 +164,17 @@ func (s *Store) AnswerWithAssets(ctx context.Context, user int64, id, qid string
 			}
 		}
 		r.History = append(r.History, jsonBytes(map[string]any{"role": "user", "content": content}))
+	}
+	// Authenticated answer values can narrow/update a delegation; question labels
+	// authored by the model cannot mint permission.
+	if r.DirectImage != nil {
+		for _, answer := range answerValues {
+			if imageWorkflow.MatchString(strings.ToLower(normalizeImageSpecs(answer.Value))) || imageDiscussion.MatchString(strings.ToLower(normalizeImageSpecs(answer.Value))) {
+				r.DirectImage = nil
+				break
+			}
+			r.DirectImage.updateSpecs(strings.ToLower(answer.Value))
+		}
 	}
 	r.completeStep(r.PendingCall.ToolID, "0.00000000", strings.Join(lines, "\n"), nil)
 	r.Question = nil

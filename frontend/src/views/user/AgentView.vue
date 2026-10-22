@@ -42,14 +42,14 @@
                   <button type="button" class="pause-continue" aria-label="继续对话" title="基于已有上下文继续处理" :disabled="!canStartRun" @click="continueRun"><Icon name="play" size="sm" aria-hidden="true" /><span>{{ continuing ? '继续中…' : '继续' }}</span></button>
                   <button v-if="!run?.work" type="button" class="pause-retry" aria-label="重试本轮回复" title="重新生成这一轮回复" :disabled="!canStartRun" @click="retryPausedRun"><Icon name="refresh" size="sm" aria-hidden="true" /><span>重试</span></button>
                 </div>
-                <p v-if="pausedError || retryError || run.error_code" class="paused-error" role="alert">{{ pausedError || retryError || agentError(run.error_code) }}</p>
+                <p v-if="pausedError || retryError || run.error_code" class="paused-error" role="alert">{{ pausedError || retryError || agentError(run.error_code, run.failure) }}</p>
               </div></Transition>
               <div v-if="run && showRunNotice" class="agent-run" :class="`tone-${state.tone}`" :data-status="run.status">
                 <div class="run-summary" role="status" aria-live="polite"><span class="status-dot" :class="{ working: busy && run.status !== 'reconciling' }" /><strong>{{ run.cancel_requested && busy ? '正在停止…' : state.label }}</strong></div>
                 <p v-if="state.detail && (busy || run.status !== 'completed')" class="run-description">{{ state.detail }}</p>
-                <p v-if="run.status === 'reconciling' && run.reconcile_deadline" class="run-description">核对截止 {{ new Date(run.reconcile_deadline).toLocaleTimeString('zh-CN', { hour12: false }) }}，超时后自动结束。</p>
+                <p v-if="run.status === 'reconciling' && run.reconcile_deadline" class="run-description">恢复截止 {{ new Date(run.reconcile_deadline).toLocaleTimeString('zh-CN', { hour12: false }) }}，超时后自动结束。</p>
                 <button v-if="run.status === 'reconciling'" type="button" class="sync-task" @click="synchronizeActiveRun?.()">同步任务状态</button>
-                <p v-if="run.error_code" class="run-error" role="alert">{{ agentError(run.error_code) }}</p>
+                <p v-if="run.error_code" class="run-error" role="alert">{{ agentError(run.error_code, run.failure) }}</p>
 
               </div>
             </div>
@@ -65,7 +65,7 @@
             <div class="composer-hint"><span>{{ configured ? 'AI 可能出错，请核实重要信息。' : '在设置中选择对话 key 和模型后，即可开始。' }}</span><span class="keyboard-hint">Enter 发送 · Shift + Enter 换行</span></div>
           </div>
         </div>
-        <AgentArtifactPanel id="agent-workspace-panel" :persistent="activeArtifact?.kind !== 'asset'" :show="!!activeArtifact" :title="activeArtifact?.kind === 'workspace' ? '工作区' : activeArtifact?.kind === 'plan' ? '方案配置' : activeAsset?.mime_type?.startsWith('image/') ? '图片预览' : '文件预览'" :subtitle="activeArtifact?.kind === 'plan' ? activeWorkPlan?.title : activeAsset?.filename" :can-back="!!returnArtifact" :back-label="returnArtifact?.kind === 'workspace' ? '返回工作区' : '返回配置卡'" @close="closeArtifact" @back="backToArtifact" @overlay="artifactOverlay = $event" @keydown="onPreviewKeydown">
+        <AgentArtifactPanel id="agent-workspace-panel" :persistent="activeArtifact?.kind !== 'asset'" :show="!!activeArtifact" :title="activeArtifact?.kind === 'workspace' ? '工作区' : activeArtifact?.kind === 'plan' ? '配置卡' : activeAsset?.mime_type?.startsWith('image/') ? '图片预览' : '文件预览'" :subtitle="activeArtifact?.kind === 'plan' ? (activeWorkPlan && agentConfigCardTitle(activeWorkPlan.title) !== '配置卡' ? agentConfigCardTitle(activeWorkPlan.title) : undefined) : activeAsset?.filename" :can-back="!!returnArtifact" :back-label="returnArtifact?.kind === 'workspace' ? '返回工作区' : '返回配置卡'" @close="closeArtifact" @back="backToArtifact" @overlay="artifactOverlay = $event" @keydown="onPreviewKeydown">
           <template #actions><button v-if="run?.status === 'waiting_user'" type="button" class="artifact-tool" aria-label="返回对话回答问题" @click="closeArtifact">回答问题</button><button v-if="busy && run?.status !== 'reconciling'" type="button" class="artifact-tool" aria-label="停止当前任务" :disabled="run?.cancel_requested" @click="cancelRun">停止</button><template v-if="activeArtifact?.kind === 'asset' && activeAsset?.url"><button v-if="activeAsset.mime_type?.startsWith('image/')" type="button" class="artifact-tool" @click="naturalImageSize = !naturalImageSize">{{ naturalImageSize ? '适应宽度' : '原图尺寸' }}</button><a class="artifact-tool" :href="activeAsset.url" :download="activeAsset.filename || activeAsset.id">下载</a></template></template>
           <AgentWorkspaceResources @request="requestVisibleAsset" v-if="activeArtifact?.kind === 'workspace'" :plans="workPlans" :images="workspaceImages" @plan="openPlanArtifact" @image="previewId = $event" @image-error="assetImageError" />
           <div v-show="activeArtifact?.kind === 'plan'" ref="artifactPlanHost" class="artifact-plan-host" />
@@ -100,7 +100,7 @@ import AgentSettings from '@/components/agent/AgentSettings.vue'
 import AgentModelPicker from '@/components/agent/AgentModelPicker.vue'
 import { useAuthStore } from '@/stores/auth'
 import { agentModelsForKey, emptyAgentConfig, emptyAgentModelLibrary, normalizeAgentModelLibrary, readAgentModelLibrary, readAgentPreferences, saveAgentPreferences, storedAgentConfig, withCurrentAgentModels, type AgentModelLibrary, type AgentModelPurpose } from '@/utils/agentPreferences'
-import { agentState, agentError } from '@/utils/agentPresentation'
+import { agentState, agentError, agentConfigCardTitle } from '@/utils/agentPresentation'
 import { agentAPI, agentReasoningEfforts, terminal, watchAgentRun, type AgentModelCapability, type AgentConfig, type AgentConversation, type AgentMessage, type AgentRun, type AgentKey, type AgentReasoningEffort } from '@/api/agent'
 const info = ref<{ enabled: boolean; history_available: boolean; conversation_memory?: boolean; asset_thumbnail_supported?: boolean;  }>()
 const authStore = useAuthStore()
@@ -176,18 +176,18 @@ async function loadModelCapabilities() {
 }
 const pickerTextModels = computed(() => config.model_api_key_id ? [...new Set([...agentModelsForKey(modelLibrary.value, 'text', config.model_api_key_id), ...(config.model ? [config.model] : [])])] : [])
 const pickerImageModels = computed(() => config.image_api_key_id ? [...new Set([...agentModelsForKey(modelLibrary.value, 'image', config.image_api_key_id), ...(config.image_model ? [config.image_model] : [])])] : [])
-const state = computed(() => run.value?.recovery_only && !terminal(run.value) && !reconciliationOverdue.value ? { label: '正在恢复图片', detail: '正在从已保存的上游响应恢复，不会重新生成图片。', tone: 'active' } : run.value?.status === 'reconciling' && reconciliationOverdue.value ? { label: '核对期限已到，正在同步最终状态', detail: '正在向服务器获取任务的结束状态；你仍可切换对话。', tone: 'warning' } : agentState(run.value?.status, run.value?.error_code))
+const state = computed(() => run.value?.recovery_only && !terminal(run.value) && !reconciliationOverdue.value ? { label: '正在恢复图片', detail: '正在从已保存的上游响应恢复，不会重新生成图片。', tone: 'active' } : run.value?.status === 'reconciling' && reconciliationOverdue.value ? { label: '正在同步任务状态', detail: '', tone: 'warning' } : agentState(run.value?.status, run.value?.error_code))
 const displayMessages = computed<AgentMessage[]>(() => {
   const current = run.value
   const replacing = retryingSource.value || (current?.retry_of && !['failed', 'cancelled', 'expired'].includes(current.status) ? current.retry_of : '')
   let visible = replacing ? messages.value.filter(message => message.role !== 'assistant' || message.run_id !== replacing) : messages.value
-  if (current?.recovery_only && !terminal(current)) visible = visible.map(message => message.role === 'assistant' && message.run_id === current.id ? { ...message, text: current.text, trace: current.trace, asset_ids: current.asset_ids, error_code: current.error_code, run_status: current.status, can_recover_image: false } : message)
+  if (current?.recovery_only && !terminal(current)) visible = visible.map(message => message.role === 'assistant' && message.run_id === current.id ? { ...message, text: current.text, trace: current.trace, asset_ids: current.asset_ids, error_code: current.error_code, failure: current.failure, run_status: current.status, can_recover_image: false } : message)
   if (retryingSource.value) return [...visible, { id: `retry-pending-${retryingSource.value}`, role: 'assistant', text: '', pending: true }]
   if (!current || visible.some(message => message.run_id === current.id && message.role === 'assistant')) return visible
   const hasContent = !!(current.text || current.asset_ids?.length || current.trace?.length || workPlans.value.some(plan => plan.source_run_id === current.id))
   const pending = !!replacing && !terminal(current) && !hasContent
   if (!hasContent && !pending) return visible
-  return [...visible, { id: current.id, role: 'assistant', text: current.text || '', asset_ids: current.asset_ids, run_id: current.id, trace: current.trace, metrics: current.metrics, run_status: current.status, error_code: current.error_code, pending }]
+  return [...visible, { id: current.id, role: 'assistant', text: current.text || '', asset_ids: current.asset_ids, run_id: current.id, trace: current.trace, metrics: current.metrics, run_status: current.status, error_code: current.error_code, failure: current.failure, pending }]
 })
 const orphanWorkPlans = computed(() => workPlans.value.filter(plan => !displayMessages.value.some(message => message.role === 'assistant' && message.run_id === plan.source_run_id)))
 const isPausedRun = computed(() => run.value?.status === 'cancelled' || (run.value?.status === 'partial_success' && run.value.cancel_requested && !run.value.error_code))
@@ -299,6 +299,21 @@ function presentLiveArtifact(kind: 'plan' | 'asset', id: string, runId: string) 
   if (kind === 'plan') openPlanArtifact(id)
   else previewId.value = id
 }
+function presentPlanForRun(snapshot: AgentRun) {
+  const request = [...(snapshot.trace || [])].reverse().find(step => step.kind === 'tool' && step.status === 'completed' && step.review_plan_id)
+  if (request) {
+    // Re-presenting an existing plan must not depend on the run that created it.
+    const plan = workPlans.value.find(item => item.id === request.review_plan_id)
+    if (!plan) return
+    const key = `review:${snapshot.id}:${request.id}`
+    if (shownLiveArtifacts.has(key)) return
+    shownLiveArtifacts.add(key)
+    openPlanArtifact(plan.id)
+    return
+  }
+  const plan = [...workPlans.value].reverse().find(item => item.source_run_id === snapshot.id)
+  if (plan) presentLiveArtifact('plan', plan.id, snapshot.id)
+}
 function mergeLivePlans(plans: WorkPlan[]) {
   const merged = new Map(workPlans.value.map(plan => [plan.id, plan]))
   for (const plan of plans) {
@@ -316,8 +331,7 @@ async function syncLivePlans(id: string, token: number, signal: AbortSignal) {
     if (signal.aborted || token !== generation || request !== planSyncRequest || run.value?.id !== id || selected.value?.id !== conversation) return
     mergeLivePlans(detail.work_plans || []); grants.value = detail.execution_grants || []
     void loadWorkAssets(token)
-    const plan = [...(detail.work_plans || [])].reverse().find(item => item.source_run_id === id)
-    if (plan) presentLiveArtifact('plan', plan.id, id)
+    presentPlanForRun(run.value)
   } catch { /* A final snapshot or the next persisted event can refresh the card. */ }
 }
 function openPlanArtifact(id: string) {
@@ -562,7 +576,7 @@ async function syncEditedPlans(token: number, only?: string) {
     if (only && id !== only) continue
     const plan = workPlans.value.find(item => item.id === id)
     if (!plan || !['draft', 'ready'].includes(plan.status)) { localPlanDrafts.delete(id); continue }
-    if (plan.revision !== entry.revision) throw new Error('方案已更新，请核对右侧配置后再发送。')
+    if (plan.revision !== entry.revision) throw new Error('配置已更新，请核对右侧配置后再发送。')
     workPending.value = id
     try {
       const updated = await agentAPI.saveDraft(id, entry.revision, entry.draft)
@@ -650,9 +664,8 @@ async function applySnapshot(snapshot: AgentRun, token: number, signal?: AbortSi
     if (token === generation && run.value?.id === snapshot.id) {
       messages.value = d.messages || []
       mergeLivePlans(d.work_plans || []); grants.value = d.execution_grants || []
-      const freshPlan = [...(d.work_plans || [])].reverse().find(plan => plan.source_run_id === snapshot.id)
-      if (freshPlan) presentLiveArtifact('plan', freshPlan.id, snapshot.id)
-      else if (snapshot.asset_ids?.length) presentLiveArtifact('asset', snapshot.asset_ids[0]!, snapshot.id)
+      presentPlanForRun(snapshot)
+      if (!snapshot.trace?.some(step => step.review_plan_id) && !workPlans.value.some(plan => plan.source_run_id === snapshot.id) && snapshot.asset_ids?.length) presentLiveArtifact('asset', snapshot.asset_ids[0]!, snapshot.id)
       void loadWorkAssets(token)
       void loadAssets(messages.value.flatMap(m => m.asset_ids || []), token)
       conversations.value = conversations.value.map(c => c.id === d.conversation.id ? d.conversation : c)
@@ -729,7 +742,7 @@ async function follow(id: string, token: number) {
           if (event.type === 'asset.created' && data?.id) { run.value.status = 'resuming_model'; run.value.asset_ids ||= []; if (!run.value.asset_ids.includes(data.id)) run.value.asset_ids.push(data.id); void loadAssets([data.id], token) }
         }
         if (event.type === 'work.item.completed' && Array.isArray(data.asset_ids)) void loadAssets(data.asset_ids, token)
-        if (['work.plan.created', 'work.plan.updated'].includes(event.type)) void syncLivePlans(id, token, signal)
+        if (['work.plan.created', 'work.plan.updated'].includes(event.type) || (terminal(run.value) && run.value.trace?.some(step => step.review_plan_id))) void syncLivePlans(id, token, signal)
         if (event.type === 'asset.created' && data?.id && data.id !== id) presentLiveArtifact('asset', data.id, id)
         if (event.type === 'work.item.completed' && data.asset_ids?.length) presentLiveArtifact('asset', data.asset_ids[0]!, id)
         run.value.last_event_sequence = Math.max(run.value.last_event_sequence || 0, event.sequence)
@@ -799,7 +812,7 @@ async function approveWork(plan: WorkPlan, draft: AgentWorkDraft, itemIds?: stri
     pendingWorkApprovals.delete(plan.id)
     run.value = submitted
     workPlans.value = workPlans.value.map(item => item.id === reviewed.id ? { ...item, status: 'submitted', run_id: submitted.id } : item)
-    messages.value.push({ id: submitted.id + '-approval', role: 'user', text: itemIds?.length ? `批准单项生成：${approvedDraft.items.filter(item => itemIds.includes(item.id)).map(item => item.title).join("、")}` : `批准方案配置：${reviewed.title}`, run_id: submitted.id })
+    messages.value.push({ id: submitted.id + '-approval', role: 'user', text: itemIds?.length ? `批准单项生成：${approvedDraft.items.filter(item => itemIds.includes(item.id)).map(item => item.title).join("、")}` : `批准配置：${reviewed.title}`, run_id: submitted.id })
     void follow(submitted.id, token)
   } catch (e) { if (token === generation) {
     if (['AGENT_WORK_REVIEW_REQUIRED', 'AGENT_CONFLICT', 'AGENT_KEY_BINDING_CHANGED', 'AGENT_AUTHORIZATION_DENIED', 'AGENT_MODEL_NOT_ALLOWED', 'AGENT_RUN_BUSY', 'ASSET_EXPIRED'].includes((e as { code?: string }).code || '')) pendingWorkApprovals.delete(plan.id)
