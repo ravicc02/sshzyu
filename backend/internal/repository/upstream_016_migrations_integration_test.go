@@ -69,6 +69,7 @@ func TestMigrationsUpgradeOfficial016From015PreservesCustomData(t *testing.T) {
 		"252_agent_file_attachments.sql": true, "253_agent_attachment_mime.sql": true,
 		"254_agent_security_storage.sql": true, "255_agent_work_plans.sql": true,
 		"256_agent_adaptive_runtime.sql": true, "257_agent_storage_maintenance_indexes.sql": true,
+		"258_upstream_balance_monitor.sql": true,
 	}
 	files, err := fs.Glob(dbmigrations.FS, "*.sql")
 	require.NoError(t, err)
@@ -111,4 +112,9 @@ func TestMigrationsUpgradeOfficial016From015PreservesCustomData(t *testing.T) {
 	var cacheTable string
 	require.NoError(t, db.QueryRowContext(ctx, `SELECT to_regclass('public.gemini_cached_contents')::text`).Scan(&cacheTable))
 	require.Equal(t, "gemini_cached_contents", cacheTable)
+	for _, table := range []string{"upstream_balance_sites", "upstream_balance_events", "upstream_balance_deliveries", "upstream_balance_channel"} {
+		var found string
+		require.NoError(t, db.QueryRowContext(ctx, "SELECT to_regclass($1)::text", "public."+table).Scan(&found))
+		require.Equal(t, table, found, "new monitor table must be applied by the upgrade")
+	}
 }
