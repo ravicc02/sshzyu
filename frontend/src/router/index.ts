@@ -567,6 +567,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/upstream-monitor',
+    name: 'AdminUpstreamMonitor',
+    component: () => import('@/views/admin/UpstreamMonitorView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: '上游监控',
+      titleKey: 'nav.upstreamMonitor',
+      description: '账户余额、低余额预警与飞书通知'
+    }
+  },
+  {
     path: '/admin/accounts',
     name: 'AdminAccounts',
     component: () => import('@/views/admin/AccountsView.vue'),

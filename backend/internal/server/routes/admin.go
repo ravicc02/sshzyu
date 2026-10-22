@@ -45,6 +45,7 @@ func RegisterAdminRoutes(
 
 		// 账号管理
 		registerAccountRoutes(admin, h, stepUpAuth)
+		registerUpstreamBalanceRoutes(admin, h)
 
 		// 公告管理
 		registerAnnouncementRoutes(admin, h)
@@ -926,4 +927,21 @@ func channelMonitorModeV2Guard(settingService *service.SettingService) gin.Handl
 		}
 		c.Next()
 	}
+}
+
+func registerUpstreamBalanceRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	monitor := admin.Group("/upstream-monitor")
+	monitor.GET("/sites", h.Admin.Account.ListUpstreamBalances)
+	monitor.GET("/summary", h.Admin.Account.ListUpstreamBalances)
+	monitor.GET("/candidates", h.Admin.Account.UpstreamBalanceCandidates)
+	monitor.POST("/discovery", h.Admin.Account.DiscoverUpstreamBalances)
+	monitor.POST("/sites", h.Admin.Account.AddUpstreamBalance)
+	monitor.PATCH("/sites/:id", h.Admin.Account.UpdateUpstreamBalance)
+	monitor.PATCH("/sites/:id/rule", h.Admin.Account.UpdateUpstreamBalance)
+	monitor.DELETE("/sites/:id", h.Admin.Account.DeleteUpstreamBalance)
+	monitor.POST("/sites/:id/refresh", h.Admin.Account.RefreshUpstreamBalance)
+	monitor.GET("/events", h.Admin.Account.UpstreamBalanceEvents)
+	monitor.GET("/feishu", h.Admin.Account.GetUpstreamBalanceFeishu)
+	monitor.PUT("/feishu", h.Admin.Account.SaveUpstreamBalanceFeishu)
+	monitor.POST("/feishu/test", h.Admin.Account.TestUpstreamBalanceFeishu)
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Wei-Shaw/sub2api/internal/upstreammonitor"
 	"io"
 	"log/slog"
 	"math"
@@ -239,6 +240,7 @@ func normalizeUpstreamBillingProbeSettings(settings *UpstreamBillingProbeSetting
 
 // UpstreamBillingProbeService discovers a remote Sub2API billing snapshot.
 type UpstreamBillingProbeService struct {
+	balanceMonitor     *upstreammonitor.Service
 	accountRepo        AccountRepository
 	accountTestService *AccountTestService
 	settingService     *SettingService
@@ -302,6 +304,10 @@ func ProvideUpstreamBillingProbeService(
 ) *UpstreamBillingProbeService {
 	svc := NewUpstreamBillingProbeService(accountRepo, accountTestService, settingService)
 	svc.SetLeaderLock(lockCache, db)
+	svc.balanceMonitor = newUpstreamBalanceMonitor(db, accountRepo, accountTestService)
+	if svc.balanceMonitor != nil {
+		svc.balanceMonitor.Start(svc.parentCtx)
+	}
 	svc.Start()
 	return svc
 }
@@ -333,6 +339,9 @@ func (s *UpstreamBillingProbeService) Stop() {
 	s.stopped = true
 	s.parentCancel()
 	s.mu.Unlock()
+	if s.balanceMonitor != nil {
+		s.balanceMonitor.Stop()
+	}
 	s.wg.Wait()
 }
 

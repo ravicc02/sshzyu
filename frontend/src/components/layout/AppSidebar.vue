@@ -873,6 +873,7 @@ const adminNavItems = computed((): NavItem[] => {
     },
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
+    { path: '/admin/upstream-monitor', label: t('nav.upstreamMonitor'), icon: SignalIcon },
     { path: '/admin/plugins', label: t('nav.plugins'), icon: PluginIcon, featureFlag: flagPluginManagement },
     { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
     { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
@@ -961,7 +962,7 @@ function groupNavigation(
 
 const managementSections = computed(() => groupNavigation(adminNavItems.value, [
   { id: 'overview', label: dockText.value.overview, paths: ['/admin/dashboard', '/admin/ops', '/admin/usage'] },
-  { id: 'resources', label: dockText.value.resources, paths: ['/admin/users', '/admin/groups', '/admin/model-prices', '/admin/accounts', '/admin/channels', '/keys'] },
+  { id: 'resources', label: dockText.value.resources, paths: ['/admin/users', '/admin/groups', '/admin/model-prices', '/admin/accounts', '/admin/upstream-monitor', '/admin/channels', '/keys'] },
   { id: 'operations', label: dockText.value.operations, paths: ['/admin/subscriptions', '/admin/orders', '/admin/redeem', '/admin/promo-codes', '/admin/lottery', '/admin/affiliates'] },
   { id: 'system', label: dockText.value.system, paths: ['/admin/announcements', '/admin/proxies', '/admin/plugins', '/admin/security-audit', '/admin/audit-logs', '/admin/settings'] }
 ], 'admin'))
