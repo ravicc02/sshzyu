@@ -111,11 +111,15 @@ func IsReasoningEffortPolicyDenied(err error) bool {
 	return errors.As(err, &mappingDenied)
 }
 
+// Replacer is safe for concurrent use and builds its lookup table once. Reuse
+// it on the request hot path instead of allocating a table per normalization.
+var reasoningEffortSeparators = strings.NewReplacer("-", "", "_", "", " ", "")
+
 // NormalizeMaxReasoningEffort validates and canonicalizes a group policy value.
 // Empty means that the group does not impose a ceiling.
 func NormalizeMaxReasoningEffort(raw string) string {
 	value := strings.ToLower(strings.TrimSpace(raw))
-	value = strings.NewReplacer("-", "", "_", "", " ", "").Replace(value)
+	value = reasoningEffortSeparators.Replace(value)
 	switch value {
 	case "":
 		return ""
