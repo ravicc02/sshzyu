@@ -98,5 +98,10 @@
     "checksum": "430003fbeac3f9caaf8f9dca9d44115a83ad02a3e3601b6d26d780ba70e4fe41",
     "risk": "backward-compatible",
     "description": "Add four admin-only upstream account balance monitoring, event, delivery and encrypted Feishu configuration tables plus indexes. No existing rows are changed or deleted; account bindings reuse existing accounts. Default alert threshold is 5 in application validation. Production configuration and activation remain manual."
+  },
+  "246_enable_gemini_image_generation_groups.sql": {
+    "checksum": "87267be7ab657173768989e2b0b105c5569c5930a7f1ed124f4cf81e5198297c",
+    "risk": "backward-compatible",
+    "description": "Official v0.2.18 enables the existing allow_image_generation flag on Gemini and Antigravity groups as the new Gemini endpoint guard starts enforcing it. Boolean backfill only; no schema removal or historical migration edits. Publishing does not execute this migration; deployment requires its own authorization."
   }
 }

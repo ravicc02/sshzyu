@@ -56,6 +56,17 @@ function mountTable(
 }
 
 describe('PlazaModelPricingTable', () => {
+  it('uses per-image units in the paid header for an image-only group', () => {
+    const model = tokenModel({ name: 'gpt-image-2' })
+    model.pricing = { ...model.pricing!, billing_mode: 'image', per_request_price: 0.13 }
+    const wrapper = mountTable([model], 1)
+    const paidHeader = wrapper.find('.pz-title')
+    expect(paidHeader.text()).toContain('modelPlaza.table.perUnitImage')
+    expect(paidHeader.text()).not.toContain('modelPlaza.table.unitPerMillion')
+    expect(wrapper.find('thead tr:nth-child(2) th[colspan="3"]').text()).toBe('modelPlaza.table.perImage')
+    expect(wrapper.findAll('thead tr:first-child th')[2].text()).toContain('modelPlaza.table.unitPerMillion')
+  })
+
   it('倍率为 1 时展示渠道单价原值($/1M),价格保底 2 位小数', () => {
     const wrapper = mountTable([tokenModel()], 1)
     const text = wrapper.text()
@@ -581,7 +592,7 @@ describe('PlazaModelPricingTable 分时计价', () => {
     // 标准行:输入 3 × 0.8
     const baseCells = trs[0].findAll('td')
     expect(baseCells[0].text()).toBe('deepseek-chat')
-    expect(baseCells[1].text()).toContain('$2.40')
+    expect(baseCells[1].text()).toContain('¥2.40')
     expect(baseCells[7].text()).toContain('0.8x')
 
     // 夜间时段行:输入 3 × 0.8 × 0.5,倍率 0.4x,标注时段不含时区
@@ -591,19 +602,19 @@ describe('PlazaModelPricingTable 分时计价', () => {
     expect(nightCells[0].text()).not.toContain('Asia/Shanghai')
     // 时区只放在 tooltip 里(i18n mock 不做插值,这里只断言挂了说明)
     expect(nightCells[0].find('[title="modelPlaza.table.timePricingRowHint"]').exists()).toBe(true)
-    expect(nightCells[1].text()).toContain('$1.20')
-    expect(nightCells[2].text()).toContain('$6.00')
-    expect(nightCells[3].text()).toContain('$1.50')
+    expect(nightCells[1].text()).toContain('¥1.20')
+    expect(nightCells[2].text()).toContain('¥6.00')
+    expect(nightCells[3].text()).toContain('¥1.50')
     expect(nightCells[7].text()).toContain('0.4x')
 
     // 晚高峰行:3 × 0.8 × 1.2 = 2.88,倍率 0.96x
     const peakCells = trs[2].findAll('td')
     expect(peakCells[0].text()).toContain('18:00–22:00')
-    expect(peakCells[1].text()).toContain('$2.88')
+    expect(peakCells[1].text()).toContain('¥2.88')
     expect(peakCells[7].text()).toContain('0.96x')
 
     // 官方列不受时段影响
-    expect(nightCells[4].text()).toContain('$3.00')
+    expect(nightCells[4].text()).toContain('¥3.00')
   })
 
   it('仅工作日生效时时段行带工作日前缀,tooltip 换用周末回落文案', () => {
@@ -635,7 +646,7 @@ describe('PlazaModelPricingTable 分时计价', () => {
     const title = nightCells[0].find('[title*="modelPlaza.table.timePricingRowHint"]').attributes('title')
     expect(title).toContain('modelPlaza.table.timePricingRowHintPeak')
     // 行内数字仍是 基础倍率 × 时段倍率(0.8 × 0.5),高峰只进披露不进价格
-    expect(nightCells[1].text()).toContain('$1.20')
+    expect(nightCells[1].text()).toContain('¥1.20')
     expect(nightCells[7].text()).toContain('0.4x')
   })
 

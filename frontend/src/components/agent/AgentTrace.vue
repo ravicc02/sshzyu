@@ -12,7 +12,7 @@
       </button>
       <Transition :css="false" @enter="motion.enter" @enter-cancelled="motion.cancel"><div v-if="isOpen(step)" :id="panelId(step)" class="step-content">
         <template v-if="step.kind === 'reasoning'">
-          <div v-if="step.summary" class="reasoning-summary" v-html="renderAgentMarkdown(step.summary)" />
+          <AgentMarkdown v-if="step.summary" class="reasoning-summary" :text="step.summary" :copyable="false" />
           <p v-else class="step-note">{{ active(step) ? '正在接收模型公开的思考摘要…' : '该模型未返回可展示的思考摘要。' }}</p>
           <div class="step-metadata"><span>模型 {{ step.name }}</span><span v-if="step.summary">模型提供的公开摘要</span></div>
         </template>
@@ -33,11 +33,12 @@
   </component>
 </template>
 <script setup lang="ts">
+import AgentMarkdown from './AgentMarkdown.vue'
 import { computed, onBeforeUnmount, ref, useId, watch } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useAgentMotion } from '@/composables/useAgentMotion'
 import type { AgentTraceStep } from '@/api/agent'
-import { agentError, agentToolLabel, renderAgentMarkdown } from '@/utils/agentPresentation'
+import { agentError, agentToolLabel } from '@/utils/agentPresentation'
 const props = defineProps<{ steps: AgentTraceStep[]; inline?: boolean }>()
 const motion = useAgentMotion()
 const expanded = ref<Record<string, boolean>>({})
@@ -89,7 +90,7 @@ onBeforeUnmount(() => clearInterval(clock))
 .process-heading::-webkit-details-marker { display:none; }.process-heading:focus-visible { outline:2px solid var(--workspace-accent); outline-offset:4px; }.process-chevron { flex-shrink:0; opacity:.7; }.agent-process[open] > .process-heading .process-chevron { transform:rotate(90deg); }.process-label { font-weight:500; }.process-counts { font-size:11px; }.process-duration { font-size:11px; opacity:.8; font-variant-numeric:tabular-nums; }.process-duration::before { content:'·'; padding-right:8px; }
 .process-step { margin-left:5px; padding-left:14px; border-left:1px solid var(--workspace-divider); }.process-step:first-of-type { margin-top:8px; }.step-toggle { display:flex; align-items:center; gap:8px; width:100%; min-height:34px; padding:6px 4px; text-align:left; font-size:12px; color:var(--trace-muted); border-radius:5px; }@media (hover: hover) {.step-toggle:hover { background:var(--workspace-soft); color:var(--workspace-ink); } }.step-toggle:focus-visible { outline:2px solid var(--workspace-accent); outline-offset:2px; }.step-icon { display:flex; align-items:center; flex:0 0 16px; }.step-title { flex:1; min-width:0; font-weight:400; }.step-state,.step-duration { white-space:nowrap; font-size:10px; font-variant-numeric:tabular-nums; }.state-failed,.failed { color:#b13730; }.state-reconciling { color:#936400; }:global(.dark .agent-process .state-failed),:global(.dark .agent-process .failed) { color:#ffaaa3; }:global(.dark .agent-process .state-reconciling) { color:#f2ce7b; }.step-chevron { opacity:.6; flex-shrink:0; }.step-chevron.expanded { transform:rotate(90deg); }
 .step-content { margin:3px 4px 12px 24px; padding:5px 0; overflow-wrap:anywhere; font-size:12px; line-height:1.85; }.step-note,.step-cost,.step-metadata,.tool-specs dt { color:var(--trace-muted); }.question-result { white-space:pre-wrap; }.step-metadata { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:10px; font-size:10px; }.step-error { margin-top:8px; color:#b13730; }:global(.dark .agent-process .step-error) { color:#ffaaa3; }.step-cost { margin-top:8px; font-size:10px; }.tool-input h4 { display:flex; gap:12px; margin-bottom:6px; font-size:10px; font-weight:400; color:var(--trace-muted); }.tool-input h4 code { font:inherit; }.tool-prompt { white-space:pre-wrap; max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:6px; background:var(--workspace-soft); }.tool-specs { display:flex; flex-wrap:wrap; gap:8px 20px; margin-top:10px; }.tool-specs dt { font-size:10px; }.tool-specs dd { font-size:11px; overflow-wrap:anywhere; }.tool-output { margin-top:10px; }
-.reasoning-summary :deep(p) { margin-bottom:10px; }.reasoning-summary :deep(ul),.reasoning-summary :deep(ol) { padding-left:20px; margin:8px 0; }.reasoning-summary :deep(ul) { list-style:disc; }.reasoning-summary :deep(ol) { list-style:decimal; }.reasoning-summary :deep(pre) { white-space:pre-wrap; padding:10px; background:var(--workspace-soft); border-radius:6px; }.reasoning-summary :deep(a) { color:var(--workspace-accent); text-decoration:underline; }.reasoning-summary :deep(h1),.reasoning-summary :deep(h2),.reasoning-summary :deep(h3),.reasoning-summary :deep(h4) { font-size:13px; font-weight:600; margin:12px 0 8px; }.reasoning-summary :deep(table) { display:block; max-width:100%; overflow-x:auto; }.reasoning-summary :deep(th),.reasoning-summary :deep(td) { border:1px solid var(--workspace-divider); padding:5px 8px; }
+.reasoning-summary :deep(p) { margin-bottom:10px; }.reasoning-summary :deep(ul),.reasoning-summary :deep(ol) { padding-left:20px; margin:8px 0; }.reasoning-summary :deep(ul) { list-style:disc; }.reasoning-summary :deep(ol) { list-style:decimal; }.reasoning-summary :deep(a) { color:var(--workspace-accent); text-decoration:underline; }.reasoning-summary :deep(h1),.reasoning-summary :deep(h2),.reasoning-summary :deep(h3),.reasoning-summary :deep(h4) { font-size:13px; font-weight:600; margin:12px 0 8px; }.reasoning-summary :deep(th),.reasoning-summary :deep(td) { border:1px solid var(--workspace-divider); padding:5px 8px; }
 .working { animation:trace-pulse 1.8s ease-in-out infinite; }@keyframes trace-pulse { 50% { opacity:.4; } }@media(prefers-reduced-motion:reduce) { .working { animation:none; } }@media(max-width:640px) { .process-step { padding-left:8px; }.step-content { margin-left:8px; }.step-state,.step-duration { font-size:10px; } }
 
 .process-heading { padding:5px 7px; margin-left:-7px; border-radius:8px; }

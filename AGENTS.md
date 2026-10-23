@@ -181,7 +181,7 @@ cd /opt/sub2api-deploy && docker compose up -d --no-build --force-recreate sub2a
 ssh us-server 'docker exec sub2api /app/main --version && curl -s http://127.0.0.1:8080/health'
 ```
 
-> **版本号规则**：本地定制版完整版本号由 `backend/cmd/server/VERSION` 决定，格式为 `X.Y.Z-rN`；`resolve-version.sh` 不再从本地/官方 tag 自动推断。`upstream-baseline.json` 必须与版本文件及官方稳定 Release/tag/commit 对齐。根 Dockerfile 默认构建本地 `source` 内嵌前端镜像；发布根镜像需先运行 `python scripts/upstream_release_guard.py --validate-clean-build --build-target root`，然后以 `--build-arg BUILD_TYPE=release` 及 VERSION、COMMIT、DATE 显式构建。`backend/Dockerfile` 只构建线上纯后端 `release` 镜像，发布前应使用 `--build-target backend` 验证。正式发布须核验镜像 tag、二进制输出及管理端 `build_type`。 **推送门禁**：每次向 `origin` 推送前运行 `python scripts/upstream_release_guard.py`，在当前机器执行一次 `git config core.hooksPath .githooks` 启用自动 `pre-push`。守卫读取待推送提交中的基线、核对官方最新稳定 Release 及 tag SHA；上游状态未知或有新版本时阻止 push 并向用户汇报，未经确认不得自动合并。钩子是本机机制，可被跳过；团队级强制保护已由服务端 `main` 分支保护承接（见 §3.4）。完整三方增量合并、migration 和部署边界见本地规划文档 `plan_docs/official-upstream-versioning-workflow.md`（`plan_docs/` 不入版本库，仅本地保留）。 **回滚**：compose 改回旧 tag → `docker compose up -d --force-recreate`。 **定制更新回滚**：接入后的回滚使用已部署 history 中的签名版本，恢复后端、UI 和固定 bootstrap；必须先核对当前 schema 的兼容性。不能用容器内 `.backup`、官方 install.sh 或官方 Docker Hub 镜像替换定制版。
+> **版本号规则**：本地定制版完整版本号由 `backend/cmd/server/VERSION` 决定，格式为 `X.Y.Z-rN`；`resolve-version.sh` 不再从本地/官方 tag 自动推断。`upstream-baseline.json` 必须与版本文件及官方稳定 Release/tag/commit 对齐。根 Dockerfile 默认构建本地 `source` 内嵌前端镜像；发布根镜像需先运行 `python scripts/upstream_release_guard.py --validate-clean-build --build-target root`，然后以 `--build-arg BUILD_TYPE=release` 及 VERSION、COMMIT、DATE 显式构建。`backend/Dockerfile` 只构建线上纯后端 `release` 镜像，发布前应使用 `--build-target backend` 验证。正式发布须核验镜像 tag、二进制输出及管理端 `build_type`。 **推送门禁**：每次向 `origin` 推送前运行 `python scripts/upstream_release_guard.py`，在当前机器执行一次 `git config core.hooksPath .githooks` 启用自动 `pre-push`。守卫读取待推送提交中的基线、核对官方最新稳定 Release 及 tag SHA；上游状态未知或有新版本时阻止 push 并向用户汇报，未经确认不得自动合并。钩子是本机机制，可被跳过；团队级强制保护已由服务端 `main` 分支保护承接（见 §3.4）。完整三方增量合并、migration 和部署边界见本地规划文档 `plan_docs/2026-10-06/official-upstream-versioning-workflow.md`（`plan_docs/` 不入版本库，仅本地保留）。 **回滚**：compose 改回旧 tag → `docker compose up -d --force-recreate`。 **定制更新回滚**：接入后的回滚使用已部署 history 中的签名版本，恢复后端、UI 和固定 bootstrap；必须先核对当前 schema 的兼容性。不能用容器内 `.backup`、官方 install.sh 或官方 Docker Hub 镜像替换定制版。
 
 ### 3.4 多人协作与提交规范
 
@@ -228,7 +228,7 @@ ssh us-server 'docker exec sub2api /app/main --version && curl -s http://127.0.0
 - 每台机器执行一次 `git config core.hooksPath .githooks` 启用 pre-push 守卫（核对官方上游 Release 状态）；钩子是本机机制、可被跳过，团队级强制由服务端 `main` 分支保护承接。
 - 禁止：force-push 已发布分支、复用已发布的版本号、用官方镜像替换定制版、**协作者直推 `main`**。
 
-> 详细三方合并、migration 安全与发布边界见本地规划文档 `plan_docs/official-upstream-versioning-workflow.md`（`plan_docs/` 不入版本库，仅本地保留）。
+> 详细三方合并、migration 安全与发布边界见本地规划文档 `plan_docs/2026-10-06/official-upstream-versioning-workflow.md`（`plan_docs/` 不入版本库，仅本地保留）。
 
 ### 3.5 定制更新与磁盘运维要点
 
@@ -312,6 +312,40 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/health
 - 命令输出含敏感值先脱敏再展示。
 
 ---
+
+## 上游模型同步流程（统一 SOP）
+
+> 上游供应商新增/下线模型时，一律走本流程。**核心原则：以上游 `/v1/models` 实测供给为准，上游有什么就接什么**，不用本站现有模型清单反推。倍率含义、汇率等无法从现有配置确认的，**先问用户，不自行猜测**。逐轮变更历史与详细证据见根目录 `agent.md`（本地记录，不入版本库）。
+
+**① 补账号** —— 一个上游 key 一条账号，`platform` 决定它能挂哪些模型（openai / deepseek / zhipu / kimi / minimax）。导入前按 `base_url` + `credentials` 查重，避免重复创建或覆盖。账号的 `model_mapping` 是**扁平**结构 `{本站模型名: 上游模型名}`，只列该上游**实测能调**的模型。
+
+**② 命名** —— 账号名 = `API 端点 + 倍率`（如 `https://api.auash.com-0038`），倍率保留原始写法、不转小数。倍率只体现在**账号名**里；`rate_multiplier` 字段是计费倍率，按用户指示填 `1.0`，不擅自写入。对外模型名与上游名可不同，靠 `model_mapping` 做别名（如上游真实名 `kimi-k3-1`）。
+
+**③ 导入** —— key 只用于写库，**执行结果中不明文展示**；凭证不打印、不写入工作区。写库前先对 `accounts`、`groups`、`channels`、`channel_model_pricing`、`composite_model_routes`、`channel_groups` 做表级快照 `*_bak_<日期>_<用途>`。
+
+**④ 更新渠道 / 价格 / 广场** —— **六处必须同步，缺一处就调不通**：
+
+1. `accounts.credentials.model_mapping`（扁平）
+2. `groups.model_pricing`（分组价卡）
+3. `groups.model_allowlist`（`{models:[],enabled:bool}`）
+4. `composite_model_routes`（仅聚合组需要，非聚合组靠白名单+账号映射）
+5. `channels.model_mapping`（**嵌套** `{platform:{模型:上游名}}`）
+6. `channel_model_pricing`（渠道价卡）
+
+- **价格**：官方 CNY 数值直接当 USD 数值（1:1），写入时**除以 1e6**（字段是 USD/token）。每次改价**重新核实官方页**，不沿用旧快照。国模现行价目表见 `agent.md`。
+- **广场**：模型广场 = 渠道映射 ∩ 分组白名单 ∩ 平台匹配；**分组必须关联渠道**才进广场（`channel_groups.group_id` 是 UNIQUE，一个组至多一个渠道）。
+
+**⑤ 刷新缓存（最容易漏，漏了就"假装上游不可用"）** —— 渠道映射走**进程内缓存**，改库后必须发布失效消息：
+
+```bash
+docker exec sub2api-redis redis-cli PUBLISH channel_cache_updated refresh   # 必须，往 scheduler_outbox 插同名记录无效
+```
+
+账号/分组变更后另需重建调度快照：向 `scheduler_outbox` 插 `full_rebuild`。
+
+**⑥ 验证** —— 建**临时 key** 走 `127.0.0.1:8080` 端到端调用，覆盖**独立组与聚合组**，验完立即软删。核对 `/v1/models` 与配置一致、`usage_logs` 计费符合价卡。**直连上游复测做对照**：直连 200 而走本站失败 → 问题在本站（多半缓存未刷新），不是上游。
+
+**关键陷阱**（完整 12 条见 `agent.md`）：`jsonb ||` 对同层同名 key 是**替换**不是合并（改嵌套用 `jsonb_set`）；**分组白名单 `model_allowlist.enabled=true` 同时约束展示与调度**——广场/`/v1/models` 会过滤，网关请求也会被 `GroupModelAllowlist` 中间件拦截并返回 404 `Model %q is not available for this group`（已实测），启用前务必确认该组现有 key 不会被打断；「某上游不提供某模型」≠「该模型全站下架」，移除范围限定在对应账号；`sched:acc:*` 在 Redis 明文存 api_key，排查只取键名、不 `GET` 打印。
 
 ## 6. 常用速查
 

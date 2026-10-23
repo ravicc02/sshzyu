@@ -8,8 +8,9 @@ import (
 	"strings"
 )
 
-// PlazaOfficialPricing 模型广场展示用的官方参考价（USD per token），与计费同源：
-// LiteLLM → 内置兜底价卡 → 模型策略。字段为 nil 表示该项缺失（0 视为未配置）。
+// PlazaOfficialPricing 模型广场展示用的官方参考价（per token）。
+// 取数口径随平台：国模走与实收同源的分组价卡（运营按官方 CNY 数值 1:1 写入 USD 字段），
+// 非国模走 LiteLLM → 内置兜底价卡 → 模型策略。字段为 nil 表示该项缺失（0 视为未配置）。
 type PlazaOfficialPricing struct {
 	InputPrice        *float64
 	OutputPrice       *float64
@@ -275,7 +276,7 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 		g := groupEnt[gid]
 		for j := range pg.Models {
 			s.fillDisplayPricing(ctx, &pg.Models[j], g)
-			pg.Models[j].OfficialPricing = s.lookupOfficialPricing(ctx, pg.Models[j].Name, officialMemo)
+			pg.Models[j].OfficialPricing = s.resolveOfficialPricing(ctx, &pg.Models[j], officialMemo)
 		}
 		out = append(out, *pg)
 	}
@@ -399,6 +400,34 @@ func plazaImageDisplayPricing(p *ChannelModelPricing, g *Group) *ChannelModelPri
 		})
 	}
 	return &clone
+}
+
+// resolveOfficialPricing 决定广场「官方价」列的取数口径。
+// 国模（IsCNProvider：kimi/zhipu/deepseek/minimax）的运营定价口径是
+// 「官方 CNY 数值按 1:1 写入 USD 字段」，因此官方价列取与实收同源的分组展示定价
+// （m.Pricing，已由 fillDisplayPricing 填充），而不是 LiteLLM 的真实美元目录价
+// （两者相差约汇率量级）。其余平台沿用 LiteLLM 美元目录价。
+// m.Pricing 不可用时回落到目录价。
+func (s *ModelPlazaService) resolveOfficialPricing(ctx context.Context, m *PlazaModel, memo map[string]*PlazaOfficialPricing) *PlazaOfficialPricing {
+	if m == nil {
+		return nil
+	}
+	if IsCNProvider(m.Platform) {
+		if p := m.Pricing; p != nil && groupPricingHasPricing(p) {
+			out := &PlazaOfficialPricing{
+				InputPrice:        p.InputPrice,
+				OutputPrice:       p.OutputPrice,
+				CacheWritePrice:   p.CacheWritePrice,
+				CacheWrite1hPrice: p.CacheWrite1hPrice,
+				CacheReadPrice:    p.CacheReadPrice,
+			}
+			if len(p.Intervals) > 0 {
+				out.Intervals = p.Intervals
+			}
+			return out
+		}
+	}
+	return s.lookupOfficialPricing(ctx, m.Name, memo)
 }
 
 // lookupOfficialPricing 查询模型的官方参考价（与计费同源：LiteLLM → 内置兜底 → 模型策略），

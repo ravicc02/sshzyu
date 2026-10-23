@@ -222,12 +222,12 @@ export default {
     guide: {
       title: '批量生图使用说明',
       uiTitle: '当前界面如何使用',
-      step1: '1. 复制下方 PPT 提示词，将四页占位内容替换为你的主题、标题和核心要点，再交给 Agent。',
+      step1: '1. 复制下方 PPT 提示词，只需填写每页主题，再交给 Agent；Agent 会自动补全文案、信息结构和视觉表现。',
       step2: '2. 复制 Agent 输出的一行配置，保留固定参数 4K、16:9 和 gpt-image-2.5-sunburst。',
-      step3: '3. 选择支持该模型的 OpenAI 批量生图 Key，粘贴配置并转换，检查四张卡片，再上传风格与背景参考图。',
+      step3: '3. 选择支持该模型的 OpenAI 批量生图 Key，粘贴配置并转换，检查每张卡片，再上传风格与背景参考图。',
       step4: '4. 确认后由你提交任务；完成后下载 ZIP，失败时仅重试失败项。下方提示词不让 Agent 自动提交，也不需要提供 Key。',
       skillTitle: '整页 PPT 生图提示词',
-      skillDesc: '替换四页内容后使用；固定 OpenAI 模型参数，不随平台切换。',
+      skillDesc: '只填写主题即可；Agent 会生成完整的页面文案、信息图结构和视觉设计要求，固定 OpenAI 模型参数。',
     },
     messages: {
       loadKeysFailed: '加载 API Key 失败',

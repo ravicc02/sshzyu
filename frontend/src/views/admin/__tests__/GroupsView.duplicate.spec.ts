@@ -296,6 +296,8 @@ describe('GroupsView duplicate action', () => {
         .trigger('click')
       const vm = wrapper.vm as any
       vm.createForm.platform = platform
+      // Let the platform watcher apply its defaults before the user enables images.
+      await wrapper.vm.$nextTick()
       vm.createForm.name = `${platform} images`
       vm.createForm.allow_image_generation = true
       vm.createForm.allow_batch_image_generation = true

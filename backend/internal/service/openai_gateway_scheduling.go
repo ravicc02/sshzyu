@@ -139,6 +139,9 @@ func (s *OpenAIGatewayService) GenerateExplicitSessionHash(c *gin.Context, body 
 		return ""
 	}
 
+	// Use the authenticated key ID, never caller-supplied user metadata. Shared
+	// session names across tenants must not inherit another tenant's routing pin.
+	sessionID = scopeOpenAISchedulingSession(c, sessionID)
 	currentHash, legacyHash := deriveOpenAISessionHashes(sessionID)
 	attachOpenAILegacySessionHashToGin(c, legacyHash)
 	return currentHash
@@ -178,9 +181,20 @@ func (s *OpenAIGatewayService) GenerateSessionHash(c *gin.Context, body []byte) 
 		sessionID = grokStickyAffinitySeed(sessionID, body)
 	}
 
+	sessionID = scopeOpenAISchedulingSession(c, sessionID)
 	currentHash, legacyHash := deriveOpenAISessionHashes(sessionID)
 	attachOpenAILegacySessionHashToGin(c, legacyHash)
 	return currentHash
+}
+
+func scopeOpenAISchedulingSession(c *gin.Context, seed string) string {
+	if isGrokRequestContext(c) {
+		return seed
+	} // Grok keeps its separate affinity contract.
+	if keyID := getAPIKeyIDFromContext(c); keyID > 0 {
+		return "scheduler-key-v1:" + isolateOpenAISessionID(keyID, seed)
+	}
+	return seed
 }
 
 // grokStickyAffinitySeed scopes sticky routing by model without changing the
@@ -214,6 +228,7 @@ func (s *OpenAIGatewayService) GenerateSessionHashWithFallback(c *gin.Context, b
 		return ""
 	}
 
+	seed = scopeOpenAISchedulingSession(c, seed)
 	currentHash, legacyHash := deriveOpenAISessionHashes(seed)
 	attachOpenAILegacySessionHashToGin(c, legacyHash)
 	return currentHash
@@ -1136,6 +1151,13 @@ func (s *OpenAIGatewayService) SelectAccountWithLoadAwareness(ctx context.Contex
 }
 
 func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Context, groupID *int64, platform string, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, useUpstreamTokenCost bool) (*AccountSelectionResult, error) {
+	if selected, err := s.tryLegacyOAuthPreference(ctx, groupID, platform, sessionHash, requestedModel, excludedIDs, requireCompact, requiredCapability, useUpstreamTokenCost); selected != nil || err != nil {
+		return selected, err
+	}
+	return s.selectAccountWithLoadAwarenessPool(ctx, groupID, platform, sessionHash, requestedModel, excludedIDs, requireCompact, requiredCapability, useUpstreamTokenCost)
+}
+
+func (s *OpenAIGatewayService) selectAccountWithLoadAwarenessPool(ctx context.Context, groupID *int64, platform string, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, useUpstreamTokenCost bool) (*AccountSelectionResult, error) {
 	platform = NormalizeOpenAICompatiblePlatform(platform)
 	if s.checkChannelPricingRestriction(ctx, groupID, requestedModel) {
 		slog.Warn("channel pricing restriction blocked request",
@@ -1611,6 +1633,9 @@ func (s *OpenAIGatewayService) recheckSelectedOpenAIAccountFromDB(ctx context.Co
 
 func (s *OpenAIGatewayService) recheckSelectedOpenAIAccountFromDBBeforeProfit(ctx context.Context, account *Account, groupID *int64, platform string, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) *Account {
 	if account == nil {
+		return nil
+	}
+	if s.isOpenAIAccountRequestRuntimeBlocked(account, requestedModel) {
 		return nil
 	}
 	platform = NormalizeOpenAICompatiblePlatform(platform)

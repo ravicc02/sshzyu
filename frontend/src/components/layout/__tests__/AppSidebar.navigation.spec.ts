@@ -94,7 +94,7 @@ async function renderSidebar(path = '/admin/dashboard', attachTo?: HTMLElement) 
 }
 
 function navigationPaths(wrapper: VueWrapper) {
-  return wrapper.findAll('nav a').map(link => link.attributes('href')).sort()
+  return wrapper.findAll('nav a[href^="/"]').map(link => link.attributes('href')).sort()
 }
 
 async function expandGroups(wrapper: VueWrapper) {
@@ -130,6 +130,27 @@ afterEach(() => {
 })
 
 describe('AppSidebar Dock navigation', () => {
+  it('offers the official status shortcut in admin and personal spaces and for regular users', async () => {
+    const wrapper = await renderSidebar()
+    const expectStatus = (view: VueWrapper, label = 'OpenAI 官方状态') => {
+      const section = view.findAll('nav section').find(item => item.text().includes(label))!
+      expect(section.attributes('aria-label')).toBe(locale.value.startsWith('zh') ? '快捷入口' : 'Shortcuts')
+      const link = section.get('a[href="https://status.openai.com/"]')
+      expect(link.text()).toBe(label)
+      expect(link.attributes('target')).toBe('_blank')
+      expect(link.attributes('rel')).toBe('noopener noreferrer')
+    }
+    expectStatus(wrapper)
+    await wrapper.get('button[aria-label="个人空间"]').trigger('click')
+    expectStatus(wrapper)
+    locale.value = 'en-US'
+    await nextTick()
+    expectStatus(wrapper, 'OpenAI Official Status')
+    authStore.isAdmin = false
+    await nextTick()
+    expectStatus(wrapper, 'OpenAI Official Status')
+  })
+
   it('marks only admin lottery, including collapsed mode, and clears after processing', async () => {
     lotteryAPI.getPendingDrawCount.mockResolvedValueOnce(2).mockResolvedValueOnce(0)
     const wrapper = await renderSidebar()

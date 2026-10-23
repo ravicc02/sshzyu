@@ -106,6 +106,20 @@
                 </router-link>
               </div>
             </template>
+            <a
+              v-else-if="item.external"
+              :href="item.path"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="sidebar-link dock-nav-item"
+              :class="{ 'sidebar-link-collapsed': isDockCollapsed }"
+              :title="isDockCollapsed ? item.label : undefined"
+              :aria-label="isDockCollapsed ? item.label : undefined"
+              @click="handleMenuItemClick(item.path)"
+            >
+              <component :is="item.icon" class="dock-nav-icon" />
+              <span v-if="!isDockCollapsed" class="sidebar-label">{{ item.label }}</span>
+            </a>
             <router-link
               v-else
               :to="item.query ? { path: item.path, query: item.query } : item.path"
@@ -190,6 +204,7 @@ import '@/styles/sidebar-dock.css'
 
 interface NavItem {
   path: string
+  external?: boolean
   query?: Record<string, string>
   label: string
   icon: unknown
@@ -273,11 +288,11 @@ const tourNavigationExpanded = computed(() => canSwitchSpaces.value && Boolean(o
 const dockText = computed(() => locale.value.startsWith('zh') ? {
   navigation: '主导航', workspace: '切换工作空间', management: '管理空间', personal: '个人空间',
   overview: '概览', resources: '用户与资源', operations: '运营与财务', system: '系统',
-  work: '工作空间', account: '我的账户', shortcuts: '快捷入口', imageStudio: '创作画布', image: '生图'
+  work: '工作空间', account: '我的账户', shortcuts: '快捷入口', officialStatus: 'OpenAI 官方状态', imageStudio: '创作画布', image: '生图'
 } : {
   navigation: 'Main navigation', workspace: 'Switch workspace', management: 'Admin', personal: 'Personal',
   overview: 'Overview', resources: 'People & resources', operations: 'Operations & billing', system: 'System',
-  work: 'Workspace', account: 'My account', shortcuts: 'Shortcuts', imageStudio: 'Creative canvas', image: 'Image generation'
+  work: 'Workspace', account: 'My account', shortcuts: 'Shortcuts', officialStatus: 'OpenAI Official Status', imageStudio: 'Creative canvas', image: 'Image generation'
 })
 
 // Per-group expand/collapse overrides. A group with no entry follows the
@@ -956,6 +971,12 @@ function groupNavigation(
     if (grouped.length) sections.push({ id: `${space}-${definition.id}`, label: definition.label, items: grouped })
   }
   const remaining = items.filter((item) => !claimed.has(item.path))
+  remaining.push({
+    path: 'https://status.openai.com/',
+    label: dockText.value.officialStatus,
+    icon: SignalIcon,
+    external: true
+  })
   if (remaining.length) sections.push({ id: `${space}-shortcuts`, label: dockText.value.shortcuts, items: remaining })
   return sections
 }

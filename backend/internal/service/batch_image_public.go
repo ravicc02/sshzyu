@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -708,11 +709,14 @@ func (s *BatchImagePublicService) ListModels(ctx context.Context, owner BatchIma
 	modelsByProvider := make(map[string]map[string]struct{})
 	groupHasConfiguredImagePrice := false
 	var batchImageTierSizes []string
+	var ownerGroup *Group
+	openAIBatchImageTiers := []string{ImageBillingSize1K, ImageBillingSize2K, ImageBillingSize4K}
 	if owner.GroupID != nil && *owner.GroupID > 0 && s.GroupRepo != nil {
 		group, err := s.GroupRepo.GetByIDLite(ctx, *owner.GroupID)
 		if err != nil || group == nil {
 			return nil, ErrBatchImageSettlementPricingMissing
 		}
+		ownerGroup = group
 		if price := group.GetImagePrice(s.defaultImageSize()); price != nil && *price >= 0 {
 			groupHasConfiguredImagePrice = true
 		}
@@ -743,6 +747,9 @@ func (s *BatchImagePublicService) ListModels(ctx context.Context, owner BatchIma
 				continue
 			}
 			for _, model := range batchImageModelsFromAccountMapping(&account) {
+				if providerName == BatchImageProviderOpenAI && (ownerGroup == nil || !ownerGroup.AllowImageGeneration) {
+					continue
+				}
 				if providerName == BatchImageProviderOpenAI {
 					// The group configuration is the source of truth for the model
 					// universe. Do not filter public model IDs by a hard-coded
@@ -759,7 +766,7 @@ func (s *BatchImagePublicService) ListModels(ctx context.Context, owner BatchIma
 				// OpenAI batch requires an explicitly priced group (deployment
 				// contract, see resolvePricingSnapshot); Gemini falls back to the
 				// catalog pricing resolver when the group has no tier prices.
-				if providerName == BatchImageProviderOpenAI && len(batchImageTierSizes) == 0 {
+				if providerName == BatchImageProviderOpenAI && !batchImageModelHasAnyPrice(ownerGroup, model, openAIBatchImageTiers) {
 					continue
 				}
 				if providerName != BatchImageProviderOpenAI && !groupHasConfiguredImagePrice {
@@ -792,7 +799,11 @@ func (s *BatchImagePublicService) ListModels(ctx context.Context, owner BatchIma
 				Provider: providerName,
 			}
 			if providerName == BatchImageProviderOpenAI {
-				entry.SupportedImageSizes = append([]string(nil), batchImageTierSizes...)
+				for _, tier := range openAIBatchImageTiers {
+					if _, ok := batchImageModelPrice(ownerGroup, model, tier); ok {
+						entry.SupportedImageSizes = append(entry.SupportedImageSizes, tier)
+					}
+				}
 				entry.SupportedMimeTypes = []string{"image/png", "image/jpeg", "image/webp"}
 				entry.SupportsCustomDimensions = true
 			} else if providerName == BatchImageProviderGeminiAPI || providerName == BatchImageProviderVertex {
@@ -1241,6 +1252,47 @@ func (s *BatchImagePublicService) listCandidateAccounts(ctx context.Context, gro
 	return s.AccountRepo.ListSchedulableByPlatform(ctx, platform)
 }
 
+// batchImageModelPrice resolves a fixed per-image price for one model/tier.
+// Model pricing takes precedence through matching per-image tiers. Legacy group
+// tier prices remain the compatibility fallback when no model tier is configured.
+func batchImageModelPrice(group *Group, model, tier string) (float64, bool) {
+	if group == nil {
+		return 0, false
+	}
+	if card := matchGroupModelPricing(group, model); card != nil &&
+		(card.BillingMode == BillingModeImage || card.BillingMode == BillingModePerRequest) {
+		for _, interval := range card.Intervals {
+			if normalizeBatchImageTier(interval.TierLabel) != normalizeBatchImageTier(tier) {
+				continue
+			}
+			if price, ok := validBatchImagePrice(interval.PerRequestPrice); ok {
+				return price, true
+			}
+		}
+	}
+	return validBatchImagePrice(group.GetImagePrice(tier))
+}
+
+func batchImageModelHasAnyPrice(group *Group, model string, tiers []string) bool {
+	for _, tier := range tiers {
+		if _, ok := batchImageModelPrice(group, model, tier); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func validBatchImagePrice(price *float64) (float64, bool) {
+	if price == nil || math.IsNaN(*price) || math.IsInf(*price, 0) || *price < 0 {
+		return 0, false
+	}
+	return *price, true
+}
+
+func normalizeBatchImageTier(tier string) string {
+	return strings.TrimSpace(strings.ToUpper(tier))
+}
+
 func isBatchImageGroupPlatform(platform string) bool {
 	return platform == PlatformGemini || platform == PlatformOpenAI
 }
@@ -1375,8 +1427,8 @@ func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, ow
 		if group.BatchImageHoldMultiplier >= 0 {
 			holdMultiplier = group.BatchImageHoldMultiplier
 		}
-		if configuredUnit := group.GetImagePrice(billingSize); configuredUnit != nil && *configuredUnit >= 0 {
-			unit = *configuredUnit
+		if configuredUnit, ok := batchImageModelPrice(group, req.Model, billingSize); ok {
+			unit = configuredUnit
 		}
 	}
 	if unit < 0 {

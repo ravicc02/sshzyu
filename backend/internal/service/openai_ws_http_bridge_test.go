@@ -1192,6 +1192,10 @@ func TestProxyOpenAIWSHTTPBridgeTurnStagesMetadataAndRelaysKeepaliveBeforeCapaci
 	preamble := strings.Join([]string{
 		`data: {"type":"response.created","response":{"id":"resp_shed"}}`,
 		"",
+		`data: {"type":"response.queued","response":{"id":"resp_shed","status":"queued"}}`,
+		"",
+		`data: {"type":"response.metadata","response_id":"resp_shed","metadata":{"openai_chatgpt_moderation_metadata":{"prompt":{}}}}`,
+		"",
 		`data: {"type":"response.in_progress","response":{"id":"resp_shed"}}`,
 		"",
 		`data: {"type":"keepalive"}`,
@@ -1247,7 +1251,8 @@ func TestProxyOpenAIWSHTTPBridgeTurnStagesMetadataAndRelaysKeepaliveBeforeCapaci
 	require.Nil(t, result)
 	var failoverErr *UpstreamFailoverError
 	require.ErrorAs(t, err, &failoverErr)
-	require.True(t, failoverErr.RetryableOnSameAccount)
+	// Congestion can switch candidates before output without retrying the same OAuth account.
+	require.False(t, failoverErr.RetryableOnSameAccount)
 	require.True(t, failoverErr.RequestScopedTransient)
 	require.Len(t, writes, 1)
 	require.JSONEq(t, `{"type":"keepalive"}`, string(writes[0]))

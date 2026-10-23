@@ -2,7 +2,14 @@
 # Start: docker compose -f docker-compose.yml -f deploy/docker-compose.agent-local.yml up -d --no-build sub2api
 services:
   sub2api:
-    image: local/sshzyu:agent-v1-dev
+    image: local/sshzyu:agent-monitor-integrated-20261023
     environment:
       AGENT_ENABLED: "true"
       AGENT_STORAGE_DIR: /app/data/agent
+    volumes:
+      - agent-local-workspace:/app/data/agent
+
+volumes:
+  agent-local-workspace:
+    external: true
+    name: sshzy_agent_local_workspace_20261021_231439

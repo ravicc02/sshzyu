@@ -49,3 +49,10 @@ plan_docs/
 
 # ---- 本地批量生图测试素材（保留本地，不入库） ----
 batch test/
+
+# Isolated TTFT test runtime and compiled binaries
+/deploy/ttft/
+
+/deploy/backups/
+
+/ui/releases/

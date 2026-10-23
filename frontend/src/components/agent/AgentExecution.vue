@@ -6,11 +6,11 @@
       <section v-for="phase in phases" :key="phase.id" class="execution-phase" :data-phase-id="phase.id">
         <details v-if="phase.model?.summary?.trim()" class="thought-disclosure" :open="finished || active(phase.model) ? true : undefined" @toggle="motion.disclose">
           <summary><Icon name="sparkles" size="xs" /><span>{{ active(phase.model) ? '正在思考' : '深度思考' }}</span><time v-if="elapsed(phase.model)" title="本次模型阶段耗时，包含摘要和回复生成">{{ elapsed(phase.model) }}</time><Icon name="chevronDown" size="xs" /></summary>
-          <div class="reasoning-summary" v-html="renderAgentMarkdown(phase.model.summary)" />
+          <AgentMarkdown class="reasoning-summary" :text="phase.model.summary" :copyable="false" />
           <span class="thought-source">模型提供的公开摘要</span>
         </details>
         <p v-else-if="phase.model && active(phase.model) && !phase.model.commentary && !finished" class="thinking-pending" role="status"><span class="activity-dot" />正在思考<time v-if="elapsed(phase.model)">{{ elapsed(phase.model) }}</time></p>
-        <div v-if="phase.model?.commentary && (!finished || phase.tools.length)" class="stage-commentary" v-html="renderAgentMarkdown(phase.model.commentary)" />
+        <AgentMarkdown v-if="phase.model?.commentary && (!finished || phase.tools.length)" class="stage-commentary" :text="phase.model.commentary" :copyable="false" />
         <component :is="finished ? 'div' : 'details'" v-if="phase.tools.length" class="tool-stage" :open="!finished && phase.running ? true : undefined" @toggle="motion.disclose">
           <summary v-if="!finished" class="stage-heading"><span class="stage-names">{{ toolNames(phase.tools) }}</span><span v-if="phase.running" class="stage-counts">已完成 {{ completed(phase.tools) }}/{{ phase.tools.length }}，{{ activityCounts(phase.tools) }}</span><span v-else-if="phase.failed" class="stage-counts">{{ phase.failed }} 项未完成</span><Icon name="chevronDown" size="xs" /></summary>
           <AgentTrace :steps="phase.tools" inline />
@@ -24,11 +24,12 @@
   </component>
 </template>
 <script setup lang="ts">
+import AgentMarkdown from './AgentMarkdown.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 import AgentTrace from './AgentTrace.vue'
 import { useAgentMotion } from '@/composables/useAgentMotion'
-import { agentToolLabel, renderAgentMarkdown } from '@/utils/agentPresentation'
+import { agentToolLabel } from '@/utils/agentPresentation'
 import type { AgentMessage, AgentTraceStep } from '@/api/agent'
 const props = defineProps<{ steps: AgentTraceStep[]; status?: string; answers?: AgentMessage[] }>()
 const motion = useAgentMotion()
@@ -82,8 +83,8 @@ onBeforeUnmount(() => clearInterval(clock))
 .execution-heading,.stage-heading,.thought-disclosure > summary { display:flex; align-items:center; gap:8px; list-style:none; cursor:pointer; color:var(--workspace-muted); font-size:12px; line-height:1.6; border-radius:6px; padding:5px 0; }
 summary::-webkit-details-marker { display:none; } summary:focus-visible { outline:2px solid var(--workspace-accent); outline-offset:3px; } summary > :deep(svg:last-child) { flex-shrink:0; transition:transform 160ms ease-out; } details[open] > summary > :deep(svg:last-child) { transform:rotate(180deg); }
 .execution-heading { width:fit-content; }.execution-failure { font-size:10px; color:var(--workspace-muted); }.execution-finished[open] > .execution-timeline { margin-top:12px; padding-left:13px; border-left:1px solid var(--workspace-divider); }
-.execution-phase + .execution-phase { margin-top:16px; }.stage-commentary { font-size:14px; line-height:1.85; overflow-wrap:anywhere; margin:8px 0 10px; }.stage-commentary :deep(p) { margin-bottom:8px; }.stage-commentary :deep(ul),.stage-commentary :deep(ol) { padding-left:20px; }.stage-commentary :deep(ul),.reasoning-summary :deep(ul) { list-style:disc; }.stage-commentary :deep(ol),.reasoning-summary :deep(ol) { list-style:decimal; }.stage-commentary :deep(table),.reasoning-summary :deep(table) { display:block; max-width:100%; overflow-x:auto; }.stage-commentary :deep(pre) { white-space:pre-wrap; font-size:12px; padding:10px; background:var(--workspace-soft); border-radius:7px; }
-.stage-heading { gap:7px; flex-wrap:wrap; }.stage-names { min-width:0; overflow-wrap:anywhere; }.stage-counts { font-size:11px; }.tool-stage > :deep(.agent-process) { margin-top:5px; }.thought-disclosure > summary { width:fit-content; font-size:11px; }.thought-disclosure time { font-variant-numeric:tabular-nums; }.reasoning-summary { font-size:13px; line-height:1.85; overflow-wrap:anywhere; color:var(--workspace-muted); margin:8px 0; }.reasoning-summary :deep(p) { margin:8px 0; }.reasoning-summary :deep(ul),.reasoning-summary :deep(ol) { padding-left:20px; }.reasoning-summary :deep(pre) { white-space:pre-wrap; padding:10px; background:var(--workspace-soft); border-radius:7px; }.thought-source { color:var(--workspace-muted); font-size:10px; }
+.execution-phase + .execution-phase { margin-top:16px; }.stage-commentary { font-size:14px; line-height:1.85; overflow-wrap:anywhere; margin:8px 0 10px; }.stage-commentary :deep(p) { margin-bottom:8px; }.stage-commentary :deep(ul),.stage-commentary :deep(ol) { padding-left:20px; }.stage-commentary :deep(ul),.reasoning-summary :deep(ul) { list-style:disc; }.stage-commentary :deep(ol),.reasoning-summary :deep(ol) { list-style:decimal; }
+.stage-heading { gap:7px; flex-wrap:wrap; }.stage-names { min-width:0; overflow-wrap:anywhere; }.stage-counts { font-size:11px; }.tool-stage > :deep(.agent-process) { margin-top:5px; }.thought-disclosure > summary { width:fit-content; font-size:11px; }.thought-disclosure time { font-variant-numeric:tabular-nums; }.reasoning-summary { font-size:13px; line-height:1.85; overflow-wrap:anywhere; color:var(--workspace-muted); margin:8px 0; }.reasoning-summary :deep(p) { margin:8px 0; }.reasoning-summary :deep(ul),.reasoning-summary :deep(ol) { padding-left:20px; }.thought-source { color:var(--workspace-muted); font-size:10px; }
 .stage-answer { margin:14px 0; padding:14px 16px; border:1px solid var(--workspace-divider); border-radius:12px; background:var(--workspace-soft); }.stage-answer header { display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:12px; }.answer-confirmed { display:inline-flex; align-items:center; gap:4px; margin-left:auto; color:var(--workspace-muted); font-size:10px; }.stage-answer dl { display:grid; gap:10px; border-top:1px solid var(--workspace-divider); padding-top:12px; }.stage-answer dt { font-size:11px; color:var(--workspace-muted); margin-bottom:3px; }.stage-answer dd,.stage-answer p { font-size:13px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
 .current-tool { display:flex; align-items:center; gap:10px; margin:14px 0 5px; color:var(--workspace-muted); font-size:12px; }.current-tool > div { min-width:0; }.current-tool small { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; margin-top:3px; }.current-tool time { font-variant-numeric:tabular-nums; }.activity-spinner { width:14px; height:14px; flex:0 0 14px; border:1.5px solid var(--workspace-divider); border-top-color:var(--workspace-accent); border-radius:50%; animation:tool-spin 1s linear infinite; }.thinking-pending { display:flex; align-items:center; gap:8px; color:var(--workspace-muted); font-size:12px; margin:8px 0; }.thinking-pending time { font-size:11px; }.activity-dot { width:6px; height:6px; border-radius:50%; background:var(--workspace-accent); animation:thought-pulse 1.8s ease-in-out infinite; }
 @media(hover:hover) { .execution-heading:hover,.stage-heading:hover,.thought-disclosure > summary:hover { color:var(--workspace-ink); } }

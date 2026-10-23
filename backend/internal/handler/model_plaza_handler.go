@@ -36,7 +36,9 @@ func NewModelPlazaHandler(
 	}
 }
 
-// modelPlazaOfficialPricing 官方参考价（USD per token，与计费目录同源）。
+// modelPlazaOfficialPricing 官方参考价（per token）。
+// 币种口径随平台：国模取与实收同源的分组价卡（运营按 CNY 数值 1:1 写入），
+// 非国模取 LiteLLM 美元目录价；前端按 platform 决定展示 ¥ 或 $。
 type modelPlazaOfficialPricing struct {
 	InputPrice        *float64 `json:"input_price"`
 	OutputPrice       *float64 `json:"output_price"`

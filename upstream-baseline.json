@@ -1,12 +1,12 @@
 {
   "upstream_repository": "Wei-Shaw/sub2api",
-  "upstream_release": "v0.2.17",
-  "upstream_commit": "060d0160417782cd962a0c7f460f6cd4565d4916",
-  "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.17",
-  "local_build_version": "0.2.17-r2",
-  "integration_commit": "2592bc1ad5d6d1421e2318b09439809ed6408cea",
-  "integrated_at": "2026-10-20",
-  "verified_at": "2026-10-23",
-  "note": "Official v0.2.17 baseline and tag commit remain unchanged. This custom revision restores explicit single-image Agent execution, greeting and review boundaries, original error reporting, bounded cancellation and matching frontend behavior; it adds admin upstream account-total-balance monitoring, New API/Sub2API adapters and encrypted Feishu alerts with default threshold 5. New migration 258 is additive and reviewed as backward-compatible. Local targeted tests and browser checks are recorded separately; full Linux CI gates signed publication. Publishing does not activate production or run production migrations.",
+  "upstream_release": "v0.2.18",
+  "upstream_commit": "ac1b8f1271be0d674fa6f074403c1410f30a3a81",
+  "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.18",
+  "local_build_version": "0.2.18-r1",
+  "integration_commit": "752adce016ecd2e9c221527188adaeb0f5955a02",
+  "integrated_at": "2026-10-24",
+  "verified_at": "2026-10-24",
+  "note": "Integrated official v0.2.18 with custom Agent execution, rich replies, bounded health-aware OAuth-first routing, workload-scoped latency, pricing display and batch-image settlement preserved. Release-only authorization: no production activation or migration execution.",
   "integration_status": "committed"
 }

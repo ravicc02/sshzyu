@@ -69,7 +69,8 @@ func TestMigrationsUpgradeOfficial016From015PreservesCustomData(t *testing.T) {
 		"252_agent_file_attachments.sql": true, "253_agent_attachment_mime.sql": true,
 		"254_agent_security_storage.sql": true, "255_agent_work_plans.sql": true,
 		"256_agent_adaptive_runtime.sql": true, "257_agent_storage_maintenance_indexes.sql": true,
-		"258_upstream_balance_monitor.sql": true,
+		"258_upstream_balance_monitor.sql":              true,
+		"246_enable_gemini_image_generation_groups.sql": true,
 	}
 	files, err := fs.Glob(dbmigrations.FS, "*.sql")
 	require.NoError(t, err)
@@ -90,6 +91,12 @@ func TestMigrationsUpgradeOfficial016From015PreservesCustomData(t *testing.T) {
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, `INSERT INTO lottery_activities(name,status) VALUES('legacy-lottery-validation','active')`)
 	require.NoError(t, err)
+	// The v0.2.18 backfill must apply to existing Gemini-family groups while
+	// preserving unrelated platforms and the exact historical migration set.
+	for _, platform := range []string{"gemini", "antigravity", "openai"} {
+		_, err = db.ExecContext(ctx, `INSERT INTO groups(name,platform,allow_image_generation) VALUES($1,$2,false)`, "legacy-image-"+platform, platform)
+		require.NoError(t, err)
+	}
 	var oldLedger string
 	require.NoError(t, db.QueryRowContext(ctx, `SELECT md5(string_agg(filename||':'||checksum,'|' ORDER BY filename)) FROM schema_migrations`).Scan(&oldLedger))
 	require.NoError(t, applyMigrationsFS(ctx, db, dbmigrations.FS))
@@ -112,6 +119,11 @@ func TestMigrationsUpgradeOfficial016From015PreservesCustomData(t *testing.T) {
 	var cacheTable string
 	require.NoError(t, db.QueryRowContext(ctx, `SELECT to_regclass('public.gemini_cached_contents')::text`).Scan(&cacheTable))
 	require.Equal(t, "gemini_cached_contents", cacheTable)
+	for _, platform := range []string{"gemini", "antigravity", "openai"} {
+		var allowed bool
+		require.NoError(t, db.QueryRowContext(ctx, `SELECT allow_image_generation FROM groups WHERE name=$1`, "legacy-image-"+platform).Scan(&allowed))
+		require.Equal(t, platform != "openai", allowed, "image backfill for %s", platform)
+	}
 	for _, table := range []string{"upstream_balance_sites", "upstream_balance_events", "upstream_balance_deliveries", "upstream_balance_channel"} {
 		var found string
 		require.NoError(t, db.QueryRowContext(ctx, "SELECT to_regclass($1)::text", "public."+table).Scan(&found))

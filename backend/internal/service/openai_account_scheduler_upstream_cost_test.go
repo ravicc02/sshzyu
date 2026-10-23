@@ -548,7 +548,7 @@ func TestOpenAISchedulingRatePlacesOAuthAtConfiguredReference(t *testing.T) {
 	require.Greater(t, factors[oauth.ID], factors[expensive.ID])
 }
 
-func TestOpenAIGatewayServiceLegacyLowRatePriorityUsesConfiguredOAuthReference(t *testing.T) {
+func TestOpenAIGatewayServiceLegacyOAuthPriorityPrecedesRateAndRetainsRelayCostOrder(t *testing.T) {
 	resetOpenAIAdvancedSchedulerSettingCacheForTest()
 	defer resetOpenAIAdvancedSchedulerSettingCacheForTest()
 
@@ -579,11 +579,14 @@ func TestOpenAIGatewayServiceLegacyLowRatePriorityUsesConfiguredOAuthReference(t
 
 	first, _, err := svc.SelectAccountWithScheduler(context.Background(), &groupID, "", "", "gpt-test", nil, OpenAIUpstreamTransportAny, false)
 	require.NoError(t, err)
-	require.Equal(t, cheap.ID, first.Account.ID)
+	require.Equal(t, oauth.ID, first.Account.ID)
 
-	second, _, err := svc.SelectAccountWithScheduler(context.Background(), &groupID, "", "", "gpt-test", map[int64]struct{}{cheap.ID: {}}, OpenAIUpstreamTransportAny, false)
+	second, _, err := svc.SelectAccountWithScheduler(context.Background(), &groupID, "", "", "gpt-test", map[int64]struct{}{oauth.ID: {}}, OpenAIUpstreamTransportAny, false)
 	require.NoError(t, err)
-	require.Equal(t, oauth.ID, second.Account.ID)
+	require.Equal(t, cheap.ID, second.Account.ID)
+	third, _, err := svc.SelectAccountWithScheduler(context.Background(), &groupID, "", "", "gpt-test", map[int64]struct{}{oauth.ID: {}, cheap.ID: {}}, OpenAIUpstreamTransportAny, false)
+	require.NoError(t, err)
+	require.Equal(t, expensive.ID, third.Account.ID)
 }
 
 func TestOpenAIModelsSelectionIgnoresTokenCostSignal(t *testing.T) {
