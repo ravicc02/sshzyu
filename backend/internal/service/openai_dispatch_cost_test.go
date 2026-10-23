@@ -162,7 +162,7 @@ func TestDispatchCostShedsHistoricallyFastAccountAfterSoftTarget(t *testing.T) {
 	releases := []func(){}
 	for i := 0; i < 20; i++ {
 		plan := s.buildOpenAIAccountLoadPlan(context.Background(), OpenAIAccountScheduleRequest{RequestedModel: "model", SessionHash: fmt.Sprintf("shed-%d", i)}, accounts, map[int64]*AccountLoadInfo{1: {}, 2: {}})
-		index, release := s.reserveDispatchCandidate(plan.selectionOrder)
+		index, release := s.reserveDispatchCandidate(plan.selectionOrder, OpenAIAccountScheduleRequest{RequestedModel: "model"})
 		chosen = append(chosen, plan.selectionOrder[index].account.ID)
 		releases = append(releases, release)
 	}

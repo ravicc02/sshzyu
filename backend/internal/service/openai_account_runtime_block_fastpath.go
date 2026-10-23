@@ -206,7 +206,7 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 
 func shouldCooldownOpenAITransientUpstreamError(statusCode int, responseBody []byte) bool {
 	switch statusCode {
-	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout, 520, 521, 522, 523, 524:
+	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusGatewayTimeout, 520, 521, 522, 523, 524:
 		return true
 	case http.StatusBadRequest:
 		return isOpenAITransientProcessingError(statusCode, "", responseBody)
@@ -558,6 +558,10 @@ func (s *OpenAIGatewayService) clearOpenAIAccountRuntimeBlockIfUnchanged(account
 func (s *OpenAIGatewayService) isOpenAIAccountRequestRuntimeBlocked(account *Account, requestedModel string) bool {
 	if s == nil {
 		return false
+	}
+	// Health cooldowns survive stale snapshots and in-flight successes.
+	if account != nil && account.Platform == PlatformOpenAI && s.getOpenAIAccountHealthCircuit().blocked(account.ID, time.Now()) {
+		return true
 	}
 	snapshot := s.peekOpenAIAccountRuntimeBlock(account)
 	if snapshot.blocked {

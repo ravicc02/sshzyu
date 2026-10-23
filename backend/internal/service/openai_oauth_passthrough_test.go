@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -1824,37 +1825,41 @@ func TestOpenAIGatewayService_APIKeyPassthrough_ContextWindow502DoesNotFailover(
 	require.True(t, body.closed)
 }
 
-func TestOpenAIGatewayService_APIKeyPassthrough_PoolModeConfigured5xxRetriesSameAccount(t *testing.T) {
+func TestOpenAIGatewayService_APIKeyPassthrough_PoolModeHealthOverridesGatewayRetries(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	rec := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(rec)
-	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(nil))
+	for _, status := range []int{500, 502, 503, 504} {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(nil))
 
-	svc := &OpenAIGatewayService{
-		cfg: &config.Config{Gateway: config.GatewayConfig{ForceCodexCLI: false}},
-		httpUpstream: &httpUpstreamRecorder{resp: &http.Response{
-			StatusCode: http.StatusBadGateway,
-			Header:     http.Header{"Content-Type": []string{"application/json"}},
-			Body:       io.NopCloser(strings.NewReader(`{"error":{"message":"temporary upstream failure"}}`)),
-		}},
+			svc := &OpenAIGatewayService{
+				cfg: &config.Config{Gateway: config.GatewayConfig{ForceCodexCLI: false}},
+				httpUpstream: &httpUpstreamRecorder{resp: &http.Response{
+					StatusCode: status,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(`{"error":{"message":"temporary upstream failure"}}`)),
+				}},
+			}
+			account := &Account{
+				ID: 128, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Concurrency: 1,
+				Credentials: map[string]any{
+					"api_key":                      "sk-test",
+					"base_url":                     "https://api.example.test",
+					"pool_mode":                    true,
+					"pool_mode_retry_status_codes": []any{float64(status)},
+				},
+				Extra: map[string]any{"openai_passthrough": true}, Status: StatusActive, Schedulable: true,
+			}
+
+			_, err := svc.Forward(context.Background(), c, account, []byte(`{"model":"gpt-5.2","input":"hello"}`))
+
+			var failoverErr *UpstreamFailoverError
+			require.ErrorAs(t, err, &failoverErr)
+			require.Equal(t, status != 502 && status != 503, failoverErr.RetryableOnSameAccount)
+			require.False(t, c.Writer.Written())
+		})
 	}
-	account := &Account{
-		ID: 128, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Concurrency: 1,
-		Credentials: map[string]any{
-			"api_key":                      "sk-test",
-			"base_url":                     "https://api.example.test",
-			"pool_mode":                    true,
-			"pool_mode_retry_status_codes": []any{float64(http.StatusBadGateway)},
-		},
-		Extra: map[string]any{"openai_passthrough": true}, Status: StatusActive, Schedulable: true,
-	}
-
-	_, err := svc.Forward(context.Background(), c, account, []byte(`{"model":"gpt-5.2","input":"hello"}`))
-
-	var failoverErr *UpstreamFailoverError
-	require.ErrorAs(t, err, &failoverErr)
-	require.True(t, failoverErr.RetryableOnSameAccount)
-	require.False(t, c.Writer.Written())
 }
 
 func TestOpenAIGatewayService_APIKeyPassthrough_PoolModeAuthErrorsTriggerFailover(t *testing.T) {

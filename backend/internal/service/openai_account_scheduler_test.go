@@ -2802,7 +2802,7 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_SubscriptionPriorityFal
 	}
 }
 
-func TestOpenAIGatewayService_SelectAccountWithScheduler_SubscriptionPriorityDisabledUsesScore(t *testing.T) {
+func TestOpenAIGatewayService_SelectAccountWithScheduler_SubscriptionPriorityDisabledStillPrefersOAuth(t *testing.T) {
 	ctx := context.Background()
 	groupID := int64(10122)
 	accounts := []Account{
@@ -2847,7 +2847,7 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_SubscriptionPriorityDis
 	require.NoError(t, err)
 	require.NotNil(t, selection)
 	require.NotNil(t, selection.Account)
-	require.Equal(t, int64(21622), selection.Account.ID)
+	require.Equal(t, int64(21621), selection.Account.ID)
 	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
 	if selection.ReleaseFunc != nil {
 		selection.ReleaseFunc()

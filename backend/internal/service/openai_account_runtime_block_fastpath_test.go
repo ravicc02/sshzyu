@@ -556,7 +556,7 @@ func TestOpenAIPoolModeNonRetryable5xx_StillCreatesModelTransientBlock(t *testin
 		shouldDisable := gateway.handleOpenAIAccountUpstreamError(
 			context.Background(),
 			account,
-			http.StatusServiceUnavailable,
+			http.StatusBadGateway,
 			http.Header{},
 			[]byte(`{"error":{"message":"upstream unavailable"}}`),
 			"gpt-5.4",

@@ -33,13 +33,26 @@ func (s *OpenAIGatewayService) trackOpenAIDispatch(id int64, release func()) fun
 
 // Reserve before Redis I/O so simultaneous selectors cannot all act on the same
 // cached zero-load snapshot. Redis remains the authoritative hard-cap gate.
-func (s *defaultOpenAIAccountScheduler) reserveDispatchCandidate(pool []openAIAccountCandidateScore) (int, func()) {
+func (s *defaultOpenAIAccountScheduler) reserveDispatchCandidate(pool []openAIAccountCandidateScore, req OpenAIAccountScheduleRequest) (int, func()) {
 	s.service.openaiDispatchMu.Lock()
 	defer s.service.openaiDispatchMu.Unlock()
 	if len(pool) == 0 || pool[0].account == nil {
 		return 0, func() {}
 	}
-	first := pool[0]
+	if index, ok := s.fairShareDispatchCandidate(pool, req); ok {
+		return index, s.service.trackOpenAIDispatch(pool[index].account.ID, nil)
+	}
+	healthy := openAIHasHealthyCandidate(pool)
+	firstIndex := 0
+	if healthy {
+		for i, c := range pool {
+			if c.account != nil && !c.overloaded {
+				firstIndex = i
+				break
+			}
+		}
+	}
+	first := pool[firstIndex]
 	target := s.service.cfg.Gateway.OpenAIScheduler.LatencyConcurrencyTarget
 	if target <= 0 {
 		target = 8
@@ -59,9 +72,9 @@ func (s *defaultOpenAIAccountScheduler) reserveDispatchCandidate(pool []openAIAc
 	}
 	if activeOf(first) >= target {
 		peer, peerCost := -1, math.MaxFloat64
-		for i := 1; i < len(pool); i++ {
+		for i := 0; i < len(pool); i++ {
 			candidate := pool[i]
-			if candidate.account == nil || candidate.account.Priority != first.account.Priority || candidate.errorRate > first.errorRate+0.05 {
+			if i == firstIndex || (healthy && candidate.overloaded) || candidate.account == nil || candidate.account.Priority != first.account.Priority || candidate.errorRate > first.errorRate+0.05 {
 				continue
 			}
 			limit := target
@@ -80,9 +93,9 @@ func (s *defaultOpenAIAccountScheduler) reserveDispatchCandidate(pool []openAIAc
 			return peer, s.service.trackOpenAIDispatch(pool[peer].account.ID, nil)
 		}
 	}
-	best, bestScore := 0, -math.MaxFloat64
+	best, bestScore := firstIndex, -math.MaxFloat64
 	for i, candidate := range pool {
-		if candidate.account == nil {
+		if candidate.account == nil || (healthy && candidate.overloaded) {
 			continue
 		}
 		score := candidate.score
@@ -98,4 +111,13 @@ func (s *defaultOpenAIAccountScheduler) reserveDispatchCandidate(pool []openAIAc
 		}
 	}
 	return best, s.service.trackOpenAIDispatch(pool[best].account.ID, nil)
+}
+
+func openAIHasHealthyCandidate(pool []openAIAccountCandidateScore) bool {
+	for _, candidate := range pool {
+		if candidate.account != nil && !candidate.overloaded {
+			return true
+		}
+	}
+	return false
 }

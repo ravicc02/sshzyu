@@ -38,7 +38,7 @@ func TestHandleOpenAITransientError_BlocksOnlyRequestedModel(t *testing.T) {
 }
 
 func TestHandleOpenAITransientError_TransientStatusesUseModelScope(t *testing.T) {
-	for _, statusCode := range []int{http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout, 520, 521, 522, 523, 524} {
+	for _, statusCode := range []int{http.StatusInternalServerError, http.StatusBadGateway, http.StatusGatewayTimeout, 520, 521, 522, 523, 524} {
 		t.Run(http.StatusText(statusCode), func(t *testing.T) {
 			svc := &OpenAIGatewayService{}
 			svc.rateLimitService = NewRateLimitService(transientCooldownAccountRepo{}, nil, &config.Config{}, nil, nil)
