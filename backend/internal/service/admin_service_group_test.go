@@ -599,25 +599,30 @@ func TestAdminService_CreateGroup_DefaultsGrokMediaGenerationEnabled(t *testing.
 	require.True(t, group.AllowImageGeneration)
 }
 
-func TestAdminService_CreateGroup_PreservesNonGrokImageGenerationDisabled(t *testing.T) {
-	repo := &groupRepoStubForAdmin{}
-	svc := &adminServiceImpl{groupRepo: repo}
+func TestAdminService_CreateGroup_DefaultsGeminiFamilyImageGenerationEnabled(t *testing.T) {
+	for _, platform := range []string{PlatformGemini, PlatformAntigravity} {
+		t.Run(platform, func(t *testing.T) {
+			repo := &groupRepoStubForAdmin{}
+			svc := &adminServiceImpl{groupRepo: repo}
 
-	group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
-		Name:           "anthropic-text",
-		Description:    "Anthropic text group",
-		Platform:       PlatformAnthropic,
-		RateMultiplier: 1.0,
-	})
-	require.NoError(t, err)
-	require.NotNil(t, group)
-	require.NotNil(t, repo.created)
-	require.False(t, repo.created.AllowImageGeneration)
-	require.False(t, group.AllowImageGeneration)
+			group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
+				Name:           platform + "-images",
+				Description:    "Gemini family group",
+				Platform:       platform,
+				RateMultiplier: 1.0,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, group)
+			require.NotNil(t, repo.created)
+			require.True(t, repo.created.AllowImageGeneration)
+			require.True(t, group.AllowImageGeneration)
+			require.False(t, repo.created.AllowBatchImageGeneration)
+		})
+	}
 }
 
 func TestAdminService_CreateGroup_DisablesBatchImageWhenImageGenerationDisabled(t *testing.T) {
-	for _, platform := range []string{PlatformGemini, PlatformOpenAI} {
+	for _, platform := range []string{PlatformOpenAI} {
 		t.Run(platform, func(t *testing.T) {
 			repo := &groupRepoStubForAdmin{}
 			svc := &adminServiceImpl{groupRepo: repo}
@@ -2397,4 +2402,25 @@ func TestAdminService_CreateGroup_CodexModelsManifestConfigDisabledAccepted(t *t
 	require.NoError(t, err)
 	require.Equal(t, []int64{1, 2}, group.CodexModelsManifestConfig.AccountIDs)
 	require.False(t, repo.created.CodexModelsManifestConfig.Enabled)
+}
+
+func TestAdminService_CreateGroup_PreservesImageGenerationDisabledWithoutPlatformDefault(t *testing.T) {
+	for _, platform := range []string{PlatformAnthropic, PlatformComposite} {
+		t.Run(platform, func(t *testing.T) {
+			repo := &groupRepoStubForAdmin{}
+			svc := &adminServiceImpl{groupRepo: repo}
+
+			group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
+				Name:           platform + "-text",
+				Description:    "Group without image default",
+				Platform:       platform,
+				RateMultiplier: 1.0,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, group)
+			require.NotNil(t, repo.created)
+			require.False(t, repo.created.AllowImageGeneration)
+			require.False(t, group.AllowImageGeneration)
+		})
+	}
 }
