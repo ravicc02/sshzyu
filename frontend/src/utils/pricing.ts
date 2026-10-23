@@ -9,8 +9,23 @@
  *
  * Uses toPrecision(10) then strips trailing zeros to avoid IEEE 754 display noise.
  * `minFractionDigits` pads the result back up to a minimum number of decimals.
+ *
+ * `currency` selects the display symbol. 国模（kimi/zhipu/deepseek/minimax）的运营
+ * 定价按「官方 CNY 数值 1:1 写入」口径维护，因此展示为 ¥；其余默认 $。
  */
-export function formatScaled(value: number | null, scale: number, minFractionDigits = 0): string {
+export type PriceCurrency = 'usd' | 'cny'
+
+const CURRENCY_SYMBOL: Record<PriceCurrency, string> = {
+  usd: '$',
+  cny: '¥',
+}
+
+export function formatScaled(
+  value: number | null,
+  scale: number,
+  minFractionDigits = 0,
+  currency: PriceCurrency = 'usd'
+): string {
   if (value == null) return '-'
   let s = Number((value * scale).toPrecision(10)).toString()
   if (minFractionDigits > 0 && !s.includes('e')) {
@@ -20,7 +35,7 @@ export function formatScaled(value: number | null, scale: number, minFractionDig
       s = (dot === -1 ? `${s}.` : s) + '0'.repeat(minFractionDigits - digits)
     }
   }
-  return `$${s}`
+  return `${CURRENCY_SYMBOL[currency]}${s}`
 }
 
 type PriceValues = {

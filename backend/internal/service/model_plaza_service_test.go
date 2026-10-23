@@ -291,6 +291,55 @@ func TestListPlazaGroups_OfficialPricingFill(t *testing.T) {
 	require.Nil(t, byName["token-absent"].OfficialPricing)
 }
 
+// 国模的运营定价口径是「官方 CNY 数值 1:1 写入 USD 字段」，因此广场官方价列
+// 必须取与实收同源的分组价卡，而不是 LiteLLM 的真实美元目录价（两者相差约汇率量级）。
+func TestListPlazaGroups_OfficialPricingUsesGroupCardForCNProvider(t *testing.T) {
+	pricingSvc := newStubPricingServiceFromMap(map[string]*LiteLLMModelPricing{
+		// 目录价（真美元）：deepseek 官方 CNY 9 元折算后约 1.32 美元/百万。
+		"deepseek-v4-pro": {Mode: "chat", InputCostPerToken: 1.32e-6, OutputCostPerToken: 3.96e-6},
+		"gpt-6.1-sol":     {Mode: "chat", InputCostPerToken: 2e-6, OutputCostPerToken: 1e-5},
+	})
+	channels := []Channel{
+		plazaPricedChannel(1, "cn-ch", []int64{10}, "deepseek", "deepseek-v4-pro"),
+		plazaPricedChannel(2, "us-ch", []int64{20}, "openai", "gpt-6.1-sol"),
+	}
+	input9, output27 := 9e-6, 27e-6
+	groups := []Group{
+		{
+			ID: 10, Name: "ds", Platform: "deepseek", RateMultiplier: 1,
+			ModelPricing: []ChannelModelPricing{{
+				Models:      []string{"deepseek-v4-pro"},
+				InputPrice:  &input9,
+				OutputPrice: &output27,
+			}},
+		},
+		{ID: 20, Name: "gpt", Platform: "openai", RateMultiplier: 1},
+	}
+	svc := newPlazaService(channels, groups, pricingSvc)
+	svc.billingService = NewBillingService(&config.Config{}, pricingSvc)
+	svc.resolver = NewModelPricingResolver(nil, svc.billingService)
+
+	out, err := svc.ListGroups(context.Background())
+	require.NoError(t, err)
+
+	byGroup := map[int64]PlazaGroup{}
+	for _, g := range out {
+		byGroup[g.ID] = g
+	}
+
+	// 国模：官方价取分组价卡（1:1 口径的人民币数值），不是目录美元价 1.32e-6。
+	dsModel := byGroup[10].Models[0]
+	require.NotNil(t, dsModel.OfficialPricing)
+	require.InDelta(t, 9e-6, *dsModel.OfficialPricing.InputPrice, 1e-15)
+	require.InDelta(t, 27e-6, *dsModel.OfficialPricing.OutputPrice, 1e-15)
+
+	// 非国模：官方价仍取 LiteLLM 目录价。
+	gptModel := byGroup[20].Models[0]
+	require.NotNil(t, gptModel.OfficialPricing)
+	require.InDelta(t, 2e-6, *gptModel.OfficialPricing.InputPrice, 1e-15)
+	require.InDelta(t, 1e-5, *gptModel.OfficialPricing.OutputPrice, 1e-15)
+}
+
 func TestListPlazaGroups_GroupImagePriceOverridesChannelPricing(t *testing.T) {
 	// 图片计费模型:档位价按实收口径合成(分组图片价 > 渠道档位价 > 渠道默认按次价),
 	// 分组独立倍率字段透传;未配图片价的分组保持渠道定价原样。
