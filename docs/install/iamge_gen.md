@@ -16,6 +16,7 @@
 | --- | --- |
 | Base URL | `https://sshzyu.com/v1` |
 | 认证头 | `Authorization: Bearer YOUR_API_KEY` |
+| 必需 User-Agent | `User-Agent: sshzyu-image-skill/1.0` |
 | 文生图 | `POST https://sshzyu.com/v1/images/generations`（JSON 请求体） |
 | 图片编辑 / 参考图 | `POST https://sshzyu.com/v1/images/edits`（multipart/form-data） |
 | 模型列表 | `GET https://sshzyu.com/v1/models` |
@@ -89,9 +90,10 @@
 行为要求：
 
 1. Key 读取顺序：`--key` → 环境变量 `SSHZYU_API_KEY` → 脚本同目录 `key.txt`；都没有时报错并提示如何配置。
-2. 请求失败时打印 HTTP 状态码与 `error.message`，并给出针对性提示：`401` Key 无效、`402` 余额不足、`403` 分组未开通图片生成权限、`429` 限流稍后重试。
-3. 成功时把每张图按 `时间戳-序号.png/jpeg/webp` 保存到输出目录，打印**绝对路径**与 `usage` 计费信息。
-4. 校验保存文件以 PNG（`89 50 4E 47`）/ JPEG（`FF D8`）/ WebP（`RIFF`）魔数开头，防止把错误响应当图片保存。
+2. 所有 API 请求（模型列表、文生图和图片编辑）必须显式设置请求头 `User-Agent: sshzyu-image-skill/1.0`；不得使用 Python、HTTP 客户端或 Agent 的默认 User-Agent。
+3. 请求失败时打印 HTTP 状态码与 `error.message`，并给出针对性提示：`401` Key 无效、`402` 余额不足、`403` 分组未开通图片生成权限、`429` 限流稍后重试。
+4. 成功时把每张图按 `时间戳-序号.png/jpeg/webp` 保存到输出目录，打印**绝对路径**与 `usage` 计费信息。
+5. 校验保存文件以 PNG（`89 50 4E 47`）/ JPEG（`FF D8`）/ WebP（`RIFF`）魔数开头，防止把错误响应当图片保存。
 
 先用脚本真实生成一张图完成自测（如「a cute orange cat wearing sunglasses」），确认图片可打开后进入下一步。
 
@@ -124,6 +126,7 @@ description: 用 sshzyu.com 中转站的 gpt-image 系列模型生成图片。�
 生成图片：python <本技能目录>/sshzyu_image.py "画面描述" [--size 1024x1024] [--quality auto] [--format png] [--n 1]
 
 - API Key 已存放在本技能目录 key.txt，脚本自动读取，无需向用户索要。
+- 所有 API 请求必须使用固定请求头 `User-Agent: sshzyu-image-skill/1.0`。
 - 尺寸矩阵与计费规则见 https://sshzyu.com/docs/install/iamge_gen.md ；默认 1K 档（1024x1024），用户明确要高分辨率时按矩阵直接请求 2K/4K，无需额外确认。
 - 生成后把图片绝对路径告诉用户。
 ```
