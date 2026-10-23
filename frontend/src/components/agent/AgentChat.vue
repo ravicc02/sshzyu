@@ -12,7 +12,7 @@
         <p v-if="message.pending" class="message-pending" role="status">正在重新生成…</p>
         <AgentExecution v-if="message.role !== 'user' && message.trace?.length" :steps="message.trace" :status="message.run_status" :answers="answersFor(message)"><template #answer-assets="{ message: answer }"><slot name="assets" :message="answer" /></template></AgentExecution>
         <p v-if="message.role === 'user'" class="user-content">{{ message.text }}</p>
-        <div v-else-if="messageText(message)" class="message-markdown" v-html="renderAgentMarkdown(messageText(message))" />
+        <AgentMarkdown v-else-if="messageText(message)" class="message-markdown" :text="messageText(message)" />
         <slot name="assets" :message="message" />
         <slot name="work" :message="message" />
         <footer v-if="!message.pending && message.role !== 'user' && (message.text || message.run_id)" class="reply-toolbar">
@@ -39,7 +39,7 @@ import Icon from '@/components/icons/Icon.vue'
 import { useAgentMotion } from '@/composables/useAgentMotion'
 import AgentExecution from './AgentExecution.vue'
 import type { AgentMessage } from '@/api/agent'
-import { renderAgentMarkdown } from '@/utils/agentPresentation'
+import AgentMarkdown from './AgentMarkdown.vue'
 const props = defineProps<{ messages: AgentMessage[]; retryRunId?: string; retryDisabled?: boolean; recoverDisabled?: boolean; retryError?: string; hideLatestRetry?: boolean }>()
 const emit = defineEmits<{ retry: [message: AgentMessage]; recover: [message: AgentMessage] }>()
 const emptyAnswers: AgentMessage[] = []
@@ -115,19 +115,6 @@ onBeforeUnmount(() => clearTimeout(copyTimer))
 .from-user .message-role { justify-content:flex-end; text-align:right; }
 .user-content { white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px 18px; background: var(--workspace-soft); border-radius: 16px 16px 4px 16px; font-size: 14px; line-height: 1.8; }
 .message-markdown { overflow-wrap: anywhere; font-size: 14px; line-height: 1.85; color: var(--workspace-ink); }
-.message-markdown :deep(p) { margin: 0 0 12px; }
-.message-markdown :deep(h1), .message-markdown :deep(h2), .message-markdown :deep(h3), .message-markdown :deep(h4) { font-size: 17px; font-weight: 600; margin: 22px 0 10px; }
-.message-markdown :deep(ul), .message-markdown :deep(ol) { padding-left: 24px; margin: 10px 0 16px; }
-.message-markdown :deep(ul) { list-style: disc; }
-.message-markdown :deep(ol) { list-style: decimal; }
-.message-markdown :deep(li) { margin: 5px 0; }
-.message-markdown :deep(pre) { max-width: 100%; overflow-x: auto; padding: 16px; background: var(--workspace-soft); border: 1px solid var(--workspace-divider); border-radius: 8px; margin: 14px 0; white-space: pre; }
-.message-markdown :deep(code) { font-size: 12px; background: var(--workspace-soft); padding: 2px 4px; border-radius: 3px; }
-.message-markdown :deep(pre code) { padding: 0; }
-.message-markdown :deep(a) { color: var(--workspace-accent); text-decoration: underline; text-underline-offset: 3px; }
-.message-markdown :deep(blockquote) { padding: 10px 16px; background: var(--workspace-soft); border-radius: 6px; margin: 12px 0; }
-.message-markdown :deep(table) { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 16px 0; }
-.message-markdown :deep(th), .message-markdown :deep(td) { padding: 8px 12px; border: 1px solid var(--workspace-divider); white-space: normal; }
 .answer-confirmation { width:fit-content; max-width:88%; margin:12px 0 24px auto; color:var(--workspace-muted); font-size:12px; }
 .answer-confirmation > summary { display:flex; align-items:center; gap:7px; width:fit-content; max-width:100%; min-height:34px; margin-left:auto; padding:6px 10px; border:1px solid var(--workspace-divider); border-radius:8px; background:var(--workspace-soft); font-size:12px; font-weight:500; line-height:1.5; cursor:pointer; list-style:none; }
 .answer-confirmation > summary::-webkit-details-marker { display:none; }

@@ -87,7 +87,10 @@ export default defineConfig(({ mode }) => {
     plugins: [
       vue(),
       checker({
-        vueTsc: true
+        vueTsc: true,
+        // `pnpm build` already runs vue-tsc -b before Vite. Avoid a second
+        // full checker competing with bundling for memory on local/CI hosts.
+        enableBuild: false
       }),
       injectPublicSettings(backendUrl)
     ],
@@ -114,6 +117,10 @@ export default defineConfig(({ mode }) => {
          */
         manualChunks(id: string) {
           if (id.includes('node_modules')) {
+            // Keep optional message renderers in their native async chunks.
+            // The catch-all vendor bundle must not pull them onto every page.
+            if (/\/(?:mermaid|katex|highlight\.js|@mermaid-js|@dagrejs|@braintree\/sanitize-url|@iconify|@upsetjs|@chevrotain|d3[^/]*|dagre[^/]*|cytoscape[^/]*|elkjs|chevrotain|khroma|roughjs|stylis|ts-dedent|layout-base|cose-base|hachure-fill|path-data-parser|points-on-curve|points-on-path)\//.test(id)) return undefined
+
             // Agent motion is loaded with the Agent route, outside shared site vendors.
             if (id.includes('/gsap/')) return 'vendor-agent-motion'
 
