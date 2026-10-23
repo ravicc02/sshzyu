@@ -1136,7 +1136,7 @@ describe('batch image PPT usage guide', () => {
       await flushPromises()
       await wrapper.findAll('button').find(button => button.text().includes('batchImage.actions.usageGuide'))!.trigger('click')
       const textarea = wrapper.get('textarea[readonly]').element as HTMLTextAreaElement
-      expect(textarea.value).toContain('请根据以下 PPT 内容')
+      expect(textarea.value).toContain('请根据用户提供的 PPT 主题')
       expect(textarea.value).toContain('每条提示词必须以“根据参考图的风格以及背景”开头。')
       expect(textarea.value.trim().split('\n').at(-1)).toBe('prompt1;prompt2;prompt3;prompt4,4K,16:9,gpt-image-2.5-sunburst')
       await wrapper.findAll('button').find(button => button.text().includes('batchImage.actions.copyInstruction'))!.trigger('click')
