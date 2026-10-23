@@ -259,9 +259,11 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 	streamFinished := false
 	if clientStream {
 		streamRes, err := s.handleChatCompletionsStreamingResponseFromGemini(c, resp, startTime, originalModel, account.Type == AccountTypeOAuth, includeUsage)
-		if err != nil && streamRes == nil {
+		if err != nil && (streamRes == nil || AgentInvocationFromContext(ctx) == nil) {
 			return nil, err
 		}
+		// Agent failures retain observed usage for inline accounting. Ordinary
+		// callers retain the upstream error contract for unbillable disconnects.
 		streamErr = err
 		usage = streamRes.usage
 		firstTokenMs = streamRes.firstTokenMs

@@ -242,3 +242,17 @@ func TestGeminiCompatForward_ClientDisconnectBeforeFinishBillsNoImage(t *testing
 	require.Zero(t, result.ImageCount)
 	require.Equal(t, 1290, result.Usage.OutputTokens)
 }
+
+func TestGeminiForwardAsChatCompletions_AgentStreamErrorPreservesObservedUsage(t *testing.T) {
+	reqBody := []byte(`{"model":"gemini-3-flash-preview","stream":true,"messages":[{"role":"user","content":"hi"}]}`)
+	svc, c, _ := newGeminiAbortingStreamService(t, "/v1/chat/completions", reqBody, geminiAbortUsageChunk, false)
+	ctx := WithAgentInvocation(c.Request.Context(), &AgentInvocationTrace{})
+	c.Request = c.Request.WithContext(ctx)
+
+	result, err := svc.ForwardAsChatCompletions(ctx, c, geminiVertexAPIKeyTestAccount(""), reqBody)
+	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+	require.NotNil(t, result)
+	require.Equal(t, 10, result.Usage.InputTokens)
+	require.Equal(t, 2, result.Usage.OutputTokens)
+	require.False(t, result.ClientDisconnect)
+}
