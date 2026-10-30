@@ -1,12 +1,12 @@
 {
   "upstream_repository": "Wei-Shaw/sub2api",
-  "upstream_release": "v0.2.18",
-  "upstream_commit": "ac1b8f1271be0d674fa6f074403c1410f30a3a81",
-  "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.18",
-  "local_build_version": "0.2.18-r1",
-  "integration_commit": "752adce016ecd2e9c221527188adaeb0f5955a02",
-  "integrated_at": "2026-10-24",
-  "verified_at": "2026-10-24",
-  "note": "Integrated official v0.2.18 with custom Agent execution, rich replies, bounded health-aware OAuth-first routing, workload-scoped latency, pricing display and batch-image settlement preserved. Release-only authorization: no production activation or migration execution.",
+  "upstream_release": "v0.2.19",
+  "upstream_commit": "dece26153621959ccd7635814f4b2d08304e681a",
+  "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.19",
+  "local_build_version": "0.2.19-r1",
+  "integration_commit": "9b2da920e2201901d0c19472b66a76121e60db26",
+  "integrated_at": "2026-10-31",
+  "verified_at": "2026-10-31",
+  "note": "Integrated official v0.2.19 with scoped admin API keys, image-count billing, Grok model catalog diagnostics and the custom unified security audit preserved. Release preparation only: no production activation or migration execution.",
   "integration_status": "committed"
 }

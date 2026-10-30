@@ -103,5 +103,15 @@
     "checksum": "87267be7ab657173768989e2b0b105c5569c5930a7f1ed124f4cf81e5198297c",
     "risk": "backward-compatible",
     "description": "Official v0.2.18 enables the existing allow_image_generation flag on Gemini and Antigravity groups as the new Gemini endpoint guard starts enforcing it. Boolean backfill only; no schema removal or historical migration edits. Publishing does not execute this migration; deployment requires its own authorization."
+  },
+  "262_scoped_admin_api_keys.sql": {
+    "checksum": "0c4c22f564f276fb305a54cf2d6c4b1a6179d748d5d8b74a3b99676282355bf6",
+    "risk": "backward-compatible",
+    "description": "Create independently stored scoped administrator API keys with hashed secrets, expiry, IP allowlists, policies, usage metadata and reversible soft deletion. No existing administrator credentials or audit records are changed or deleted."
+  },
+  "263_group_image_count_billing.sql": {
+    "checksum": "c91d6d31937658e71c68fa3af6a26fc47380f61243a681ac275aeb4706b242ab",
+    "risk": "backward-compatible",
+    "description": "Add a default-off group-level image-count billing flag. Existing billing behavior remains unchanged until an administrator enables the option for an eligible OpenAI or Composite group."
   }
 }
