@@ -20,7 +20,11 @@ const (
 	ErrorCodeEncryptionKeyRequired = "prompt_audit_encryption_key_required"
 	ErrorCodeRequiresEnabled       = "prompt_guard_requires_audit_enabled"
 
-	DefaultGuardModel = "sileader/qwen3guard:0.6b"
+	DefaultGuardModel   = "sileader/qwen3guard:0.6b"
+	DefaultBlockMessage = "提示词安全审计拒绝了该请求，请调整输入后重试"
+
+	PromptScannerProfileQwen3Guard     = "qwen3guard"
+	PromptScannerProfileJSONClassifier = "json_classifier"
 )
 
 type Mode string
@@ -142,6 +146,7 @@ type NormalizedResult struct {
 type PromptDecision struct {
 	Kind           DecisionKind      `json:"kind"`
 	ErrorCode      string            `json:"error_code,omitempty"`
+	ClientMessage  string            `json:"client_message,omitempty"`
 	Result         *NormalizedResult `json:"result,omitempty"`
 	AllowNextStage bool              `json:"allow_next_stage"`
 }

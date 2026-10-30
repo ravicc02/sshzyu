@@ -906,15 +906,10 @@ const adminNavItems = computed((): NavItem[] => {
     { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
     { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
     {
-      path: '/admin/security-audit',
+      path: '/admin/risk-control',
       label: t('nav.securityAudit'),
       icon: ShieldIcon,
-      expandOnly: true,
       featureFlag: flagRiskControl,
-      children: [
-        { path: '/admin/risk-control', label: t('nav.contentModeration'), icon: ShieldIcon },
-        { path: '/admin/prompt-audit', label: t('nav.promptAudit'), icon: ShieldIcon },
-      ],
     },
     { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true },
     { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true },
@@ -998,7 +993,7 @@ const managementSections = computed(() => groupNavigation(adminNavItems.value, [
   { id: 'overview', label: dockText.value.overview, paths: ['/admin/dashboard', '/admin/ops', '/admin/usage'] },
   { id: 'resources', label: dockText.value.resources, paths: ['/admin/users', '/admin/groups', '/admin/model-prices', '/admin/accounts', '/admin/upstream-monitor', '/admin/channels', '/keys'] },
   { id: 'operations', label: dockText.value.operations, paths: ['/admin/subscriptions', '/admin/orders', '/admin/redeem', '/admin/promo-codes', '/admin/lottery', '/admin/affiliates'] },
-  { id: 'system', label: dockText.value.system, paths: ['/admin/announcements', '/admin/proxies', '/admin/plugins', '/admin/security-audit', '/admin/audit-logs', '/admin/settings'] }
+  { id: 'system', label: dockText.value.system, paths: ['/admin/announcements', '/admin/proxies', '/admin/plugins', '/admin/risk-control', '/admin/audit-logs', '/admin/settings'] }
 ], 'admin'))
 
 const personalSections = computed(() => groupNavigation(isAdmin.value ? personalNavItems.value : userNavItems.value, [

@@ -48,6 +48,28 @@ func TestAgentPlatformAccountingRecoveryNoDispatch(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAgentResponseErrorIgnoresNull(t *testing.T) {
+	for _, response := range []string{
+		`{"status":"completed","output":[],"error":null}`,
+		`{"status":"completed","output":[],"error":""}`,
+		`{"status":"completed","output":[]}`,
+	} {
+		if agentResponseHasError([]byte(response)) {
+			t.Fatalf("completed response rejected: %s", response)
+		}
+	}
+	for _, response := range []string{
+		`{"status":"failed","output":[],"error":null}`,
+		`{"status":"incomplete","output":[],"error":null}`,
+		`{"status":"completed","output":[],"error":{"message":"upstream failed"}}`,
+	} {
+		if !agentResponseHasError([]byte(response)) {
+			t.Fatalf("failed response accepted: %s", response)
+		}
+	}
+}
+
 func TestAgentResponseBound(t *testing.T) {
 	w := &agentResponseWriter{headers: make(http.Header)}
 	if _, err := w.Write(make([]byte, agentlimits.ImageResponseBytes+1)); err == nil || !w.overflow {

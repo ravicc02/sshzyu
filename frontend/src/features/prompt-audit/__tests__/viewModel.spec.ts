@@ -14,6 +14,9 @@ const config = (): PromptAuditConfig => ({
   enabled: true,
   blocking_enabled: false,
   blocking_latest_turn_only: false,
+    keyword_filter_enabled: true,
+    keywords: ['忽略之前'],
+    block_message: 'blocked',
   store_pass_events: false,
   effective_mode: 'async_audit',
   strategy: 'priority',
@@ -23,7 +26,7 @@ const config = (): PromptAuditConfig => ({
   all_groups: true,
   group_ids: [],
   endpoints: [{
-    id: 'guard-1', name: 'Guard One', protocol: 'openai_compatible', base_url: 'http://127.0.0.1:8000',
+    id: 'guard-1', name: 'Guard One', protocol: 'openai_compatible', scanner_profile: 'json_classifier', base_url: 'http://127.0.0.1:8000',
     model: 'sileader/qwen3guard:0.6b', timeout_ms: 3000, input_limit: 4000, enabled: true,
     has_token: true, token_status: 'configured',
   }],

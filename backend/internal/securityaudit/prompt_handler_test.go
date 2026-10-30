@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -22,6 +24,7 @@ type fakePromptAdminService struct {
 	probe        func(context.Context, ProbeRequest) ProbeResult
 	runtime      RuntimeSnapshot
 	list         func(context.Context, EventFilter, int, int) (*EventPage, error)
+	listFilter   func(context.Context, EventFilter, int, int) (*FilterRecordPage, error)
 	get          func(context.Context, int64) (*Event, error)
 	deleteOne    func(context.Context, int64) (*DeleteResult, error)
 	deleteIDs    func(context.Context, []int64) (*DeleteResult, error)
@@ -50,6 +53,12 @@ func (s *fakePromptAdminService) ListEvents(ctx context.Context, filter EventFil
 		return &EventPage{}, nil
 	}
 	return s.list(ctx, filter, page, pageSize)
+}
+func (s *fakePromptAdminService) ListFilterRecords(ctx context.Context, filter EventFilter, page, pageSize int) (*FilterRecordPage, error) {
+	if s.listFilter == nil {
+		return &FilterRecordPage{}, nil
+	}
+	return s.listFilter(ctx, filter, page, pageSize)
 }
 func (s *fakePromptAdminService) GetEvent(ctx context.Context, id int64) (*Event, error) {
 	if s.get == nil {
@@ -96,6 +105,7 @@ func promptAdminRouter(service PromptAdminService) *gin.Engine {
 	group.PUT("/config", handler.UpdateConfig)
 	group.POST("/endpoints/probe", handler.ProbeEndpoint)
 	group.GET("/runtime", handler.GetRuntime)
+	group.GET("/filter-records", handler.ListFilterRecords)
 	group.GET("/events", handler.ListEvents)
 	group.GET("/events/:id", handler.GetEvent)
 	group.DELETE("/events/:id", handler.DeleteEvent)
@@ -211,11 +221,24 @@ func TestPromptAdminRejectsInvalidEventIDsTimesAndPagination(t *testing.T) {
 		{http.MethodGet, "/admin/prompt-audit/events?group_id=bad", nil, "prompt_audit_invalid_filter_id"},
 		{http.MethodGet, "/admin/prompt-audit/events?start_at=not-time", nil, "prompt_audit_invalid_time"},
 		{http.MethodGet, "/admin/prompt-audit/events?page=0", nil, "prompt_audit_invalid_pagination"},
+		{http.MethodGet, "/admin/prompt-audit/events?page=9223372036854775807", nil, "prompt_audit_invalid_pagination"},
 		{http.MethodPost, "/admin/prompt-audit/events/batch-delete", map[string]any{"ids": []int64{1, -2}}, "prompt_audit_invalid_event_id"},
 	} {
 		response := promptAdminRequest(t, router, tc.method, tc.path, tc.body)
 		require.Equalf(t, http.StatusBadRequest, response.Code, "%s %s", tc.method, tc.path)
 		require.Contains(t, response.Body.String(), tc.reason)
+	}
+}
+
+func TestPromptAdminRejectsOverflowingPagination(t *testing.T) {
+	router := promptAdminRouter(nil)
+	for _, size := range []int{20, 21, 100} {
+		query := "/admin/prompt-audit/events?page=" + strconv.Itoa(math.MaxInt/size+1) + "&page_size=" + strconv.Itoa(size)
+		t.Run(query, func(t *testing.T) {
+			response := promptAdminRequest(t, router, http.MethodGet, query, nil)
+			require.Equal(t, http.StatusBadRequest, response.Code)
+			require.Contains(t, response.Body.String(), "prompt_audit_invalid_pagination")
+		})
 	}
 }
 

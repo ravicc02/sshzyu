@@ -140,6 +140,7 @@ func (g *GuardEvaluator) Evaluate(ctx context.Context, cfg ActiveConfig, snapsho
 	decision := &PromptDecision{Kind: kind, Result: aggregated, AllowNextStage: kind == DecisionAllow || kind == DecisionFlag}
 	if kind == DecisionBlock {
 		decision.ErrorCode = ErrorCodeBlocked
+		decision.ClientMessage = cfg.BlockMessage
 	}
 	if g.metrics != nil {
 		g.metrics.Observe(kind, g.clock.Now().Sub(start))

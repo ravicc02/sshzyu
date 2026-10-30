@@ -18,7 +18,7 @@ const DialogStub = defineComponent({ props: ['show', 'title'], emits: ['close'],
 const PaginationStub = defineComponent({ props: ['total', 'page', 'pageSize'], emits: ['update:page', 'update:pageSize'], template: '<div data-test="pagination" />' })
 
 const endpoint = (): PromptAuditEndpointDraft => ({
-  id: 'guard-1', name: 'Guard One', protocol: 'openai_compatible', base_url: 'http://127.0.0.1:8000',
+  id: 'guard-1', name: 'Guard One', protocol: 'openai_compatible', scanner_profile: 'qwen3guard', base_url: 'http://127.0.0.1:8000',
   model: 'guard-model', timeout_ms: 3000, input_limit: 4000, enabled: true,
   has_token: true, token_status: 'configured', token: '', clear_token: false,
 })
@@ -65,9 +65,9 @@ describe('Prompt Audit components', () => {
     expect(token.attributes('placeholder')).toContain('admin.promptAudit.pool.reenterSecret')
   })
 
-  it('supports group search, stale configured groups, nine scanners, and bounded worker inputs', async () => {
+  it('supports group search, stale configured groups, and nine scanners', async () => {
     const draft: PromptAuditDraft = {
-      enabled: true, blocking_enabled: false, blocking_latest_turn_only: false, store_pass_events: false, effective_mode: 'async_audit', strategy: 'priority',
+      enabled: true, blocking_enabled: false, blocking_latest_turn_only: false, keyword_filter_enabled: false, keywords: [], block_message: 'blocked', store_pass_events: false, effective_mode: 'async_audit', strategy: 'priority',
       worker_count: 4, queue_capacity: 100, scanners: SCANNER_CATALOG.map((item) => item.id), all_groups: false, group_ids: [1, 99],
       endpoints: [endpoint()], config_version: 1, updated_at: '', updated_by: 0, change_summary: '',
     }
@@ -79,9 +79,6 @@ describe('Prompt Audit components', () => {
     await wrapper.get('[aria-label="admin.promptAudit.policy.searchGroups"]').setValue('Beta')
     expect(wrapper.text()).toContain('Beta')
     expect(wrapper.text()).not.toContain('Alpha')
-    await wrapper.get('[aria-label="admin.promptAudit.policy.workerCount"]').setValue('6')
-    const emitted = wrapper.emitted('update:draft')?.at(-1)?.[0] as PromptAuditDraft
-    expect(emitted.worker_count).toBe(6)
   })
 
   it('keeps identity fields separate, supports selection, and opens filter deletion from the toolbar', async () => {

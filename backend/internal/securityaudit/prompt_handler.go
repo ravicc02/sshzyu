@@ -3,6 +3,7 @@ package securityaudit
 import (
 	"context"
 	"errors"
+	"math"
 	"strconv"
 	"strings"
 
@@ -18,6 +19,7 @@ type PromptAdminService interface {
 	Probe(context.Context, ProbeRequest) ProbeResult
 	Runtime(context.Context) RuntimeSnapshot
 	ListEvents(context.Context, EventFilter, int, int) (*EventPage, error)
+	ListFilterRecords(context.Context, EventFilter, int, int) (*FilterRecordPage, error)
 	GetEvent(context.Context, int64) (*Event, error)
 	DeleteEvent(context.Context, int64) (*DeleteResult, error)
 	DeleteEventsByIDs(context.Context, []int64) (*DeleteResult, error)
@@ -91,12 +93,44 @@ func (h *PromptAdminHandler) ListEvents(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
+	if page > math.MaxInt/pageSize {
+		response.ErrorFrom(c, infraerrors.BadRequest("prompt_audit_invalid_pagination", "分页参数无效"))
+		return
+	}
 	filter, err := eventFilterFromQuery(c)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 	result, err := h.service.ListEvents(c.Request.Context(), filter, page, pageSize)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *PromptAdminHandler) ListFilterRecords(c *gin.Context) {
+	page, err := positiveIntQuery(c, "page", 1, 0)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	pageSize, err := positiveIntQuery(c, "page_size", 20, 100)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if page > math.MaxInt/pageSize {
+		response.ErrorFrom(c, infraerrors.BadRequest("prompt_audit_invalid_pagination", "分页参数无效"))
+		return
+	}
+	filter, err := eventFilterFromQuery(c)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	result, err := h.service.ListFilterRecords(c.Request.Context(), filter, page, pageSize)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -229,7 +263,8 @@ func configAuditFields(request UpdateConfigRequest, saved *PublicConfig) map[str
 	return map[string]any{
 		"enabled": request.Enabled, "blocking_enabled": request.BlockingEnabled,
 		"blocking_latest_turn_only": request.BlockingLatestTurnOnly,
-		"config_version":            version, "endpoint_count": len(request.Endpoints),
+		"keyword_filter_enabled":    request.KeywordFilterEnabled, "keyword_count": len(request.Keywords),
+		"config_version": version, "endpoint_count": len(request.Endpoints),
 		"scanner_count": len(request.Scanners), "all_groups": request.AllGroups,
 		"group_count": len(request.GroupIDs),
 	}

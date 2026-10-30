@@ -162,17 +162,18 @@ func TestRunCheck_QuotaProbeAttachesSnapshotToPrimaryRowOnly(t *testing.T) {
 	h := &openAICaptureHandler{}
 	endpoint := setupFakeOpenAI(t, h)
 	repo := &quotaModeRepoStub{monitor: &ChannelMonitor{
-		ID:              4,
-		Provider:        MonitorProviderOpenAI,
-		APIMode:         MonitorAPIModeChatCompletions,
-		Endpoint:        endpoint,
-		APIKey:          "OLD:sk-openai",
-		PrimaryModel:    "gpt-test",
-		ExtraModels:     []string{"gpt-extra"},
-		Enabled:         true,
-		IntervalSeconds: 60,
-		CheckMode:       MonitorCheckModeQuotaProbe,
-		AccountID:       int64Ptr(12),
+		ID:                  4,
+		Provider:            MonitorProviderOpenAI,
+		APIMode:             MonitorAPIModeChatCompletions,
+		Endpoint:            endpoint,
+		APIKey:              "OLD:sk-openai",
+		PrimaryModel:        "gpt-test",
+		ExtraModels:         []string{"gpt-extra"},
+		Enabled:             true,
+		IntervalSeconds:     60,
+		CheckMode:           MonitorCheckModeQuotaProbe,
+		AccountID:           int64Ptr(12),
+		IntelligenceEnabled: true,
 	}}
 	svc := newQuotaModeService(repo)
 	usage := &stubMonitorUsageSource{usage: &UsageInfo{

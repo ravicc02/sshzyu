@@ -350,7 +350,9 @@ func (m *ConfigManager) buildNextStorage(current storageConfig, req UpdateConfig
 	}
 	next := storageConfig{
 		Enabled: req.Enabled, BlockingEnabled: req.BlockingEnabled, BlockingLatestTurnOnly: req.BlockingLatestTurnOnly, StorePassEvents: req.StorePassEvents,
-		Strategy: strings.TrimSpace(req.Strategy), WorkerCount: req.WorkerCount,
+		KeywordFilterEnabled: req.KeywordFilterEnabled, Keywords: append([]string(nil), req.Keywords...),
+		BlockMessage: strings.TrimSpace(req.BlockMessage),
+		Strategy:     strings.TrimSpace(req.Strategy), WorkerCount: req.WorkerCount,
 		QueueCapacity: req.QueueCapacity, Scanners: append([]string(nil), req.Scanners...),
 		AllGroups: req.AllGroups, GroupIDs: append([]int64(nil), req.GroupIDs...),
 		ConfigVersion: current.ConfigVersion, UpdatedBy: actorID,
@@ -363,7 +365,8 @@ func (m *ConfigManager) buildNextStorage(current storageConfig, req UpdateConfig
 		}
 		stored := StorageEndpoint{
 			ID: strings.TrimSpace(endpoint.ID), Name: strings.TrimSpace(endpoint.Name),
-			Protocol: strings.TrimSpace(endpoint.Protocol), BaseURL: baseURL, Model: strings.TrimSpace(endpoint.Model),
+			Protocol: strings.TrimSpace(endpoint.Protocol), ScannerProfile: normalizePromptScannerProfile(endpoint.ScannerProfile),
+			BaseURL: baseURL, Model: strings.TrimSpace(endpoint.Model),
 			TimeoutMS: endpoint.TimeoutMS, InputLimit: endpoint.InputLimit, Enabled: endpoint.Enabled,
 		}
 		old, hadOld := currentByID[stored.ID]
@@ -517,6 +520,7 @@ func (m *ConfigManager) clearLoadError() bool {
 
 func cloneStorageConfig(cfg storageConfig) storageConfig {
 	cfg.Scanners = append([]string(nil), cfg.Scanners...)
+	cfg.Keywords = append([]string(nil), cfg.Keywords...)
 	cfg.GroupIDs = append([]int64(nil), cfg.GroupIDs...)
 	cfg.Endpoints = append([]StorageEndpoint(nil), cfg.Endpoints...)
 	return cfg
@@ -524,6 +528,7 @@ func cloneStorageConfig(cfg storageConfig) storageConfig {
 
 func cloneActiveConfig(cfg ActiveConfig) ActiveConfig {
 	cfg.Scanners = append([]string(nil), cfg.Scanners...)
+	cfg.Keywords = append([]string(nil), cfg.Keywords...)
 	cfg.GroupIDs = append([]int64(nil), cfg.GroupIDs...)
 	cfg.Endpoints = append([]ActiveEndpoint(nil), cfg.Endpoints...)
 	return cfg

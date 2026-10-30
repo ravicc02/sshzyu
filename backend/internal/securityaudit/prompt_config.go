@@ -55,6 +55,7 @@ type StorageEndpoint struct {
 	ID              string `json:"id"`
 	Name            string `json:"name"`
 	Protocol        string `json:"protocol"`
+	ScannerProfile  string `json:"scanner_profile"`
 	BaseURL         string `json:"base_url"`
 	Model           string `json:"model"`
 	TokenCiphertext string `json:"token_ciphertext,omitempty"`
@@ -67,6 +68,9 @@ type storageConfig struct {
 	Enabled                bool              `json:"enabled"`
 	BlockingEnabled        bool              `json:"blocking_enabled"`
 	BlockingLatestTurnOnly bool              `json:"blocking_latest_turn_only"`
+	KeywordFilterEnabled   bool              `json:"keyword_filter_enabled"`
+	Keywords               []string          `json:"keywords"`
+	BlockMessage           string            `json:"block_message"`
 	StorePassEvents        bool              `json:"store_pass_events"`
 	Strategy               string            `json:"strategy"`
 	WorkerCount            int               `json:"worker_count"`
@@ -82,15 +86,16 @@ type storageConfig struct {
 }
 
 type ActiveEndpoint struct {
-	ID         string
-	Name       string
-	Protocol   string
-	BaseURL    string
-	Model      string
-	Token      string
-	TimeoutMS  int
-	InputLimit int
-	Enabled    bool
+	ID             string
+	Name           string
+	Protocol       string
+	ScannerProfile string
+	BaseURL        string
+	Model          string
+	Token          string
+	TimeoutMS      int
+	InputLimit     int
+	Enabled        bool
 	// TokenInvalid marks an endpoint whose persisted token ciphertext cannot be
 	// decrypted with the current encryption key (key changed or auto-generated
 	// on restart). The endpoint is kept visible for admins but excluded from
@@ -103,6 +108,9 @@ type ActiveConfig struct {
 	Enabled                bool
 	BlockingEnabled        bool
 	BlockingLatestTurnOnly bool
+	KeywordFilterEnabled   bool
+	Keywords               []string
+	BlockMessage           string
 	StorePassEvents        bool
 	Strategy               string
 	WorkerCount            int
@@ -118,22 +126,26 @@ type ActiveConfig struct {
 }
 
 type PublicEndpoint struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Protocol    string `json:"protocol"`
-	BaseURL     string `json:"base_url"`
-	Model       string `json:"model"`
-	TimeoutMS   int    `json:"timeout_ms"`
-	InputLimit  int    `json:"input_limit"`
-	Enabled     bool   `json:"enabled"`
-	HasToken    bool   `json:"has_token"`
-	TokenStatus string `json:"token_status"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Protocol       string `json:"protocol"`
+	ScannerProfile string `json:"scanner_profile"`
+	BaseURL        string `json:"base_url"`
+	Model          string `json:"model"`
+	TimeoutMS      int    `json:"timeout_ms"`
+	InputLimit     int    `json:"input_limit"`
+	Enabled        bool   `json:"enabled"`
+	HasToken       bool   `json:"has_token"`
+	TokenStatus    string `json:"token_status"`
 }
 
 type PublicConfig struct {
 	Enabled                bool             `json:"enabled"`
 	BlockingEnabled        bool             `json:"blocking_enabled"`
 	BlockingLatestTurnOnly bool             `json:"blocking_latest_turn_only"`
+	KeywordFilterEnabled   bool             `json:"keyword_filter_enabled"`
+	Keywords               []string         `json:"keywords"`
+	BlockMessage           string           `json:"block_message"`
 	StorePassEvents        bool             `json:"store_pass_events"`
 	EffectiveMode          Mode             `json:"effective_mode"`
 	Strategy               string           `json:"strategy"`
@@ -150,16 +162,17 @@ type PublicConfig struct {
 }
 
 type UpdateEndpoint struct {
-	ID         string `json:"id" binding:"required"`
-	Name       string `json:"name" binding:"required"`
-	Protocol   string `json:"protocol"`
-	BaseURL    string `json:"base_url" binding:"required"`
-	Model      string `json:"model"`
-	Token      string `json:"token,omitempty"`
-	ClearToken bool   `json:"clear_token"`
-	TimeoutMS  int    `json:"timeout_ms"`
-	InputLimit int    `json:"input_limit"`
-	Enabled    bool   `json:"enabled"`
+	ID             string `json:"id" binding:"required"`
+	Name           string `json:"name" binding:"required"`
+	Protocol       string `json:"protocol"`
+	ScannerProfile string `json:"scanner_profile"`
+	BaseURL        string `json:"base_url" binding:"required"`
+	Model          string `json:"model"`
+	Token          string `json:"token,omitempty"`
+	ClearToken     bool   `json:"clear_token"`
+	TimeoutMS      int    `json:"timeout_ms"`
+	InputLimit     int    `json:"input_limit"`
+	Enabled        bool   `json:"enabled"`
 }
 
 type UpdateConfigRequest struct {
@@ -167,6 +180,9 @@ type UpdateConfigRequest struct {
 	Enabled                bool             `json:"enabled"`
 	BlockingEnabled        bool             `json:"blocking_enabled"`
 	BlockingLatestTurnOnly bool             `json:"blocking_latest_turn_only"`
+	KeywordFilterEnabled   bool             `json:"keyword_filter_enabled"`
+	Keywords               []string         `json:"keywords"`
+	BlockMessage           string           `json:"block_message"`
 	StorePassEvents        bool             `json:"store_pass_events"`
 	Strategy               string           `json:"strategy"`
 	WorkerCount            int              `json:"worker_count"`
@@ -182,6 +198,9 @@ func DefaultStorageConfig() storageConfig {
 		Enabled:                false,
 		BlockingEnabled:        false,
 		BlockingLatestTurnOnly: false,
+		KeywordFilterEnabled:   true,
+		Keywords:               append([]string(nil), DefaultPromptAuditKeywords...),
+		BlockMessage:           DefaultBlockMessage,
 		StorePassEvents:        false,
 		Strategy:               "priority",
 		WorkerCount:            DefaultWorkerCount,
@@ -230,6 +249,18 @@ func normalizeStorageConfig(cfg *storageConfig) {
 	}
 	cfg.Scanners = canonicalScannerIDs(cfg.Scanners)
 	cfg.GroupIDs = canonicalInt64s(cfg.GroupIDs)
+	cfg.KeywordFilterEnabled = true
+	cfg.Keywords = normalizePromptKeywords(cfg.Keywords)
+	cfg.BlockMessage = strings.TrimSpace(cfg.BlockMessage)
+	if cfg.BlockMessage == "" {
+		cfg.BlockMessage = DefaultBlockMessage
+	}
+	if len([]rune(cfg.BlockMessage)) > 500 {
+		cfg.BlockMessage = string([]rune(cfg.BlockMessage)[:500])
+	}
+	if len(cfg.Keywords) == 0 {
+		cfg.Keywords = append([]string(nil), DefaultPromptAuditKeywords...)
+	}
 	// Preserve an invalid blocking-without-audit combination so validation can
 	// reject it instead of silently changing administrator intent.
 	for i := range cfg.Endpoints {
@@ -240,6 +271,7 @@ func normalizeStorageConfig(cfg *storageConfig) {
 		if ep.Protocol == "" {
 			ep.Protocol = "openai_compatible"
 		}
+		ep.ScannerProfile = normalizePromptScannerProfile(ep.ScannerProfile)
 		ep.BaseURL = strings.TrimSpace(ep.BaseURL)
 		ep.Model = strings.TrimSpace(ep.Model)
 		if ep.Model == "" {
@@ -285,6 +317,9 @@ func validateStorageConfig(cfg storageConfig) error {
 		seen[ep.ID] = struct{}{}
 		if ep.Protocol != "openai_compatible" {
 			return infraerrors.BadRequest("prompt_audit_invalid_endpoint_protocol", "审计节点仅支持 OpenAI 兼容协议")
+		}
+		if ep.ScannerProfile != PromptScannerProfileQwen3Guard && ep.ScannerProfile != PromptScannerProfileJSONClassifier {
+			return infraerrors.BadRequest("prompt_audit_invalid_scanner_profile", "审计节点判定协议无效")
 		}
 		if _, err := NormalizeBaseURL(ep.BaseURL); err != nil {
 			return err
@@ -334,6 +369,10 @@ func validateUpdateConfigRequest(req UpdateConfigRequest) error {
 		}
 	}
 	for _, endpoint := range req.Endpoints {
+		profile := normalizePromptScannerProfile(endpoint.ScannerProfile)
+		if profile != PromptScannerProfileQwen3Guard && profile != PromptScannerProfileJSONClassifier {
+			return infraerrors.BadRequest("prompt_audit_invalid_scanner_profile", "审计节点判定协议无效")
+		}
 		if endpoint.TimeoutMS < MinTimeoutMS || endpoint.TimeoutMS > MaxTimeoutMS {
 			return infraerrors.BadRequest("prompt_audit_invalid_timeout", "审计节点超时超出允许范围")
 		}
@@ -405,7 +444,7 @@ func PublicFromStorage(cfg storageConfig, riskControlEnabled bool, invalidTokenE
 			}
 		}
 		endpoints = append(endpoints, PublicEndpoint{
-			ID: ep.ID, Name: ep.Name, Protocol: ep.Protocol, BaseURL: ep.BaseURL,
+			ID: ep.ID, Name: ep.Name, Protocol: ep.Protocol, ScannerProfile: ep.ScannerProfile, BaseURL: ep.BaseURL,
 			Model: ep.Model, TimeoutMS: ep.TimeoutMS, InputLimit: ep.InputLimit,
 			Enabled: ep.Enabled, HasToken: hasToken, TokenStatus: status,
 		})
@@ -413,6 +452,8 @@ func PublicFromStorage(cfg storageConfig, riskControlEnabled bool, invalidTokenE
 	active := ActiveConfig{RiskControlEnabled: riskControlEnabled, Enabled: cfg.Enabled, BlockingEnabled: cfg.BlockingEnabled}
 	return PublicConfig{
 		Enabled: cfg.Enabled, BlockingEnabled: cfg.BlockingEnabled, BlockingLatestTurnOnly: cfg.BlockingLatestTurnOnly, StorePassEvents: cfg.StorePassEvents,
+		KeywordFilterEnabled: cfg.KeywordFilterEnabled, Keywords: append([]string(nil), cfg.Keywords...),
+		BlockMessage:  cfg.BlockMessage,
 		EffectiveMode: active.EffectiveMode(), Strategy: cfg.Strategy, WorkerCount: cfg.WorkerCount,
 		QueueCapacity: cfg.QueueCapacity, Scanners: scanners, AllGroups: cfg.AllGroups,
 		GroupIDs: groupIDs, Endpoints: endpoints, ConfigVersion: cfg.ConfigVersion,
@@ -424,7 +465,9 @@ func ActiveFromStorage(cfg storageConfig, riskControlEnabled bool, encryptor Sec
 	active := ActiveConfig{
 		RiskControlEnabled: riskControlEnabled, Enabled: cfg.Enabled, BlockingEnabled: cfg.BlockingEnabled,
 		BlockingLatestTurnOnly: cfg.BlockingLatestTurnOnly,
-		StorePassEvents:        cfg.StorePassEvents, Strategy: cfg.Strategy, WorkerCount: cfg.WorkerCount,
+		KeywordFilterEnabled:   cfg.KeywordFilterEnabled, Keywords: append([]string(nil), cfg.Keywords...),
+		BlockMessage:    cfg.BlockMessage,
+		StorePassEvents: cfg.StorePassEvents, Strategy: cfg.Strategy, WorkerCount: cfg.WorkerCount,
 		QueueCapacity: cfg.QueueCapacity, Scanners: append([]string(nil), cfg.Scanners...), AllGroups: cfg.AllGroups,
 		GroupIDs: append([]int64(nil), cfg.GroupIDs...), ConfigVersion: cfg.ConfigVersion,
 		UpdatedAt: cfg.UpdatedAt, UpdatedBy: cfg.UpdatedBy, ChangeSummary: cfg.ChangeSummary,
@@ -450,7 +493,8 @@ func ActiveFromStorage(cfg storageConfig, riskControlEnabled bool, encryptor Sec
 			}
 		}
 		active.Endpoints = append(active.Endpoints, ActiveEndpoint{
-			ID: ep.ID, Name: ep.Name, Protocol: ep.Protocol, BaseURL: ep.BaseURL, Model: ep.Model,
+			ID: ep.ID, Name: ep.Name, Protocol: ep.Protocol, ScannerProfile: ep.ScannerProfile,
+			BaseURL: ep.BaseURL, Model: ep.Model,
 			Token: token, TimeoutMS: ep.TimeoutMS, InputLimit: ep.InputLimit,
 			Enabled: ep.Enabled && !tokenInvalid, TokenInvalid: tokenInvalid,
 		})
@@ -463,18 +507,31 @@ func changeSummary(cfg storageConfig) string {
 		Enabled                bool   `json:"enabled"`
 		BlockingEnabled        bool   `json:"blocking_enabled"`
 		BlockingLatestTurnOnly bool   `json:"blocking_latest_turn_only"`
+		KeywordFilterEnabled   bool   `json:"keyword_filter_enabled"`
+		KeywordCount           int    `json:"keyword_count"`
 		StorePassEvents        bool   `json:"store_pass_events"`
 		EndpointCount          int    `json:"endpoint_count"`
 		ScannerCount           int    `json:"scanner_count"`
 		AllGroups              bool   `json:"all_groups"`
 		GroupCount             int    `json:"group_count"`
 		GroupHash              string `json:"group_hash"`
-	}{cfg.Enabled, cfg.BlockingEnabled, cfg.BlockingLatestTurnOnly, cfg.StorePassEvents, len(cfg.Endpoints), len(cfg.Scanners), cfg.AllGroups, len(cfg.GroupIDs), ""}
+	}{cfg.Enabled, cfg.BlockingEnabled, cfg.BlockingLatestTurnOnly, cfg.KeywordFilterEnabled, len(cfg.Keywords), cfg.StorePassEvents, len(cfg.Endpoints), len(cfg.Scanners), cfg.AllGroups, len(cfg.GroupIDs), ""}
 	rawGroups, _ := json.Marshal(cfg.GroupIDs)
 	digest := sha256.Sum256(rawGroups)
 	summary.GroupHash = hex.EncodeToString(digest[:])
 	raw, _ := json.Marshal(summary)
 	return string(raw)
+}
+
+func normalizePromptScannerProfile(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", PromptScannerProfileQwen3Guard:
+		return PromptScannerProfileQwen3Guard
+	case PromptScannerProfileJSONClassifier:
+		return PromptScannerProfileJSONClassifier
+	default:
+		return strings.TrimSpace(value)
+	}
 }
 
 func canonicalInt64s(values []int64) []int64 {

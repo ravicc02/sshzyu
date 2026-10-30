@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -202,12 +203,22 @@ func (s *OpenAICompatibleScanner) Scan(ctx context.Context, endpoint ActiveEndpo
 	if err != nil {
 		return nil, &GuardError{Code: ErrorCodeUnavailable, Cause: err}
 	}
+	profile := normalizePromptScannerProfile(endpoint.ScannerProfile)
 	payload := map[string]any{
 		"model":       endpoint.Model,
-		"messages":    []map[string]string{{"role": "user", "content": chunk}},
 		"temperature": 0,
-		"max_tokens":  64,
 		"seed":        42,
+	}
+	switch profile {
+	case PromptScannerProfileJSONClassifier:
+		payload["messages"] = []map[string]string{
+			{"role": "system", "content": buildJSONClassifierSystemPrompt(enabledScanners)},
+			{"role": "user", "content": "<UNTRUSTED_PROMPT>\n" + strconv.Quote(chunk) + "\n</UNTRUSTED_PROMPT>"},
+		}
+		payload["max_tokens"] = 256
+	default:
+		payload["messages"] = []map[string]string{{"role": "user", "content": chunk}}
+		payload["max_tokens"] = 64
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -247,7 +258,12 @@ func (s *OpenAICompatibleScanner) Scan(ctx context.Context, endpoint ActiveEndpo
 	if err != nil {
 		return nil, &GuardError{Code: ErrorCodeInvalidResponse, Cause: err}
 	}
-	result, err := ParseQwen3Guard(content, enabledScanners)
+	var result *NormalizedResult
+	if profile == PromptScannerProfileJSONClassifier {
+		result, err = ParseJSONClassifier(content, enabledScanners)
+	} else {
+		result, err = ParseQwen3Guard(content, enabledScanners)
+	}
 	if err != nil {
 		return nil, err
 	}

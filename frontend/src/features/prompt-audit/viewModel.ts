@@ -7,6 +7,7 @@ import type {
 } from './types'
 
 export const DEFAULT_GUARD_MODEL = 'sileader/qwen3guard:0.6b'
+export const DEFAULT_JSON_CLASSIFIER_MODEL = 'glm-5.3-flash'
 
 export const SCANNER_CATALOG = [
   { id: 'violent', label: 'Violent' },
@@ -30,10 +31,14 @@ export function cloneData<T>(value: T): T {
 export function configToDraft(config: PromptAuditConfig): PromptAuditDraft {
   return {
     ...cloneData(config),
+    keyword_filter_enabled: true,
+    keywords: [...(config.keywords ?? [])],
+    block_message: config.block_message ?? '',
     group_ids: [...(config.group_ids ?? [])],
     scanners: [...(config.scanners ?? [])],
     endpoints: (config.endpoints ?? []).map((endpoint) => ({
       ...endpoint,
+      scanner_profile: endpoint.scanner_profile ?? 'qwen3guard',
       token: '',
       clear_token: false,
     })),
@@ -45,6 +50,7 @@ export function createDefaultEndpoint(index = 1): PromptAuditEndpointDraft {
     id: `guard-${Date.now()}-${index}`,
     name: `Guard ${index}`,
     protocol: 'openai_compatible',
+    scanner_profile: 'qwen3guard',
     base_url: 'http://127.0.0.1:8000',
     model: DEFAULT_GUARD_MODEL,
     timeout_ms: 3000,
@@ -63,6 +69,9 @@ export function buildUpdateRequest(draft: PromptAuditDraft): PromptAuditUpdateRe
     enabled: draft.enabled,
     blocking_enabled: draft.enabled && draft.blocking_enabled,
     blocking_latest_turn_only: draft.blocking_latest_turn_only,
+    keyword_filter_enabled: true,
+    keywords: [...draft.keywords],
+    block_message: draft.block_message,
     store_pass_events: draft.store_pass_events,
     strategy: 'priority',
     worker_count: Number(draft.worker_count),
@@ -74,6 +83,7 @@ export function buildUpdateRequest(draft: PromptAuditDraft): PromptAuditUpdateRe
       id: endpoint.id.trim(),
       name: endpoint.name.trim(),
       protocol: 'openai_compatible',
+      scanner_profile: endpoint.scanner_profile,
       base_url: endpoint.base_url.trim(),
       model: endpoint.model.trim() || DEFAULT_GUARD_MODEL,
       token: endpoint.token.trim() || undefined,

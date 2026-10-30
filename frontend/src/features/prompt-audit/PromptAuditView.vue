@@ -1,7 +1,7 @@
 <template>
-  <AppLayout>
+  <component :is="embedded ? 'div' : AppLayout">
     <div class="mx-auto max-w-[1600px]" :class="activeTab === 'config' && draft ? 'pb-28' : 'pb-8'">
-      <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <header v-if="!embedded" class="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p class="text-xs font-semibold uppercase tracking-[0.16em] text-primary-600 dark:text-primary-400">{{ t('nav.securityAudit') }}</p>
           <h1 class="mt-1 text-2xl font-semibold tracking-tight text-gray-950 dark:text-white">{{ t('admin.promptAudit.title') }}</h1>
@@ -19,7 +19,7 @@
       </div>
 
       <template v-else>
-        <div class="mb-4" role="tablist" :aria-label="t('admin.promptAudit.title')">
+        <div v-if="!mode" class="mb-4" role="tablist" :aria-label="t('admin.promptAudit.title')">
           <div class="tabs inline-flex">
             <button
               v-for="tab in pageTabs"
@@ -62,7 +62,7 @@
               class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-200"
             >
               <span>{{ t('admin.promptAudit.events.passEventsDisabled') }}</span>
-              <button type="button" class="btn btn-secondary btn-sm" @click="activeTab = 'config'">
+              <button v-if="!mode" type="button" class="btn btn-secondary btn-sm" @click="activeTab = 'config'">
                 {{ t('admin.promptAudit.events.openConfiguration') }}
               </button>
             </div>
@@ -140,7 +140,7 @@
       @criteria-change="clearDeletePreview"
     />
     <EventDetailDialog :show="showEventDetail" :event="activeEvent" :loading="loading.detail" @close="closeEventDetail" />
-  </AppLayout>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -173,8 +173,9 @@ import { buildUpdateRequest, cloneData, configToDraft, draftFingerprint, emptyEv
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()
+const props = defineProps<{ embedded?: boolean; mode?: 'records' | 'config' }>()
 type PromptAuditPageTab = 'config' | 'events'
-const activeTab = ref<PromptAuditPageTab>('events')
+const activeTab = ref<PromptAuditPageTab>(props.mode === 'config' ? 'config' : 'events')
 const pageTabs = computed(() => [
   { id: 'events' as const, label: t('admin.promptAudit.tabs.events') },
   { id: 'config' as const, label: t('admin.promptAudit.tabs.config') },

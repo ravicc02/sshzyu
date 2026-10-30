@@ -689,28 +689,33 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/admin/risk-control',
     name: 'AdminRiskControl',
-    component: () => import('@/views/admin/RiskControlView.vue'),
+    component: () => import('@/views/admin/SecurityAuditView.vue'),
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
-      title: 'Risk Control',
-      titleKey: 'admin.riskControl.title',
-      descriptionKey: 'admin.riskControl.description',
+      title: 'Security Audit',
+      titleKey: 'admin.securityAudit.title',
+      descriptionKey: 'admin.securityAudit.description',
+      requiresRiskControl: true
+    }
+  },
+  {
+    path: '/admin/risk-control/config',
+    name: 'AdminSecurityAuditConfig',
+    component: () => import('@/views/admin/SecurityAuditConfigPage.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Security Audit Settings',
+      titleKey: 'admin.securityAudit.settings',
+      descriptionKey: 'admin.securityAudit.settingsDescription',
       requiresRiskControl: true
     }
   },
   {
     path: '/admin/prompt-audit',
     name: 'AdminPromptAudit',
-    component: () => import('@/features/prompt-audit/PromptAuditView.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: true,
-      title: 'Prompt Audit',
-      titleKey: 'admin.promptAudit.title',
-      descriptionKey: 'admin.promptAudit.description',
-      requiresRiskControl: true
-    }
+    redirect: (to) => ({ path: '/admin/risk-control', query: { ...to.query, tab: 'model' } })
   },
   {
     path: '/admin/usage',

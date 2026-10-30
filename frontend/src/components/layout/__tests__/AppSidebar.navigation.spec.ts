@@ -204,12 +204,15 @@ describe('AppSidebar Dock navigation', () => {
     expect(wrapper.findAll('.dock-section-title').map(section => section.text())).toEqual([
       '概览', '用户与资源', '运营与财务', '系统', '快捷入口'
     ])
+    const systemSection = wrapper.get('section[aria-label="系统"]')
+    expect(systemSection.find('a[href="/admin/risk-control"]').exists()).toBe(true)
+    expect(systemSection.find('a[href="https://status.openai.com/"]').exists()).toBe(false)
     await expandGroups(wrapper)
     expect(navigationPaths(wrapper)).toEqual([
       '/admin/dashboard', '/admin/ops', '/admin/users', '/admin/groups', '/admin/model-prices',
       '/admin/channels/pricing', '/admin/channels/monitor', '/admin/subscriptions',
       '/admin/accounts', '/admin/upstream-monitor', '/admin/plugins', '/admin/announcements', '/admin/proxies',
-      '/admin/risk-control', '/admin/prompt-audit', '/admin/redeem', '/admin/promo-codes', '/admin/lottery',
+      '/admin/risk-control', '/admin/redeem', '/admin/promo-codes', '/admin/lottery',
       '/admin/affiliates/invites', '/admin/affiliates/rebates', '/admin/affiliates/transfers',
       '/admin/orders/dashboard', '/admin/orders', '/admin/orders/plans',
       '/admin/usage', '/admin/audit-logs', '/admin/settings', '/custom/admin-help'

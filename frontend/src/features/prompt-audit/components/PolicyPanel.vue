@@ -51,17 +51,25 @@
             </label>
           </div>
         </fieldset>
+
+        <fieldset class="mt-5 border-t border-gray-100 pt-5 dark:border-dark-800">
+          <legend class="text-sm font-medium text-gray-900 dark:text-white">{{ t('admin.promptAudit.policy.keywordFilter') }}</legend>
+          <label class="mt-3 block text-sm text-gray-700 dark:text-dark-200">
+            <span class="flex items-center justify-between gap-3">
+              <span>{{ t('admin.promptAudit.policy.keywords') }}</span>
+              <span class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.promptAudit.policy.keywordCount', { count: draft.keywords?.length ?? 0 }) }}</span>
+            </span>
+            <textarea
+              class="input mt-1.5 min-h-40 w-full font-mono text-xs leading-5"
+              :value="(draft.keywords ?? []).join('\n')"
+              :aria-label="t('admin.promptAudit.policy.keywords')"
+              @input="patch({ keywords: splitKeywords(($event.target as HTMLTextAreaElement).value) })"
+            />
+          </label>
+        </fieldset>
       </div>
 
       <div class="space-y-4 rounded-xl border border-gray-200 p-4 dark:border-dark-700/60 dark:bg-dark-900/20 sm:p-5">
-        <label class="block text-sm text-gray-700 dark:text-dark-200">
-          <span>{{ t('admin.promptAudit.policy.workerCount') }}</span>
-          <input :value="draft.worker_count" type="number" min="1" max="32" class="input mt-1.5 w-full" :aria-label="t('admin.promptAudit.policy.workerCount')" @input="patch({ worker_count: Number(($event.target as HTMLInputElement).value) })" />
-        </label>
-        <label class="block text-sm text-gray-700 dark:text-dark-200">
-          <span>{{ t('admin.promptAudit.policy.queueCapacity') }}</span>
-          <input :value="draft.queue_capacity" type="number" min="1" max="100000" class="input mt-1.5 w-full" :aria-label="t('admin.promptAudit.policy.queueCapacity')" @input="patch({ queue_capacity: Number(($event.target as HTMLInputElement).value) })" />
-        </label>
         <div class="rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:bg-dark-900/50 dark:text-dark-300">
           <p class="font-medium text-gray-800 dark:text-dark-100">{{ t('admin.promptAudit.policy.strategy') }}</p>
           <p class="mt-1">priority · {{ t('admin.promptAudit.policy.strategyHint') }}</p>
@@ -107,5 +115,18 @@ function toggleScanner(id: string) {
 }
 function scannerLabel(id: string): string {
   return t(`admin.promptAudit.scanners.${id}`)
+}
+function splitKeywords(value: string): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const line of value.split(/\r?\n/)) {
+    const keyword = line.trim()
+    if (!keyword) continue
+    const key = keyword.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(keyword)
+  }
+  return result
 }
 </script>

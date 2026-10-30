@@ -9,6 +9,7 @@ import type {
   PromptDeleteResult,
   PromptEventFilters,
   PromptEventPage,
+  PromptFilterRecordPage,
   PromptProbeResult,
   PromptAuditEndpointDraft,
 } from './types'
@@ -32,6 +33,7 @@ export async function probeEndpoint(endpoint: PromptAuditEndpointDraft): Promise
       id: endpoint.id,
       name: endpoint.name,
       protocol: 'openai_compatible',
+      scanner_profile: endpoint.scanner_profile,
       base_url: endpoint.base_url,
       model: endpoint.model,
       token: endpoint.token || undefined,
@@ -54,6 +56,17 @@ export async function listEvents(
   pageSize: number,
 ): Promise<PromptEventPage> {
   const { data } = await apiClient.get<PromptEventPage>(`${basePath}/events`, {
+    params: { page, page_size: pageSize, ...eventQueryParams(filters) },
+  })
+  return data
+}
+
+export async function listFilterRecords(
+  filters: PromptEventFilters,
+  page: number,
+  pageSize: number,
+): Promise<PromptFilterRecordPage> {
+  const { data } = await apiClient.get<PromptFilterRecordPage>(`${basePath}/filter-records`, {
     params: { page, page_size: pageSize, ...eventQueryParams(filters) },
   })
   return data
@@ -108,6 +121,7 @@ export const promptAuditAPI = {
   updateConfig,
   probeEndpoint,
   getRuntime,
+  listFilterRecords,
   listEvents,
   getEvent,
   deleteEvent,

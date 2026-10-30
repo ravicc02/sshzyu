@@ -19,10 +19,21 @@ describe('Prompt Audit API', () => {
     expect(client.get).toHaveBeenCalledWith('/admin/prompt-audit/runtime')
   })
 
+  it('loads keyword filter records from their read-only endpoint', async () => {
+    client.get.mockResolvedValue({ data: { items: [], total: 0, page: 1, page_size: 20, pages: 0 } })
+    const filters = emptyEventFilters()
+    filters.decision = 'critical'
+    filters.keyword = 'audit-v7'
+    await promptAuditAPI.listFilterRecords(filters, 2, 50)
+    expect(client.get).toHaveBeenCalledWith('/admin/prompt-audit/filter-records', {
+      params: { page: 2, page_size: 50, decision: 'critical', keyword: 'audit-v7' },
+    })
+  })
+
   it('sends a temporary probe token only in the request and never invents response credentials', async () => {
     client.post.mockResolvedValue({ data: { ok: true, token_applied: true } })
     const result = await promptAuditAPI.probeEndpoint({
-      id: 'guard-1', name: 'Guard', protocol: 'openai_compatible', base_url: 'http://127.0.0.1:8000', model: 'guard',
+      id: 'guard-1', name: 'Guard', protocol: 'openai_compatible', scanner_profile: 'json_classifier', base_url: 'http://127.0.0.1:8000', model: 'guard',
       token: 'api-canary-secret', clear_token: false, timeout_ms: 1000, input_limit: 1000, enabled: true, has_token: false, token_status: 'missing',
     })
     expect(client.post).toHaveBeenCalledWith('/admin/prompt-audit/endpoints/probe', expect.objectContaining({ endpoint: expect.objectContaining({ token: 'api-canary-secret' }) }))

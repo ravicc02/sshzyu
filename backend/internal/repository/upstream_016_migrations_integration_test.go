@@ -71,6 +71,9 @@ func TestMigrationsUpgradeOfficial016From015PreservesCustomData(t *testing.T) {
 		"256_agent_adaptive_runtime.sql": true, "257_agent_storage_maintenance_indexes.sql": true,
 		"258_upstream_balance_monitor.sql":              true,
 		"246_enable_gemini_image_generation_groups.sql": true,
+		"259_channel_monitor_group_link.sql":            true, "260_api_key_batches.sql": true,
+		"261_channel_monitor_hybrid_unified.sql": true, "262_scoped_admin_api_keys.sql": true,
+		"263_group_image_count_billing.sql": true,
 	}
 	files, err := fs.Glob(dbmigrations.FS, "*.sql")
 	require.NoError(t, err)

@@ -163,6 +163,9 @@ func (s *PromptService) Evaluate(ctx context.Context, req Request) (*PromptDecis
 	if err != nil {
 		return nil, &GuardError{Code: ErrorCodeInvalidResponse, Cause: err}
 	}
+	if !shouldAuditPrompt(cfg, snapshot.ScanText) {
+		return &PromptDecision{Kind: DecisionAllow, AllowNextStage: true}, nil
+	}
 	return s.evaluator.Evaluate(ctx, cfg, snapshot)
 }
 
@@ -337,6 +340,7 @@ func (s *PromptService) resolveProbeEndpoint(input UpdateEndpoint) (ActiveEndpoi
 	if model == "" {
 		model = DefaultGuardModel
 	}
+	profile := normalizePromptScannerProfile(input.ScannerProfile)
 	timeout := input.TimeoutMS
 	if timeout == 0 {
 		timeout = DefaultTimeoutMS
@@ -346,7 +350,7 @@ func (s *PromptService) resolveProbeEndpoint(input UpdateEndpoint) (ActiveEndpoi
 		limit = DefaultInputLimit
 	}
 	storage := storageConfig{Enabled: false, Strategy: "priority", WorkerCount: DefaultWorkerCount, QueueCapacity: DefaultQueueCapacity, Scanners: append([]string(nil), AllScannerIDs...), AllGroups: true,
-		Endpoints: []StorageEndpoint{{ID: strings.TrimSpace(input.ID), Name: strings.TrimSpace(input.Name), Protocol: "openai_compatible", BaseURL: baseURL, Model: model, TimeoutMS: timeout, InputLimit: limit}}}
+		Endpoints: []StorageEndpoint{{ID: strings.TrimSpace(input.ID), Name: strings.TrimSpace(input.Name), Protocol: "openai_compatible", ScannerProfile: profile, BaseURL: baseURL, Model: model, TimeoutMS: timeout, InputLimit: limit}}}
 	if storage.Endpoints[0].ID == "" {
 		storage.Endpoints[0].ID = "probe"
 	}
@@ -356,7 +360,7 @@ func (s *PromptService) resolveProbeEndpoint(input UpdateEndpoint) (ActiveEndpoi
 	if err := validateStorageConfig(storage); err != nil {
 		return ActiveEndpoint{}, false, err
 	}
-	return ActiveEndpoint{ID: storage.Endpoints[0].ID, Name: storage.Endpoints[0].Name, Protocol: "openai_compatible", BaseURL: baseURL, Model: model, Token: token, TimeoutMS: timeout, InputLimit: limit, Enabled: true}, token != "", nil
+	return ActiveEndpoint{ID: storage.Endpoints[0].ID, Name: storage.Endpoints[0].Name, Protocol: "openai_compatible", ScannerProfile: profile, BaseURL: baseURL, Model: model, Token: token, TimeoutMS: timeout, InputLimit: limit, Enabled: true}, token != "", nil
 }
 
 func (s *PromptService) finishProbe(id string, started time.Time, result ProbeResult) ProbeResult {
@@ -386,6 +390,11 @@ func (s *PromptService) probeSnapshot() map[string]ProbeResult {
 func (s *PromptService) ListEvents(ctx context.Context, filter EventFilter, page, pageSize int) (*EventPage, error) {
 	return s.repo.ListEvents(ctx, filter, page, pageSize)
 }
+
+func (s *PromptService) ListFilterRecords(ctx context.Context, filter EventFilter, page, pageSize int) (*FilterRecordPage, error) {
+	return s.repo.ListFilterRecords(ctx, filter, page, pageSize)
+}
+
 func (s *PromptService) GetEvent(ctx context.Context, id int64) (*Event, error) {
 	return s.repo.GetEvent(ctx, id)
 }

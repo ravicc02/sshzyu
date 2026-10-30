@@ -101,6 +101,22 @@ func agentErrorBodyMessage(body []byte) string {
 	}
 	return ""
 }
+
+func agentResponseHasError(body []byte) bool {
+	status := gjson.GetBytes(body, "status").String()
+	if status == "failed" || status == "incomplete" {
+		return true
+	}
+	value := gjson.GetBytes(body, "error")
+	if !value.Exists() || value.Type == gjson.Null {
+		return false
+	}
+	if value.Type == gjson.String {
+		return strings.TrimSpace(value.String()) != ""
+	}
+	return true
+}
+
 func knownAgentRejection(status int) bool {
 	switch status {
 	case 400, 401, 402, 403, 404, 405, 406, 410, 413, 415, 422, 429, 451:

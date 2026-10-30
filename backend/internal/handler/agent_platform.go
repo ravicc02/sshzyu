@@ -374,7 +374,7 @@ func (p *platformAgentExecutor) Execute(ctx context.Context, in agent.Invocation
 		}
 		return out, agentIncompleteFailure("AGENT_RESPONSE_INCOMPLETE", message, trace.Dispatched)
 	}
-	if status := gjson.GetBytes(raw, "status").String(); status == "failed" || status == "incomplete" || gjson.GetBytes(raw, "error").Exists() {
+	if agentResponseHasError(raw) {
 		message := agentErrorBodyMessage(raw)
 		if message == "" {
 			message = "上游未完成本次请求。"

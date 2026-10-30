@@ -1,11 +1,13 @@
 export type PromptAuditMode = 'off' | 'async_audit' | 'blocking'
 export type PromptDecision = 'pass' | 'flag' | 'critical'
 export type PromptRiskLevel = 'low' | 'medium' | 'high' | 'critical'
+export type PromptScannerProfile = 'qwen3guard' | 'json_classifier'
 
 export interface PromptAuditEndpoint {
   id: string
   name: string
   protocol: 'openai_compatible'
+  scanner_profile: PromptScannerProfile
   base_url: string
   model: string
   timeout_ms: number
@@ -24,6 +26,9 @@ export interface PromptAuditConfig {
   enabled: boolean
   blocking_enabled: boolean
   blocking_latest_turn_only: boolean
+  keyword_filter_enabled: boolean
+  keywords: string[]
+  block_message: string
   store_pass_events: boolean
   effective_mode: PromptAuditMode
   strategy: 'priority'
@@ -48,6 +53,9 @@ export interface PromptAuditUpdateRequest {
   enabled: boolean
   blocking_enabled: boolean
   blocking_latest_turn_only: boolean
+  keyword_filter_enabled: boolean
+  keywords: string[]
+  block_message: string
   store_pass_events: boolean
   strategy: 'priority'
   worker_count: number
@@ -59,6 +67,7 @@ export interface PromptAuditUpdateRequest {
     id: string
     name: string
     protocol: 'openai_compatible'
+    scanner_profile: PromptScannerProfile
     base_url: string
     model: string
     token?: string
@@ -211,6 +220,42 @@ export interface PromptEventFilters {
 
 export interface PromptEventPage {
   items: PromptAuditEvent[]
+  total: number
+  page: number
+  page_size: number
+  pages: number
+}
+
+export interface PromptFilterRecord {
+  id: number
+  request_id: string
+  user_id: number
+  username: string
+  user_email: string
+  api_key_id: number
+  api_key_name: string
+  group_id?: number
+  group_name: string
+  provider: string
+  endpoint: string
+  protocol: string
+  model: string
+  prompt_hash: string
+  redacted_preview: string
+  prompt_length: number
+  message_count: number
+  stage: string
+  result: 'pass' | 'flag' | 'critical' | 'pending' | 'error' | string
+  risk_level: PromptRiskLevel | string
+  action: 'Allow' | 'Warn' | 'Block' | string
+  categories: string[]
+  config_version: number
+  latency_ms: number
+  created_at: string
+}
+
+export interface PromptFilterRecordPage {
+  items: PromptFilterRecord[]
   total: number
   page: number
   page_size: number

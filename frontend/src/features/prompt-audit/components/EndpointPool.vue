@@ -56,6 +56,9 @@
           <div class="min-w-0 xl:block">
             <p class="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400 xl:hidden">{{ t('admin.promptAudit.pool.model') }}</p>
             <p class="truncate text-sm font-medium text-gray-700 dark:text-dark-200" :title="endpoint.model">{{ endpoint.model }}</p>
+            <span class="mt-1 inline-flex rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-dark-800 dark:text-dark-300">
+              {{ scannerProfileLabel(endpoint.scanner_profile) }}
+            </span>
           </div>
 
           <div>
@@ -119,6 +122,14 @@
           <span>{{ t('admin.promptAudit.pool.model') }}</span>
           <input v-model="editing.model" class="input w-full" :aria-label="t('admin.promptAudit.pool.model')" />
         </label>
+        <label class="space-y-1 text-sm text-gray-700 dark:text-dark-200 sm:col-span-2">
+          <span>{{ t('admin.promptAudit.pool.scannerProfile') }}</span>
+          <select v-model="editing.scanner_profile" class="input w-full" :aria-label="t('admin.promptAudit.pool.scannerProfile')" @change="applyProfileDefaults">
+            <option value="qwen3guard">{{ t('admin.promptAudit.pool.profileQwen') }}</option>
+            <option value="json_classifier">{{ t('admin.promptAudit.pool.profileJSON') }}</option>
+          </select>
+          <span class="block text-xs text-gray-500 dark:text-dark-400">{{ t('admin.promptAudit.pool.scannerProfileHint') }}</span>
+        </label>
         <label class="space-y-1 text-sm text-gray-700 dark:text-dark-200">
           <span>{{ t('admin.promptAudit.pool.timeout') }}</span>
           <input v-model.number="editing.timeout_ms" class="input w-full" type="number" min="100" max="30000" required :aria-label="t('admin.promptAudit.pool.timeout')" />
@@ -143,7 +154,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import type { PromptAuditEndpointDraft, PromptProbeResult } from '../types'
-import { cloneData, createDefaultEndpoint } from '../viewModel'
+import { cloneData, createDefaultEndpoint, DEFAULT_GUARD_MODEL, DEFAULT_JSON_CLASSIFIER_MODEL } from '../viewModel'
 
 const props = defineProps<{
   endpoints: PromptAuditEndpointDraft[]
@@ -179,6 +190,20 @@ function saveEditor() {
   else next.splice(editingIndex.value, 1, value)
   emit('update:endpoints', next)
   closeEditor()
+}
+function applyProfileDefaults() {
+  if (!editing.value) return
+  if (editing.value.scanner_profile === 'json_classifier' && editing.value.model.trim() === DEFAULT_GUARD_MODEL) {
+    editing.value.model = DEFAULT_JSON_CLASSIFIER_MODEL
+  }
+  if (editing.value.scanner_profile === 'qwen3guard' && editing.value.model.trim() === DEFAULT_JSON_CLASSIFIER_MODEL) {
+    editing.value.model = DEFAULT_GUARD_MODEL
+  }
+}
+function scannerProfileLabel(profile: PromptAuditEndpointDraft['scanner_profile']): string {
+  return profile === 'json_classifier'
+    ? t('admin.promptAudit.pool.profileJSON')
+    : t('admin.promptAudit.pool.profileQwen')
 }
 function toggleEndpoint(id: string) {
   emit('update:endpoints', props.endpoints.map((item) => item.id === id ? { ...item, enabled: !item.enabled } : cloneData(item)))

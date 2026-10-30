@@ -1,5 +1,5 @@
 <template>
-  <AppLayout>
+  <component :is="embedded ? 'div' : AppLayout">
     <div class="space-y-6">
       <div v-if="loading" class="flex items-center justify-center py-16">
         <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary-600"></div>
@@ -7,23 +7,23 @@
 
       <template v-else>
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
+          <div v-if="!embedded">
             <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('admin.riskControl.title') }}</h1>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.description') }}</p>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
+          <div v-if="!props.embedded" class="flex flex-wrap items-center gap-2">
             <button type="button" class="btn btn-secondary inline-flex items-center gap-2" :disabled="statusLoading" @click="loadStatus(false)">
               <Icon name="refresh" size="sm" :class="statusLoading ? 'animate-spin' : ''" />
               {{ t('admin.riskControl.refreshStatus') }}
             </button>
-            <button type="button" class="btn btn-primary inline-flex items-center gap-2" @click="openSettings">
+            <button v-if="!props.embedded" type="button" class="btn btn-primary inline-flex items-center gap-2" @click="openSettings">
               <Icon name="cog" size="sm" />
               {{ t('admin.riskControl.openSettings') }}
             </button>
           </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div v-if="!props.embedded" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div
             v-for="item in overviewItems"
             :key="item.key"
@@ -54,7 +54,7 @@
         </div>
 
         <div
-          v-if="showPreBlockRuntimeCard"
+          v-if="showPreBlockRuntimeCard && !props.embedded"
           data-test="pre-block-runtime-cards"
           class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,520px)_minmax(0,1fr)]"
         >
@@ -1115,7 +1115,7 @@
         </template>
       </BaseDialog>
     </div>
-  </AppLayout>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -1196,6 +1196,7 @@ const riskThresholdDefaults: Record<string, number> = {
 const riskThresholdCategories = Object.keys(riskThresholdDefaults)
 
 const { t } = useI18n()
+const props = defineProps<{ embedded?: boolean }>()
 const appStore = useAppStore()
 const defaultBlockMessage = () => t('admin.riskControl.defaultBlockMessage')
 
@@ -1521,8 +1522,8 @@ const apiKeyHealthSummary = computed(() => {
     .join(' · ')
 })
 
-const overviewItems = computed<OverviewItem[]>(() => [
-  {
+const overviewItems = computed<OverviewItem[]>(() => {
+  const items: OverviewItem[] = [{
     key: 'status',
     label: t('admin.riskControl.overview.status'),
     value: configForm.enabled ? t('admin.riskControl.overview.enabled') : t('admin.riskControl.overview.disabled'),
@@ -1557,8 +1558,9 @@ const overviewItems = computed<OverviewItem[]>(() => [
     meta: t('admin.riskControl.overview.currentFilter'),
     icon: 'document',
     iconClass: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300',
-  },
-])
+  }]
+  return props.embedded ? items.filter((item) => item.key !== 'api-key') : items
+})
 
 const moderationScoreRows = computed<ModerationScoreRow[]>(() => {
   const result = moderationTestResult.value
