@@ -41,6 +41,7 @@
           <Toggle
             :model-value="monitorFor(group)?.enabled === true"
             :disabled="busyGroupId === group.id"
+            :data-probe-toggle-group-id="group.id"
             @update:model-value="(value) => emit('toggle', group, monitorFor(group), value)"
           />
           <button type="button" class="btn btn-secondary btn-sm whitespace-nowrap" @click="emit('configure', group, monitorFor(group))">

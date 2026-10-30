@@ -128,7 +128,7 @@ describe('ChannelMonitorView active probe groups', () => {
   it('toggles an existing group monitor without opening configuration', async () => {
     const wrapper = mountView()
     await flushPromises()
-    await wrapper.findAll('.probe-toggle')[0]!.trigger('click')
+    await wrapper.get('[data-probe-toggle-group-id="101"]').trigger('click')
     await flushPromises()
     expect(updateMonitor).toHaveBeenCalledWith(42, { enabled: true })
     expect(wrapper.findComponent({ name: 'MonitorFormDialog' }).props('show')).toBe(false)
@@ -138,7 +138,7 @@ describe('ChannelMonitorView active probe groups', () => {
   it('opens details with the selected group prefilled for an unconfigured probe', async () => {
     const wrapper = mountView()
     await flushPromises()
-    await wrapper.findAll('.probe-toggle')[1]!.trigger('click')
+    await wrapper.get('[data-probe-toggle-group-id="102"]').trigger('click')
     await flushPromises()
     const dialog = wrapper.findComponent({ name: 'MonitorFormDialog' })
     expect(dialog.props('show')).toBe(true)
