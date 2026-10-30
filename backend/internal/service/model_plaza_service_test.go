@@ -16,7 +16,7 @@ func newPlazaService(channels []Channel, groups []Group, pricing *PricingService
 	repo := &mockChannelRepository{
 		listAllFn: func(ctx context.Context) ([]Channel, error) { return channels, nil },
 	}
-	return NewModelPlazaService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, nil, pricing, nil, nil)
+	return NewModelPlazaService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, nil, pricing, nil, nil, nil)
 }
 
 func plazaPricedChannel(id int64, name string, groupIDs []int64, platform string, models ...string) Channel {
@@ -87,6 +87,73 @@ func TestListPlazaGroups_DedupFirstWinsWithPricingUpgrade(t *testing.T) {
 	require.Len(t, out[0].Models, 1)
 	require.NotNil(t, out[0].Models[0].Pricing, "无价条目应被有价条目升级")
 	require.NotNil(t, out[0].Models[0].Pricing.InputPrice)
+}
+
+func TestListPlazaGroups_ExplicitMappingExposesRouteTarget(t *testing.T) {
+	ch := Channel{
+		ID: 1, Name: "openai", Status: StatusActive, GroupIDs: []int64{10},
+		ModelPricing: []ChannelModelPricing{{
+			Platform: "openai", Models: []string{"gpt-6-sol"},
+		}},
+		ModelMapping: map[string]map[string]string{
+			"openai": {"gpt-6-luna": "gpt-6-sol"},
+		},
+	}
+	group := Group{ID: 10, Name: "openai-group", Platform: "openai", RateMultiplier: 1}
+
+	out, err := newPlazaService([]Channel{ch}, []Group{group}, nil).ListGroups(context.Background())
+
+	require.NoError(t, err)
+	require.Len(t, out, 1)
+	luna := plazaModelsByName(out[0].Models)["gpt-6-luna"]
+	require.Equal(t, "gpt-6-luna", luna.Name)
+	require.Equal(t, "gpt-6-sol", luna.RouteTarget)
+}
+
+func TestListPlazaGroups_GroupModelsFollowLiveAccountMapping(t *testing.T) {
+	channel := Channel{
+		ID: 1, Name: "openai", Status: StatusActive, GroupIDs: []int64{10},
+		ModelPricing: []ChannelModelPricing{{
+			Platform: PlatformOpenAI, Models: []string{"gpt-6-sol", "gpt-7-sol"},
+		}},
+	}
+	group := Group{ID: 10, Name: "g", Platform: PlatformOpenAI, RateMultiplier: 1}
+	accountRepo := &stubGroupModelAccountRepo{
+		accountsByGroup: map[int64][]Account{
+			10: {
+				{Platform: PlatformOpenAI, Credentials: map[string]any{
+					"model_mapping": map[string]any{"gpt-6-luna": "gpt-6-sol"},
+				}},
+			},
+		},
+	}
+	repo := &mockChannelRepository{
+		listAllFn: func(context.Context) ([]Channel, error) { return []Channel{channel}, nil },
+	}
+	svc := NewModelPlazaService(repo, &stubGroupRepoForAvailable{activeGroups: []Group{group}}, nil, nil, nil, nil, accountRepo)
+
+	first, err := svc.ListGroups(context.Background())
+	require.NoError(t, err)
+	require.Len(t, first, 1)
+	require.Equal(t, []string{"gpt-6-luna"}, plazaModelNames(first[0].Models))
+	require.Equal(t, "gpt-6-sol", first[0].Models[0].RouteTarget)
+
+	accountRepo.accountsByGroup[10] = []Account{
+		{Platform: PlatformOpenAI, Credentials: map[string]any{
+			"model_mapping": map[string]any{"gpt-7-sol": "gpt-7-sol"},
+		}},
+	}
+	second, err := svc.ListGroups(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, []string{"gpt-7-sol"}, plazaModelNames(second[0].Models))
+}
+
+func plazaModelNames(models []PlazaModel) []string {
+	names := make([]string, 0, len(models))
+	for _, model := range models {
+		names = append(names, model.Name)
+	}
+	return names
 }
 
 func TestListPlazaGroups_PlatformIsolation(t *testing.T) {
@@ -207,7 +274,7 @@ func TestListPlazaGroups_CompositeIncludesExplicitRouteModels(t *testing.T) {
 		{ID: 4, GroupID: 10, PublicModel: "invalid-target", MatchType: CompositeRouteMatchExact, TargetPlatform: PlatformComposite, Enabled: true},
 	}}
 	repo := &mockChannelRepository{listAllFn: func(context.Context) ([]Channel, error) { return []Channel{channel}, nil }}
-	svc := NewModelPlazaService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, routes, nil, nil, nil)
+	svc := NewModelPlazaService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, routes, nil, nil, nil, nil)
 
 	out, err := svc.ListGroups(context.Background())
 
@@ -423,7 +490,7 @@ func TestListPlazaGroups_RepoErrorsPropagate(t *testing.T) {
 	repo := &mockChannelRepository{
 		listAllFn: func(ctx context.Context) ([]Channel, error) { return nil, sentinel },
 	}
-	svc := NewModelPlazaService(repo, &stubGroupRepoForAvailable{}, nil, nil, nil, nil)
+	svc := NewModelPlazaService(repo, &stubGroupRepoForAvailable{}, nil, nil, nil, nil, nil)
 	out, err := svc.ListGroups(context.Background())
 	require.Nil(t, out)
 	require.ErrorIs(t, err, sentinel)
@@ -431,7 +498,7 @@ func TestListPlazaGroups_RepoErrorsPropagate(t *testing.T) {
 	svc2 := NewModelPlazaService(
 		&mockChannelRepository{listAllFn: func(ctx context.Context) ([]Channel, error) { return nil, nil }},
 		&stubGroupRepoForAvailable{listActiveErr: sentinel},
-		nil, nil, nil, nil,
+		nil, nil, nil, nil, nil,
 	)
 	out2, err2 := svc2.ListGroups(context.Background())
 	require.Nil(t, out2)
@@ -446,9 +513,9 @@ func newPlazaServiceWithBilling(channels []Channel, groups []Group, groupPlatfor
 			return groupPlatforms, nil
 		},
 	}
-	cs := NewChannelService(repo, nil, nil, nil, nil)
+	cs := NewChannelService(repo, nil, nil, nil, nil, nil, nil)
 	bs := NewBillingService(&config.Config{}, catalog)
-	return NewModelPlazaService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, nil, catalog, bs, NewModelPricingResolver(cs, bs))
+	return NewModelPlazaService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, nil, catalog, bs, NewModelPricingResolver(cs, bs), nil)
 }
 
 func plazaModelsByName(models []PlazaModel) map[string]PlazaModel {

@@ -112,6 +112,12 @@ func RegisterUserRoutes(
 			keys.PUT("/:id", h.APIKey.Update)
 			keys.DELETE("/:id", h.APIKey.Delete)
 		}
+		batchKeys := authenticated.Group("/batch-keys")
+		{
+			batchKeys.GET("", h.APIKey.ListBatches)
+			batchKeys.POST("", h.APIKey.CreateBatch)
+			batchKeys.GET("/:batch_id", h.APIKey.GetBatch)
+		}
 
 		// 用户可用分组（非管理员接口）
 		groups := authenticated.Group("/groups")

@@ -153,6 +153,25 @@ func matchGroupModelPricing(group *Group, model string) *ChannelModelPricing {
 		return nil
 	}
 	model = normalizeChannelPricingModelName(model)
+	var providerEntry *ChannelModelPricing
+	if provider := modelProviderPlatform(model); provider != "" {
+		for i := range group.ModelPricing {
+			entry := &group.ModelPricing[i]
+			if entry.RateMultiplier == nil {
+				continue
+			}
+			for _, pattern := range entry.Models {
+				if entryProvider, ok := providerFromGroupRateEntry(pattern); ok && entryProvider == provider {
+					cp := entry.Clone()
+					providerEntry = &cp
+					break
+				}
+			}
+			if providerEntry != nil {
+				break
+			}
+		}
+	}
 	var wildcard *ChannelModelPricing
 	for i := range group.ModelPricing {
 		entry := &group.ModelPricing[i]
@@ -160,6 +179,9 @@ func matchGroupModelPricing(group *Group, model string) *ChannelModelPricing {
 			normalized := normalizeChannelPricingModelName(pattern)
 			if normalized == model {
 				cp := entry.Clone()
+				if cp.RateMultiplier == nil && providerEntry != nil {
+					cp.RateMultiplier = providerEntry.RateMultiplier
+				}
 				return &cp
 			}
 			if strings.HasSuffix(normalized, "*") && strings.HasPrefix(model, strings.TrimSuffix(normalized, "*")) && wildcard == nil {
@@ -167,6 +189,15 @@ func matchGroupModelPricing(group *Group, model string) *ChannelModelPricing {
 				wildcard = &cp
 			}
 		}
+	}
+	if wildcard != nil && wildcard.RateMultiplier == nil && providerEntry != nil {
+		wildcard.RateMultiplier = providerEntry.RateMultiplier
+	}
+	if wildcard != nil {
+		return wildcard
+	}
+	if providerEntry != nil {
+		return providerEntry
 	}
 	return wildcard
 }

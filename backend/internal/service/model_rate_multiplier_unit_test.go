@@ -132,6 +132,74 @@ func TestAdminService_ClearGroupModelRateMultiplier_RemovesOnlyRate(t *testing.T
 	require.Contains(t, invalidator.groupIDs, groupID)
 }
 
+func TestAdminService_SetGroupProviderRateMultiplier_UsesWildcardAndKeepsOtherProviders(t *testing.T) {
+	const groupID = int64(11)
+	group := &Group{
+		ID:       groupID,
+		Platform: PlatformComposite,
+		ModelPricing: []ChannelModelPricing{
+			{Models: []string{"deepseek-v4.1-flash"}, InputPrice: testRatePtr(2), RateMultiplier: testRatePtr(0.4)},
+			{Models: []string{"glm-5.3-flash"}, InputPrice: testRatePtr(0.8), RateMultiplier: testRatePtr(0.4)},
+			{Models: []string{"kimi-k3.1-pro"}, InputPrice: testRatePtr(13), RateMultiplier: testRatePtr(0.4)},
+		},
+	}
+	groupRepo := &groupRepoStubForAdmin{getByIDByID: map[int64]*Group{groupID: group}}
+	invalidator := &authCacheInvalidatorStub{}
+	svc := &adminServiceImpl{groupRepo: groupRepo, authCacheInvalidator: invalidator}
+
+	require.NoError(t, svc.SetGroupProviderRateMultiplier(context.Background(), groupID, PlatformDeepseek, 0.75))
+
+	require.NotNil(t, groupRepo.updated)
+	var deepseekWildcard, glmRate, kimiRate *float64
+	for i := range groupRepo.updated.ModelPricing {
+		entry := &groupRepo.updated.ModelPricing[i]
+		for _, model := range entry.Models {
+			switch model {
+			case "__provider_rate__:deepseek":
+				deepseekWildcard = entry.RateMultiplier
+			case "glm-5.3-flash":
+				glmRate = entry.RateMultiplier
+			case "kimi-k3.1-pro":
+				kimiRate = entry.RateMultiplier
+			case "deepseek-v4.1-flash":
+				require.Nil(t, entry.RateMultiplier, "exact provider override must be cleared in favor of wildcard")
+				require.NotNil(t, entry.InputPrice, "exact model pricing must be preserved")
+				require.InDelta(t, 2, *entry.InputPrice, 1e-12)
+			}
+		}
+	}
+	require.NotNil(t, deepseekWildcard)
+	require.InDelta(t, 0.75, *deepseekWildcard, 1e-12)
+	require.InDelta(t, 0.4, *glmRate, 1e-12)
+	require.InDelta(t, 0.4, *kimiRate, 1e-12)
+	require.Contains(t, invalidator.groupIDs, groupID)
+
+	rates := GroupProviderRates(groupRepo.updated)
+	byProvider := map[string]float64{}
+	for _, rate := range rates {
+		byProvider[rate.Platform] = rate.RateMultiplier
+	}
+	require.InDelta(t, 0.75, byProvider[PlatformDeepseek], 1e-12)
+	require.InDelta(t, 0.4, byProvider[PlatformZhipu], 1e-12)
+	require.InDelta(t, 0.4, byProvider[PlatformKimi], 1e-12)
+	futureDeepSeek := matchGroupModelPricing(groupRepo.updated, "deepseek-v9-future")
+	require.NotNil(t, futureDeepSeek)
+	require.NotNil(t, futureDeepSeek.RateMultiplier)
+	require.InDelta(t, 0.75, *futureDeepSeek.RateMultiplier, 1e-12)
+	existingDeepSeek := matchGroupModelPricing(groupRepo.updated, "deepseek-v4.1-flash")
+	require.NotNil(t, existingDeepSeek)
+	require.NotNil(t, existingDeepSeek.RateMultiplier)
+	require.InDelta(t, 0.75, *existingDeepSeek.RateMultiplier, 1e-12)
+	require.NotNil(t, existingDeepSeek.InputPrice)
+	require.InDelta(t, 2, *existingDeepSeek.InputPrice, 1e-12)
+
+	require.NoError(t, svc.ClearGroupProviderRateMultiplier(context.Background(), groupID, PlatformDeepseek))
+	for i := range groupRepo.updated.ModelPricing {
+		entry := groupRepo.updated.ModelPricing[i]
+		require.NotEqual(t, []string{"__provider_rate__:deepseek"}, entry.Models)
+	}
+}
+
 // -----------------------------------------------------------------------------
 // 二、计费链路：recordUsageCore 端到端
 // -----------------------------------------------------------------------------

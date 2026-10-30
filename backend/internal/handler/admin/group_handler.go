@@ -1156,6 +1156,55 @@ func (h *GroupHandler) ClearGroupModelRateMultiplier(c *gin.Context) {
 	response.Success(c, gin.H{"message": "Model rate multiplier cleared successfully"})
 }
 
+// SetGroupProviderRateMultiplier sets one multiplier for a composite group's
+// provider wildcard, e.g. deepseek-* or glm-*.
+func (h *GroupHandler) SetGroupProviderRateMultiplier(c *gin.Context) {
+	if h.rejectUnsupportedSimpleModeOperation(c, "advanced") {
+		return
+	}
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+	provider := c.Param("provider")
+	if provider == "" {
+		response.BadRequest(c, "Invalid provider")
+		return
+	}
+	var req SetGroupModelRateMultiplierRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if err := h.adminService.SetGroupProviderRateMultiplier(c.Request.Context(), groupID, provider, req.RateMultiplier); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"message": "Provider rate multiplier updated successfully"})
+}
+
+func (h *GroupHandler) ClearGroupProviderRateMultiplier(c *gin.Context) {
+	if h.rejectUnsupportedSimpleModeOperation(c, "advanced") {
+		return
+	}
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+	provider := c.Param("provider")
+	if provider == "" {
+		response.BadRequest(c, "Invalid provider")
+		return
+	}
+	if err := h.adminService.ClearGroupProviderRateMultiplier(c.Request.Context(), groupID, provider); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"message": "Provider rate multiplier cleared successfully"})
+}
+
 // BatchSetGroupRPMOverridesRequest represents batch set rpm_override request
 type BatchSetGroupRPMOverridesRequest struct {
 	Entries []service.GroupRPMOverrideInput `json:"entries" binding:"required"`

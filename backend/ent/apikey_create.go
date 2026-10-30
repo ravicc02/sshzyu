@@ -85,6 +85,34 @@ func (_c *APIKeyCreate) SetName(v string) *APIKeyCreate {
 	return _c
 }
 
+// SetBatchID sets the "batch_id" field.
+func (_c *APIKeyCreate) SetBatchID(v string) *APIKeyCreate {
+	_c.mutation.SetBatchID(v)
+	return _c
+}
+
+// SetNillableBatchID sets the "batch_id" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableBatchID(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetBatchID(*v)
+	}
+	return _c
+}
+
+// SetBatchName sets the "batch_name" field.
+func (_c *APIKeyCreate) SetBatchName(v string) *APIKeyCreate {
+	_c.mutation.SetBatchName(v)
+	return _c
+}
+
+// SetNillableBatchName sets the "batch_name" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableBatchName(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetBatchName(*v)
+	}
+	return _c
+}
+
 // SetGroupID sets the "group_id" field.
 func (_c *APIKeyCreate) SetGroupID(v int64) *APIKeyCreate {
 	_c.mutation.SetGroupID(v)
@@ -383,6 +411,10 @@ func (_c *APIKeyCreate) defaults() error {
 		v := apikey.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.BatchName(); !ok {
+		v := apikey.DefaultBatchName
+		_c.mutation.SetBatchName(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := apikey.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -447,6 +479,19 @@ func (_c *APIKeyCreate) check() error {
 	if v, ok := _c.mutation.Name(); ok {
 		if err := apikey.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "APIKey.name": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.BatchID(); ok {
+		if err := apikey.BatchIDValidator(v); err != nil {
+			return &ValidationError{Name: "batch_id", err: fmt.Errorf(`ent: validator failed for field "APIKey.batch_id": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.BatchName(); !ok {
+		return &ValidationError{Name: "batch_name", err: errors.New(`ent: missing required field "APIKey.batch_name"`)}
+	}
+	if v, ok := _c.mutation.BatchName(); ok {
+		if err := apikey.BatchNameValidator(v); err != nil {
+			return &ValidationError{Name: "batch_name", err: fmt.Errorf(`ent: validator failed for field "APIKey.batch_name": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
@@ -530,6 +575,14 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 		_node.Name = value
+	}
+	if value, ok := _c.mutation.BatchID(); ok {
+		_spec.SetField(apikey.FieldBatchID, field.TypeString, value)
+		_node.BatchID = &value
+	}
+	if value, ok := _c.mutation.BatchName(); ok {
+		_spec.SetField(apikey.FieldBatchName, field.TypeString, value)
+		_node.BatchName = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
@@ -760,6 +813,36 @@ func (u *APIKeyUpsert) SetName(v string) *APIKeyUpsert {
 // UpdateName sets the "name" field to the value that was provided on create.
 func (u *APIKeyUpsert) UpdateName() *APIKeyUpsert {
 	u.SetExcluded(apikey.FieldName)
+	return u
+}
+
+// SetBatchID sets the "batch_id" field.
+func (u *APIKeyUpsert) SetBatchID(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldBatchID, v)
+	return u
+}
+
+// UpdateBatchID sets the "batch_id" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateBatchID() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldBatchID)
+	return u
+}
+
+// ClearBatchID clears the value of the "batch_id" field.
+func (u *APIKeyUpsert) ClearBatchID() *APIKeyUpsert {
+	u.SetNull(apikey.FieldBatchID)
+	return u
+}
+
+// SetBatchName sets the "batch_name" field.
+func (u *APIKeyUpsert) SetBatchName(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldBatchName, v)
+	return u
+}
+
+// UpdateBatchName sets the "batch_name" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateBatchName() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldBatchName)
 	return u
 }
 
@@ -1182,6 +1265,41 @@ func (u *APIKeyUpsertOne) SetName(v string) *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) UpdateName() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateName()
+	})
+}
+
+// SetBatchID sets the "batch_id" field.
+func (u *APIKeyUpsertOne) SetBatchID(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetBatchID(v)
+	})
+}
+
+// UpdateBatchID sets the "batch_id" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateBatchID() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateBatchID()
+	})
+}
+
+// ClearBatchID clears the value of the "batch_id" field.
+func (u *APIKeyUpsertOne) ClearBatchID() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearBatchID()
+	})
+}
+
+// SetBatchName sets the "batch_name" field.
+func (u *APIKeyUpsertOne) SetBatchName(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetBatchName(v)
+	})
+}
+
+// UpdateBatchName sets the "batch_name" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateBatchName() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateBatchName()
 	})
 }
 
@@ -1820,6 +1938,41 @@ func (u *APIKeyUpsertBulk) SetName(v string) *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) UpdateName() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateName()
+	})
+}
+
+// SetBatchID sets the "batch_id" field.
+func (u *APIKeyUpsertBulk) SetBatchID(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetBatchID(v)
+	})
+}
+
+// UpdateBatchID sets the "batch_id" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateBatchID() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateBatchID()
+	})
+}
+
+// ClearBatchID clears the value of the "batch_id" field.
+func (u *APIKeyUpsertBulk) ClearBatchID() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearBatchID()
+	})
+}
+
+// SetBatchName sets the "batch_name" field.
+func (u *APIKeyUpsertBulk) SetBatchName(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetBatchName(v)
+	})
+}
+
+// UpdateBatchName sets the "batch_name" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateBatchName() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateBatchName()
 	})
 }
 

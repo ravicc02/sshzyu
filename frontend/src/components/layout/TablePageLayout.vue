@@ -1,5 +1,5 @@
 <template>
-  <div class="table-page-layout" :class="{ 'mobile-mode': isMobile }">
+  <div class="table-page-layout" :class="{ 'mobile-mode': isMobile, embedded }">
     <!-- 固定区域：操作按钮 -->
     <div v-if="$slots.actions" class="layout-section-fixed table-page-actions">
       <slot name="actions" />
@@ -26,6 +26,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const isMobile = ref(false)
 
@@ -114,5 +116,24 @@ onUnmounted(() => {
   @apply flex-none;
   display: table;
   min-width: 100%;
+}
+
+.table-page-layout.embedded {
+  height: auto;
+  min-height: 0;
+}
+
+.table-page-layout.embedded .layout-section-scrollable {
+  @apply flex-none;
+}
+
+.table-page-layout.embedded .table-scroll-container {
+  @apply h-auto;
+  max-height: min(60vh, 560px);
+}
+
+.table-page-layout.embedded .table-scroll-container :deep(.table-wrapper) {
+  @apply flex-none;
+  max-height: calc(min(60vh, 560px) - 48px);
 }
 </style>

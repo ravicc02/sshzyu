@@ -32,22 +32,27 @@ const (
 
 // ChannelMonitor 渠道监控配置（service 层模型，不直接暴露 ent 类型）。
 type ChannelMonitor struct {
-	ID              int64
-	Name            string
-	Provider        string
-	APIMode         string
-	Endpoint        string
-	APIKey          string // 解密后的明文 API Key（仅在 service 内部使用，handler 层不应直接序列化返回）
-	PrimaryModel    string
-	ExtraModels     []string
-	GroupName       string
-	Enabled         bool
-	IntervalSeconds int
-	JitterSeconds   int // 每次调度 ± [0, jitter] 的随机偏移（秒），0 = 固定间隔
-	LastCheckedAt   *time.Time
-	CreatedBy       int64
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID           int64
+	Name         string
+	Provider     string
+	APIMode      string
+	Endpoint     string
+	APIKey       string // 解密后的明文 API Key（仅在 service 内部使用，handler 层不应直接序列化返回）
+	PrimaryModel string
+	ExtraModels  []string
+	GroupName    string
+	// GroupID is the durable group link used by hybrid monitoring. GroupName is
+	// kept as a display and backward-compatibility fallback for legacy rows.
+	GroupID              *int64
+	ProbeFallbackEnabled bool
+	IntelligenceEnabled  bool
+	Enabled              bool
+	IntervalSeconds      int
+	JitterSeconds        int // 每次调度 ± [0, jitter] 的随机偏移（秒），0 = 固定间隔
+	LastCheckedAt        *time.Time
+	CreatedBy            int64
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
 
 	// 配额模式（check_mode = quota / quota_probe）：
 	// 关联已有账号复用账号侧用量服务，Endpoint/APIKey 可为空（quota 模式）。
@@ -82,22 +87,25 @@ type ChannelMonitorListParams struct {
 
 // ChannelMonitorCreateParams 创建参数。
 type ChannelMonitorCreateParams struct {
-	Name             string
-	Provider         string
-	APIMode          string
-	Endpoint         string
-	APIKey           string
-	PrimaryModel     string
-	ExtraModels      []string
-	GroupName        string
-	Enabled          bool
-	IntervalSeconds  int
-	JitterSeconds    int
-	CreatedBy        int64
-	TemplateID       *int64
-	ExtraHeaders     map[string]string
-	BodyOverrideMode string
-	BodyOverride     map[string]any
+	Name                 string
+	Provider             string
+	APIMode              string
+	Endpoint             string
+	APIKey               string
+	PrimaryModel         string
+	ExtraModels          []string
+	GroupName            string
+	GroupID              *int64
+	ProbeFallbackEnabled bool
+	IntelligenceEnabled  bool
+	Enabled              bool
+	IntervalSeconds      int
+	JitterSeconds        int
+	CreatedBy            int64
+	TemplateID           *int64
+	ExtraHeaders         map[string]string
+	BodyOverrideMode     string
+	BodyOverride         map[string]any
 
 	// 配额模式：CheckMode 空串默认 probe；quota/quota_probe 必须关联账号。
 	CheckMode string
@@ -106,17 +114,20 @@ type ChannelMonitorCreateParams struct {
 
 // ChannelMonitorUpdateParams 更新参数（指针字段表示"未提供则不更新"）。
 type ChannelMonitorUpdateParams struct {
-	Name            *string
-	Provider        *string
-	APIMode         *string
-	Endpoint        *string
-	APIKey          *string // 空字符串表示不修改；非空字符串覆盖
-	PrimaryModel    *string
-	ExtraModels     *[]string
-	GroupName       *string
-	Enabled         *bool
-	IntervalSeconds *int
-	JitterSeconds   *int
+	Name                 *string
+	Provider             *string
+	APIMode              *string
+	Endpoint             *string
+	APIKey               *string // 空字符串表示不修改；非空字符串覆盖
+	PrimaryModel         *string
+	ExtraModels          *[]string
+	GroupName            *string
+	GroupID              *int64 // 0 clears the association; nil leaves it unchanged
+	ProbeFallbackEnabled *bool
+	IntelligenceEnabled  *bool
+	Enabled              *bool
+	IntervalSeconds      *int
+	JitterSeconds        *int
 	// 自定义快照字段：指针为 nil 表示不更新，非 nil 覆盖
 	// TemplateID *(*int64)：用 ** 表达三态：nil=不更新；&nil=清空；&&id=设为 id。
 	// 简化处理：用 ClearTemplate 显式标志 + TemplateID（普通指针）
@@ -150,13 +161,18 @@ type UserMonitorView struct {
 	Name                 string
 	Provider             string
 	GroupName            string
+	GroupID              *int64
+	ProbeFallbackEnabled bool
 	PrimaryModel         string
+	IntervalSeconds      int
 	PrimaryStatus        string
 	PrimaryLatencyMs     *int
 	PrimaryPingLatencyMs *int    // 主模型最近一次 ping 延迟
 	Availability7d       float64 // 0-100
 	ExtraModels          []ExtraModelStatus
 	Timeline             []UserMonitorTimelinePoint // 主模型最近 N 个历史点（按 checked_at DESC，最新在前）
+	IntelligenceTimeline []UserMonitorTimelinePoint // OpenAI 主模型的独立推理检测，未配置时为空
+	IntelligenceEnabled  bool
 	// LatestQuota 主模型最近一次配额快照；channel_monitor_show_quota=false
 	// 时由 handler 服务端剥离。
 	LatestQuota *domain.MonitorQuotaSnapshot
@@ -245,9 +261,11 @@ type ChannelMonitorAvailability struct {
 // PrimaryStatus / PrimaryLatencyMs 描述主模型最近状态；Availability7d 是主模型 7 天可用率；
 // ExtraModels 描述附加模型最近状态（用于 hover 展示）。
 type MonitorStatusSummary struct {
-	PrimaryStatus    string // 空字符串表示无历史
-	PrimaryLatencyMs *int
-	Availability7d   float64 // 0-100，无历史时为 0
-	ExtraModels      []ExtraModelStatus
-	LatestQuota      *domain.MonitorQuotaSnapshot // 主模型最近配额快照（配额模式）
+	PrimaryStatus         string // 空字符串表示无历史
+	IntelligenceStatus    string // 与主模型可用性独立
+	IntelligenceCheckedAt *time.Time
+	PrimaryLatencyMs      *int
+	Availability7d        float64 // 0-100，无历史时为 0
+	ExtraModels           []ExtraModelStatus
+	LatestQuota           *domain.MonitorQuotaSnapshot // 主模型最近配额快照（配额模式）
 }

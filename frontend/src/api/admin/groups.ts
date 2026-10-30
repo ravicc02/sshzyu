@@ -119,6 +119,14 @@ export async function getModelAllowlistCandidates(
   return data.models || []
 }
 
+/** Get the exact public /v1/models catalog for one group. */
+export async function getAvailableModels(id: number): Promise<string[]> {
+  const { data } = await apiClient.get<{ models: string[] }>(
+    `/admin/groups/${id}/available-models`
+  )
+  return data.models || []
+}
+
 /**
  * Create new group
  * @param groupData - Group data
@@ -478,6 +486,7 @@ export const groupsAPI = {
   getLiveCapability,
   getById,
   getModelAllowlistCandidates,
+  getAvailableModels,
   create,
   duplicate,
   update,

@@ -50,6 +50,8 @@ type CheckOptions struct {
 	// BodyOverride 在 merge 模式下做浅合并（key 命中黑名单时静默丢弃），
 	// 在 replace 模式下直接当作完整 body。
 	BodyOverride map[string]any
+	// ReasoningProbe reserves enough output tokens for reasoning models.
+	ReasoningProbe bool
 }
 
 // runCheckForModel 对单个 (provider, model) 做一次完整检测。
@@ -107,8 +109,27 @@ func runCheckForModel(ctx context.Context, provider, endpoint, apiKey, model str
 	return finalizeOperationalOrDegraded(res, latency, latencyMs)
 }
 
+// A wrong reasoning answer is not a failed availability check.
+func runIntelligenceCheckForModel(ctx context.Context, endpoint, apiKey, model string, opts *CheckOptions) *CheckResult {
+	result := &CheckResult{Model: monitorIntelligenceModel, Status: MonitorStatusError, CheckedAt: time.Now()}
+	start := time.Now()
+	text, _, status, err := callProvider(ctx, MonitorProviderOpenAI, endpoint, apiKey, model, monitorIntelligencePrompt, opts)
+	latency := int(time.Since(start) / time.Millisecond)
+	result.LatencyMs = &latency
+	if err != nil {
+		result.Message = truncateMessage(sanitizeErrorMessage(err.Error()))
+	} else if status < 200 || status >= 300 {
+		result.Message = fmt.Sprintf("reasoning probe HTTP %d", status)
+	} else if !validateIntelligenceResponse(text) {
+		result.Status = MonitorStatusFailed
+		result.Message = "reasoning probe answer mismatch"
+	} else {
+		result.Status = MonitorStatusOperational
+	}
+	return result
+}
+
 // finalizeOperationalOrDegraded 负责走到最后一步的 operational/degraded 判定。
-// 拆出来是为了让 runCheckForModel 不超过 30 行。
 func finalizeOperationalOrDegraded(res *CheckResult, latency time.Duration, latencyMs int) *CheckResult {
 	if latency >= monitorDegradedThreshold {
 		res.Status = MonitorStatusDegraded
@@ -425,6 +446,22 @@ func buildRequestBody(adapter providerAdapter, provider, apiMode, model, prompt 
 	if err != nil {
 		return nil, fmt.Errorf("marshal default body: %w", err)
 	}
+	if opts != nil && opts.ReasoningProbe && provider == MonitorProviderOpenAI {
+		var reasoningBody map[string]any
+		if err := json.Unmarshal(defaultBody, &reasoningBody); err != nil {
+			return nil, err
+		}
+		if apiMode == MonitorAPIModeResponses {
+			reasoningBody["max_output_tokens"] = 2048
+			reasoningBody["instructions"] = "Provide only the numerical answer."
+		} else {
+			reasoningBody["max_tokens"] = 2048
+		}
+		defaultBody, err = json.Marshal(reasoningBody)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if mode != MonitorBodyOverrideModeMerge || opts == nil || len(opts.BodyOverride) == 0 {
 		return defaultBody, nil
 	}
@@ -435,7 +472,7 @@ func buildRequestBody(adapter providerAdapter, provider, apiMode, model, prompt 
 	}
 	deny := bodyMergeKeyDenyList[bodyMergeDenyKey(provider, apiMode)]
 	for k, v := range opts.BodyOverride {
-		if deny[k] {
+		if deny[k] || (opts.ReasoningProbe && (k == "max_tokens" || k == "max_output_tokens")) {
 			continue
 		}
 		defaultMap[k] = v

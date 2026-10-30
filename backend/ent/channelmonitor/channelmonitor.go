@@ -39,6 +39,12 @@ const (
 	FieldExtraModels = "extra_models"
 	// FieldGroupName holds the string denoting the group_name field in the database.
 	FieldGroupName = "group_name"
+	// FieldGroupID holds the string denoting the group_id field in the database.
+	FieldGroupID = "group_id"
+	// FieldProbeFallbackEnabled holds the string denoting the probe_fallback_enabled field in the database.
+	FieldProbeFallbackEnabled = "probe_fallback_enabled"
+	// FieldIntelligenceEnabled holds the string denoting the intelligence_enabled field in the database.
+	FieldIntelligenceEnabled = "intelligence_enabled"
 	// FieldEnabled holds the string denoting the enabled field in the database.
 	FieldEnabled = "enabled"
 	// FieldIntervalSeconds holds the string denoting the interval_seconds field in the database.
@@ -103,6 +109,9 @@ var Columns = []string{
 	FieldPrimaryModel,
 	FieldExtraModels,
 	FieldGroupName,
+	FieldGroupID,
+	FieldProbeFallbackEnabled,
+	FieldIntelligenceEnabled,
 	FieldEnabled,
 	FieldIntervalSeconds,
 	FieldJitterSeconds,
@@ -153,6 +162,10 @@ var (
 	DefaultGroupName string
 	// GroupNameValidator is a validator for the "group_name" field. It is called by the builders before save.
 	GroupNameValidator func(string) error
+	// DefaultProbeFallbackEnabled holds the default value on creation for the "probe_fallback_enabled" field.
+	DefaultProbeFallbackEnabled bool
+	// DefaultIntelligenceEnabled holds the default value on creation for the "intelligence_enabled" field.
+	DefaultIntelligenceEnabled bool
 	// DefaultEnabled holds the default value on creation for the "enabled" field.
 	DefaultEnabled bool
 	// IntervalSecondsValidator is a validator for the "interval_seconds" field. It is called by the builders before save.
@@ -261,6 +274,21 @@ func ByPrimaryModel(opts ...sql.OrderTermOption) OrderOption {
 // ByGroupName orders the results by the group_name field.
 func ByGroupName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldGroupName, opts...).ToFunc()
+}
+
+// ByGroupID orders the results by the group_id field.
+func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
+}
+
+// ByProbeFallbackEnabled orders the results by the probe_fallback_enabled field.
+func ByProbeFallbackEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProbeFallbackEnabled, opts...).ToFunc()
+}
+
+// ByIntelligenceEnabled orders the results by the intelligence_enabled field.
+func ByIntelligenceEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIntelligenceEnabled, opts...).ToFunc()
 }
 
 // ByEnabled orders the results by the enabled field.

@@ -92,6 +92,7 @@ type ChannelMonitorV2Metric struct {
 	SuccessRequests          int64                   `json:"success_requests"`
 	ErrorRequests            int64                   `json:"error_requests"`
 	RequestCount             int64                   `json:"request_count"`
+	HasRequests              bool                    `json:"has_requests"` // Retained when volume is redacted.
 	InputTokens              int64                   `json:"input_tokens"`
 	OutputTokens             int64                   `json:"output_tokens"`
 	CacheCreationTokens      int64                   `json:"cache_creation_tokens"`
@@ -246,13 +247,14 @@ type ChannelMonitorV2ModelRow struct {
 }
 
 type ChannelMonitorV2MatrixRow struct {
-	Platform  string                       `json:"platform"`
-	GroupID   *int64                       `json:"group_id,omitempty"`
-	GroupName string                       `json:"group_name,omitempty"`
-	Model     string                       `json:"model,omitempty"`
-	Metrics   ChannelMonitorV2Metric       `json:"metrics"`
-	Health    ChannelMonitorV2Health       `json:"health"`
-	Buckets   []ChannelMonitorV2TrendPoint `json:"buckets"`
+	Platform       string                       `json:"platform"`
+	RateMultiplier *float64                     `json:"rate_multiplier,omitempty"`
+	GroupID        *int64                       `json:"group_id,omitempty"`
+	GroupName      string                       `json:"group_name,omitempty"`
+	Model          string                       `json:"model,omitempty"`
+	Metrics        ChannelMonitorV2Metric       `json:"metrics"`
+	Health         ChannelMonitorV2Health       `json:"health"`
+	Buckets        []ChannelMonitorV2TrendPoint `json:"buckets"`
 }
 
 type ChannelMonitorV2Matrix struct {

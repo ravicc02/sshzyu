@@ -145,6 +145,48 @@ func (_c *ChannelMonitorCreate) SetNillableGroupName(v *string) *ChannelMonitorC
 	return _c
 }
 
+// SetGroupID sets the "group_id" field.
+func (_c *ChannelMonitorCreate) SetGroupID(v int64) *ChannelMonitorCreate {
+	_c.mutation.SetGroupID(v)
+	return _c
+}
+
+// SetNillableGroupID sets the "group_id" field if the given value is not nil.
+func (_c *ChannelMonitorCreate) SetNillableGroupID(v *int64) *ChannelMonitorCreate {
+	if v != nil {
+		_c.SetGroupID(*v)
+	}
+	return _c
+}
+
+// SetProbeFallbackEnabled sets the "probe_fallback_enabled" field.
+func (_c *ChannelMonitorCreate) SetProbeFallbackEnabled(v bool) *ChannelMonitorCreate {
+	_c.mutation.SetProbeFallbackEnabled(v)
+	return _c
+}
+
+// SetNillableProbeFallbackEnabled sets the "probe_fallback_enabled" field if the given value is not nil.
+func (_c *ChannelMonitorCreate) SetNillableProbeFallbackEnabled(v *bool) *ChannelMonitorCreate {
+	if v != nil {
+		_c.SetProbeFallbackEnabled(*v)
+	}
+	return _c
+}
+
+// SetIntelligenceEnabled sets the "intelligence_enabled" field.
+func (_c *ChannelMonitorCreate) SetIntelligenceEnabled(v bool) *ChannelMonitorCreate {
+	_c.mutation.SetIntelligenceEnabled(v)
+	return _c
+}
+
+// SetNillableIntelligenceEnabled sets the "intelligence_enabled" field if the given value is not nil.
+func (_c *ChannelMonitorCreate) SetNillableIntelligenceEnabled(v *bool) *ChannelMonitorCreate {
+	if v != nil {
+		_c.SetIntelligenceEnabled(*v)
+	}
+	return _c
+}
+
 // SetEnabled sets the "enabled" field.
 func (_c *ChannelMonitorCreate) SetEnabled(v bool) *ChannelMonitorCreate {
 	_c.mutation.SetEnabled(v)
@@ -347,6 +389,14 @@ func (_c *ChannelMonitorCreate) defaults() {
 		v := channelmonitor.DefaultGroupName
 		_c.mutation.SetGroupName(v)
 	}
+	if _, ok := _c.mutation.ProbeFallbackEnabled(); !ok {
+		v := channelmonitor.DefaultProbeFallbackEnabled
+		_c.mutation.SetProbeFallbackEnabled(v)
+	}
+	if _, ok := _c.mutation.IntelligenceEnabled(); !ok {
+		v := channelmonitor.DefaultIntelligenceEnabled
+		_c.mutation.SetIntelligenceEnabled(v)
+	}
 	if _, ok := _c.mutation.Enabled(); !ok {
 		v := channelmonitor.DefaultEnabled
 		_c.mutation.SetEnabled(v)
@@ -436,6 +486,12 @@ func (_c *ChannelMonitorCreate) check() error {
 		if err := channelmonitor.GroupNameValidator(v); err != nil {
 			return &ValidationError{Name: "group_name", err: fmt.Errorf(`ent: validator failed for field "ChannelMonitor.group_name": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.ProbeFallbackEnabled(); !ok {
+		return &ValidationError{Name: "probe_fallback_enabled", err: errors.New(`ent: missing required field "ChannelMonitor.probe_fallback_enabled"`)}
+	}
+	if _, ok := _c.mutation.IntelligenceEnabled(); !ok {
+		return &ValidationError{Name: "intelligence_enabled", err: errors.New(`ent: missing required field "ChannelMonitor.intelligence_enabled"`)}
 	}
 	if _, ok := _c.mutation.Enabled(); !ok {
 		return &ValidationError{Name: "enabled", err: errors.New(`ent: missing required field "ChannelMonitor.enabled"`)}
@@ -544,6 +600,18 @@ func (_c *ChannelMonitorCreate) createSpec() (*ChannelMonitor, *sqlgraph.CreateS
 	if value, ok := _c.mutation.GroupName(); ok {
 		_spec.SetField(channelmonitor.FieldGroupName, field.TypeString, value)
 		_node.GroupName = value
+	}
+	if value, ok := _c.mutation.GroupID(); ok {
+		_spec.SetField(channelmonitor.FieldGroupID, field.TypeInt64, value)
+		_node.GroupID = &value
+	}
+	if value, ok := _c.mutation.ProbeFallbackEnabled(); ok {
+		_spec.SetField(channelmonitor.FieldProbeFallbackEnabled, field.TypeBool, value)
+		_node.ProbeFallbackEnabled = value
+	}
+	if value, ok := _c.mutation.IntelligenceEnabled(); ok {
+		_spec.SetField(channelmonitor.FieldIntelligenceEnabled, field.TypeBool, value)
+		_node.IntelligenceEnabled = value
 	}
 	if value, ok := _c.mutation.Enabled(); ok {
 		_spec.SetField(channelmonitor.FieldEnabled, field.TypeBool, value)
@@ -825,6 +893,54 @@ func (u *ChannelMonitorUpsert) UpdateGroupName() *ChannelMonitorUpsert {
 // ClearGroupName clears the value of the "group_name" field.
 func (u *ChannelMonitorUpsert) ClearGroupName() *ChannelMonitorUpsert {
 	u.SetNull(channelmonitor.FieldGroupName)
+	return u
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *ChannelMonitorUpsert) SetGroupID(v int64) *ChannelMonitorUpsert {
+	u.Set(channelmonitor.FieldGroupID, v)
+	return u
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsert) UpdateGroupID() *ChannelMonitorUpsert {
+	u.SetExcluded(channelmonitor.FieldGroupID)
+	return u
+}
+
+// AddGroupID adds v to the "group_id" field.
+func (u *ChannelMonitorUpsert) AddGroupID(v int64) *ChannelMonitorUpsert {
+	u.Add(channelmonitor.FieldGroupID, v)
+	return u
+}
+
+// ClearGroupID clears the value of the "group_id" field.
+func (u *ChannelMonitorUpsert) ClearGroupID() *ChannelMonitorUpsert {
+	u.SetNull(channelmonitor.FieldGroupID)
+	return u
+}
+
+// SetProbeFallbackEnabled sets the "probe_fallback_enabled" field.
+func (u *ChannelMonitorUpsert) SetProbeFallbackEnabled(v bool) *ChannelMonitorUpsert {
+	u.Set(channelmonitor.FieldProbeFallbackEnabled, v)
+	return u
+}
+
+// UpdateProbeFallbackEnabled sets the "probe_fallback_enabled" field to the value that was provided on create.
+func (u *ChannelMonitorUpsert) UpdateProbeFallbackEnabled() *ChannelMonitorUpsert {
+	u.SetExcluded(channelmonitor.FieldProbeFallbackEnabled)
+	return u
+}
+
+// SetIntelligenceEnabled sets the "intelligence_enabled" field.
+func (u *ChannelMonitorUpsert) SetIntelligenceEnabled(v bool) *ChannelMonitorUpsert {
+	u.Set(channelmonitor.FieldIntelligenceEnabled, v)
+	return u
+}
+
+// UpdateIntelligenceEnabled sets the "intelligence_enabled" field to the value that was provided on create.
+func (u *ChannelMonitorUpsert) UpdateIntelligenceEnabled() *ChannelMonitorUpsert {
+	u.SetExcluded(channelmonitor.FieldIntelligenceEnabled)
 	return u
 }
 
@@ -1189,6 +1305,62 @@ func (u *ChannelMonitorUpsertOne) UpdateGroupName() *ChannelMonitorUpsertOne {
 func (u *ChannelMonitorUpsertOne) ClearGroupName() *ChannelMonitorUpsertOne {
 	return u.Update(func(s *ChannelMonitorUpsert) {
 		s.ClearGroupName()
+	})
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *ChannelMonitorUpsertOne) SetGroupID(v int64) *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetGroupID(v)
+	})
+}
+
+// AddGroupID adds v to the "group_id" field.
+func (u *ChannelMonitorUpsertOne) AddGroupID(v int64) *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.AddGroupID(v)
+	})
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertOne) UpdateGroupID() *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateGroupID()
+	})
+}
+
+// ClearGroupID clears the value of the "group_id" field.
+func (u *ChannelMonitorUpsertOne) ClearGroupID() *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.ClearGroupID()
+	})
+}
+
+// SetProbeFallbackEnabled sets the "probe_fallback_enabled" field.
+func (u *ChannelMonitorUpsertOne) SetProbeFallbackEnabled(v bool) *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetProbeFallbackEnabled(v)
+	})
+}
+
+// UpdateProbeFallbackEnabled sets the "probe_fallback_enabled" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertOne) UpdateProbeFallbackEnabled() *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateProbeFallbackEnabled()
+	})
+}
+
+// SetIntelligenceEnabled sets the "intelligence_enabled" field.
+func (u *ChannelMonitorUpsertOne) SetIntelligenceEnabled(v bool) *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetIntelligenceEnabled(v)
+	})
+}
+
+// UpdateIntelligenceEnabled sets the "intelligence_enabled" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertOne) UpdateIntelligenceEnabled() *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateIntelligenceEnabled()
 	})
 }
 
@@ -1743,6 +1915,62 @@ func (u *ChannelMonitorUpsertBulk) UpdateGroupName() *ChannelMonitorUpsertBulk {
 func (u *ChannelMonitorUpsertBulk) ClearGroupName() *ChannelMonitorUpsertBulk {
 	return u.Update(func(s *ChannelMonitorUpsert) {
 		s.ClearGroupName()
+	})
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *ChannelMonitorUpsertBulk) SetGroupID(v int64) *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetGroupID(v)
+	})
+}
+
+// AddGroupID adds v to the "group_id" field.
+func (u *ChannelMonitorUpsertBulk) AddGroupID(v int64) *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.AddGroupID(v)
+	})
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertBulk) UpdateGroupID() *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateGroupID()
+	})
+}
+
+// ClearGroupID clears the value of the "group_id" field.
+func (u *ChannelMonitorUpsertBulk) ClearGroupID() *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.ClearGroupID()
+	})
+}
+
+// SetProbeFallbackEnabled sets the "probe_fallback_enabled" field.
+func (u *ChannelMonitorUpsertBulk) SetProbeFallbackEnabled(v bool) *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetProbeFallbackEnabled(v)
+	})
+}
+
+// UpdateProbeFallbackEnabled sets the "probe_fallback_enabled" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertBulk) UpdateProbeFallbackEnabled() *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateProbeFallbackEnabled()
+	})
+}
+
+// SetIntelligenceEnabled sets the "intelligence_enabled" field.
+func (u *ChannelMonitorUpsertBulk) SetIntelligenceEnabled(v bool) *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetIntelligenceEnabled(v)
+	})
+}
+
+// UpdateIntelligenceEnabled sets the "intelligence_enabled" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertBulk) UpdateIntelligenceEnabled() *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateIntelligenceEnabled()
 	})
 }
 

@@ -1,4 +1,4 @@
-import type { GroupPlatform } from '@/types'
+import type { Group, GroupPlatform } from '@/types'
 
 export type KeyGroupProvider = 'anthropic' | 'openai' | 'domestic' | 'other'
 
@@ -24,6 +24,21 @@ const PROVIDER_BY_PLATFORM: Record<GroupPlatform, KeyGroupProvider> = {
 
 export function getKeyGroupProvider(platform: GroupPlatform): KeyGroupProvider {
   return PROVIDER_BY_PLATFORM[platform] ?? 'other'
+}
+
+export function getKeyGroupProviderForGroup(
+  group: Pick<Group, 'platform' | 'provider_rates'> & {
+    providerRates?: Array<{ platform: GroupPlatform; rate_multiplier: number }>
+  }
+): KeyGroupProvider {
+  const providerRates = group.provider_rates ?? group.providerRates ?? []
+  if (group.platform === 'composite' && providerRates.length) {
+    const providers = providerRates.map((entry) => entry.platform)
+    if (providers.every((platform) => PROVIDER_BY_PLATFORM[platform] === 'domestic')) {
+      return 'domestic'
+    }
+  }
+  return getKeyGroupProvider(group.platform)
 }
 
 // Collections use representative provider marks rather than an invented brand logo.

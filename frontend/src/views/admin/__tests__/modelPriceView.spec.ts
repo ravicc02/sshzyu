@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildPlatformSections, effectiveModelRate, formatRate } from '../modelPriceView'
+import { buildPlatformSections, buildProviderPriceGroups, effectiveModelRate, formatRate } from '../modelPriceView'
 import type { GroupModelPriceGroup } from '@/api/admin/modelPrice'
 
 function g(partial: Partial<GroupModelPriceGroup> & { id: number }): GroupModelPriceGroup {
@@ -94,5 +94,28 @@ describe('effectiveModelRate', () => {
   it('与 formatRate 组合得到页面展示文本', () => {
     expect(formatRate(effectiveModelRate(0.25, { rate_multiplier: 0.5 }))).toBe('0.5x')
     expect(formatRate(effectiveModelRate(0.25, { rate_multiplier: null }))).toBe('0.25x')
+  })
+})
+
+describe('buildProviderPriceGroups', () => {
+  it('groups composite models by provider and keeps one effective rate', () => {
+    const group = g({
+      id: 65,
+      platform: 'composite',
+      rate_multiplier: 0.4,
+      models: [
+        { model: 'kimi-k3.1-pro', provider: 'kimi', custom_rate: false, rate_multiplier: null },
+        { model: 'deepseek-v4.1-flash', provider: 'deepseek', custom_rate: true, rate_multiplier: 0.4 },
+        { model: 'glm-5.3-flash', provider: 'zhipu', custom_rate: false, rate_multiplier: null }
+      ]
+    })
+
+    const providers = buildProviderPriceGroups(group)
+
+    expect(providers.map((entry) => entry.provider)).toEqual(['deepseek', 'zhipu', 'kimi'])
+    expect(providers[0].rate).toBe(0.4)
+    expect(providers[0].mixed).toBe(false)
+    expect(providers[0].custom).toBe(true)
+    expect(providers[2].models.map((entry) => entry.model)).toEqual(['kimi-k3.1-pro'])
   })
 })

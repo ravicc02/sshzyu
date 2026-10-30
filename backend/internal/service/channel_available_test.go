@@ -21,6 +21,19 @@ type stubGroupRepoForAvailable struct {
 	listActiveCalls int
 }
 
+type stubGroupModelAccountRepo struct {
+	AccountRepository
+	accountsByGroup map[int64][]Account
+	errByGroup      map[int64]error
+}
+
+func (s *stubGroupModelAccountRepo) ListSchedulableByGroupID(ctx context.Context, groupID int64) ([]Account, error) {
+	if err := s.errByGroup[groupID]; err != nil {
+		return nil, err
+	}
+	return s.accountsByGroup[groupID], nil
+}
+
 func (s *stubGroupRepoForAvailable) ListActive(ctx context.Context) ([]Group, error) {
 	s.listActiveCalls++
 	if s.listActiveErr != nil {
@@ -75,7 +88,7 @@ func newAvailableChannelService(channels []Channel, groupRepo GroupRepository) *
 	repo := &mockChannelRepository{
 		listAllFn: func(ctx context.Context) ([]Channel, error) { return channels, nil },
 	}
-	return NewChannelService(repo, groupRepo, nil, nil, nil)
+	return NewChannelService(repo, groupRepo, nil, nil, nil, nil, nil)
 }
 
 func TestListAvailable_EmptyActiveGroups_NoGroupsAttached(t *testing.T) {
@@ -134,7 +147,7 @@ func TestListAvailable_ListAllErrorPropagates(t *testing.T) {
 		listAllFn: func(ctx context.Context) ([]Channel, error) { return nil, sentinel },
 	}
 	groupRepo := &stubGroupRepoForAvailable{}
-	svc := NewChannelService(repo, groupRepo, nil, nil, nil)
+	svc := NewChannelService(repo, groupRepo, nil, nil, nil, nil, nil)
 	out, err := svc.ListAvailable(context.Background())
 	require.Nil(t, out)
 	require.ErrorIs(t, err, sentinel)
@@ -174,6 +187,59 @@ func TestListAvailable_DefaultsEmptyBillingModelSource(t *testing.T) {
 	}
 	require.Equal(t, BillingModelSourceChannelMapped, byName["empty"])
 	require.Equal(t, BillingModelSourceUpstream, byName["explicit"])
+}
+
+func TestListAvailable_GroupModelsFollowLiveAccountMapping(t *testing.T) {
+	repo := &mockChannelRepository{
+		listAllFn: func(ctx context.Context) ([]Channel, error) {
+			return []Channel{{
+				ID:       1,
+				Name:     "openai",
+				Status:   StatusActive,
+				GroupIDs: []int64{10},
+				ModelPricing: []ChannelModelPricing{{
+					Platform: PlatformOpenAI,
+					Models:   []string{"gpt-6-sol", "gpt-7-sol"},
+				}},
+			}}, nil
+		},
+	}
+	groupRepo := &stubGroupRepoForAvailable{
+		activeGroups: []Group{{ID: 10, Name: "g", Platform: PlatformOpenAI}},
+	}
+	accountRepo := &stubGroupModelAccountRepo{
+		accountsByGroup: map[int64][]Account{
+			10: {
+				{Platform: PlatformOpenAI, Credentials: map[string]any{
+					"model_mapping": map[string]any{"gpt-6-luna": "gpt-6-sol"},
+				}},
+			},
+		},
+	}
+	svc := NewChannelService(repo, groupRepo, nil, nil, nil, accountRepo, nil)
+
+	first, err := svc.ListAvailable(context.Background())
+	require.NoError(t, err)
+	require.Len(t, first, 1)
+	require.Equal(t, []string{"gpt-6-luna"}, supportedModelNames(first[0].Groups[0].Models))
+	require.Equal(t, "gpt-6-sol", first[0].Groups[0].Models[0].RouteTarget)
+
+	accountRepo.accountsByGroup[10] = []Account{
+		{Platform: PlatformOpenAI, Credentials: map[string]any{
+			"model_mapping": map[string]any{"gpt-7-sol": "gpt-7-sol"},
+		}},
+	}
+	second, err := svc.ListAvailable(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, []string{"gpt-7-sol"}, supportedModelNames(second[0].Groups[0].Models))
+}
+
+func supportedModelNames(models []SupportedModel) []string {
+	names := make([]string, 0, len(models))
+	for _, model := range models {
+		names = append(names, model.Name)
+	}
+	return names
 }
 
 func TestPricingNeedsFallback(t *testing.T) {

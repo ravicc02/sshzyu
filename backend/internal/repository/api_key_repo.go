@@ -47,6 +47,8 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		SetUserID(key.UserID).
 		SetKey(key.Key).
 		SetName(key.Name).
+		SetNillableBatchID(key.BatchID).
+		SetBatchName(key.BatchName).
 		SetStatus(key.Status).
 		SetNillableGroupID(key.GroupID).
 		SetNillableLastUsedAt(key.LastUsedAt).
@@ -433,7 +435,7 @@ func (r *apiKeyRepository) deleteWithTombstone(ctx context.Context, exec *dbent.
 }
 
 func (r *apiKeyRepository) apiKeyListByUserIDQuery(userID int64, filters service.APIKeyListFilters) *dbent.APIKeyQuery {
-	q := r.activeQuery().Where(apikey.UserIDEQ(userID))
+	q := r.activeQuery().Where(apikey.UserIDEQ(userID), apikey.BatchIDIsNil())
 
 	if filters.Search != "" {
 		q = q.Where(apikey.Or(
@@ -504,6 +506,86 @@ func (r *apiKeyRepository) ListAllByUserID(ctx context.Context, userID int64, fi
 		return nil, err
 	}
 	return outKeys, nil
+}
+
+func (r *apiKeyRepository) ListBatchesByUserID(ctx context.Context, userID int64) ([]service.APIKeyBatchSummary, error) {
+	rows, err := r.sql.QueryContext(ctx, `
+		SELECT
+			k.batch_id,
+			COALESCE(MAX(k.batch_name), ''),
+			k.group_id,
+			COALESCE(MAX(g.name), ''),
+			COALESCE(MAX(g.platform), ''),
+			COUNT(*),
+			COUNT(*) FILTER (WHERE k.status = 'active'),
+			COALESCE(MAX(k.quota), 0),
+			COALESCE(SUM(k.quota), 0),
+			COALESCE(SUM(k.quota_used), 0),
+			MIN(k.created_at),
+			MAX(k.last_used_at)
+		FROM api_keys AS k
+		LEFT JOIN groups AS g ON g.id = k.group_id
+		WHERE k.user_id = $1
+		  AND k.batch_id IS NOT NULL
+		  AND k.deleted_at IS NULL
+		GROUP BY k.batch_id, k.group_id
+		ORDER BY MIN(k.created_at) DESC`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list api key batches: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]service.APIKeyBatchSummary, 0)
+	for rows.Next() {
+		var item service.APIKeyBatchSummary
+		var groupID sql.NullInt64
+		var lastUsedAt sql.NullTime
+		if err := rows.Scan(
+			&item.BatchID,
+			&item.BatchName,
+			&groupID,
+			&item.GroupName,
+			&item.GroupPlatform,
+			&item.KeyCount,
+			&item.ActiveKeyCount,
+			&item.QuotaPerKey,
+			&item.QuotaTotal,
+			&item.QuotaUsedTotal,
+			&item.CreatedAt,
+			&lastUsedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan api key batch: %w", err)
+		}
+		if groupID.Valid {
+			id := groupID.Int64
+			item.GroupID = &id
+		}
+		if lastUsedAt.Valid {
+			t := lastUsedAt.Time
+			item.LastUsedAt = &t
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func (r *apiKeyRepository) ListByUserIDAndBatchID(ctx context.Context, userID int64, batchID string) ([]service.APIKey, error) {
+	rows, err := r.activeQuery().
+		Where(apikey.UserIDEQ(userID), apikey.BatchIDEQ(batchID)).
+		WithGroup().
+		Order(dbent.Asc(apikey.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list api key batch keys: %w", err)
+	}
+	out := make([]service.APIKey, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, *apiKeyEntityToService(row))
+	}
+	if err := r.attachLastUsedIPs(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *apiKeyRepository) attachLastUsedIPs(ctx context.Context, keys []service.APIKey) error {
@@ -888,6 +970,8 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		UserID:        m.UserID,
 		Key:           m.Key,
 		Name:          m.Name,
+		BatchID:       m.BatchID,
+		BatchName:     m.BatchName,
 		Status:        m.Status,
 		IPWhitelist:   m.IPWhitelist,
 		IPBlacklist:   m.IPBlacklist,

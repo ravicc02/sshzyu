@@ -1305,7 +1305,8 @@ func (s *adminServiceImpl) BatchSetGroupRateMultipliers(ctx context.Context, gro
 // GroupModelPriceEntry 是「模型价格」页的单个模型条目。
 // CustomRate 表示该模型是否已配置独立倍率；界面不展示具体数值（隐式配置）。
 type GroupModelPriceEntry struct {
-	Model string `json:"model"`
+	Model    string `json:"model"`
+	Provider string `json:"provider,omitempty"`
 	// CustomRate 表示该模型是否已配置独立倍率（等价于 RateMultiplier != nil）。
 	CustomRate bool `json:"custom_rate"`
 	// RateMultiplier 是该模型的实际覆盖倍率（未配置为 nil）。这是管理员侧页面，
@@ -1377,7 +1378,11 @@ func (s *adminServiceImpl) groupModelPriceEntries(ctx context.Context, group *Gr
 	entries := make([]GroupModelPriceEntry, 0, len(models))
 	for _, m := range models {
 		entry := matchGroupModelPricing(group, m)
-		item := GroupModelPriceEntry{Model: m}
+		provider := strings.TrimSpace(group.Platform)
+		if group.Platform == PlatformComposite {
+			provider = modelProviderPlatform(m)
+		}
+		item := GroupModelPriceEntry{Model: m, Provider: provider}
 		if entry != nil && entry.RateMultiplier != nil && *entry.RateMultiplier > 0 {
 			rate := *entry.RateMultiplier
 			item.CustomRate = true
@@ -1532,6 +1537,136 @@ func (s *adminServiceImpl) ClearGroupModelRateMultiplier(ctx context.Context, gr
 		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, groupID)
 	}
 	return nil
+}
+
+// SetGroupProviderRateMultiplier applies one multiplier to all current and
+// future models of a provider in a composite group. The durable override is a
+// wildcard entry such as deepseek-* or glm-*.
+func (s *adminServiceImpl) SetGroupProviderRateMultiplier(ctx context.Context, groupID int64, provider string, rateMultiplier float64) error {
+	if err := s.ValidateSimpleModeGroupOperation(AdminGroupOperationMultiplier); err != nil {
+		return err
+	}
+	provider = strings.TrimSpace(provider)
+	pattern := groupProviderModelPattern(provider)
+	if pattern == "" {
+		return infraerrors.BadRequest("INVALID_PROVIDER", "provider is not supported")
+	}
+	if !(rateMultiplier > 0) {
+		return infraerrors.BadRequest("INVALID_RATE_MULTIPLIER", "rate_multiplier must be > 0")
+	}
+	group, err := s.groupRepo.GetByID(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	if group == nil {
+		return infraerrors.NotFound("GROUP_NOT_FOUND", "group not found")
+	}
+	if group.Platform != PlatformComposite {
+		return infraerrors.BadRequest("INVALID_GROUP_PLATFORM", "provider rates require a composite group")
+	}
+	pricing := clearProviderRateOverrides(group.ModelPricing, provider)
+	value := rateMultiplier
+	found := false
+	for i := range pricing {
+		for _, model := range pricing[i].Models {
+			if strings.EqualFold(strings.TrimSpace(model), pattern) {
+				pricing[i].RateMultiplier = &value
+				found = true
+				break
+			}
+		}
+		if found {
+			break
+		}
+	}
+	if !found {
+		pricing = append(pricing, ChannelModelPricing{
+			Models:         []string{pattern},
+			Platform:       PlatformComposite,
+			BillingMode:    BillingModeToken,
+			RateMultiplier: &value,
+		})
+	}
+	normalized, err := normalizeGroupModelPricing(group.Platform, pricing)
+	if err != nil {
+		return err
+	}
+	group.ModelPricing = normalized
+	if err := s.groupRepo.Update(ctx, group); err != nil {
+		return err
+	}
+	if s.authCacheInvalidator != nil {
+		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, groupID)
+	}
+	return nil
+}
+
+func (s *adminServiceImpl) ClearGroupProviderRateMultiplier(ctx context.Context, groupID int64, provider string) error {
+	if err := s.ValidateSimpleModeGroupOperation(AdminGroupOperationMultiplier); err != nil {
+		return err
+	}
+	provider = strings.TrimSpace(provider)
+	if groupProviderModelPattern(provider) == "" {
+		return infraerrors.BadRequest("INVALID_PROVIDER", "provider is not supported")
+	}
+	group, err := s.groupRepo.GetByID(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	if group == nil {
+		return infraerrors.NotFound("GROUP_NOT_FOUND", "group not found")
+	}
+	if group.Platform != PlatformComposite {
+		return infraerrors.BadRequest("INVALID_GROUP_PLATFORM", "provider rates require a composite group")
+	}
+	group.ModelPricing = clearProviderRateOverrides(group.ModelPricing, provider)
+	normalized, err := normalizeGroupModelPricing(group.Platform, group.ModelPricing)
+	if err != nil {
+		return err
+	}
+	group.ModelPricing = normalized
+	if err := s.groupRepo.Update(ctx, group); err != nil {
+		return err
+	}
+	if s.authCacheInvalidator != nil {
+		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, groupID)
+	}
+	return nil
+}
+
+func clearProviderRateOverrides(pricing []ChannelModelPricing, provider string) []ChannelModelPricing {
+	out := make([]ChannelModelPricing, 0, len(pricing))
+	for _, entry := range pricing {
+		providerOnly := len(entry.Models) > 0
+		touchesProvider := false
+		providerMarkerEntry := false
+		for _, model := range entry.Models {
+			if entryProvider, ok := providerFromGroupRateEntry(model); ok {
+				providerMarkerEntry = true
+				touchesProvider = touchesProvider || entryProvider == provider
+				providerOnly = providerOnly && entryProvider == provider
+				continue
+			}
+			if modelProviderPlatform(model) == provider {
+				touchesProvider = true
+			} else {
+				providerOnly = false
+			}
+		}
+		if !touchesProvider {
+			out = append(out, entry)
+			continue
+		}
+		entry.RateMultiplier = nil
+		if providerMarkerEntry {
+			continue
+		}
+		if providerOnly && !groupPricingHasPricing(&entry) {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return out
 }
 
 // groupModelPriceEntries 的模型清单已改为复用「分组模型候选」口径，故原先按

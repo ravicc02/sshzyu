@@ -433,6 +433,16 @@ func (s *stubAdminService) ClearGroupModelRateMultiplier(_ context.Context, _ in
 	return nil
 }
 
+func (s *stubAdminService) SetGroupProviderRateMultiplier(_ context.Context, _ int64, _ string, _ float64) error {
+	s.advancedGroupOperationCalls++
+	return nil
+}
+
+func (s *stubAdminService) ClearGroupProviderRateMultiplier(_ context.Context, _ int64, _ string) error {
+	s.advancedGroupOperationCalls++
+	return nil
+}
+
 func (s *stubAdminService) ClearGroupRPMOverrides(_ context.Context, _ int64) error {
 	return nil
 }

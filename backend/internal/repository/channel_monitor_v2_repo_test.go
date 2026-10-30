@@ -78,12 +78,14 @@ func TestChannelMonitorV2MetricIncludesSuccessRate(t *testing.T) {
 	acc.success, acc.errors = 80, 20
 	metric := acc.metric(1, false)
 	require.Equal(t, int64(100), metric.RequestCount)
+	require.True(t, metric.HasRequests)
 	require.InDelta(t, 0.8, metric.SuccessRate, 0.0001)
 	require.InDelta(t, 0.2, metric.ErrorRate, 0.0001)
 	require.Nil(t, metric.UpstreamAffectedRequests)
 
 	adminMetric := acc.metric(1, true)
 	require.NotNil(t, adminMetric.UpstreamAffectedRequests)
+	require.False(t, newMetricAccumulator().metric(1, false).HasRequests)
 }
 
 func TestChannelMonitorV2WhereUsesConfiguredScopeAndEmptyFilterMeansAllConfigured(t *testing.T) {
@@ -162,6 +164,18 @@ func TestChannelMonitorV2AdminScopeRemainsGlobal(t *testing.T) {
 	where, args := channelMonitorV2Where(filter, cfg, "m")
 	require.Contains(t, where, "m.group_id = ANY($4)")
 	require.Equal(t, pq.Array([]int64{9}), args[3])
+}
+
+func TestChannelMonitorV2GroupInfoLoadsRealMultiplier(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	mock.ExpectQuery(`SELECT id, COALESCE\(name, ''\), lower\(COALESCE`).WithArgs(pq.Array([]int64{4})).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "platform", "rate_multiplier"}).AddRow(4, "ChatGPT Plus", "openai", 0.045))
+	info, err := (&channelMonitorV2Repository{db: db}).loadChannelMonitorV2GroupInfo(context.Background(), []int64{4})
+	require.NoError(t, err)
+	require.Equal(t, 0.045, info[4].rateMultiplier)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestChannelMonitorV2MatrixDoesNotSeedGroupsForEmptyViewerScope(t *testing.T) {

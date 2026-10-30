@@ -46,6 +46,8 @@ export interface PlazaTimePricing {
 export interface PlazaModel {
   name: string
   platform: string
+  /** Explicit cross-model channel mapping target, e.g. gpt-6-luna -> gpt-6-sol. */
+  route_target?: string
   /** 实收口径的展示定价：多档时 intervals 为各档绝对单价（已由计费服务折算）；均为标准时段价。 */
   pricing: UserSupportedModelPricing | null
   official_pricing: PlazaOfficialPricing | null

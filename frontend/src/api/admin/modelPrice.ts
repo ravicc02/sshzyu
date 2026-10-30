@@ -8,6 +8,8 @@ import { apiClient } from '../client'
 /** 模型价格页的单个模型条目 */
 export interface GroupModelPriceEntry {
   model: string
+  /** Composite group provider inferred from the model name, e.g. deepseek/zhipu/kimi. */
+  provider?: string
   /** 是否已配独立倍率（等价于 rate_multiplier != null） */
   custom_rate: boolean
   /** 实际覆盖倍率；未配置为 null（页面回落展示分组默认倍率） */
@@ -73,11 +75,30 @@ export async function clearModelRateMultiplier(groupId: number, model: string): 
   )
 }
 
+export async function setProviderRateMultiplier(
+  groupId: number,
+  provider: string,
+  rateMultiplier: number
+): Promise<void> {
+  await apiClient.put(
+    `/admin/groups/${groupId}/model-prices/provider-rate-multipliers/${encodeURIComponent(provider)}`,
+    { rate_multiplier: rateMultiplier }
+  )
+}
+
+export async function clearProviderRateMultiplier(groupId: number, provider: string): Promise<void> {
+  await apiClient.delete(
+    `/admin/groups/${groupId}/model-prices/provider-rate-multipliers/${encodeURIComponent(provider)}`
+  )
+}
+
 export const modelPriceAPI = {
   listGroupModelPrices,
   listAllGroupModelPrices,
   setModelRateMultiplier,
-  clearModelRateMultiplier
+  clearModelRateMultiplier,
+  setProviderRateMultiplier,
+  clearProviderRateMultiplier
 }
 
 export default modelPriceAPI

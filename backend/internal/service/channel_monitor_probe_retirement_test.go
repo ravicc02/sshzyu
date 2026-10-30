@@ -48,16 +48,19 @@ func TestRunCheck_NilRuntimeReaderFailsClosedAsV2(t *testing.T) {
 }
 
 func TestNormalizeChannelMonitorMode(t *testing.T) {
-	require.Equal(t, ChannelMonitorModeV1, normalizeChannelMonitorMode(""))
-	require.Equal(t, ChannelMonitorModeV1, normalizeChannelMonitorMode("v1"))
-	require.Equal(t, ChannelMonitorModeV2, normalizeChannelMonitorMode("v2"))
-	require.Equal(t, ChannelMonitorModeV1, normalizeChannelMonitorMode("invalid"))
-	require.Equal(t, ChannelMonitorModeV1, normalizeChannelMonitorMode(" V1 "))
+	require.Equal(t, ChannelMonitorModeHybrid, normalizeChannelMonitorMode(""))
+	require.Equal(t, ChannelMonitorModeHybrid, normalizeChannelMonitorMode("v1"))
+	require.Equal(t, ChannelMonitorModeHybrid, normalizeChannelMonitorMode("v2"))
+	require.Equal(t, ChannelMonitorModeHybrid, normalizeChannelMonitorMode("hybrid"))
+	require.Equal(t, ChannelMonitorModeHybrid, normalizeChannelMonitorMode("invalid"))
+	require.Equal(t, ChannelMonitorModeHybrid, normalizeChannelMonitorMode(" V1 "))
 }
 
 func TestChannelMonitorRuntimeActiveProbesAllowed(t *testing.T) {
 	require.False(t, (ChannelMonitorRuntime{Enabled: false, Mode: ChannelMonitorModeV1}).ActiveProbesAllowed())
 	require.True(t, (ChannelMonitorRuntime{Enabled: true, Mode: ChannelMonitorModeV1}).ActiveProbesAllowed())
 	require.False(t, (ChannelMonitorRuntime{Enabled: true, Mode: ChannelMonitorModeV2}).ActiveProbesAllowed())
+	require.True(t, (ChannelMonitorRuntime{Enabled: true, Mode: ChannelMonitorModeHybrid}).ActiveProbesAllowed())
 	require.True(t, (ChannelMonitorRuntime{Enabled: true, Mode: ChannelMonitorModeV2}).PassiveAggregationAllowed())
+	require.True(t, (ChannelMonitorRuntime{Enabled: true, Mode: ChannelMonitorModeHybrid}).PassiveAggregationAllowed())
 }

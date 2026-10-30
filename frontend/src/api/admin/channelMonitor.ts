@@ -73,6 +73,12 @@ export interface ChannelMonitor {
   primary_model: string
   extra_models: string[]
   group_name: string
+  /** Durable group association used by hybrid status cards. */
+  group_id?: number | null
+  /** Whether active probe data may fill a group with no real traffic. */
+  probe_fallback_enabled?: boolean
+  /** Whether the OpenAI reasoning probe runs for this monitor. */
+  intelligence_enabled?: boolean
   enabled: boolean
   interval_seconds: number
   /** 每次调度在 interval 基础上 ± [0, jitter] 的随机偏移（秒），0 = 固定间隔 */
@@ -83,6 +89,8 @@ export interface ChannelMonitor {
   updated_at: string
   /** Latest status of the primary model (empty when no history yet) */
   primary_status: MonitorStatus | ''
+  intelligence_status?: MonitorStatus | ''
+  intelligence_checked_at?: string | null
   /** Latest latency of the primary model in ms (null when no history yet) */
   primary_latency_ms: number | null
   /** Primary model 7-day availability percentage (0-100) */
@@ -141,6 +149,10 @@ export interface CreateParams {
   primary_model: string
   extra_models?: string[]
   group_name?: string
+  /** 0 clears the link on update; null/undefined leaves it unchanged. */
+  group_id?: number | null
+  probe_fallback_enabled?: boolean
+  intelligence_enabled?: boolean
   enabled?: boolean
   interval_seconds: number
   jitter_seconds?: number

@@ -68,11 +68,26 @@ func (s *ChannelMonitorService) ListUserView(ctx context.Context) ([]*UserMonito
 	summaries := s.BatchMonitorStatusSummary(ctx, ids, primaryByID, extrasByID)
 	latestMap := s.batchLatest(ctx, ids)
 	timelineMap := s.batchTimeline(ctx, ids, primaryByID)
+	intelligenceModels := make(map[int64]string)
+	for _, m := range monitors {
+		if shouldRunIntelligenceProbe(m) {
+			intelligenceModels[m.ID] = monitorIntelligenceModel
+		}
+	}
+	var intelligenceTimeline map[int64][]*ChannelMonitorHistoryEntry
+	if len(intelligenceModels) > 0 {
+		intelligenceTimeline = s.batchTimeline(ctx, ids, intelligenceModels)
+	}
 
 	views := make([]*UserMonitorView, 0, len(monitors))
 	for _, m := range monitors {
 		primaryLatest := pickLatest(latestMap[m.ID], m.PrimaryModel)
-		views = append(views, buildUserViewFromSummary(m, summaries[m.ID], primaryLatest, timelineMap[m.ID]))
+		view := buildUserViewFromSummary(m, summaries[m.ID], primaryLatest, timelineMap[m.ID])
+		if _, ok := intelligenceModels[m.ID]; ok {
+			view.IntelligenceEnabled = true
+			view.IntelligenceTimeline = buildTimelinePoints(intelligenceTimeline[m.ID])
+		}
+		views = append(views, view)
 	}
 	return views, nil
 }
@@ -200,6 +215,10 @@ func buildStatusSummary(
 	extras []string,
 ) MonitorStatusSummary {
 	summary := MonitorStatusSummary{ExtraModels: make([]ExtraModelStatus, 0, len(extras))}
+	if l := latestByModel[monitorIntelligenceModel]; l != nil {
+		summary.IntelligenceStatus = l.Status
+		summary.IntelligenceCheckedAt = &l.CheckedAt
+	}
 	if primary != "" {
 		if l, ok := latestByModel[primary]; ok {
 			summary.PrimaryStatus = l.Status
@@ -231,16 +250,19 @@ func buildUserViewFromSummary(
 	timelineEntries []*ChannelMonitorHistoryEntry,
 ) *UserMonitorView {
 	view := &UserMonitorView{
-		ID:               m.ID,
-		Name:             m.Name,
-		Provider:         m.Provider,
-		GroupName:        m.GroupName,
-		PrimaryModel:     m.PrimaryModel,
-		PrimaryStatus:    summary.PrimaryStatus,
-		PrimaryLatencyMs: summary.PrimaryLatencyMs,
-		Availability7d:   summary.Availability7d,
-		ExtraModels:      summary.ExtraModels,
-		Timeline:         buildTimelinePoints(timelineEntries),
+		ID:                   m.ID,
+		Name:                 m.Name,
+		Provider:             m.Provider,
+		GroupName:            m.GroupName,
+		GroupID:              cloneInt64Pointer(m.GroupID),
+		ProbeFallbackEnabled: m.ProbeFallbackEnabled,
+		PrimaryModel:         m.PrimaryModel,
+		IntervalSeconds:      m.IntervalSeconds,
+		PrimaryStatus:        summary.PrimaryStatus,
+		PrimaryLatencyMs:     summary.PrimaryLatencyMs,
+		Availability7d:       summary.Availability7d,
+		ExtraModels:          summary.ExtraModels,
+		Timeline:             buildTimelinePoints(timelineEntries),
 	}
 	if primaryLatest != nil {
 		view.PrimaryPingLatencyMs = primaryLatest.PingLatencyMs

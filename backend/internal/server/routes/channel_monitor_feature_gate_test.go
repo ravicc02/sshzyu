@@ -141,14 +141,18 @@ func TestChannelMonitorModeV2Guard(t *testing.T) {
 			wantCode:   "CHANNEL_MONITOR_DISABLED",
 		},
 		{
-			name:       "mode v1 blocks with mode mismatch",
+			name:       "legacy mode v1 normalizes to hybrid",
 			svc:        newChannelMonitorModeSettings(true, service.ChannelMonitorModeV1),
-			wantStatus: http.StatusForbidden,
-			wantCode:   "CHANNEL_MONITOR_MODE_MISMATCH",
+			wantStatus: http.StatusOK,
 		},
 		{
 			name:       "mode v2 allows",
 			svc:        newChannelMonitorModeSettings(true, service.ChannelMonitorModeV2),
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "mode hybrid allows passive aggregation",
+			svc:        newChannelMonitorModeSettings(true, service.ChannelMonitorModeHybrid),
 			wantStatus: http.StatusOK,
 		},
 	}

@@ -26,13 +26,19 @@ export interface UserMonitorView {
   name: string
   provider: Provider
   group_name: string
+  group_id?: number | null
+  probe_fallback_enabled?: boolean
   primary_model: string
+  interval_seconds?: number
   primary_status: MonitorStatus
   primary_latency_ms: number | null
   primary_ping_latency_ms: number | null
   availability_7d: number
   extra_models: UserMonitorExtraModel[]
   timeline: MonitorTimelinePoint[]
+  /** Separate OpenAI reasoning checks; never included in availability. */
+  intelligence_timeline?: MonitorTimelinePoint[]
+  intelligence_enabled?: boolean
   /**
    * 主模型最近配额快照。仅当系统开启 channel_monitor_show_quota 时
    * 服务端才会下发（关闭时服务端已剥离，前端 flag 仅作纵深防御）。

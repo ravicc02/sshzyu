@@ -21,7 +21,7 @@
 
           <div class="flex w-full flex-shrink-0 flex-wrap items-center justify-end gap-3 lg:w-auto">
             <button
-              @click="loadChannels"
+              @click="loadChannels()"
               :disabled="loading"
               class="btn btn-secondary"
               :title="t('common.refresh', 'Refresh')"
@@ -49,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -67,6 +67,9 @@ const channels = ref<UserAvailableChannel[]>([])
 const userGroupRates = ref<Record<number, number>>({})
 const loading = ref(false)
 const searchQuery = ref('')
+const AUTO_REFRESH_MS = 15_000
+let refreshTimer: number | null = null
+let requestInFlight = false
 
 const columnLabels = computed(() => ({
   name: t('availableChannels.columns.name'),
@@ -102,8 +105,10 @@ const filteredChannels = computed(() => {
     .filter((ch): ch is UserAvailableChannel => ch !== null)
 })
 
-async function loadChannels() {
-  loading.value = true
+async function loadChannels(silent = false) {
+  if (requestInFlight) return
+  requestInFlight = true
+  if (!silent) loading.value = true
   try {
     // 渠道列表和用户专属倍率并发拉取。专属倍率失败不阻塞渠道展示——
     // 失败时只是无法渲染专属倍率角标，降级为仅显示默认倍率。
@@ -117,11 +122,27 @@ async function loadChannels() {
     channels.value = list
     userGroupRates.value = rates
   } catch (err: unknown) {
-    appStore.showError(extractApiErrorMessage(err, t('common.error')))
+    if (!silent) appStore.showError(extractApiErrorMessage(err, t('common.error')))
   } finally {
+    requestInFlight = false
     loading.value = false
   }
 }
 
-onMounted(loadChannels)
+function refreshWhenVisible() {
+  if (!document.hidden) void loadChannels(true)
+}
+
+onMounted(() => {
+  void loadChannels()
+  window.addEventListener('focus', refreshWhenVisible)
+  document.addEventListener('visibilitychange', refreshWhenVisible)
+  refreshTimer = window.setInterval(refreshWhenVisible, AUTO_REFRESH_MS)
+})
+
+onBeforeUnmount(() => {
+  if (refreshTimer) window.clearInterval(refreshTimer)
+  window.removeEventListener('focus', refreshWhenVisible)
+  document.removeEventListener('visibilitychange', refreshWhenVisible)
+})
 </script>

@@ -20,6 +20,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/dgraph-io/ristretto"
+	"github.com/google/uuid"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -128,6 +129,11 @@ type apiKeyAllByUserIDLister interface {
 	ListAllByUserID(ctx context.Context, userID int64, filters APIKeyListFilters) ([]APIKey, error)
 }
 
+type apiKeyBatchRepository interface {
+	ListBatchesByUserID(ctx context.Context, userID int64) ([]APIKeyBatchSummary, error)
+	ListByUserIDAndBatchID(ctx context.Context, userID int64, batchID string) ([]APIKey, error)
+}
+
 // APIKeyRateLimitData holds rate limit usage and window state for an API key.
 type APIKeyRateLimitData struct {
 	// QuotaUsed 是总额度已用量（quota_used）。
@@ -216,6 +222,8 @@ type APIKeyAuthCacheInvalidator interface {
 type CreateAPIKeyRequest struct {
 	Name        string   `json:"name"`
 	GroupID     *int64   `json:"group_id"`
+	BatchID     *string  `json:"-"`
+	BatchName   string   `json:"-"`
 	CustomKey   *string  `json:"custom_key"`   // 可选的自定义key
 	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单
 	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单
@@ -228,6 +236,15 @@ type CreateAPIKeyRequest struct {
 	RateLimit5h float64 `json:"rate_limit_5h"`
 	RateLimit1d float64 `json:"rate_limit_1d"`
 	RateLimit7d float64 `json:"rate_limit_7d"`
+}
+
+const MaxBatchAPIKeys = 50
+
+type CreateAPIKeyBatchRequest struct {
+	Name    string
+	GroupID int64
+	Count   int
+	Quota   float64
 }
 
 // UpdateAPIKeyRequest 更新API Key请求
@@ -572,6 +589,8 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		UserID:      userID,
 		Key:         key,
 		Name:        html.EscapeString(req.Name),
+		BatchID:     req.BatchID,
+		BatchName:   html.EscapeString(req.BatchName),
 		GroupID:     req.GroupID,
 		Status:      StatusActive,
 		IPWhitelist: req.IPWhitelist,
@@ -597,6 +616,101 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	s.compileAPIKeyIPRules(apiKey)
 
 	return apiKey, nil
+}
+
+// CreateBatch creates a set of independently manageable keys that share a
+// batch identifier, group, and per-key quota.
+func (s *APIKeyService) CreateBatch(ctx context.Context, userID int64, req CreateAPIKeyBatchRequest) ([]APIKey, error) {
+	if req.GroupID <= 0 {
+		return nil, infraerrors.BadRequest("BATCH_GROUP_REQUIRED", "group is required")
+	}
+	if req.Count <= 0 || req.Count > MaxBatchAPIKeys {
+		return nil, infraerrors.BadRequest("BATCH_COUNT_INVALID", "batch key count must be between 1 and 50")
+	}
+	if err := validateAPIKeyLimit(req.Quota); err != nil {
+		return nil, err
+	}
+	if req.Quota <= 0 {
+		return nil, infraerrors.BadRequest("BATCH_QUOTA_REQUIRED", "batch key quota must be greater than zero")
+	}
+	if s.cfg != nil && s.cfg.APIKeyCreate.MaxActivePerUser > 0 {
+		count, err := s.apiKeyRepo.CountByUserID(ctx, userID)
+		if err != nil {
+			return nil, fmt.Errorf("count api keys: %w", err)
+		}
+		if count+int64(req.Count) > int64(s.cfg.APIKeyCreate.MaxActivePerUser) {
+			return nil, ErrAPIKeyCountExceeded
+		}
+	}
+
+	baseName := strings.TrimSpace(req.Name)
+	if baseName == "" {
+		baseName = "批量密钥 " + time.Now().Format("20060102-150405")
+	}
+	baseName = truncateBatchName(baseName, req.Count)
+	batchID := uuid.NewString()
+	groupID := req.GroupID
+	created := make([]APIKey, 0, req.Count)
+	for i := 1; i <= req.Count; i++ {
+		key, err := s.Create(ctx, userID, CreateAPIKeyRequest{
+			Name:      batchAPIKeyName(baseName, i, req.Count),
+			GroupID:   &groupID,
+			BatchID:   &batchID,
+			BatchName: baseName,
+			Quota:     req.Quota,
+		})
+		if err != nil {
+			for j := range created {
+				_ = s.Delete(ctx, created[j].ID, userID)
+			}
+			return nil, err
+		}
+		created = append(created, *key)
+	}
+	return created, nil
+}
+
+func truncateBatchName(name string, count int) string {
+	minWidth := max(3, len(strconv.Itoa(count)))
+	suffixWidth := minWidth + 1 // hyphen + zero-padded index
+	maxRunes := 100 - suffixWidth
+	runes := []rune(strings.TrimSpace(name))
+	if len(runes) > maxRunes {
+		runes = runes[:maxRunes]
+	}
+	return string(runes)
+}
+
+func batchAPIKeyName(base string, index, count int) string {
+	width := max(3, len(strconv.Itoa(count)))
+	return fmt.Sprintf("%s-%0*d", base, width, index)
+}
+
+// ListBatches returns aggregate metadata for the current user's batch keys.
+func (s *APIKeyService) ListBatches(ctx context.Context, userID int64) ([]APIKeyBatchSummary, error) {
+	repo, ok := s.apiKeyRepo.(apiKeyBatchRepository)
+	if !ok {
+		return nil, fmt.Errorf("list api key batches: repository does not support batches")
+	}
+	return repo.ListBatchesByUserID(ctx, userID)
+}
+
+// ListBatchKeys returns all keys in a batch owned by the current user.
+func (s *APIKeyService) ListBatchKeys(ctx context.Context, userID int64, batchID string) ([]APIKey, error) {
+	batchID = strings.TrimSpace(batchID)
+	if batchID == "" || len(batchID) > 64 {
+		return nil, infraerrors.BadRequest("BATCH_ID_INVALID", "invalid batch id")
+	}
+	repo, ok := s.apiKeyRepo.(apiKeyBatchRepository)
+	if !ok {
+		return nil, fmt.Errorf("list api key batch: repository does not support batches")
+	}
+	keys, err := repo.ListByUserIDAndBatchID(ctx, userID, batchID)
+	if err != nil {
+		return nil, err
+	}
+	s.fillCurrentConcurrency(ctx, keys)
+	return keys, nil
 }
 
 // List 获取用户的API Key列表

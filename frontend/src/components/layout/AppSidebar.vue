@@ -117,7 +117,8 @@
               :aria-label="isDockCollapsed ? item.label : undefined"
               @click="handleMenuItemClick(item.path)"
             >
-              <component :is="item.icon" class="dock-nav-icon" />
+              <span v-if="item.iconSvg" class="sidebar-svg-icon dock-custom-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
+              <component v-else :is="item.icon" class="dock-nav-icon" />
               <span v-if="!isDockCollapsed" class="sidebar-label">{{ item.label }}</span>
             </a>
             <router-link
@@ -520,9 +521,21 @@ const brandShortcuts = {
   recharge: 'ed47558cbb4346a5'
 } as const
 
+// These menu entries are full external applications, not embeddable custom
+// pages. Keep their configuration in custom_menu_items, but navigate directly.
+const directExternalMenuURLs = new Set([
+  'https://shop.raviportfolio.cc/'
+])
+
 function customMenuNavigation(item: CustomMenuItem): NavItem {
   const icon = item.id === brandShortcuts.guide ? GuideIcon
     : item.id === brandShortcuts.recharge ? CreditCardIcon : null
+  if (directExternalMenuURLs.has(item.url)) {
+    const externalURL = sanitizeUrl(item.url)
+    if (externalURL) {
+      return { path: externalURL, external: true, label: item.label, icon, iconSvg: icon ? undefined : item.icon_svg }
+    }
+  }
   return { path: `/custom/${item.id}`, label: item.label, icon, iconSvg: icon ? undefined : item.icon_svg }
 }
 

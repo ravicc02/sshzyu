@@ -67,6 +67,8 @@ type AdminService interface {
 	SetGroupModelRateMultiplier(ctx context.Context, groupID int64, model string, rateMultiplier float64) error
 	// ClearGroupModelRateMultiplier 清除某模型的独立倍率（回落分组默认）。
 	ClearGroupModelRateMultiplier(ctx context.Context, groupID int64, model string) error
+	SetGroupProviderRateMultiplier(ctx context.Context, groupID int64, provider string, rateMultiplier float64) error
+	ClearGroupProviderRateMultiplier(ctx context.Context, groupID int64, provider string) error
 	ClearGroupRPMOverrides(ctx context.Context, groupID int64) error
 	BatchSetGroupRPMOverrides(ctx context.Context, groupID int64, entries []GroupRPMOverrideInput) error
 	UpdateGroupSortOrders(ctx context.Context, updates []GroupSortOrderUpdate) error

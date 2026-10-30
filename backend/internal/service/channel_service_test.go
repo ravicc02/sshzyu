@@ -214,11 +214,11 @@ func (m *mockChannelAuthCacheInvalidator) InvalidateAuthCacheByGroupID(_ context
 // ---------------------------------------------------------------------------
 
 func newTestChannelService(repo *mockChannelRepository) *ChannelService {
-	return NewChannelService(repo, nil, nil, nil, nil)
+	return NewChannelService(repo, nil, nil, nil, nil, nil, nil)
 }
 
 func newTestChannelServiceWithAuth(repo *mockChannelRepository, auth *mockChannelAuthCacheInvalidator) *ChannelService {
-	return NewChannelService(repo, nil, auth, nil, nil)
+	return NewChannelService(repo, nil, auth, nil, nil, nil, nil)
 }
 
 // makeStandardRepo returns a repo that serves one active channel with anthropic pricing
@@ -1408,7 +1408,7 @@ func TestInvalidateCache(t *testing.T) {
 
 func TestInvalidateCachePublishesToOtherInstances(t *testing.T) {
 	cachePubSub := &mockChannelCachePubSub{}
-	publisher := NewChannelService(&mockChannelRepository{}, nil, nil, nil, cachePubSub)
+	publisher := NewChannelService(&mockChannelRepository{}, nil, nil, nil, cachePubSub, nil, nil)
 	updated := false
 	subscriberRepo := &mockChannelRepository{
 		listAllFn: func(_ context.Context) ([]Channel, error) {
@@ -1431,7 +1431,7 @@ func TestInvalidateCachePublishesToOtherInstances(t *testing.T) {
 			return map[int64]string{10: PlatformAnthropic}, nil
 		},
 	}
-	subscriber := NewChannelService(subscriberRepo, nil, nil, nil, cachePubSub)
+	subscriber := NewChannelService(subscriberRepo, nil, nil, nil, cachePubSub, nil, nil)
 
 	require.NotNil(t, subscriber.GetChannelModelPricing(context.Background(), 10, "old-model"))
 	require.Nil(t, subscriber.GetChannelModelPricing(context.Background(), 10, "new-model"))

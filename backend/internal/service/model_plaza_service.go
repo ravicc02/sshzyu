@@ -27,6 +27,8 @@ type PlazaModel struct {
 	Platform        string
 	Pricing         *ChannelModelPricing
 	OfficialPricing *PlazaOfficialPricing
+	// RouteTarget 是渠道显式跨模型映射的目标；同名或隐式映射为空。
+	RouteTarget string
 	// LongContextBasis 多档时的计价基准（整单 / 仅超出部分），单档为空。
 	LongContextBasis ContextPricingBasis
 	// TimePricing 计费会生效的分时倍率时段；无分时为 nil。
@@ -70,6 +72,7 @@ type PlazaGroup struct {
 type ModelPlazaService struct {
 	channelRepo    ChannelRepository
 	groupRepo      GroupRepository
+	accountRepo    AccountRepository
 	routeRepo      CompositeModelRouteRepository
 	pricingService *PricingService
 	billingService *BillingService
@@ -84,10 +87,12 @@ func NewModelPlazaService(
 	pricingService *PricingService,
 	billingService *BillingService,
 	resolver *ModelPricingResolver,
+	accountRepo AccountRepository,
 ) *ModelPlazaService {
 	return &ModelPlazaService{
 		channelRepo:    channelRepo,
 		groupRepo:      groupRepo,
+		accountRepo:    accountRepo,
 		routeRepo:      routeRepo,
 		pricingService: pricingService,
 		billingService: billingService,
@@ -121,6 +126,16 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 	sort.SliceStable(channels, func(i, j int) bool {
 		return strings.ToLower(channels[i].Name) < strings.ToLower(channels[j].Name)
 	})
+	channelsByGroup := make(map[int64][]*Channel)
+	for i := range channels {
+		ch := &channels[i]
+		if ch.Status != StatusActive {
+			continue
+		}
+		for _, gid := range ch.GroupIDs {
+			channelsByGroup[gid] = append(channelsByGroup[gid], ch)
+		}
+	}
 
 	byGroup := make(map[int64]*PlazaGroup, len(groups))
 	groupEnt := make(map[int64]*Group, len(groups))
@@ -194,13 +209,17 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 					if pg.Models[at].Pricing == nil && m.Pricing != nil {
 						pg.Models[at].Pricing = m.Pricing
 					}
+					if pg.Models[at].RouteTarget == "" && m.RouteTarget != "" {
+						pg.Models[at].RouteTarget = m.RouteTarget
+					}
 					continue
 				}
 				idx[key] = len(pg.Models)
 				pg.Models = append(pg.Models, PlazaModel{
-					Name:     m.Name,
-					Platform: m.Platform,
-					Pricing:  m.Pricing,
+					Name:        m.Name,
+					Platform:    m.Platform,
+					Pricing:     m.Pricing,
+					RouteTarget: m.RouteTarget,
 				})
 			}
 		}
@@ -258,6 +277,37 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 				pg.Models = append(pg.Models, PlazaModel{Name: name, Platform: platform, Pricing: pricing})
 			}
 		}
+	}
+
+	// The group's public catalog is owned by its currently schedulable accounts.
+	// Override the channel-derived union so account mapping edits are reflected
+	// immediately on the next request without a code or cache change.
+	for _, gid := range order {
+		group := groupEnt[gid]
+		pg := byGroup[gid]
+		merged := make(map[modelKey]SupportedModel)
+		for _, ch := range channelsByGroup[gid] {
+			models, err := groupSupportedModels(ctx, s.accountRepo, s.routeRepo, s.pricingService, ch, group)
+			if err != nil {
+				return nil, fmt.Errorf("list group %d models: %w", gid, err)
+			}
+			for _, model := range models {
+				merged[modelKey{platform: model.Platform, name: model.Name}] = model
+			}
+		}
+		if len(merged) == 0 {
+			continue
+		}
+		models := make([]PlazaModel, 0, len(merged))
+		for _, model := range merged {
+			models = append(models, PlazaModel{
+				Name:        model.Name,
+				Platform:    model.Platform,
+				Pricing:     model.Pricing,
+				RouteTarget: model.RouteTarget,
+			})
+		}
+		pg.Models = models
 	}
 
 	officialMemo := make(map[string]*PlazaOfficialPricing)

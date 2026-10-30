@@ -75,6 +75,8 @@ const countdown = autoRefresh.countdown
 const overallStatus = computed<OverallStatus>(() => {
   if (items.value.length === 0) return 'operational'
   for (const it of items.value) {
+    const latest = it.timeline?.[0]?.checked_at
+    if (!latest || !Number.isFinite(Date.parse(latest)) || Date.now() - Date.parse(latest) > Math.max(150, (it.interval_seconds || 60) * 2.5) * 1000) return 'degraded'
     if (it.primary_status === 'failed' || it.primary_status === 'error') return 'degraded'
     if (it.primary_status !== STATUS_OPERATIONAL) return 'degraded'
   }

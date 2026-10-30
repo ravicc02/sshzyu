@@ -75,6 +75,17 @@ func (ChannelMonitor) Fields() []ent.Field {
 			Optional().
 			Default("").
 			MaxLen(100),
+		// Durable link for hybrid monitoring. The legacy group_name column stays
+		// for display and for rows created before this field existed.
+		field.Int64("group_id").
+			Optional().
+			Nillable(),
+		field.Bool("probe_fallback_enabled").
+			Default(true).
+			Comment("Use active probes as fallback when the group has no real traffic"),
+		field.Bool("intelligence_enabled").
+			Default(true).
+			Comment("Run the OpenAI reasoning probe for this monitor"),
 		field.Bool("enabled").
 			Default(true),
 		field.Int("interval_seconds").
@@ -131,6 +142,7 @@ func (ChannelMonitor) Indexes() []ent.Index {
 		index.Fields("provider"),
 		index.Fields("provider", "api_mode"),
 		index.Fields("group_name"),
+		index.Fields("group_id"),
 		index.Fields("template_id"),
 		index.Fields("account_id"),
 	}

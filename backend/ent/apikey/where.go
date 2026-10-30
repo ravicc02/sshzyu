@@ -85,6 +85,16 @@ func Name(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldName, v))
 }
 
+// BatchID applies equality check predicate on the "batch_id" field. It's identical to BatchIDEQ.
+func BatchID(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldBatchID, v))
+}
+
+// BatchName applies equality check predicate on the "batch_name" field. It's identical to BatchNameEQ.
+func BatchName(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldBatchName, v))
+}
+
 // GroupID applies equality check predicate on the "group_id" field. It's identical to GroupIDEQ.
 func GroupID(v int64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldGroupID, v))
@@ -438,6 +448,146 @@ func NameEqualFold(v string) predicate.APIKey {
 // NameContainsFold applies the ContainsFold predicate on the "name" field.
 func NameContainsFold(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldContainsFold(FieldName, v))
+}
+
+// BatchIDEQ applies the EQ predicate on the "batch_id" field.
+func BatchIDEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldBatchID, v))
+}
+
+// BatchIDNEQ applies the NEQ predicate on the "batch_id" field.
+func BatchIDNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldBatchID, v))
+}
+
+// BatchIDIn applies the In predicate on the "batch_id" field.
+func BatchIDIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldBatchID, vs...))
+}
+
+// BatchIDNotIn applies the NotIn predicate on the "batch_id" field.
+func BatchIDNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldBatchID, vs...))
+}
+
+// BatchIDGT applies the GT predicate on the "batch_id" field.
+func BatchIDGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldBatchID, v))
+}
+
+// BatchIDGTE applies the GTE predicate on the "batch_id" field.
+func BatchIDGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldBatchID, v))
+}
+
+// BatchIDLT applies the LT predicate on the "batch_id" field.
+func BatchIDLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldBatchID, v))
+}
+
+// BatchIDLTE applies the LTE predicate on the "batch_id" field.
+func BatchIDLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldBatchID, v))
+}
+
+// BatchIDContains applies the Contains predicate on the "batch_id" field.
+func BatchIDContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldBatchID, v))
+}
+
+// BatchIDHasPrefix applies the HasPrefix predicate on the "batch_id" field.
+func BatchIDHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldBatchID, v))
+}
+
+// BatchIDHasSuffix applies the HasSuffix predicate on the "batch_id" field.
+func BatchIDHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldBatchID, v))
+}
+
+// BatchIDIsNil applies the IsNil predicate on the "batch_id" field.
+func BatchIDIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldBatchID))
+}
+
+// BatchIDNotNil applies the NotNil predicate on the "batch_id" field.
+func BatchIDNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldBatchID))
+}
+
+// BatchIDEqualFold applies the EqualFold predicate on the "batch_id" field.
+func BatchIDEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldBatchID, v))
+}
+
+// BatchIDContainsFold applies the ContainsFold predicate on the "batch_id" field.
+func BatchIDContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldBatchID, v))
+}
+
+// BatchNameEQ applies the EQ predicate on the "batch_name" field.
+func BatchNameEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldBatchName, v))
+}
+
+// BatchNameNEQ applies the NEQ predicate on the "batch_name" field.
+func BatchNameNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldBatchName, v))
+}
+
+// BatchNameIn applies the In predicate on the "batch_name" field.
+func BatchNameIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldBatchName, vs...))
+}
+
+// BatchNameNotIn applies the NotIn predicate on the "batch_name" field.
+func BatchNameNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldBatchName, vs...))
+}
+
+// BatchNameGT applies the GT predicate on the "batch_name" field.
+func BatchNameGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldBatchName, v))
+}
+
+// BatchNameGTE applies the GTE predicate on the "batch_name" field.
+func BatchNameGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldBatchName, v))
+}
+
+// BatchNameLT applies the LT predicate on the "batch_name" field.
+func BatchNameLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldBatchName, v))
+}
+
+// BatchNameLTE applies the LTE predicate on the "batch_name" field.
+func BatchNameLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldBatchName, v))
+}
+
+// BatchNameContains applies the Contains predicate on the "batch_name" field.
+func BatchNameContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldBatchName, v))
+}
+
+// BatchNameHasPrefix applies the HasPrefix predicate on the "batch_name" field.
+func BatchNameHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldBatchName, v))
+}
+
+// BatchNameHasSuffix applies the HasSuffix predicate on the "batch_name" field.
+func BatchNameHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldBatchName, v))
+}
+
+// BatchNameEqualFold applies the EqualFold predicate on the "batch_name" field.
+func BatchNameEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldBatchName, v))
+}
+
+// BatchNameContainsFold applies the ContainsFold predicate on the "batch_name" field.
+func BatchNameContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldBatchName, v))
 }
 
 // GroupIDEQ applies the EQ predicate on the "group_id" field.

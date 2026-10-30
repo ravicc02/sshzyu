@@ -2,7 +2,9 @@ package handler
 
 import (
 	"sort"
+	"strconv"
 
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -64,7 +66,8 @@ type userAvailableGroup struct {
 	IsExclusive        bool    `json:"is_exclusive"`
 
 	// 不对外输出；List 按请求语言把 Name 换成译文后丢弃。
-	i18n service.GroupI18n
+	i18n   service.GroupI18n
+	models []service.SupportedModel
 }
 
 // userSupportedModelPricing 用户可见的定价字段白名单。
@@ -182,6 +185,48 @@ func (h *AvailableChannelHandler) List(c *gin.Context) {
 	response.Success(c, out)
 }
 
+// AdminGroupModels returns the exact public model catalog for one group.
+// Unlike model-allowlist candidates, this is derived from the same
+// groupSupportedModels path used by /v1/models and channel availability.
+func (h *AvailableChannelHandler) AdminGroupModels(c *gin.Context) {
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || groupID <= 0 {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+	if h.channelService == nil {
+		response.Success(c, gin.H{"models": []string{}})
+		return
+	}
+	channels, err := h.channelService.ListAvailable(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	models := make(map[string]struct{})
+	for _, channel := range channels {
+		if channel.Status != service.StatusActive {
+			continue
+		}
+		for _, group := range channel.Groups {
+			if group.ID != groupID {
+				continue
+			}
+			for _, model := range group.Models {
+				if name := model.Name; name != "" {
+					models[name] = struct{}{}
+				}
+			}
+		}
+	}
+	out := make([]string, 0, len(models))
+	for name := range models {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	response.Success(c, gin.H{"models": out})
+}
+
 // localizeUserAvailableGroups 把分组名称就地换成请求首选语言的版本。
 func localizeUserAvailableGroups(groups []userAvailableGroup, acceptLanguage string) {
 	for i := range groups {
@@ -214,10 +259,19 @@ func buildPlatformSections(
 	}
 
 	if len(compositeGroups) > 0 {
-		modelPlatforms := make(map[string]struct{}, len(ch.SupportedModels))
-		for i := range ch.SupportedModels {
-			if platform := ch.SupportedModels[i].Platform; platform != "" {
-				modelPlatforms[platform] = struct{}{}
+		modelPlatforms := make(map[string]struct{})
+		for _, group := range compositeGroups {
+			for _, model := range group.models {
+				if model.Platform != "" {
+					modelPlatforms[model.Platform] = struct{}{}
+				}
+			}
+		}
+		if len(modelPlatforms) == 0 {
+			for _, model := range ch.SupportedModels {
+				if domain.IsConcretePlatform(model.Platform) {
+					modelPlatforms[model.Platform] = struct{}{}
+				}
 			}
 		}
 		if len(modelPlatforms) == 0 {
@@ -243,11 +297,31 @@ func buildPlatformSections(
 
 	sections := make([]userChannelPlatformSection, 0, len(platforms))
 	for _, platform := range platforms {
-		platformSet := map[string]struct{}{platform: {}}
+		modelsByKey := make(map[string]service.SupportedModel)
+		for _, group := range groupsByPlatform[platform] {
+			for _, model := range group.models {
+				if model.Platform != platform {
+					continue
+				}
+				modelsByKey[model.Platform+"|"+model.Name] = model
+			}
+		}
+		if len(modelsByKey) == 0 {
+			for _, model := range ch.SupportedModels {
+				if model.Platform == platform {
+					modelsByKey[model.Platform+"|"+model.Name] = model
+				}
+			}
+		}
+		models := make([]service.SupportedModel, 0, len(modelsByKey))
+		for _, model := range modelsByKey {
+			models = append(models, model)
+		}
+		sort.SliceStable(models, func(i, j int) bool { return models[i].Name < models[j].Name })
 		sections = append(sections, userChannelPlatformSection{
 			Platform:        platform,
 			Groups:          groupsByPlatform[platform],
-			SupportedModels: toUserSupportedModels(ch.SupportedModels, platformSet),
+			SupportedModels: toUserSupportedModels(models, nil),
 		})
 	}
 	return sections
@@ -275,6 +349,7 @@ func filterUserVisibleGroups(
 			PeakEnd:            g.PeakEnd,
 			PeakRateMultiplier: g.PeakRateMultiplier,
 			IsExclusive:        g.IsExclusive,
+			models:             g.Models,
 		})
 	}
 	return visible

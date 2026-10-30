@@ -95,6 +95,57 @@
               </div>
 
               <div v-if="isExpanded(g.id)">
+                <div v-if="g.platform === 'composite'" class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-dark-700 dark:border-dark-700">
+                  <div
+                    v-for="provider in buildProviderPriceGroups(g)"
+                    :key="provider.provider"
+                    class="px-4 py-3"
+                  >
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <div class="flex min-w-0 items-center gap-2">
+                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg" :class="platformBadgeLightClass(provider.provider)">
+                          <PlatformIcon :platform="provider.provider as GroupPlatform" size="sm" />
+                        </span>
+                        <strong class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ providerLabel(provider.provider) }}</strong>
+                        <span class="text-xs text-gray-400 dark:text-dark-500">{{ t('admin.modelPrice.providerModelCount', { count: provider.models.length }) }}</span>
+                        <span class="inline-flex shrink-0 rounded-full px-2 py-0.5 font-mono text-xs font-medium" :class="provider.custom ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-dark-900 dark:text-dark-300'">
+                          {{ provider.mixed ? t('admin.modelPrice.mixedRate') : formatRate(provider.rate) }}
+                        </span>
+                      </div>
+                      <div class="flex shrink-0 items-center gap-2">
+                        <button
+                          type="button"
+                          :data-testid="`provider-adjust-${g.id}-${provider.provider}`"
+                          :disabled="saving"
+                          class="rounded-md border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-dark-600 dark:text-dark-200 dark:hover:bg-dark-900"
+                          @click="openProviderDialog(g, provider)"
+                        >
+                          {{ t('admin.modelPrice.adjust') }}
+                        </button>
+                        <button
+                          v-if="provider.custom"
+                          type="button"
+                          :data-testid="`provider-reset-${g.id}-${provider.provider}`"
+                          :disabled="saving"
+                          class="rounded-md border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-dark-600 dark:text-dark-200 dark:hover:bg-dark-900"
+                          @click="clearProviderRate(g.id, provider)"
+                        >
+                          {{ t('admin.modelPrice.reset') }}
+                        </button>
+                      </div>
+                    </div>
+                    <div class="mt-2 flex flex-wrap gap-1.5 pl-9">
+                      <span
+                        v-for="model in provider.models"
+                        :key="model.model"
+                        class="rounded-md bg-gray-50 px-2 py-1 font-mono text-xs text-gray-600 dark:bg-dark-900 dark:text-dark-300"
+                      >
+                        {{ model.model }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <template v-else>
                 <div v-if="g.models.length" class="flex flex-wrap items-center gap-3 border-t border-gray-100 px-4 py-3 dark:border-dark-700">
                   <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-dark-200">
                     <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
@@ -176,13 +227,14 @@
                     </div>
                   </li>
                 </ul>
+                </template>
               </div>
             </article>
           </div>
         </section>
       </template>
 
-      <BaseDialog :show="dialog.visible" :title="t(dialog.batch ? 'admin.modelPrice.batchDialogTitle' : 'admin.modelPrice.dialogTitle')"
+      <BaseDialog :show="dialog.visible" :title="t(dialog.provider ? 'admin.modelPrice.providerDialogTitle' : dialog.batch ? 'admin.modelPrice.batchDialogTitle' : 'admin.modelPrice.dialogTitle')"
         width="narrow" :show-close-button="!saving" @close="closeDialog">
           <p class="break-all text-sm text-gray-500 dark:text-dark-400">{{ dialog.groupName }}</p>
           <p class="mt-1 break-all text-sm text-gray-500 dark:text-dark-400">{{ dialog.models.join('、') }}</p>
@@ -199,7 +251,7 @@
             @keyup.enter="saveRate"
           />
           <p class="mt-2 text-xs text-gray-400 dark:text-dark-500">
-            {{ t(dialog.batch ? 'admin.modelPrice.batchInputHint' : 'admin.modelPrice.inputHint') }}
+            {{ t(dialog.provider ? 'admin.modelPrice.providerInputHint' : dialog.batch ? 'admin.modelPrice.batchInputHint' : 'admin.modelPrice.inputHint') }}
           </p>
           <p v-if="dialog.error" role="alert" class="mt-3 text-sm text-red-600 dark:text-red-400">{{ dialog.error }}</p>
           <p v-if="saving" role="status" class="mt-3 text-sm text-gray-500">{{ t('admin.modelPrice.progress', { done: progress, total: dialog.models.length }) }}</p>
@@ -242,11 +294,19 @@ import {
   platformLabel
 } from '@/utils/platformColors'
 import type { GroupPlatform } from '@/types'
-import { buildPlatformSections, effectiveModelRate, formatRate } from './modelPriceView'
+import {
+  buildPlatformSections,
+  buildProviderPriceGroups,
+  effectiveModelRate,
+  formatRate,
+  type ProviderPriceGroup
+} from './modelPriceView'
 import {
   clearModelRateMultiplier,
+  clearProviderRateMultiplier,
   listAllGroupModelPrices,
   setModelRateMultiplier,
+  setProviderRateMultiplier,
   type GroupModelPriceEntry,
   type GroupModelPriceGroup
 } from '@/api/admin/modelPrice'
@@ -298,6 +358,10 @@ function sectionLabel(platform: string): string {
   return platform ? platformLabel(platform) : t('admin.modelPrice.otherPlatform')
 }
 
+function providerLabel(platform: string): string {
+  return platform && platform !== 'other' ? platformLabel(platform) : t('admin.modelPrice.otherProvider')
+}
+
 // 默认全部折叠，只展开用户点开的分组（reactive Set 的增删是响应式的）。
 const expandedGroups = reactive(new Set<number>())
 
@@ -307,6 +371,7 @@ const dialog = reactive<{
   models: string[]
   groupName: string
   batch: boolean
+  provider: string
   error: string
   value: number | string | undefined
 }>({
@@ -315,6 +380,7 @@ const dialog = reactive<{
   models: [],
   groupName: '',
   batch: false,
+  provider: '',
   error: '',
   value: undefined
 })
@@ -353,6 +419,7 @@ function openDialog(groupId: number, m: GroupModelPriceEntry) {
   dialog.models = [m.model]
   dialog.groupName = groups.value.find(group => group.id === groupId)?.name ?? ''
   dialog.batch = false
+  dialog.provider = ''
   dialog.error = ''
   // 回显当前覆盖倍率；未配置时留空，提示将回落分组默认倍率。
   dialog.value = m.rate_multiplier ?? undefined
@@ -363,7 +430,21 @@ function openBatchDialog(group: GroupModelPriceGroup) {
   const models = selectedModels(group)
   if (!models.length) return
   Object.assign(dialog, { visible: true, groupId: group.id, groupName: group.name,
-    models: models.map(model => model.model), batch: true, error: '', value: undefined })
+    models: models.map(model => model.model), batch: true, provider: '', error: '', value: undefined })
+}
+
+function openProviderDialog(group: GroupModelPriceGroup, provider: ProviderPriceGroup) {
+  if (saving.value) return
+  Object.assign(dialog, {
+    visible: true,
+    groupId: group.id,
+    groupName: group.name,
+    models: provider.models.map(model => model.model),
+    batch: false,
+    provider: provider.provider,
+    error: '',
+    value: provider.mixed ? undefined : provider.rate
+  })
 }
 
 function closeDialog() {
@@ -384,6 +465,19 @@ async function saveRate() {
   const failed: string[] = []
   const models = [...dialog.models]
   try {
+    if (dialog.provider) {
+      await setProviderRateMultiplier(dialog.groupId, dialog.provider, value)
+      const group = groups.value.find(group => group.id === dialog.groupId)
+      for (const entry of group?.models ?? []) {
+        if (entry.model && models.includes(entry.model)) {
+          entry.rate_multiplier = value
+          entry.custom_rate = true
+        }
+      }
+      feedback.value = t('admin.modelPrice.savedCount', { count: models.length })
+      dialog.visible = false
+      return
+    }
     for (const model of models) {
       try {
         await setModelRateMultiplier(dialog.groupId, model, value)
@@ -402,6 +496,26 @@ async function saveRate() {
     } else {
       dialog.visible = false
     }
+  } finally {
+    saving.value = false
+  }
+}
+
+async function clearProviderRate(groupId: number, provider: ProviderPriceGroup) {
+  if (saving.value) return
+  saving.value = true
+  try {
+    await clearProviderRateMultiplier(groupId, provider.provider)
+    const group = groups.value.find(group => group.id === groupId)
+    for (const entry of group?.models ?? []) {
+      if (entry.provider === provider.provider) {
+        entry.rate_multiplier = null
+        entry.custom_rate = false
+      }
+    }
+    feedback.value = ''
+  } catch {
+    feedback.value = t('admin.modelPrice.resetFailed')
   } finally {
     saving.value = false
   }

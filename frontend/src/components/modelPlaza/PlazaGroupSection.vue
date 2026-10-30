@@ -70,9 +70,19 @@
             :key="`${model.platform}:${model.name}`"
             class="min-w-0 rounded-xl border border-gray-200 bg-gray-50/70 p-3 transition-colors group-hover/header:border-gray-300 group-hover/header:bg-white dark:border-dark-700 dark:bg-dark-900/50 dark:group-hover/header:border-dark-600 dark:group-hover/header:bg-dark-900"
           >
-            <span class="flex min-w-0 items-center gap-1.5 font-mono text-xs font-medium text-gray-700 dark:text-dark-200">
-              <PlatformIcon :platform="model.platform as GroupPlatform" size="xs" />
-              <span class="truncate">{{ model.name }}</span>
+            <span class="flex min-w-0 items-center justify-between gap-2 font-mono text-xs font-medium text-gray-700 dark:text-dark-200">
+              <span class="flex min-w-0 items-center gap-1.5">
+                <PlatformIcon :platform="model.platform as GroupPlatform" size="xs" />
+                <span class="truncate">{{ model.name }}</span>
+              </span>
+              <span
+                v-if="model.route_target && model.route_target !== model.name"
+                class="inline-flex min-w-0 shrink-0 items-center gap-1 rounded-md bg-primary-50 px-1.5 py-0.5 text-[10px] font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
+                :aria-label="t('modelPlaza.card.routesTo', { target: model.route_target })"
+              >
+                <Icon name="arrowRight" size="xs" class="h-3 w-3 shrink-0" />
+                <span class="max-w-32 truncate">{{ model.route_target }}</span>
+              </span>
             </span>
             <span v-if="previewPrice(model)" class="mt-2 grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1 pl-5">
               <span class="text-[10px] text-gray-400 dark:text-dark-500">{{ t('modelPlaza.card.basePrice') }}</span>

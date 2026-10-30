@@ -547,7 +547,7 @@ func TestSnapshotRedactsPublicConfigPolicyFields(t *testing.T) {
 func TestRedactChannelMonitorV2MetricKeepsRates(t *testing.T) {
 	p50 := int64(100)
 	m := ChannelMonitorV2Metric{
-		SuccessRequests: 90, ErrorRequests: 10, RequestCount: 100,
+		SuccessRequests: 90, ErrorRequests: 10, RequestCount: 100, HasRequests: true,
 		InputTokens: 1, OutputTokens: 2, CacheCreationTokens: 3, CacheReadTokens: 4,
 		TokenCount: 10, RPM: 12, TPM: 34, ErrorRate: 0.1, SuccessRate: 0.9,
 		CacheRate: 0.5, CacheRateNumerator: 4, CacheRateDenominator: 8,
@@ -557,6 +557,7 @@ func TestRedactChannelMonitorV2MetricKeepsRates(t *testing.T) {
 	m.UpstreamAffectedRequests = &upstream
 	redactChannelMonitorV2Metric(&m, false)
 	require.Zero(t, m.RequestCount)
+	require.True(t, m.HasRequests)
 	require.Zero(t, m.ErrorRequests)
 	require.Zero(t, m.TokenCount)
 	require.Zero(t, m.CacheRateNumerator)
@@ -569,6 +570,7 @@ func TestRedactChannelMonitorV2MetricKeepsRates(t *testing.T) {
 	require.Equal(t, int64(100), *m.TTFT.P50Ms)
 
 	redactChannelMonitorV2Metric(&m, true)
+	require.True(t, m.HasRequests)
 	require.Zero(t, m.RPM)
 	require.Zero(t, m.TPM)
 	require.InDelta(t, 0.1, m.ErrorRate, 0.0001)

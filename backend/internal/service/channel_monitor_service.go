@@ -164,24 +164,27 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 		return nil, fmt.Errorf("encrypt api key: %w", err)
 	}
 	m := &ChannelMonitor{
-		Name:             strings.TrimSpace(p.Name),
-		Provider:         p.Provider,
-		APIMode:          defaultAPIMode(p.APIMode),
-		Endpoint:         normalizeEndpoint(p.Endpoint),
-		APIKey:           encrypted, // 注意：传入 repository 时该字段为密文
-		PrimaryModel:     normalizeMonitorPrimaryModel(p.Provider, checkMode, p.PrimaryModel),
-		ExtraModels:      normalizeModels(p.ExtraModels),
-		GroupName:        strings.TrimSpace(p.GroupName),
-		Enabled:          p.Enabled,
-		IntervalSeconds:  p.IntervalSeconds,
-		JitterSeconds:    p.JitterSeconds,
-		CreatedBy:        p.CreatedBy,
-		TemplateID:       p.TemplateID,
-		ExtraHeaders:     emptyHeadersIfNil(p.ExtraHeaders),
-		BodyOverrideMode: defaultBodyMode(p.BodyOverrideMode),
-		BodyOverride:     p.BodyOverride,
-		CheckMode:        checkMode,
-		AccountID:        cloneInt64Pointer(p.AccountID),
+		Name:                 strings.TrimSpace(p.Name),
+		Provider:             p.Provider,
+		APIMode:              defaultAPIMode(p.APIMode),
+		Endpoint:             normalizeEndpoint(p.Endpoint),
+		APIKey:               encrypted, // 注意：传入 repository 时该字段为密文
+		PrimaryModel:         normalizeMonitorPrimaryModel(p.Provider, checkMode, p.PrimaryModel),
+		ExtraModels:          normalizeModels(p.ExtraModels),
+		GroupName:            strings.TrimSpace(p.GroupName),
+		GroupID:              cloneInt64Pointer(p.GroupID),
+		ProbeFallbackEnabled: p.ProbeFallbackEnabled,
+		IntelligenceEnabled:  p.IntelligenceEnabled,
+		Enabled:              p.Enabled,
+		IntervalSeconds:      p.IntervalSeconds,
+		JitterSeconds:        p.JitterSeconds,
+		CreatedBy:            p.CreatedBy,
+		TemplateID:           p.TemplateID,
+		ExtraHeaders:         emptyHeadersIfNil(p.ExtraHeaders),
+		BodyOverrideMode:     defaultBodyMode(p.BodyOverrideMode),
+		BodyOverride:         p.BodyOverride,
+		CheckMode:            checkMode,
+		AccountID:            cloneInt64Pointer(p.AccountID),
 	}
 	if err := s.repo.Create(ctx, m); err != nil {
 		return nil, fmt.Errorf("create channel monitor: %w", err)
@@ -239,6 +242,9 @@ func (s *ChannelMonitorService) Duplicate(
 		PrimaryModel:         source.PrimaryModel,
 		ExtraModels:          append([]string{}, source.ExtraModels...),
 		GroupName:            source.GroupName,
+		GroupID:              cloneInt64Pointer(source.GroupID),
+		ProbeFallbackEnabled: source.ProbeFallbackEnabled,
+		IntelligenceEnabled:  source.IntelligenceEnabled,
 		Enabled:              false,
 		IntervalSeconds:      source.IntervalSeconds,
 		JitterSeconds:        source.JitterSeconds,
@@ -597,7 +603,7 @@ func (s *ChannelMonitorService) ListHistory(ctx context.Context, id int64, model
 
 // RunCheck 同步触发对一个监控的检测：并发跑 primary + extra 模型，
 // 写历史记录并更新 last_checked_at。返回每个模型的检测结果。
-// 仅当 channel_monitor_enabled=true 且 channel_monitor_mode=v1 时真正探测；
+// 仅当 channel_monitor_enabled=true 且模式为 v1/hybrid 时真正探测；
 // mode=v2 时返回 ErrChannelMonitorActiveProbesRetired，不产生上游流量。
 //
 // 按 check_mode 分派：probe（默认，现状探活）/ quota（仅查关联账号配额，
@@ -620,6 +626,18 @@ func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*Chec
 	}
 
 	var results []*CheckResult
+	var intelligence *CheckResult
+	var intelligenceGroup errgroup.Group
+	// A replace-mode request is static and cannot contain this question.
+	if shouldRunIntelligenceProbe(m) {
+		intelligenceGroup.Go(func() error {
+			intelligence = runIntelligenceCheckForModel(ctx, m.Endpoint, m.APIKey, m.PrimaryModel, &CheckOptions{
+				APIMode: m.APIMode, ExtraHeaders: m.ExtraHeaders,
+				BodyOverrideMode: m.BodyOverrideMode, BodyOverride: m.BodyOverride, ReasoningProbe: true,
+			})
+			return nil
+		})
+	}
 	switch checkMode {
 	case MonitorCheckModeQuota:
 		results = s.runQuotaOnlyCheck(ctx, m)
@@ -629,8 +647,27 @@ func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*Chec
 	default:
 		results = s.runChecksConcurrent(ctx, m)
 	}
+	_ = intelligenceGroup.Wait()
 	s.persistCheckResults(ctx, m, results)
+	if intelligence != nil {
+		s.persistIntelligenceResult(ctx, m, intelligence)
+	}
 	return results, nil
+}
+
+func shouldRunIntelligenceProbe(m *ChannelMonitor) bool {
+	return m != nil && m.IntelligenceEnabled && m.Provider == MonitorProviderOpenAI &&
+		defaultCheckMode(m.CheckMode) != MonitorCheckModeQuota &&
+		m.BodyOverrideMode != MonitorBodyOverrideModeReplace
+}
+
+func (s *ChannelMonitorService) persistIntelligenceResult(ctx context.Context, m *ChannelMonitor, result *CheckResult) {
+	if err := s.repo.InsertHistoryBatch(ctx, []*ChannelMonitorHistoryRow{{
+		MonitorID: m.ID, Model: monitorIntelligenceModel, Status: result.Status,
+		LatencyMs: result.LatencyMs, Message: result.Message, CheckedAt: result.CheckedAt,
+	}}); err != nil {
+		slog.Error("channel_monitor: insert reasoning history failed", "monitor_id", m.ID, "error", err)
+	}
 }
 
 // runQuotaOnlyCheck quota 模式：一次配额抓取 → 单条 CheckResult
@@ -942,6 +979,20 @@ func applyMonitorUpdate(existing *ChannelMonitor, p ChannelMonitorUpdateParams) 
 	}
 	if p.GroupName != nil {
 		existing.GroupName = strings.TrimSpace(*p.GroupName)
+	}
+	if p.GroupID != nil {
+		if *p.GroupID > 0 {
+			id := *p.GroupID
+			existing.GroupID = &id
+		} else {
+			existing.GroupID = nil
+		}
+	}
+	if p.ProbeFallbackEnabled != nil {
+		existing.ProbeFallbackEnabled = *p.ProbeFallbackEnabled
+	}
+	if p.IntelligenceEnabled != nil {
+		existing.IntelligenceEnabled = *p.IntelligenceEnabled
 	}
 	if p.Enabled != nil {
 		existing.Enabled = *p.Enabled

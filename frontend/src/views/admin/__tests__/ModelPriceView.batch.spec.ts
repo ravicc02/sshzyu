@@ -3,7 +3,13 @@ import { flushPromises, mount } from '@vue/test-utils'
 import ModelPriceView from '../ModelPriceView.vue'
 import messages from '@/i18n/locales/en/admin/modelPrice'
 
-const api = vi.hoisted(() => ({ listAllGroupModelPrices: vi.fn(), setModelRateMultiplier: vi.fn(), clearModelRateMultiplier: vi.fn() }))
+const api = vi.hoisted(() => ({
+  listAllGroupModelPrices: vi.fn(),
+  setModelRateMultiplier: vi.fn(),
+  clearModelRateMultiplier: vi.fn(),
+  setProviderRateMultiplier: vi.fn(),
+  clearProviderRateMultiplier: vi.fn()
+}))
 vi.mock('@/api/admin/modelPrice', () => ({ ...api, default: api }))
 vi.mock('vue-i18n', async importOriginal => ({ ...await importOriginal<typeof import('vue-i18n')>(), useI18n: () => ({
   t: (key: string, values: Record<string, unknown> = {}) => {
@@ -30,6 +36,8 @@ beforeEach(() => {
       models: [{ model: 'model-a', custom_rate: false, rate_multiplier: null }] }
   ])
   api.setModelRateMultiplier.mockResolvedValue(undefined)
+  api.setProviderRateMultiplier.mockResolvedValue(undefined)
+  api.clearProviderRateMultiplier.mockResolvedValue(undefined)
 })
 
 describe('model pricing batch actions', () => {
@@ -122,6 +130,35 @@ describe('model pricing batch actions', () => {
     await wrapper.findAll('li button')[1].trigger('click')
     await flushPromises()
     expect(wrapper.findAll('li button')).toHaveLength(2)
+    wrapper.unmount()
+  })
+
+  it('adjusts one multiplier per provider in a composite group', async () => {
+    api.listAllGroupModelPrices.mockResolvedValueOnce([{
+      id: 65,
+      name: '国模聚合分组',
+      platform: 'composite',
+      rate_multiplier: 0.4,
+      models: [
+        { model: 'deepseek-v4.1-flash', provider: 'deepseek', custom_rate: false, rate_multiplier: null },
+        { model: 'glm-5.3-flash', provider: 'zhipu', custom_rate: false, rate_multiplier: null },
+        { model: 'kimi-k3.1-pro', provider: 'kimi', custom_rate: false, rate_multiplier: null }
+      ]
+    }])
+    const wrapper = await setup()
+
+    expect(wrapper.text()).toContain('DeepSeek')
+    expect(wrapper.text()).toContain('Zhipu')
+    expect(wrapper.text()).toContain('Kimi')
+    expect(wrapper.find('[data-testid="select-all-65"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="provider-adjust-65-deepseek"]').trigger('click')
+    await wrapper.get('input[type="number"]').setValue('0.6')
+    await wrapper.get('[data-testid="save-rate"]').trigger('click')
+    await flushPromises()
+
+    expect(api.setProviderRateMultiplier).toHaveBeenCalledWith(65, 'deepseek', 0.6)
+    expect(wrapper.text()).toContain('0.6x')
     wrapper.unmount()
   })
 })

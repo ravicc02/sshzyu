@@ -100,6 +100,40 @@ func (_u *APIKeyUpdate) SetNillableName(v *string) *APIKeyUpdate {
 	return _u
 }
 
+// SetBatchID sets the "batch_id" field.
+func (_u *APIKeyUpdate) SetBatchID(v string) *APIKeyUpdate {
+	_u.mutation.SetBatchID(v)
+	return _u
+}
+
+// SetNillableBatchID sets the "batch_id" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableBatchID(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetBatchID(*v)
+	}
+	return _u
+}
+
+// ClearBatchID clears the value of the "batch_id" field.
+func (_u *APIKeyUpdate) ClearBatchID() *APIKeyUpdate {
+	_u.mutation.ClearBatchID()
+	return _u
+}
+
+// SetBatchName sets the "batch_name" field.
+func (_u *APIKeyUpdate) SetBatchName(v string) *APIKeyUpdate {
+	_u.mutation.SetBatchName(v)
+	return _u
+}
+
+// SetNillableBatchName sets the "batch_name" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableBatchName(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetBatchName(*v)
+	}
+	return _u
+}
+
 // SetGroupID sets the "group_id" field.
 func (_u *APIKeyUpdate) SetGroupID(v int64) *APIKeyUpdate {
 	_u.mutation.SetGroupID(v)
@@ -555,6 +589,16 @@ func (_u *APIKeyUpdate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "APIKey.name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.BatchID(); ok {
+		if err := apikey.BatchIDValidator(v); err != nil {
+			return &ValidationError{Name: "batch_id", err: fmt.Errorf(`ent: validator failed for field "APIKey.batch_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BatchName(); ok {
+		if err := apikey.BatchNameValidator(v); err != nil {
+			return &ValidationError{Name: "batch_name", err: fmt.Errorf(`ent: validator failed for field "APIKey.batch_name": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := apikey.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "APIKey.status": %w`, err)}
@@ -592,6 +636,15 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.BatchID(); ok {
+		_spec.SetField(apikey.FieldBatchID, field.TypeString, value)
+	}
+	if _u.mutation.BatchIDCleared() {
+		_spec.ClearField(apikey.FieldBatchID, field.TypeString)
+	}
+	if value, ok := _u.mutation.BatchName(); ok {
+		_spec.SetField(apikey.FieldBatchName, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
@@ -883,6 +936,40 @@ func (_u *APIKeyUpdateOne) SetName(v string) *APIKeyUpdateOne {
 func (_u *APIKeyUpdateOne) SetNillableName(v *string) *APIKeyUpdateOne {
 	if v != nil {
 		_u.SetName(*v)
+	}
+	return _u
+}
+
+// SetBatchID sets the "batch_id" field.
+func (_u *APIKeyUpdateOne) SetBatchID(v string) *APIKeyUpdateOne {
+	_u.mutation.SetBatchID(v)
+	return _u
+}
+
+// SetNillableBatchID sets the "batch_id" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableBatchID(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetBatchID(*v)
+	}
+	return _u
+}
+
+// ClearBatchID clears the value of the "batch_id" field.
+func (_u *APIKeyUpdateOne) ClearBatchID() *APIKeyUpdateOne {
+	_u.mutation.ClearBatchID()
+	return _u
+}
+
+// SetBatchName sets the "batch_name" field.
+func (_u *APIKeyUpdateOne) SetBatchName(v string) *APIKeyUpdateOne {
+	_u.mutation.SetBatchName(v)
+	return _u
+}
+
+// SetNillableBatchName sets the "batch_name" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableBatchName(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetBatchName(*v)
 	}
 	return _u
 }
@@ -1355,6 +1442,16 @@ func (_u *APIKeyUpdateOne) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "APIKey.name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.BatchID(); ok {
+		if err := apikey.BatchIDValidator(v); err != nil {
+			return &ValidationError{Name: "batch_id", err: fmt.Errorf(`ent: validator failed for field "APIKey.batch_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BatchName(); ok {
+		if err := apikey.BatchNameValidator(v); err != nil {
+			return &ValidationError{Name: "batch_name", err: fmt.Errorf(`ent: validator failed for field "APIKey.batch_name": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := apikey.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "APIKey.status": %w`, err)}
@@ -1409,6 +1506,15 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.BatchID(); ok {
+		_spec.SetField(apikey.FieldBatchID, field.TypeString, value)
+	}
+	if _u.mutation.BatchIDCleared() {
+		_spec.ClearField(apikey.FieldBatchID, field.TypeString)
+	}
+	if value, ok := _u.mutation.BatchName(); ok {
+		_spec.SetField(apikey.FieldBatchName, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)

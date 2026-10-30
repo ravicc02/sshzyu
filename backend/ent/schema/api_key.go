@@ -41,6 +41,15 @@ func (APIKey) Fields() []ent.Field {
 		field.String("name").
 			MaxLen(100).
 			NotEmpty(),
+		// Batch keys remain ordinary API keys for gateway/auth/billing, but are
+		// excluded from the primary key-management page and listed separately.
+		field.String("batch_id").
+			MaxLen(64).
+			Optional().
+			Nillable(),
+		field.String("batch_name").
+			MaxLen(100).
+			Default(""),
 		field.Int64("group_id").
 			Optional().
 			Nillable(),
@@ -137,6 +146,7 @@ func (APIKey) Indexes() []ent.Index {
 	return []ent.Index{
 		// key 字段已在 Fields() 中声明 Unique()，无需重复索引
 		index.Fields("user_id"),
+		index.Fields("user_id", "batch_id"),
 		index.Fields("group_id"),
 		index.Fields("status"),
 		index.Fields("deleted_at"),

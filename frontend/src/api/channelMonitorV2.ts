@@ -39,6 +39,7 @@ export interface MonitorMetric {
   success_requests: number
   error_requests: number
   request_count: number
+  has_requests?: boolean
   token_count: number
   rpm: number
   tpm: number
@@ -164,6 +165,7 @@ export interface MonitorMatrixRow {
   platform: string
   group_id?: number
   group_name?: string
+  rate_multiplier?: number
   model?: string
   metrics: MonitorMetric
   health: MonitorHealth

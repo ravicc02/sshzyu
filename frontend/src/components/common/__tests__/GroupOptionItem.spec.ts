@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 
 import GroupOptionItem from '../GroupOptionItem.vue'
+import GroupProviderRatesTooltip from '../GroupProviderRatesTooltip.vue'
 
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
@@ -39,6 +40,37 @@ describe('GroupOptionItem description layout', () => {
     expect(descriptionElement?.classes()).toContain('whitespace-pre-line')
     expect(descriptionElement?.classes()).toContain('[overflow-wrap:anywhere]')
     expect(descriptionElement?.classes()).toContain('line-clamp-3')
-    expect(wrapper.find('[title]').attributes('title')).toBe(description)
+    expect(wrapper.find('[title]').exists()).toBe(false)
+  })
+
+  it('shows provider rates beside the group name for composite groups', () => {
+    const wrapper = mount(GroupOptionItem, {
+      props: {
+        name: '国模聚合分组',
+        platform: 'composite',
+        providerRates: [
+          { platform: 'deepseek', rate_multiplier: 0.4 },
+          { platform: 'zhipu', rate_multiplier: 0.35 },
+          { platform: 'kimi', rate_multiplier: 0.5 }
+        ]
+      },
+      global: {
+        stubs: {
+          GroupBadge: true,
+          GroupProviderRatesTooltip: {
+            props: ['rates'],
+            template: '<div data-testid="provider-rates" />'
+          }
+        }
+      }
+    })
+
+    const tooltip = wrapper.findComponent(GroupProviderRatesTooltip)
+    expect(tooltip.exists()).toBe(true)
+    expect(tooltip.props('rates')).toEqual([
+      { platform: 'deepseek', rate_multiplier: 0.4 },
+      { platform: 'zhipu', rate_multiplier: 0.35 },
+      { platform: 'kimi', rate_multiplier: 0.5 }
+    ])
   })
 })

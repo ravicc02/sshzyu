@@ -14,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import PlazaNavBar from '@/components/modelPlaza/PlazaNavBar.vue'
@@ -33,16 +33,41 @@ const isEmbedded = computed(() => route.query.embedded === '1' && authStore.isAu
 const data = ref<ModelPlazaResponse | null>(null)
 const loading = ref(true)
 const loadFailed = ref(false)
+const AUTO_REFRESH_MS = 15_000
+let refreshTimer: number | null = null
+let requestInFlight = false
 
-onMounted(async () => {
+async function loadPlaza(silent = false) {
+  if (requestInFlight) return
+  requestInFlight = true
+  if (!silent && !data.value) loading.value = true
   // 独立形态导航条需要站点名/Logo;有 __APP_CONFIG__ 注入时同步命中缓存。
   void appStore.fetchPublicSettings()
   try {
     data.value = await getModelPlaza()
+    loadFailed.value = false
   } catch {
-    loadFailed.value = true
+    if (!data.value) loadFailed.value = true
   } finally {
+    requestInFlight = false
     loading.value = false
   }
+}
+
+function refreshWhenVisible() {
+  if (!document.hidden) void loadPlaza(true)
+}
+
+onMounted(() => {
+  void loadPlaza()
+  window.addEventListener('focus', refreshWhenVisible)
+  document.addEventListener('visibilitychange', refreshWhenVisible)
+  refreshTimer = window.setInterval(refreshWhenVisible, AUTO_REFRESH_MS)
+})
+
+onBeforeUnmount(() => {
+  if (refreshTimer) window.clearInterval(refreshTimer)
+  window.removeEventListener('focus', refreshWhenVisible)
+  document.removeEventListener('visibilitychange', refreshWhenVisible)
 })
 </script>

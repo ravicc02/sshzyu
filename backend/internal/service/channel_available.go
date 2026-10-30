@@ -25,6 +25,7 @@ type AvailableGroupRef struct {
 	PeakEnd            string
 	PeakRateMultiplier float64
 	IsExclusive        bool
+	Models             []SupportedModel
 }
 
 // AvailableChannel 可用渠道视图：用于「可用渠道」页面展示渠道基础信息 +
@@ -62,8 +63,9 @@ func (s *ChannelService) ListAvailable(ctx context.Context) ([]AvailableChannel,
 		return nil, fmt.Errorf("list active groups: %w", err)
 	}
 	groupByID := make(map[int64]AvailableGroupRef, len(groups))
+	groupEntityByID := make(map[int64]*Group, len(groups))
 	for i := range groups {
-		g := groups[i]
+		g := &groups[i]
 		groupByID[g.ID] = AvailableGroupRef{
 			ID:                 g.ID,
 			Name:               g.Name,
@@ -77,6 +79,7 @@ func (s *ChannelService) ListAvailable(ctx context.Context) ([]AvailableChannel,
 			PeakRateMultiplier: g.PeakRateMultiplier,
 			IsExclusive:        g.IsExclusive,
 		}
+		groupEntityByID[g.ID] = g
 	}
 
 	out := make([]AvailableChannel, 0, len(channels))
@@ -85,6 +88,11 @@ func (s *ChannelService) ListAvailable(ctx context.Context) ([]AvailableChannel,
 		groups := make([]AvailableGroupRef, 0, len(ch.GroupIDs))
 		for _, gid := range ch.GroupIDs {
 			if ref, ok := groupByID[gid]; ok {
+				models, modelErr := groupSupportedModels(ctx, s.accountRepo, s.routeRepo, s.pricingService, ch, groupEntityByID[gid])
+				if modelErr != nil {
+					return nil, fmt.Errorf("list models for group %d: %w", gid, modelErr)
+				}
+				ref.Models = models
 				groups = append(groups, ref)
 			}
 		}

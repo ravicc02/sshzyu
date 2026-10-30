@@ -101,3 +101,35 @@ describe('MonitorCard quota snapshot visibility', () => {
     expect(wrapper.text()).not.toContain('monitorCommon.checkMode.quota')
   })
 })
+
+describe('MonitorCard reasoning results', () => {
+  it('does not show reasoning checks for non-OpenAI channels', () => {
+    const wrapper = mountCard(makeItem({ provider: 'anthropic' }))
+    expect(wrapper.text()).not.toContain('channelStatus.intelligenceChecks')
+  })
+
+  it('keeps missing, stale, and current reasoning results distinct from availability', () => {
+    const base = makeItem({ provider: 'openai', primary_model: 'gpt-6-astra', intelligence_enabled: true })
+    const pending = mountCard(base)
+    expect(pending.text()).toContain('channelStatus.intelligencePending')
+    expect(pending.text()).toContain('channelStatus.intelligenceChecks')
+
+    const stale = mountCard({ ...base, intelligence_timeline: [{
+      status: 'operational', checked_at: '2025-01-01T00:00:00Z', latency_ms: 42, ping_latency_ms: null,
+    }] })
+    expect(stale.text()).toContain('channelStatus.intelligenceStale')
+    expect(stale.text()).not.toContain('channelStatus.intelligencePassed')
+
+    const fresh = mountCard({ ...base, intelligence_timeline: [{
+      status: 'failed', checked_at: new Date().toISOString(), latency_ms: 42, ping_latency_ms: null,
+    }] })
+    expect(fresh.text()).toContain('channelStatus.intelligenceFailed')
+    expect(fresh.text()).toContain('channelStatus.availability')
+
+    const errored = mountCard({ ...base, intelligence_timeline: [{
+      status: 'error', checked_at: new Date().toISOString(), latency_ms: null, ping_latency_ms: null,
+    }] })
+    expect(errored.text()).toContain('channelStatus.intelligenceError')
+    expect(errored.text()).not.toContain('channelStatus.intelligenceFailed')
+  })
+})

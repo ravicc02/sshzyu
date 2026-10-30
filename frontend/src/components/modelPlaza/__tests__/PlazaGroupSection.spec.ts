@@ -102,6 +102,17 @@ describe('PlazaGroupSection 模型卡片', () => {
     expect(wrapper.get('button').attributes('aria-expanded')).toBe('true')
     expect(wrapper.findComponent(PlazaModelPricingTable).exists()).toBe(true)
   })
+
+  it('uses the API route target to show an explicit mapping arrow', () => {
+    const model = ladderModel(1)
+    model.name = 'gpt-6-luna'
+    model.route_target = 'gpt-6-sol'
+    const wrapper = mountSection(group({ models: [model] }))
+
+    expect(wrapper.text()).toContain('gpt-6-luna')
+    expect(wrapper.text()).toContain('gpt-6-sol')
+    expect(wrapper.get('[aria-label="modelPlaza.card.routesTo"]').exists()).toBe(true)
+  })
 })
 
 describe('PlazaGroupSection 长上下文说明', () => {

@@ -32,6 +32,8 @@ type APIKey struct {
 	UserID      int64
 	Key         string
 	Name        string
+	BatchID     *string
+	BatchName   string
 	GroupID     *int64
 	Status      string
 	IPWhitelist []string
@@ -142,4 +144,20 @@ type APIKeyListFilters struct {
 	Search  string
 	Status  string
 	GroupID *int64 // nil=不筛选, 0=无分组, >0=指定分组
+}
+
+// APIKeyBatchSummary is the aggregate view of one batch-generated key set.
+type APIKeyBatchSummary struct {
+	BatchID        string
+	BatchName      string
+	GroupID        *int64
+	GroupName      string
+	GroupPlatform  string
+	KeyCount       int64
+	ActiveKeyCount int64
+	QuotaPerKey    float64
+	QuotaTotal     float64
+	QuotaUsedTotal float64
+	CreatedAt      time.Time
+	LastUsedAt     *time.Time
 }

@@ -48,6 +48,8 @@ func (r *channelMonitorRepository) Create(ctx context.Context, m *service.Channe
 		SetPrimaryModel(m.PrimaryModel).
 		SetExtraModels(emptySliceIfNil(m.ExtraModels)).
 		SetGroupName(m.GroupName).
+		SetProbeFallbackEnabled(m.ProbeFallbackEnabled).
+		SetIntelligenceEnabled(m.IntelligenceEnabled).
 		SetEnabled(m.Enabled).
 		SetIntervalSeconds(m.IntervalSeconds).
 		SetJitterSeconds(m.JitterSeconds).
@@ -57,6 +59,9 @@ func (r *channelMonitorRepository) Create(ctx context.Context, m *service.Channe
 		SetCheckMode(defaultCheckModeRepo(m.CheckMode))
 	if m.TemplateID != nil {
 		builder = builder.SetTemplateID(*m.TemplateID)
+	}
+	if m.GroupID != nil {
+		builder = builder.SetGroupID(*m.GroupID)
 	}
 	if m.AccountID != nil {
 		builder = builder.SetAccountID(*m.AccountID)
@@ -120,6 +125,8 @@ func (r *channelMonitorRepository) Update(ctx context.Context, m *service.Channe
 		SetPrimaryModel(m.PrimaryModel).
 		SetExtraModels(emptySliceIfNil(m.ExtraModels)).
 		SetGroupName(m.GroupName).
+		SetProbeFallbackEnabled(m.ProbeFallbackEnabled).
+		SetIntelligenceEnabled(m.IntelligenceEnabled).
 		SetEnabled(m.Enabled).
 		SetIntervalSeconds(m.IntervalSeconds).
 		SetJitterSeconds(m.JitterSeconds).
@@ -130,6 +137,11 @@ func (r *channelMonitorRepository) Update(ctx context.Context, m *service.Channe
 		updater = updater.SetTemplateID(*m.TemplateID)
 	} else {
 		updater = updater.ClearTemplateID()
+	}
+	if m.GroupID != nil {
+		updater = updater.SetGroupID(*m.GroupID)
+	} else {
+		updater = updater.ClearGroupID()
 	}
 	if m.AccountID != nil {
 		updater = updater.SetAccountID(*m.AccountID)
@@ -779,6 +791,9 @@ func entToServiceMonitor(row *dbent.ChannelMonitor) *service.ChannelMonitor {
 		PrimaryModel:         row.PrimaryModel,
 		ExtraModels:          extras,
 		GroupName:            row.GroupName,
+		GroupID:              cloneInt64PointerRepo(row.GroupID),
+		ProbeFallbackEnabled: row.ProbeFallbackEnabled,
+		IntelligenceEnabled:  row.IntelligenceEnabled,
 		Enabled:              row.Enabled,
 		IntervalSeconds:      row.IntervalSeconds,
 		JitterSeconds:        row.JitterSeconds,
@@ -801,6 +816,14 @@ func entToServiceMonitor(row *dbent.ChannelMonitor) *service.ChannelMonitor {
 		out.AccountID = &id
 	}
 	return out
+}
+
+func cloneInt64PointerRepo(value *int64) *int64 {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 func channelMonitorHeadersForPersistence(m *service.ChannelMonitor) map[string]string {

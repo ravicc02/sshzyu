@@ -6,6 +6,44 @@ export interface PlatformSection {
   groups: GroupModelPriceGroup[]
 }
 
+export interface ProviderPriceGroup {
+  provider: string
+  models: GroupModelPriceEntry[]
+  rate: number
+  mixed: boolean
+  custom: boolean
+}
+
+const PROVIDER_ORDER = ['deepseek', 'zhipu', 'kimi', 'minimax']
+
+/** Composite group: one pricing control per upstream provider. */
+export function buildProviderPriceGroups(group: GroupModelPriceGroup): ProviderPriceGroup[] {
+  const buckets = new Map<string, GroupModelPriceEntry[]>()
+  for (const model of group.models) {
+    const provider = model.provider || 'other'
+    const bucket = buckets.get(provider)
+    if (bucket) bucket.push(model)
+    else buckets.set(provider, [model])
+  }
+  const rank = (provider: string) => {
+    const index = PROVIDER_ORDER.indexOf(provider)
+    return index < 0 ? PROVIDER_ORDER.length : index
+  }
+  return [...buckets.entries()]
+    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+    .map(([provider, models]) => {
+      const rates = models.map((model) => effectiveModelRate(group.rate_multiplier, model))
+      const first = rates[0] ?? group.rate_multiplier
+      return {
+        provider,
+        models,
+        rate: first,
+        mixed: rates.some((rate) => Math.abs(rate - first) > 1e-9),
+        custom: models.some((model) => model.custom_rate),
+      }
+    })
+}
+
 /**
  * 把「模型价格」页的全部分组按平台归类成分节（页面据此按类型展示）。
  *

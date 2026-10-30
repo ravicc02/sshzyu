@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import MonitorFormDialog from '@/components/admin/monitor/MonitorFormDialog.vue'
+import ModelTagInput from '@/components/admin/channel/ModelTagInput.vue'
 import {
   DEFAULT_GROK_ENDPOINT,
   DEFAULT_GROK_MODEL,
@@ -10,10 +11,11 @@ import {
   PROVIDER_GROK,
 } from '@/constants/channelMonitor'
 
-const { listTemplates, accountsList, accountsGetById } = vi.hoisted(() => ({
+const { listTemplates, accountsList, accountsGetById, groupCandidates } = vi.hoisted(() => ({
   listTemplates: vi.fn(),
   accountsList: vi.fn(),
   accountsGetById: vi.fn(),
+  groupCandidates: vi.fn(),
 }))
 
 
@@ -39,6 +41,10 @@ vi.mock('@/api/admin', () => ({
     accounts: {
       list: (...args: unknown[]) => accountsList(...args),
       getById: (...args: unknown[]) => accountsGetById(...args),
+    },
+    groups: {
+      getAllIncludingInactive: vi.fn().mockResolvedValue([]),
+      getAvailableModels: groupCandidates,
     },
   },
 }))
@@ -72,9 +78,9 @@ const BaseDialogStub = defineComponent({
   template: '<div v-if="show"><slot /><slot name="footer" /></div>',
 })
 
-function mountDialog() {
+function mountDialog(props: Record<string, unknown> = {}) {
   return mount(MonitorFormDialog, {
-    props: { show: true, monitor: null },
+    props: { show: true, monitor: null, ...props },
     global: {
       stubs: {
         BaseDialog: BaseDialogStub,
@@ -93,6 +99,7 @@ describe('channel monitor Grok provider', () => {
     listTemplates.mockReset().mockResolvedValue({ items: [] })
     accountsList.mockReset().mockResolvedValue({ items: [] })
     accountsGetById.mockReset()
+    groupCandidates.mockReset().mockResolvedValue([])
   })
 
   it('offers Grok in the responsive provider grid and prefills its official defaults', async () => {
@@ -151,5 +158,57 @@ describe('channel monitor Grok provider', () => {
     await grokButton.trigger('click')
     expect((endpoint.element as HTMLInputElement).value).toBe(DEFAULT_GROK_ENDPOINT)
     expect((model.element as HTMLInputElement).value).toBe('grok-custom')
+  })
+
+  it('prefills a newly selected group and its /v1/models catalog', async () => {
+    groupCandidates.mockResolvedValue(['gpt-5.6-sol', 'gpt-5.5'])
+    const wrapper = mountDialog({
+      initialGroup: {
+        id: 18,
+        name: '124K生图组',
+        platform: 'openai',
+        status: 'active',
+        rate_multiplier: 1,
+      },
+      initialEnabled: true,
+    })
+    await flushPromises()
+
+    expect(groupCandidates).toHaveBeenCalledWith(18)
+    expect((wrapper.get('[data-testid="monitor-primary-model"]').element as HTMLInputElement).value).toBe('gpt-5.6-sol')
+    expect(wrapper.get('[data-testid="monitor-provider-openai"]').classes().join(' ')).toContain('border-emerald-500')
+    wrapper.unmount()
+  })
+
+  it('fetches group models into the multi-select picker', async () => {
+    groupCandidates.mockResolvedValue(['gpt-5.6-sol', 'gpt-5.5', 'gpt-5.4'])
+    const wrapper = mountDialog({
+      initialGroup: {
+        id: 25,
+        name: 'OpenAI 高缓存',
+        platform: 'openai',
+        status: 'active',
+        rate_multiplier: 0.2,
+      },
+      initialEnabled: true,
+    })
+    await flushPromises()
+
+    const fetchButton = wrapper.findAll('button').find((item) => item.text().includes('admin.channelMonitor.form.fetchGroupModels'))!
+    await fetchButton.trigger('click')
+    await flushPromises()
+    const selectedOption = wrapper.findAll('label').find((item) => item.text().includes('gpt-5.4'))!
+    expect((selectedOption.find('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(true)
+    await selectedOption.find('input[type="checkbox"]').setValue(false)
+    const unselectedOption = wrapper.findAll('label').find((item) => item.text().includes('gpt-5.4'))!
+    expect(unselectedOption.exists()).toBe(true)
+    expect((unselectedOption.find('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false)
+
+    await unselectedOption.find('input[type="checkbox"]').setValue(true)
+    const applyButton = wrapper.findAll('button').find((item) => item.text().includes('admin.channelMonitor.form.groupModelsApply'))!
+    await applyButton.trigger('click')
+
+    expect(wrapper.findComponent(ModelTagInput).props('models')).toContain('gpt-5.4')
+    wrapper.unmount()
   })
 })

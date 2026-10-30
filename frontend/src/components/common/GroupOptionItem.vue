@@ -1,18 +1,18 @@
 <template>
   <div class="flex min-w-0 flex-1 items-start justify-between gap-3">
     <!-- Left: name + description -->
-    <div
-      class="flex min-w-0 flex-1 flex-col items-start"
-      :title="description || undefined"
-    >
+    <div class="flex min-w-0 flex-1 flex-col items-start">
       <!-- Row 1: platform badge (name bold) -->
-      <GroupBadge
-        :name="name"
-        :platform="platform"
-        :subscription-type="subscriptionType"
-        :show-rate="false"
-        class="groupOptionItemBadge"
-      />
+      <div class="flex min-w-0 items-center">
+        <GroupBadge
+          :name="name"
+          :platform="platform"
+          :subscription-type="subscriptionType"
+          :show-rate="false"
+          class="groupOptionItemBadge"
+        />
+        <GroupProviderRatesTooltip v-if="providerRates.length" :rates="providerRates" />
+      </div>
       <!-- Row 2: description with top spacing -->
       <span
         v-if="description"
@@ -62,6 +62,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import GroupBadge from './GroupBadge.vue'
+import GroupProviderRatesTooltip from './GroupProviderRatesTooltip.vue'
 import type { SubscriptionType, GroupPlatform } from '@/types'
 import { useAppStore } from '@/stores/app'
 import { formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
@@ -81,6 +82,7 @@ interface Props {
   description?: string | null
   selected?: boolean
   showCheckmark?: boolean
+  providerRates?: Array<{ platform: GroupPlatform; rate_multiplier: number }>
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -88,7 +90,8 @@ const props = withDefaults(defineProps<Props>(), {
   selected: false,
   showCheckmark: true,
   userRateMultiplier: null,
-  peakRateEnabled: false
+  peakRateEnabled: false,
+  providerRates: () => []
 })
 
 // Whether user has a custom rate different from default

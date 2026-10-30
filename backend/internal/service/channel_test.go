@@ -510,6 +510,29 @@ func TestSupportedModels_ExactKeysAndPricing(t *testing.T) {
 	require.Equal(t, int64(10), got[1].Pricing.ID)
 }
 
+func TestSupportedModels_ExactMappingExposesRouteTarget(t *testing.T) {
+	ch := &Channel{
+		ModelPricing: []ChannelModelPricing{
+			{ID: 10, Platform: "openai", Models: []string{"gpt-6-sol"}},
+		},
+		ModelMapping: map[string]map[string]string{
+			"openai": {"gpt-6-luna": "gpt-6-sol"},
+		},
+	}
+
+	var luna SupportedModel
+	for _, model := range ch.SupportedModels() {
+		if model.Name == "gpt-6-luna" {
+			luna = model
+			break
+		}
+	}
+	require.Equal(t, "gpt-6-luna", luna.Name)
+	require.Equal(t, "gpt-6-sol", luna.RouteTarget)
+	require.NotNil(t, luna.Pricing)
+	require.Equal(t, int64(10), luna.Pricing.ID)
+}
+
 func TestSupportedModels_WildcardExpandedFromPricing(t *testing.T) {
 	ch := &Channel{
 		ModelPricing: []ChannelModelPricing{

@@ -46,6 +46,45 @@ type CreateAPIKeyRequest struct {
 	RateLimit7d *float64 `json:"rate_limit_7d"`
 }
 
+type CreateAPIKeyBatchRequest struct {
+	Name    string  `json:"name" binding:"max=100"`
+	GroupID int64   `json:"group_id" binding:"required,gt=0"`
+	Count   int     `json:"count" binding:"required,min=1,max=50"`
+	Quota   float64 `json:"quota" binding:"required,gt=0"`
+}
+
+type apiKeyBatchSummaryResponse struct {
+	BatchID        string     `json:"batch_id"`
+	BatchName      string     `json:"batch_name"`
+	GroupID        *int64     `json:"group_id"`
+	GroupName      string     `json:"group_name"`
+	GroupPlatform  string     `json:"group_platform"`
+	KeyCount       int64      `json:"key_count"`
+	ActiveKeyCount int64      `json:"active_key_count"`
+	QuotaPerKey    float64    `json:"quota_per_key"`
+	QuotaTotal     float64    `json:"quota_total"`
+	QuotaUsedTotal float64    `json:"quota_used_total"`
+	CreatedAt      time.Time  `json:"created_at"`
+	LastUsedAt     *time.Time `json:"last_used_at"`
+}
+
+func apiKeyBatchSummaryToResponse(item service.APIKeyBatchSummary) apiKeyBatchSummaryResponse {
+	return apiKeyBatchSummaryResponse{
+		BatchID:        item.BatchID,
+		BatchName:      item.BatchName,
+		GroupID:        item.GroupID,
+		GroupName:      item.GroupName,
+		GroupPlatform:  item.GroupPlatform,
+		KeyCount:       item.KeyCount,
+		ActiveKeyCount: item.ActiveKeyCount,
+		QuotaPerKey:    item.QuotaPerKey,
+		QuotaTotal:     item.QuotaTotal,
+		QuotaUsedTotal: item.QuotaUsedTotal,
+		CreatedAt:      item.CreatedAt,
+		LastUsedAt:     item.LastUsedAt,
+	}
+}
+
 // UpdateAPIKeyRequest represents the update API key request payload
 type UpdateAPIKeyRequest struct {
 	Name        string    `json:"name"`
@@ -224,6 +263,78 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 		}
 		return dto.APIKeyFromService(key).Localized(c.GetHeader("Accept-Language")), nil
 	})
+}
+
+// ListBatches lists the current user's batch-generated API key sets.
+// GET /api/v1/batch-keys
+func (h *APIKeyHandler) ListBatches(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	items, err := h.apiKeyService.ListBatches(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	out := make([]apiKeyBatchSummaryResponse, 0, len(items))
+	for _, item := range items {
+		out = append(out, apiKeyBatchSummaryToResponse(item))
+	}
+	response.Success(c, gin.H{"items": out})
+}
+
+// CreateBatch creates a set of independent keys in one batch.
+// POST /api/v1/batch-keys
+func (h *APIKeyHandler) CreateBatch(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	var req CreateAPIKeyBatchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if !validAPIKeyLimit(req.Quota) || req.Quota <= 0 {
+		response.BadRequest(c, "Invalid request: quota must be finite and greater than zero")
+		return
+	}
+	executeUserIdempotentJSON(c, "user.api_key_batches.create", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
+		keys, err := h.apiKeyService.CreateBatch(ctx, subject.UserID, service.CreateAPIKeyBatchRequest{
+			Name: req.Name, GroupID: req.GroupID, Count: req.Count, Quota: req.Quota,
+		})
+		if err != nil {
+			return nil, err
+		}
+		out := make([]dto.APIKey, 0, len(keys))
+		for i := range keys {
+			out = append(out, *dto.APIKeyFromService(&keys[i]).Localized(c.GetHeader("Accept-Language")))
+		}
+		return gin.H{"items": out}, nil
+	})
+}
+
+// GetBatch lists every key in one batch owned by the current user.
+// GET /api/v1/batch-keys/:batch_id
+func (h *APIKeyHandler) GetBatch(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	keys, err := h.apiKeyService.ListBatchKeys(c.Request.Context(), subject.UserID, c.Param("batch_id"))
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	out := make([]dto.APIKey, 0, len(keys))
+	for i := range keys {
+		out = append(out, *dto.APIKeyFromService(&keys[i]).Localized(c.GetHeader("Accept-Language")))
+	}
+	response.Success(c, gin.H{"items": out})
 }
 
 // Update handles updating an API key

@@ -307,6 +307,25 @@ describe('AppSidebar Dock navigation', () => {
     expect(navigationPaths(wrapper)).toContain('/admin/settings')
   })
 
+  it('opens direct external custom menus as links instead of embedded custom pages', async () => {
+    const direct: CustomMenu = {
+      id: 'ai-recharge-20261030',
+      label: 'AI代充',
+      url: 'https://shop.raviportfolio.cc/',
+      visibility: 'user',
+      sort_order: 2,
+      icon_svg: '<svg viewBox="0 0 24 24"><path fill="#d22" d="M1 1h2v2z" /></svg>',
+    }
+    appStore.cachedPublicSettings.custom_menu_items = [direct]
+    const wrapper = await renderSidebar('/keys')
+    const link = wrapper.get('a[href="https://shop.raviportfolio.cc/"]')
+    expect(link.text()).toBe('AI代充')
+    expect(link.attributes('target')).toBe('_blank')
+    expect(link.attributes('rel')).toBe('noopener noreferrer')
+    expect(link.get('.dock-custom-icon path').attributes('fill')).toBe('#d22')
+    expect(wrapper.find(`a[href="/custom/${direct.id}"]`).exists()).toBe(false)
+  })
+
   it('follows direct navigation and asynchronously loaded custom routes without resetting manual choices', async () => {
     const wrapper = await renderSidebar('/custom/guide')
     expect(wrapper.get('button[aria-label="管理空间"]').attributes('aria-pressed')).toBe('true')

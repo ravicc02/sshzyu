@@ -30,7 +30,7 @@ func agentPricingFixture(t *testing.T, source string, mapping map[string]string,
 		ChannelModelPricing{Platform: PlatformOpenAI, Models: []string{"text-model"}, BillingMode: BillingModeToken, InputPrice: testPtrFloat64(3e-6), OutputPrice: testPtrFloat64(15e-6)},
 		ChannelModelPricing{Platform: PlatformOpenAI, Models: []string{"expensive-model"}, BillingMode: BillingModeToken, InputPrice: testPtrFloat64(30e-6), OutputPrice: testPtrFloat64(150e-6)},
 	)
-	cs := NewChannelService(repo, nil, nil, nil, nil)
+	cs := NewChannelService(repo, nil, nil, nil, nil, nil, nil)
 	bs := newTestBillingServiceForResolver()
 	bs.fallbackPrices["text-model"] = &ModelPricing{InputPricePerToken: 3e-6, OutputPricePerToken: 15e-6}
 	bs.fallbackPrices["expensive-model"] = &ModelPricing{InputPricePerToken: 30e-6, OutputPricePerToken: 150e-6}

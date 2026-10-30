@@ -2,7 +2,7 @@
   <div>
     <div
       v-if="loading && items.length === 0"
-      class="grid gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+      class="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
     >
       <div
         v-for="i in 6"
@@ -33,7 +33,7 @@
 
     <div
       v-else
-      class="grid gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+      class="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
     >
       <MonitorCard
         v-for="item in items"

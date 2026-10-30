@@ -216,6 +216,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/batch-keys',
+    name: 'BatchKeys',
+    component: () => import('@/views/user/BatchKeysView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Batch Keys',
+      titleKey: 'batchKeys.title',
+      descriptionKey: 'batchKeys.description'
+    }
+  },
+  {
     path: '/agent',
     name: 'Agent',
     component: () => import('@/views/user/AgentView.vue'),
