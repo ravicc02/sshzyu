@@ -120,6 +120,21 @@ func validateJitter(jitterSec, intervalSec int) error {
 	return nil
 }
 
+func validateIntelligenceInterval(seconds int) error {
+	if seconds < channelMonitorIntelligenceMinIntervalSeconds ||
+		seconds > channelMonitorIntelligenceMaxIntervalSeconds {
+		return ErrChannelMonitorInvalidIntelligenceInterval
+	}
+	return nil
+}
+
+func normalizeChannelMonitorIntelligenceInterval(seconds int) int {
+	if seconds <= 0 {
+		return DefaultChannelMonitorIntelligenceIntervalSeconds
+	}
+	return seconds
+}
+
 // validateEndpoint 校验 endpoint：
 //   - scheme 强制 https（本地 compose 可显式允许回环地址使用 http）
 //   - 允许上游路径前缀（如 /anthropic），不允许 query/fragment

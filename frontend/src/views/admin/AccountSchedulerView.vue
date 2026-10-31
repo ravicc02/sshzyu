@@ -258,7 +258,7 @@
                     <th class="rank-column">排名</th>
                     <th>账号</th>
                     <th>可用性</th>
-                    <th v-if="supportsDegradation">最近降智率</th>
+                    <th v-if="supportsDegradation">通过率 / 降智率</th>
                     <th v-if="supportsDegradation">调度分</th>
                     <th v-if="supportsDegradation">最近探测</th>
                     <th v-if="supportsDegradation" class="action-column">操作</th>
@@ -305,19 +305,24 @@
                     </td>
                     <td v-if="supportsDegradation">
                       <div class="value-stack">
-                        <strong :class="rateClass(account.degradation_rate)">
-                          {{ formatRate(account.degradation_rate) }}
+                        <strong :class="passRateClass(account.pass_count, account.sample_count)">
+                          {{ formatPassRate(account.pass_count, account.sample_count) }}
                         </strong>
-                        <small
-                          >{{ account.degraded_count }} /
-                          {{ account.sample_count }} · 错误
-                          {{ account.error_count }}</small
-                        >
+                        <small>
+                          降智率 {{ formatRate(account.degradation_rate) }} ·
+                          {{ account.pass_count }}/{{ account.sample_count }} · 错误
+                          {{ account.error_count }}
+                        </small>
                       </div>
                     </td>
                     <td v-if="supportsDegradation">
                       <div class="value-stack">
-                        <strong>{{ formatScore(account.score) }}</strong>
+                        <strong>
+                          {{ formatScore(account.score) }}
+                          <span class="score-max">
+                            / {{ formatScore(selectedGroup?.score_max) }}
+                          </span>
+                        </strong>
                         <small
                           >降智因子
                           {{ account.degradation_factor.toFixed(2) }}</small
@@ -725,15 +730,23 @@ function formatRate(rate?: number) {
   return typeof rate === "number" ? `${(rate * 100).toFixed(1)}%` : "暂无";
 }
 
-function rateClass(rate?: number) {
-  if (typeof rate !== "number") return "";
-  if (rate >= 0.5) return "danger";
-  if (rate >= 0.2) return "warning";
+function formatPassRate(passCount: number, sampleCount: number) {
+  if (!sampleCount) return "暂无";
+  return `${((passCount / sampleCount) * 100).toFixed(1)}%`;
+}
+
+function passRateClass(passCount: number, sampleCount: number) {
+  if (!sampleCount) return "";
+  const rate = passCount / sampleCount;
+  if (rate < 0.5) return "danger";
+  if (rate < 0.8) return "warning";
   return "good";
 }
 
-function formatScore(score: number) {
-  return Number.isFinite(score) ? score.toFixed(2) : "-";
+function formatScore(score?: number) {
+  return typeof score === "number" && Number.isFinite(score)
+    ? score.toFixed(2)
+    : "-";
 }
 
 function formatWeight(weight?: number) {
@@ -1271,6 +1284,11 @@ select:focus {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+.score-max {
+  color: var(--monitor-muted);
+  font-size: 10px;
+  font-weight: 400;
 }
 .probe-status {
   font-size: 11px;

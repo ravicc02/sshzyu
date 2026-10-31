@@ -191,14 +191,20 @@
       </div>
 
       <div v-if="!isCompositeGroup && form.provider === PROVIDER_OPENAI" class="rounded-2xl border border-gray-200 bg-gray-50/70 p-4 dark:border-dark-700 dark:bg-dark-900/30">
-        <div>
-          <div class="flex items-start justify-between gap-4">
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.channelMonitor.form.intelligenceEnabled') }}</p>
-              <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('admin.channelMonitor.form.intelligenceEnabledHint') }}</p>
-            </div>
-            <Toggle v-model="form.intelligence_enabled" />
-          </div>
+        <div class="flex items-center justify-between gap-4">
+          <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.channelMonitor.form.intelligenceEnabled') }}</p>
+          <Toggle v-model="form.intelligence_enabled" />
+        </div>
+        <div v-if="form.intelligence_enabled" class="mt-3 border-t border-gray-200 pt-3 dark:border-dark-700">
+          <label class="input-label">{{ t('admin.channelMonitor.form.intelligenceIntervalMinutes') }}</label>
+          <input
+            v-model.number="intelligenceIntervalMinutes"
+            type="number"
+            min="5"
+            max="1440"
+            step="5"
+            class="input"
+          />
         </div>
       </div>
 
@@ -421,6 +427,7 @@ interface MonitorForm {
   group_id: number | null
   probe_fallback_enabled: boolean
   intelligence_enabled: boolean
+  intelligence_interval_seconds: number
   interval_seconds: number
   jitter_seconds: number
   enabled: boolean
@@ -445,6 +452,7 @@ const form = reactive<MonitorForm>({
   group_id: null,
   probe_fallback_enabled: true,
   intelligence_enabled: true,
+  intelligence_interval_seconds: 1800,
   interval_seconds: systemDefaultInterval.value,
   jitter_seconds: 0,
   enabled: true,
@@ -452,6 +460,14 @@ const form = reactive<MonitorForm>({
   extra_headers: {},
   body_override_mode: 'off',
   body_override: null,
+})
+
+const intelligenceIntervalMinutes = computed({
+  get: () => Math.max(5, Math.round(form.intelligence_interval_seconds / 60)),
+  set: (value: number) => {
+    const minutes = Math.min(1440, Math.max(5, Math.round(Number(value) || 30)))
+    form.intelligence_interval_seconds = minutes * 60
+  },
 })
 
 // quota / quota_probe 需要关联账号；probe / quota_probe 需要探活字段。
@@ -951,6 +967,7 @@ function resetForm() {
   form.group_id = null
   form.probe_fallback_enabled = true
   form.intelligence_enabled = true
+  form.intelligence_interval_seconds = 1800
   form.interval_seconds = systemDefaultInterval.value
   form.jitter_seconds = 0
   form.enabled = true
@@ -976,6 +993,7 @@ function loadFromMonitor(m: ChannelMonitor) {
   form.group_id = m.group_id ?? null
   form.probe_fallback_enabled = true
   form.intelligence_enabled = m.intelligence_enabled !== false
+  form.intelligence_interval_seconds = m.intelligence_interval_seconds || 1800
   form.interval_seconds = m.interval_seconds || systemDefaultInterval.value
   form.jitter_seconds = m.jitter_seconds || 0
   form.enabled = m.enabled
@@ -1126,6 +1144,7 @@ function buildPayload(): CreateParams {
     group_id: form.group_id,
       probe_fallback_enabled: true,
     intelligence_enabled: !isCompositeGroup.value && form.provider === PROVIDER_OPENAI ? form.intelligence_enabled : false,
+    intelligence_interval_seconds: form.intelligence_interval_seconds,
     enabled: form.enabled,
     interval_seconds: form.interval_seconds,
     jitter_seconds: form.jitter_seconds || 0,

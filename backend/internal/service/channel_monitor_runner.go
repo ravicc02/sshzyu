@@ -327,11 +327,19 @@ func (r *ChannelMonitorRunner) runOne(id int64, name string) {
 		}
 	}()
 
-	if _, err := r.svc.RunCheck(ctx, id); err != nil {
-		if errors.Is(err, ErrChannelMonitorAPIKeyDecryptFailed) {
+	var runErr error
+	if scheduled, ok := r.svc.(interface {
+		RunScheduledCheck(context.Context, int64) ([]*CheckResult, error)
+	}); ok {
+		_, runErr = scheduled.RunScheduledCheck(ctx, id)
+	} else {
+		_, runErr = r.svc.RunCheck(ctx, id)
+	}
+	if runErr != nil {
+		if errors.Is(runErr, ErrChannelMonitorAPIKeyDecryptFailed) {
 			r.Unschedule(id)
 		}
 		slog.Warn("channel_monitor: run check failed",
-			"monitor_id", id, "name", name, "error", err)
+			"monitor_id", id, "name", name, "error", runErr)
 	}
 }

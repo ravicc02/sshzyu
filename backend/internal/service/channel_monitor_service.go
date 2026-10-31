@@ -95,6 +95,7 @@ const maxChannelMonitorNameRunes = 100
 // invalid HTTP header name, and repository adapters remove it before exposing
 // ExtraHeaders to the service layer.
 const ChannelMonitorDuplicateOperationIDMetadataKey = "sub2api:duplicate_operation_id"
+const ChannelMonitorIntelligenceIntervalMetadataKey = "sub2api:intelligence_interval_seconds"
 
 // NewChannelMonitorService 创建渠道监控服务实例。
 func NewChannelMonitorService(repo ChannelMonitorRepository, encryptor SecretEncryptor) *ChannelMonitorService {
@@ -168,27 +169,28 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 		return nil, fmt.Errorf("encrypt api key: %w", err)
 	}
 	m := &ChannelMonitor{
-		Name:                 strings.TrimSpace(p.Name),
-		Provider:             p.Provider,
-		APIMode:              defaultAPIMode(p.APIMode),
-		Endpoint:             normalizeEndpoint(p.Endpoint),
-		APIKey:               encrypted, // 注意：传入 repository 时该字段为密文
-		PrimaryModel:         normalizeMonitorPrimaryModel(p.Provider, checkMode, p.PrimaryModel),
-		ExtraModels:          normalizeModels(p.ExtraModels),
-		GroupName:            strings.TrimSpace(p.GroupName),
-		GroupID:              cloneInt64Pointer(p.GroupID),
-		ProbeFallbackEnabled: p.ProbeFallbackEnabled,
-		IntelligenceEnabled:  p.IntelligenceEnabled,
-		Enabled:              p.Enabled,
-		IntervalSeconds:      p.IntervalSeconds,
-		JitterSeconds:        p.JitterSeconds,
-		CreatedBy:            p.CreatedBy,
-		TemplateID:           p.TemplateID,
-		ExtraHeaders:         emptyHeadersIfNil(p.ExtraHeaders),
-		BodyOverrideMode:     defaultBodyMode(p.BodyOverrideMode),
-		BodyOverride:         p.BodyOverride,
-		CheckMode:            checkMode,
-		AccountID:            cloneInt64Pointer(p.AccountID),
+		Name:                        strings.TrimSpace(p.Name),
+		Provider:                    p.Provider,
+		APIMode:                     defaultAPIMode(p.APIMode),
+		Endpoint:                    normalizeEndpoint(p.Endpoint),
+		APIKey:                      encrypted, // 注意：传入 repository 时该字段为密文
+		PrimaryModel:                normalizeMonitorPrimaryModel(p.Provider, checkMode, p.PrimaryModel),
+		ExtraModels:                 normalizeModels(p.ExtraModels),
+		GroupName:                   strings.TrimSpace(p.GroupName),
+		GroupID:                     cloneInt64Pointer(p.GroupID),
+		ProbeFallbackEnabled:        p.ProbeFallbackEnabled,
+		IntelligenceEnabled:         p.IntelligenceEnabled,
+		IntelligenceIntervalSeconds: normalizeChannelMonitorIntelligenceInterval(p.IntelligenceIntervalSeconds),
+		Enabled:                     p.Enabled,
+		IntervalSeconds:             p.IntervalSeconds,
+		JitterSeconds:               p.JitterSeconds,
+		CreatedBy:                   p.CreatedBy,
+		TemplateID:                  p.TemplateID,
+		ExtraHeaders:                emptyHeadersIfNil(p.ExtraHeaders),
+		BodyOverrideMode:            defaultBodyMode(p.BodyOverrideMode),
+		BodyOverride:                p.BodyOverride,
+		CheckMode:                   checkMode,
+		AccountID:                   cloneInt64Pointer(p.AccountID),
 	}
 	if err := s.repo.Create(ctx, m); err != nil {
 		return nil, fmt.Errorf("create channel monitor: %w", err)
@@ -238,28 +240,29 @@ func (s *ChannelMonitorService) Duplicate(
 	}
 
 	duplicate := &ChannelMonitor{
-		Name:                 duplicateChannelMonitorName(source.Name),
-		Provider:             source.Provider,
-		APIMode:              source.APIMode,
-		Endpoint:             source.Endpoint,
-		APIKey:               encryptedAPIKey,
-		PrimaryModel:         source.PrimaryModel,
-		ExtraModels:          append([]string{}, source.ExtraModels...),
-		GroupName:            source.GroupName,
-		GroupID:              cloneInt64Pointer(source.GroupID),
-		ProbeFallbackEnabled: source.ProbeFallbackEnabled,
-		IntelligenceEnabled:  source.IntelligenceEnabled,
-		Enabled:              false,
-		IntervalSeconds:      source.IntervalSeconds,
-		JitterSeconds:        source.JitterSeconds,
-		CreatedBy:            createdBy,
-		TemplateID:           cloneInt64Pointer(source.TemplateID),
-		ExtraHeaders:         cloneChannelMonitorHeaders(source.ExtraHeaders),
-		BodyOverrideMode:     source.BodyOverrideMode,
-		BodyOverride:         bodyOverride,
-		CheckMode:            defaultCheckMode(source.CheckMode),
-		AccountID:            cloneInt64Pointer(source.AccountID),
-		DuplicateOperationID: operationID,
+		Name:                        duplicateChannelMonitorName(source.Name),
+		Provider:                    source.Provider,
+		APIMode:                     source.APIMode,
+		Endpoint:                    source.Endpoint,
+		APIKey:                      encryptedAPIKey,
+		PrimaryModel:                source.PrimaryModel,
+		ExtraModels:                 append([]string{}, source.ExtraModels...),
+		GroupName:                   source.GroupName,
+		GroupID:                     cloneInt64Pointer(source.GroupID),
+		ProbeFallbackEnabled:        source.ProbeFallbackEnabled,
+		IntelligenceEnabled:         source.IntelligenceEnabled,
+		IntelligenceIntervalSeconds: source.IntelligenceIntervalSeconds,
+		Enabled:                     false,
+		IntervalSeconds:             source.IntervalSeconds,
+		JitterSeconds:               source.JitterSeconds,
+		CreatedBy:                   createdBy,
+		TemplateID:                  cloneInt64Pointer(source.TemplateID),
+		ExtraHeaders:                cloneChannelMonitorHeaders(source.ExtraHeaders),
+		BodyOverrideMode:            source.BodyOverrideMode,
+		BodyOverride:                bodyOverride,
+		CheckMode:                   defaultCheckMode(source.CheckMode),
+		AccountID:                   cloneInt64Pointer(source.AccountID),
+		DuplicateOperationID:        operationID,
 	}
 	if err := s.repo.Create(ctx, duplicate); err != nil {
 		return nil, fmt.Errorf("duplicate channel monitor: %w", err)
@@ -395,6 +398,11 @@ func validateCreateParams(p ChannelMonitorCreateParams) error {
 	}
 	if err := validateJitter(p.JitterSeconds, p.IntervalSeconds); err != nil {
 		return err
+	}
+	if p.IntelligenceIntervalSeconds > 0 {
+		if err := validateIntelligenceInterval(p.IntelligenceIntervalSeconds); err != nil {
+			return err
+		}
 	}
 	usesQuota := monitorCheckModeUsesQuota(checkMode)
 	// probe 分支（含 quota_probe 的探活部分）仍需 endpoint + api_key；
@@ -613,6 +621,16 @@ func (s *ChannelMonitorService) ListHistory(ctx context.Context, id int64, model
 // 按 check_mode 分派：probe（默认，现状探活）/ quota（仅查关联账号配额，
 // 零 LLM 成本）/ quota_probe（探活 + 配额快照挂主模型行）。
 func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*CheckResult, error) {
+	return s.runCheck(ctx, id, false)
+}
+
+// RunScheduledCheck executes the normal availability probe and runs the
+// reasoning probe only when its independent interval is due.
+func (s *ChannelMonitorService) RunScheduledCheck(ctx context.Context, id int64) ([]*CheckResult, error) {
+	return s.runCheck(ctx, id, true)
+}
+
+func (s *ChannelMonitorService) runCheck(ctx context.Context, id int64, scheduled bool) ([]*CheckResult, error) {
 	rt := s.probeRuntime(ctx)
 	if !rt.Enabled {
 		return nil, ErrChannelMonitorDisabled
@@ -633,7 +651,7 @@ func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*Chec
 	var intelligence *CheckResult
 	var intelligenceGroup errgroup.Group
 	// A replace-mode request is static and cannot contain this question.
-	if shouldRunIntelligenceProbe(m) {
+	if shouldRunIntelligenceProbe(m) && (!scheduled || s.intelligenceCheckDue(ctx, m)) {
 		intelligenceGroup.Go(func() error {
 			intelligence = runIntelligenceCheckForModel(ctx, m.Endpoint, m.APIKey, m.PrimaryModel, &CheckOptions{
 				APIMode: m.APIMode, ExtraHeaders: m.ExtraHeaders,
@@ -658,6 +676,23 @@ func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*Chec
 		s.persistIntelligenceResult(ctx, m, intelligence)
 	}
 	return results, nil
+}
+
+func (s *ChannelMonitorService) intelligenceCheckDue(ctx context.Context, m *ChannelMonitor) bool {
+	if m == nil {
+		return false
+	}
+	interval := time.Duration(normalizeChannelMonitorIntelligenceInterval(m.IntelligenceIntervalSeconds)) * time.Second
+	latest, err := s.repo.ListHistory(ctx, m.ID, monitorIntelligenceModel, 1)
+	if err != nil {
+		slog.Warn("channel_monitor: load latest intelligence history failed",
+			"monitor_id", m.ID, "error", err)
+		return true
+	}
+	if len(latest) == 0 {
+		return true
+	}
+	return time.Since(latest[0].CheckedAt) >= interval
 }
 
 // ShouldRunScheduledCheck applies the hybrid idle rule without changing manual
@@ -1021,6 +1056,12 @@ func applyMonitorUpdate(existing *ChannelMonitor, p ChannelMonitorUpdateParams) 
 	}
 	if p.IntelligenceEnabled != nil {
 		existing.IntelligenceEnabled = *p.IntelligenceEnabled
+	}
+	if p.IntelligenceIntervalSeconds != nil {
+		if err := validateIntelligenceInterval(*p.IntelligenceIntervalSeconds); err != nil {
+			return err
+		}
+		existing.IntelligenceIntervalSeconds = *p.IntelligenceIntervalSeconds
 	}
 	if p.Enabled != nil {
 		existing.Enabled = *p.Enabled

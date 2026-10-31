@@ -12,7 +12,7 @@ const (
 	// ChannelMonitorProbeUserAgentMarker identifies probes that reach the local
 	// gateway. Usage-log based idle checks exclude these internal requests.
 	ChannelMonitorProbeUserAgentMarker = "SSHZYU-ChannelMonitor/"
-	monitorInternalUserAgent            = ChannelMonitorProbeUserAgentMarker + "1.0"
+	monitorInternalUserAgent           = ChannelMonitorProbeUserAgentMarker + "1.0"
 
 	// monitorRequestTimeout 单次模型请求总超时（含 Body 读取）。
 	monitorRequestTimeout = 45 * time.Second
@@ -75,6 +75,13 @@ const (
 	MonitorProviderZhipu       = "zhipu"
 	MonitorProviderDeepseek    = "deepseek"
 	MonitorProviderMiniMax     = "minimax"
+
+	// DefaultChannelMonitorIntelligenceIntervalSeconds is the independent
+	// cadence for OpenAI reasoning probes. The regular availability interval
+	// remains unchanged.
+	DefaultChannelMonitorIntelligenceIntervalSeconds = 1800
+	channelMonitorIntelligenceMinIntervalSeconds     = 300
+	channelMonitorIntelligenceMaxIntervalSeconds     = 86400
 
 	// MonitorCheckMode 检测模式（channel_monitors.check_mode）。
 	//   probe       - LLM 探活（默认，原有行为）
@@ -185,6 +192,10 @@ var (
 	)
 	ErrChannelMonitorInvalidJitter = infraerrors.BadRequest(
 		"CHANNEL_MONITOR_INVALID_JITTER", "jitter_seconds must be >= 0 and interval_seconds - jitter_seconds must be >= 15",
+	)
+	ErrChannelMonitorInvalidIntelligenceInterval = infraerrors.BadRequest(
+		"CHANNEL_MONITOR_INVALID_INTELLIGENCE_INTERVAL",
+		"intelligence_interval_seconds must be in [300, 86400]",
 	)
 	ErrChannelMonitorInvalidEndpoint = infraerrors.BadRequest(
 		"CHANNEL_MONITOR_INVALID_ENDPOINT", "endpoint must be a valid https URL",

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -798,31 +799,39 @@ func entToServiceMonitor(row *dbent.ChannelMonitor) *service.ChannelMonitor {
 	}
 	duplicateOperationID := headers[service.ChannelMonitorDuplicateOperationIDMetadataKey]
 	delete(headers, service.ChannelMonitorDuplicateOperationIDMetadataKey)
+	intelligenceInterval := service.DefaultChannelMonitorIntelligenceIntervalSeconds
+	if raw := strings.TrimSpace(headers[service.ChannelMonitorIntelligenceIntervalMetadataKey]); raw != "" {
+		if seconds, err := strconv.Atoi(raw); err == nil && seconds > 0 {
+			intelligenceInterval = seconds
+		}
+	}
+	delete(headers, service.ChannelMonitorIntelligenceIntervalMetadataKey)
 	out := &service.ChannelMonitor{
-		ID:                   row.ID,
-		Name:                 row.Name,
-		Provider:             string(row.Provider),
-		APIMode:              defaultAPIModeRepo(row.APIMode),
-		Endpoint:             row.Endpoint,
-		APIKey:               row.APIKeyEncrypted, // 仍为密文，service 层负责解密
-		PrimaryModel:         row.PrimaryModel,
-		ExtraModels:          extras,
-		GroupName:            row.GroupName,
-		GroupID:              cloneInt64PointerRepo(row.GroupID),
-		ProbeFallbackEnabled: row.ProbeFallbackEnabled,
-		IntelligenceEnabled:  row.IntelligenceEnabled,
-		Enabled:              row.Enabled,
-		IntervalSeconds:      row.IntervalSeconds,
-		JitterSeconds:        row.JitterSeconds,
-		LastCheckedAt:        row.LastCheckedAt,
-		CreatedBy:            row.CreatedBy,
-		CreatedAt:            row.CreatedAt,
-		UpdatedAt:            row.UpdatedAt,
-		ExtraHeaders:         headers,
-		BodyOverrideMode:     row.BodyOverrideMode,
-		BodyOverride:         row.BodyOverride,
-		CheckMode:            defaultCheckModeRepo(row.CheckMode),
-		DuplicateOperationID: duplicateOperationID,
+		ID:                          row.ID,
+		Name:                        row.Name,
+		Provider:                    string(row.Provider),
+		APIMode:                     defaultAPIModeRepo(row.APIMode),
+		Endpoint:                    row.Endpoint,
+		APIKey:                      row.APIKeyEncrypted, // 仍为密文，service 层负责解密
+		PrimaryModel:                row.PrimaryModel,
+		ExtraModels:                 extras,
+		GroupName:                   row.GroupName,
+		GroupID:                     cloneInt64PointerRepo(row.GroupID),
+		ProbeFallbackEnabled:        row.ProbeFallbackEnabled,
+		IntelligenceEnabled:         row.IntelligenceEnabled,
+		IntelligenceIntervalSeconds: intelligenceInterval,
+		Enabled:                     row.Enabled,
+		IntervalSeconds:             row.IntervalSeconds,
+		JitterSeconds:               row.JitterSeconds,
+		LastCheckedAt:               row.LastCheckedAt,
+		CreatedBy:                   row.CreatedBy,
+		CreatedAt:                   row.CreatedAt,
+		UpdatedAt:                   row.UpdatedAt,
+		ExtraHeaders:                headers,
+		BodyOverrideMode:            row.BodyOverrideMode,
+		BodyOverride:                row.BodyOverride,
+		CheckMode:                   defaultCheckModeRepo(row.CheckMode),
+		DuplicateOperationID:        duplicateOperationID,
 	}
 	if row.TemplateID != nil {
 		id := *row.TemplateID
@@ -847,17 +856,28 @@ func channelMonitorHeadersForPersistence(m *service.ChannelMonitor) map[string]s
 	if m == nil {
 		return map[string]string{}
 	}
-	headers := make(map[string]string, len(m.ExtraHeaders)+1)
+	headers := make(map[string]string, len(m.ExtraHeaders)+2)
 	for key, value := range m.ExtraHeaders {
-		if key == service.ChannelMonitorDuplicateOperationIDMetadataKey {
+		if key == service.ChannelMonitorDuplicateOperationIDMetadataKey ||
+			key == service.ChannelMonitorIntelligenceIntervalMetadataKey {
 			continue
 		}
 		headers[key] = value
 	}
+	headers[service.ChannelMonitorIntelligenceIntervalMetadataKey] = strconv.Itoa(
+		normalizeChannelMonitorIntelligenceIntervalRepo(m.IntelligenceIntervalSeconds),
+	)
 	if operationID := strings.TrimSpace(m.DuplicateOperationID); operationID != "" {
 		headers[service.ChannelMonitorDuplicateOperationIDMetadataKey] = operationID
 	}
 	return headers
+}
+
+func normalizeChannelMonitorIntelligenceIntervalRepo(seconds int) int {
+	if seconds <= 0 {
+		return service.DefaultChannelMonitorIntelligenceIntervalSeconds
+	}
+	return seconds
 }
 
 // emptyHeadersIfNilRepo 与 service.emptyHeadersIfNil 功能一致，

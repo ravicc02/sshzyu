@@ -611,6 +611,7 @@ export default {
         probeFallbackEnabledHint: '分组没有真实请求样本时，用该监控的主动探测结果补充状态、可用率和延迟。',
         intelligenceEnabled: '开启降智测试',
         intelligenceEnabledHint: '仅 OpenAI 分组生效；固定题面和 medium 推理档。回复仅含 21 才通过，其他答案记为未通过，单次失败不等同账号降智；请求错误单独记录。',
+        intelligenceIntervalMinutes: '降智测试间隔（分钟）',
         intervalSeconds: '检测间隔 (秒)',
         intervalSecondsHint: '范围：15 - 3600 秒',
         jitterSeconds: '随机抖动 (± 秒)',

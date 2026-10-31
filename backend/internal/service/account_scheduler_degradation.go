@@ -126,6 +126,7 @@ type AccountSchedulerGroupView struct {
 	DegradationEnabled   bool                  `json:"degradation_enabled"`
 	IntervalSeconds      int                   `json:"interval_seconds"`
 	TestModel            string                `json:"test_model"`
+	ScoreMax             float64               `json:"score_max"`
 	ModelCandidates      []string              `json:"model_candidates"`
 	OAuthFirst           bool                  `json:"oauth_first"`
 	LowestAccountID      *int64                `json:"lowest_account_id,omitempty"`
@@ -314,6 +315,10 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 
 	weight, _ := s.degradationWeight(ctx)
 	advancedEnabled, _ := s.advancedSchedulerEnabled(ctx)
+	scoreMax := 0.0
+	if s.gateway != nil {
+		scoreMax = s.gateway.OpenAIAccountSchedulerScoreMaximum(ctx)
+	}
 	overview := &AccountSchedulerOverview{
 		ScoringMode:       "score",
 		OAuthFirst:        true,
@@ -408,6 +413,7 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 			DegradationEnabled:   setting.DegradationEnabled,
 			IntervalSeconds:      setting.IntervalSeconds,
 			TestModel:            setting.TestModel,
+			ScoreMax:             scoreMax,
 			ModelCandidates:      group.ModelCandidates,
 			OAuthFirst:           oauthFirst,
 			Accounts:             rows,
@@ -535,10 +541,6 @@ func (s *AccountSchedulerService) RunNow(ctx context.Context, input AccountSched
 			continue
 		}
 		setting := settings[account.GroupID]
-		if input.AccountID <= 0 && !setting.DegradationEnabled {
-			result.Skipped++
-			continue
-		}
 		model := strings.TrimSpace(setting.TestModel)
 		if model == "" && group != nil {
 			model = firstAccountSchedulerModel(group.ModelCandidates)

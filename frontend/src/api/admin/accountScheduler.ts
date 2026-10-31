@@ -32,6 +32,7 @@ export interface AccountSchedulerGroup {
   degradation_enabled: boolean
   interval_seconds: number
   test_model: string
+  score_max?: number
   model_candidates: string[]
   oauth_first: boolean
   lowest_account_id?: number

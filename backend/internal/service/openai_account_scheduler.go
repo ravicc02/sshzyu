@@ -2808,6 +2808,24 @@ func (s *OpenAIGatewayService) openAIWSSchedulerWeightsForRequest(ctx context.Co
 	return overridden
 }
 
+// OpenAIAccountSchedulerScoreMaximum returns the theoretical full score for
+// the currently active scheduler weights.
+func (s *OpenAIGatewayService) OpenAIAccountSchedulerScoreMaximum(ctx context.Context) float64 {
+	if s == nil {
+		return 0
+	}
+	weights := s.openAIWSSchedulerWeightsForRequest(ctx)
+	return weights.Priority +
+		weights.Load +
+		weights.Queue +
+		weights.ErrorRate +
+		weights.TTFT +
+		weights.Reset +
+		weights.QuotaHeadroom +
+		weights.UpstreamCost*(1-openAIUpstreamCostNeutralFactor) +
+		weights.Degradation
+}
+
 func applyOpenAIAdvancedSchedulerWeightOverrides(
 	weights GatewayOpenAIWSSchedulerScoreWeightsView,
 	overrides map[string]float64,
