@@ -1,0 +1,103 @@
+import { apiClient } from '../client'
+
+export interface AccountSchedulerRow {
+  id: number
+  name: string
+  platform: string
+  credential_type: string
+  oauth: boolean
+  available: boolean
+  availability_reason: string
+  degradation_rate?: number
+  sample_count: number
+  pass_count: number
+  degraded_count: number
+  error_count: number
+  latest_status: string
+  latest_checked_at?: string
+  average_latency_ms: number
+  rank: number
+  score: number
+  score_weight: number
+  degradation_factor: number
+  lowest_degradation: boolean
+}
+
+export interface AccountSchedulerGroup {
+  id: number
+  name: string
+  platform: string
+  status: string
+  degradation_enabled: boolean
+  interval_seconds: number
+  test_model: string
+  model_candidates: string[]
+  oauth_first: boolean
+  lowest_account_id?: number
+  accounts: AccountSchedulerRow[]
+}
+
+export interface AccountDegradationProbe {
+  id: number
+  account_id: number
+  account_name: string
+  group_id: number
+  model: string
+  status: 'pass' | 'degraded' | 'error'
+  response_text: string
+  error_message: string
+  latency_ms: number
+  checked_at: string
+}
+
+export interface AccountSchedulerOverview {
+  scoring_mode: string
+  oauth_first: boolean
+  priority_ignored: boolean
+  degradation_weight: number
+  advanced_enabled: boolean
+  tested_groups: number
+  enabled_groups: number
+  total_accounts: number
+  available_accounts: number
+  groups: AccountSchedulerGroup[]
+  recent_probes: AccountDegradationProbe[]
+  generated_at: string
+}
+
+export interface AccountSchedulerSettingInput {
+  group_id: number
+  degradation_enabled?: boolean
+  interval_seconds?: number
+  test_model?: string
+  degradation_weight?: number
+}
+
+export async function getOverview(): Promise<AccountSchedulerOverview> {
+  const { data } = await apiClient.get<AccountSchedulerOverview>('/admin/account-scheduler/overview')
+  return data
+}
+
+export async function updateSetting(
+  input: AccountSchedulerSettingInput,
+): Promise<void> {
+  await apiClient.put('/admin/account-scheduler/settings', input)
+}
+
+export async function runNow(input: { group_id: number; account_id?: number }): Promise<{
+  run: number
+  skipped: number
+  failed: number
+  results: AccountDegradationProbe[]
+}> {
+  const { data } = await apiClient.post('/admin/account-scheduler/run', input)
+  return data
+}
+
+export const accountSchedulerAPI = {
+  getOverview,
+  updateSetting,
+  runNow,
+}
+
+export default accountSchedulerAPI

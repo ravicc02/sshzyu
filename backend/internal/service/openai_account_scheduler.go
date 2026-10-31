@@ -997,6 +997,14 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 
 	weights := s.service.openAIWSSchedulerWeightsForRequest(ctx)
 	now := time.Now()
+	degradationFactors := map[int64]float64(nil)
+	if weights.Degradation > 0 && req.GroupID != nil && *req.GroupID > 0 && s.service.accountDegradation != nil {
+		accountIDs := make([]int64, 0, len(candidates))
+		for _, candidate := range candidates {
+			accountIDs = append(accountIDs, candidate.account.ID)
+		}
+		degradationFactors = s.service.accountDegradationFactors(ctx, *req.GroupID, accountIDs)
+	}
 	upstreamCostFactors := map[int64]float64(nil)
 	if req.UseUpstreamTokenCost && weights.UpstreamCost > 0 {
 		accounts := make([]*Account, 0, len(candidates))
@@ -1074,6 +1082,10 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 		if factor, ok := upstreamCostFactors[item.account.ID]; ok {
 			upstreamCostFactor = factor
 		}
+		degradationFactor := 0.5
+		if factor, ok := degradationFactors[item.account.ID]; ok {
+			degradationFactor = factor
+		}
 
 		item.costPriorityActive = req.UseUpstreamTokenCost && weights.UpstreamCost > 0
 		item.score = weights.Priority*priorityFactor +
@@ -1083,7 +1095,8 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 			weights.TTFT*ttftFactor +
 			weights.Reset*resetFactor +
 			weights.QuotaHeadroom*quotaHeadroomFactor +
-			weights.UpstreamCost*(upstreamCostFactor-openAIUpstreamCostNeutralFactor)
+			weights.UpstreamCost*(upstreamCostFactor-openAIUpstreamCostNeutralFactor) +
+			weights.Degradation*degradationFactor
 		if req.StickyWeighted {
 			if req.PreviousResponseCanMove && req.StickyPreviousAccountID > 0 && item.account.ID == req.StickyPreviousAccountID {
 				item.score += weights.Previous
@@ -2010,7 +2023,7 @@ func (s *OpenAIGatewayService) openAIAdvancedSchedulerRuntimeSettings(ctx contex
 			if values, err := repo.GetMultiple(dbCtx, openAIAdvancedSchedulerRuntimeSettingKeys()); err == nil {
 				lowUpstreamRatePriorityEnabled = strings.EqualFold(strings.TrimSpace(values[SettingKeyOpenAILowUpstreamRatePriorityEnabled]), "true")
 				oauthSchedulingRateMultiplier = parseOpenAIOAuthSchedulingRateMultiplier(values)
-				enabled = strings.EqualFold(strings.TrimSpace(values[openAIAdvancedSchedulerSettingKey]), "true")
+				enabled = !strings.EqualFold(strings.TrimSpace(values[openAIAdvancedSchedulerSettingKey]), "false")
 				stickyWeightedEnabled = strings.EqualFold(strings.TrimSpace(values[SettingKeyOpenAIAdvancedSchedulerStickyWeightedEnabled]), "true")
 				subscriptionPriorityEnabled = strings.EqualFold(strings.TrimSpace(values[SettingKeyOpenAIAdvancedSchedulerSubscriptionPriorityEnabled]), "true")
 				lbTopKOverride = parsePositiveIntOverride(values[SettingKeyOpenAIAdvancedSchedulerLBTopK])
@@ -2027,7 +2040,7 @@ func (s *OpenAIGatewayService) openAIAdvancedSchedulerRuntimeSettings(ctx contex
 				}
 				lowUpstreamRatePriorityEnabled = strings.EqualFold(strings.TrimSpace(fallbackValues[SettingKeyOpenAILowUpstreamRatePriorityEnabled]), "true")
 				oauthSchedulingRateMultiplier = parseOpenAIOAuthSchedulingRateMultiplier(fallbackValues)
-				enabled = strings.EqualFold(strings.TrimSpace(fallbackValues[openAIAdvancedSchedulerSettingKey]), "true")
+				enabled = !strings.EqualFold(strings.TrimSpace(fallbackValues[openAIAdvancedSchedulerSettingKey]), "false")
 				stickyWeightedEnabled = strings.EqualFold(strings.TrimSpace(fallbackValues[SettingKeyOpenAIAdvancedSchedulerStickyWeightedEnabled]), "true")
 				subscriptionPriorityEnabled = strings.EqualFold(strings.TrimSpace(fallbackValues[SettingKeyOpenAIAdvancedSchedulerSubscriptionPriorityEnabled]), "true")
 				lbTopKOverride = parsePositiveIntOverride(fallbackValues[SettingKeyOpenAIAdvancedSchedulerLBTopK])
@@ -2115,6 +2128,7 @@ func openAIAdvancedSchedulerWeightOverrideSpecs() []openAIAdvancedSchedulerWeigh
 		{key: SettingKeyOpenAIAdvancedSchedulerWeightUpstreamCost, name: "upstream_cost"},
 		{key: SettingKeyOpenAIAdvancedSchedulerWeightPreviousResponse, name: "previous_response"},
 		{key: SettingKeyOpenAIAdvancedSchedulerWeightSessionSticky, name: "session_sticky"},
+		{key: SettingKeyOpenAIAdvancedSchedulerWeightDegradation, name: "degradation"},
 	}
 }
 
@@ -2754,10 +2768,11 @@ func (s *OpenAIGatewayService) openAIWSSchedulerWeights() GatewayOpenAIWSSchedul
 			UpstreamCost:  s.cfg.Gateway.OpenAIWS.SchedulerScoreWeights.UpstreamCost,
 			Previous:      s.cfg.Gateway.OpenAIWS.SchedulerScoreWeights.PreviousResponse,
 			SessionSticky: s.cfg.Gateway.OpenAIWS.SchedulerScoreWeights.SessionSticky,
+			Degradation:   1.5,
 		}
 	}
 	return GatewayOpenAIWSSchedulerScoreWeightsView{
-		Priority:      1.0,
+		Priority:      0,
 		Load:          1.0,
 		Queue:         0.7,
 		ErrorRate:     0.8,
@@ -2767,6 +2782,7 @@ func (s *OpenAIGatewayService) openAIWSSchedulerWeights() GatewayOpenAIWSSchedul
 		UpstreamCost:  0.0,
 		Previous:      5.0,
 		SessionSticky: 3.0,
+		Degradation:   1.5,
 	}
 }
 
@@ -2775,12 +2791,20 @@ func (s *OpenAIGatewayService) openAIWSSchedulerWeightsForRequest(ctx context.Co
 	settings := s.openAIAdvancedSchedulerRuntimeSettings(ctx)
 	// 同 openAIWSLBTopKForRequest：总开关关闭时不应用 DB 覆盖值。
 	if !settings.enabled {
+		weights.Priority = 0
+		if degradation, ok := settings.weightOverrides["degradation"]; ok {
+			weights.Degradation = degradation
+		}
 		return weights
 	}
 	overridden := applyOpenAIAdvancedSchedulerWeightOverrides(weights, settings.weightOverrides)
 	if !overridden.configWeights().IsValid() {
+		weights.Priority = 0
 		return weights
 	}
+	// Priority is no longer a routing input. OAuth remains a hard first tier,
+	// and all same-tier accounts are ordered by the score factors below.
+	overridden.Priority = 0
 	return overridden
 }
 
@@ -2810,6 +2834,8 @@ func applyOpenAIAdvancedSchedulerWeightOverrides(
 			weights.Previous = value
 		case "session_sticky":
 			weights.SessionSticky = value
+		case "degradation":
+			weights.Degradation = value
 		}
 	}
 	return weights
@@ -2827,6 +2853,7 @@ type GatewayOpenAIWSSchedulerScoreWeightsView struct {
 	UpstreamCost  float64
 	Previous      float64
 	SessionSticky float64
+	Degradation   float64
 }
 
 func (w GatewayOpenAIWSSchedulerScoreWeightsView) configWeights() config.GatewayOpenAIWSSchedulerScoreWeights {
@@ -2883,6 +2910,24 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 	weights GatewayOpenAIWSSchedulerScoreWeightsView,
 	stickyWeightedEnabled bool,
 	oauthSchedulingRateMultiplier *float64,
+) map[int64]OpenAIAccountSchedulerScoreSnapshot {
+	return buildOpenAIAccountSchedulerScoreSnapshotWithDegradation(
+		accounts,
+		loadMap,
+		weights,
+		stickyWeightedEnabled,
+		oauthSchedulingRateMultiplier,
+		nil,
+	)
+}
+
+func buildOpenAIAccountSchedulerScoreSnapshotWithDegradation(
+	accounts []*Account,
+	loadMap map[int64]*AccountLoadInfo,
+	weights GatewayOpenAIWSSchedulerScoreWeightsView,
+	stickyWeightedEnabled bool,
+	oauthSchedulingRateMultiplier *float64,
+	degradationFactors map[int64]float64,
 ) map[int64]OpenAIAccountSchedulerScoreSnapshot {
 	if len(accounts) == 0 {
 		return nil
@@ -2992,6 +3037,11 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 			weights.Reset*resetFactor +
 			weights.QuotaHeadroom*quotaHeadroomFactor +
 			weights.UpstreamCost*(upstreamCostFactor-openAIUpstreamCostNeutralFactor)
+		degradationFactor := 0.5
+		if factor, ok := degradationFactors[candidate.account.ID]; ok {
+			degradationFactor = factor
+		}
+		baseScore += weights.Degradation * degradationFactor
 		score := OpenAIAccountSchedulerScoreSnapshot{
 			BaseScore:             baseScore,
 			StickyWeightedEnabled: stickyWeightedEnabled,
@@ -3003,6 +3053,59 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 		result[candidate.account.ID] = score
 	}
 	return result
+}
+
+func (s *OpenAIGatewayService) BuildOpenAIAccountSchedulerScoreSnapshots(
+	ctx context.Context,
+	groupID int64,
+	accounts []*Account,
+	loadMap map[int64]*AccountLoadInfo,
+) map[int64]OpenAIAccountSchedulerScoreSnapshot {
+	if s == nil {
+		return nil
+	}
+	weights := s.openAIWSSchedulerWeightsForRequest(ctx)
+	degradationFactors := map[int64]float64(nil)
+	if weights.Degradation > 0 && groupID > 0 && s.accountDegradation != nil {
+		accountIDs := make([]int64, 0, len(accounts))
+		for _, account := range accounts {
+			if account != nil {
+				accountIDs = append(accountIDs, account.ID)
+			}
+		}
+		degradationFactors = s.accountDegradationFactors(ctx, groupID, accountIDs)
+	}
+	return buildOpenAIAccountSchedulerScoreSnapshotWithDegradation(
+		accounts,
+		loadMap,
+		weights,
+		s.isOpenAIAdvancedSchedulerStickyWeightedEnabled(ctx),
+		s.openAIOAuthSchedulingRateMultiplier(ctx),
+		degradationFactors,
+	)
+}
+
+func (s *OpenAIGatewayService) accountDegradationFactors(
+	ctx context.Context,
+	groupID int64,
+	accountIDs []int64,
+) map[int64]float64 {
+	if s == nil || s.accountDegradation == nil || groupID <= 0 || len(accountIDs) == 0 {
+		return nil
+	}
+	scores := s.accountDegradation.AccountDegradationScores(ctx, groupID, accountIDs)
+	if len(scores) == 0 {
+		return nil
+	}
+	factors := make(map[int64]float64, len(scores))
+	for accountID, score := range scores {
+		if !score.HasSamples {
+			factors[accountID] = 0.5
+			continue
+		}
+		factors[accountID] = 1 - clamp01(score.Rate)
+	}
+	return factors
 }
 
 func openAIUpstreamCostFactors(accounts []*Account, now time.Time, oauthSchedulingRateMultiplier *float64) map[int64]float64 {

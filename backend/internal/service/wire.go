@@ -984,6 +984,7 @@ var ProviderSet = wire.NewSet(
 	ProvideIdempotencyCleanupService,
 	ProvideScheduledTestService,
 	ProvideScheduledTestRunnerService,
+	ProvideAccountSchedulerService,
 	NewGroupCapacityService,
 	NewChannelService,
 	wire.Bind(new(ChannelCacheInvalidator), new(*ChannelService)),
@@ -1003,6 +1004,20 @@ var ProviderSet = wire.NewSet(
 	NewChannelMonitorRequestTemplateService,
 	ProvideUserPlatformQuotaUsageFlusher,
 )
+
+func ProvideAccountSchedulerService(
+	repo AccountSchedulerRepository,
+	accountTestSvc *AccountTestService,
+	gateway *OpenAIGatewayService,
+	settingRepo SettingRepository,
+) *AccountSchedulerService {
+	service := NewAccountSchedulerService(repo, accountTestSvc, gateway, settingRepo)
+	if gateway != nil {
+		gateway.SetAccountDegradationScoreProvider(service)
+	}
+	deployment.StartWhenOpen(service.Start)
+	return service
+}
 
 // ProvideUserPlatformQuotaUsageFlusher 创建并启动 UserPlatformQuotaUsageFlusher。
 func ProvideUserPlatformQuotaUsageFlusher(cfg *config.Config, cache BillingCache, quotaRepo UserPlatformQuotaRepository, tw *TimingWheelService) *UserPlatformQuotaUsageFlusher {

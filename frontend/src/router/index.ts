@@ -603,6 +603,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/account-scheduler',
+    name: 'AdminAccountScheduler',
+    component: () => import('@/views/admin/AccountSchedulerView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Account Scheduler',
+      titleKey: 'nav.accountScheduler',
+      description: 'OAuth优先、评分调度与账号级降智率测试'
+    }
+  },
+  {
     path: '/admin/plugins',
     name: 'AdminPlugins',
     component: () => import('@/views/admin/PluginsView.vue'),

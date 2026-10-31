@@ -118,6 +118,9 @@ func RegisterAdminRoutes(
 		// 定时测试计划
 		registerScheduledTestRoutes(admin, h)
 
+		// 账号调度与降智率测试
+		registerAccountSchedulerRoutes(admin, h)
+
 		// 渠道管理
 		registerChannelRoutes(admin, h)
 
@@ -136,6 +139,15 @@ func RegisterAdminRoutes(
 
 		// 操作审计日志
 		registerAuditLogRoutes(admin, h, stepUpAuth)
+	}
+}
+
+func registerAccountSchedulerRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	scheduler := admin.Group("/account-scheduler")
+	{
+		scheduler.GET("/overview", h.Admin.AccountScheduler.Overview)
+		scheduler.PUT("/settings", h.Admin.AccountScheduler.UpdateSetting)
+		scheduler.POST("/run", h.Admin.AccountScheduler.Run)
 	}
 }
 
