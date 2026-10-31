@@ -91,6 +91,41 @@ func (r *accountSchedulerRepository) ListGroupSettings(ctx context.Context) (map
 	return settings, rows.Err()
 }
 
+func (r *accountSchedulerRepository) ListGroupPrimaryModels(
+	ctx context.Context,
+	groupIDs []int64,
+) (map[int64]string, error) {
+	if len(groupIDs) == 0 {
+		return map[int64]string{}, nil
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT DISTINCT ON (group_id)
+			group_id,
+			primary_model
+		FROM channel_monitors
+		WHERE group_id = ANY($1)
+			AND provider = 'openai'
+		ORDER BY group_id, updated_at DESC, id DESC
+	`, pq.Array(groupIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make(map[int64]string, len(groupIDs))
+	for rows.Next() {
+		var groupID int64
+		var model string
+		if err := rows.Scan(&groupID, &model); err != nil {
+			return nil, err
+		}
+		if groupID > 0 && strings.TrimSpace(model) != "" {
+			out[groupID] = strings.TrimSpace(model)
+		}
+	}
+	return out, rows.Err()
+}
+
 func (r *accountSchedulerRepository) UpsertGroupSetting(
 	ctx context.Context,
 	setting service.AccountSchedulerGroupSetting,

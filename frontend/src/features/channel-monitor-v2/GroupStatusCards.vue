@@ -491,6 +491,22 @@ function intelligenceSummary(row: MonitorMatrixRow) {
   if (!props.hybrid) return t('channelMonitorV2.groupCards.intelligencePending')
   const probe = intelligenceProbe(row)
   if (!probe) return t('channelMonitorV2.groupCards.intelligenceNotConfigured')
+  if (probe.intelligence_source === 'account_aggregate') {
+    const samples = probe.intelligence_samples || 0
+    const passed = probe.intelligence_passed || 0
+    if (samples > 0) {
+      return t('channelMonitorV2.groupCards.intelligenceAccountRate', {
+        passed,
+        samples,
+        rate: Math.round((passed / samples) * 100),
+      })
+    }
+    if ((probe.intelligence_errors || 0) > 0) {
+      return t('channelMonitorV2.groupCards.intelligenceAccountErrors', {
+        count: probe.intelligence_errors,
+      })
+    }
+  }
   const latest = probe.intelligence_timeline?.[0]
   if (!latest) return t('channelMonitorV2.groupCards.intelligenceWaiting')
   if (latest.status === 'operational') return t('channelMonitorV2.groupCards.intelligenceNotDegraded')
@@ -500,7 +516,15 @@ function intelligenceSummary(row: MonitorMatrixRow) {
 
 function intelligenceSummaryClass(row: MonitorMatrixRow) {
   if (!props.hybrid || !intelligenceProbe(row)) return 'text-gray-500 dark:text-gray-400'
-  const latest = intelligenceProbe(row)?.intelligence_timeline?.[0]
+  const probe = intelligenceProbe(row)
+  const status = probe?.intelligence_status || probe?.intelligence_timeline?.[0]?.status
+  const latest = probe?.intelligence_timeline?.[0]
+  if (probe?.intelligence_source === 'account_aggregate' && status) {
+    if (status === 'operational') return 'font-semibold text-emerald-700 dark:text-emerald-300'
+    if (status === 'degraded') return 'font-semibold text-amber-700 dark:text-amber-300'
+    if (status === 'failed') return 'font-semibold text-rose-700 dark:text-rose-300'
+    return 'font-semibold text-amber-700 dark:text-amber-300'
+  }
   if (!latest) return 'text-gray-500 dark:text-gray-400'
   if (latest.status === 'operational') return 'font-semibold text-emerald-700 dark:text-emerald-300'
   if (latest.status === 'failed') return 'font-semibold text-rose-700 dark:text-rose-300'

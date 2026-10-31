@@ -93,6 +93,11 @@ export interface ChannelMonitor {
   primary_status: MonitorStatus | ''
   intelligence_status?: MonitorStatus | ''
   intelligence_checked_at?: string | null
+  intelligence_source?: 'account_aggregate' | 'channel_fallback' | ''
+  intelligence_samples?: number
+  intelligence_passed?: number
+  intelligence_failed?: number
+  intelligence_errors?: number
   /** Latest latency of the primary model in ms (null when no history yet) */
   primary_latency_ms: number | null
   /** Primary model 7-day availability percentage (0-100) */

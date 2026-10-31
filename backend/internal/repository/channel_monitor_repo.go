@@ -260,6 +260,63 @@ func (r *channelMonitorRepository) HasRecentTrafficForGroup(ctx context.Context,
 	return exists, nil
 }
 
+func (r *channelMonitorRepository) ListGroupAccountDegradationSummaries(
+	ctx context.Context,
+	groupIDs []int64,
+	since time.Time,
+	modelByGroup map[int64]string,
+) (map[int64]service.GroupAccountDegradationSummary, error) {
+	if len(groupIDs) == 0 {
+		return map[int64]service.GroupAccountDegradationSummary{}, nil
+	}
+	modelFilter, err := json.Marshal(modelByGroup)
+	if err != nil {
+		return nil, fmt.Errorf("marshal degradation model filter: %w", err)
+	}
+	const query = `
+		SELECT
+			group_id,
+			COUNT(*) FILTER (WHERE status = 'pass') AS pass_count,
+			COUNT(*) FILTER (WHERE status = 'degraded') AS degraded_count,
+			COUNT(*) FILTER (WHERE status = 'error') AS error_count,
+			MAX(checked_at) AS latest_checked_at,
+			(ARRAY_AGG(model ORDER BY checked_at DESC, id DESC))[1] AS latest_model
+		FROM account_degradation_probes
+		WHERE group_id = ANY($1)
+		  AND checked_at >= $2
+		  AND (
+			NULLIF($3::jsonb ->> group_id::text, '') IS NULL
+			OR model = ($3::jsonb ->> group_id::text)
+		  )
+		GROUP BY group_id
+	`
+	rows, err := r.db.QueryContext(ctx, query, pq.Array(groupIDs), since, string(modelFilter))
+	if err != nil {
+		return nil, fmt.Errorf("group account degradation summaries: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make(map[int64]service.GroupAccountDegradationSummary, len(groupIDs))
+	for rows.Next() {
+		var summary service.GroupAccountDegradationSummary
+		var latest time.Time
+		if err := rows.Scan(
+			&summary.GroupID,
+			&summary.PassCount,
+			&summary.DegradedCount,
+			&summary.ErrorCount,
+			&latest,
+			&summary.LatestModel,
+		); err != nil {
+			return nil, err
+		}
+		summary.LatestCheckedAt = &latest
+		summary.SampleCount = summary.PassCount + summary.DegradedCount
+		out[summary.GroupID] = summary
+	}
+	return out, rows.Err()
+}
+
 func (r *channelMonitorRepository) InsertHistoryBatch(ctx context.Context, rows []*service.ChannelMonitorHistoryRow) error {
 	if len(rows) == 0 {
 		return nil

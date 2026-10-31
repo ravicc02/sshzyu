@@ -23,6 +23,9 @@ const (
 	accountSchedulerMaximumIntervalSeconds = 86400
 	accountSchedulerHistoryWindow          = 24 * time.Hour
 	accountSchedulerProbeWorkers           = 4
+	AccountDegradationReuseWindow          = 30 * time.Minute
+	DegradationSourceAccountAggregate      = "account_aggregate"
+	DegradationSourceChannelFallback       = "channel_fallback"
 )
 
 var (
@@ -75,6 +78,27 @@ type AccountDegradationStat struct {
 	LatestStatus     string
 	LatestCheckedAt  *time.Time
 	AverageLatencyMs float64
+}
+
+type GroupAccountDegradationSummary struct {
+	GroupID         int64
+	SampleCount     int64
+	PassCount       int64
+	DegradedCount   int64
+	ErrorCount      int64
+	LatestCheckedAt *time.Time
+	LatestModel     string
+}
+
+func (s GroupAccountDegradationSummary) IsFresh(now time.Time) bool {
+	return s.LatestCheckedAt != nil && now.Sub(*s.LatestCheckedAt) <= AccountDegradationReuseWindow
+}
+
+func (s GroupAccountDegradationSummary) PassRate() float64 {
+	if s.SampleCount <= 0 {
+		return 0
+	}
+	return float64(s.PassCount) / float64(s.SampleCount)
 }
 
 func (s AccountDegradationStat) SampleCount() int64 {
@@ -196,6 +220,10 @@ type AccountSchedulerRepository interface {
 	InsertProbe(ctx context.Context, probe *AccountDegradationProbe) error
 }
 
+type accountSchedulerProbeProfileReader interface {
+	ListGroupPrimaryModels(ctx context.Context, groupIDs []int64) (map[int64]string, error)
+}
+
 type AccountSchedulerService struct {
 	repo           AccountSchedulerRepository
 	accountTestSvc *AccountTestService
@@ -315,6 +343,7 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 
 	weight, _ := s.degradationWeight(ctx)
 	advancedEnabled, _ := s.advancedSchedulerEnabled(ctx)
+	probeModels := s.accountSchedulerGroupPrimaryModels(ctx, groups)
 	scoreMax := 0.0
 	if s.gateway != nil {
 		scoreMax = s.gateway.OpenAIAccountSchedulerScoreMaximum(ctx)
@@ -336,14 +365,13 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 			setting = AccountSchedulerGroupSetting{
 				GroupID:         group.ID,
 				IntervalSeconds: accountSchedulerDefaultIntervalSeconds,
-				TestModel:       firstAccountSchedulerModel(group.ModelCandidates),
 			}
 		}
 		if setting.IntervalSeconds <= 0 {
 			setting.IntervalSeconds = accountSchedulerDefaultIntervalSeconds
 		}
 		if degradationSupported && strings.TrimSpace(setting.TestModel) == "" {
-			setting.TestModel = firstAccountSchedulerModel(group.ModelCandidates)
+			setting.TestModel = resolveAccountSchedulerProbeModel(setting, group, probeModels[group.ID])
 		}
 		if !degradationSupported {
 			setting.DegradationEnabled = false
@@ -528,6 +556,7 @@ func (s *AccountSchedulerService) RunNow(ctx context.Context, input AccountSched
 		return nil, err
 	}
 	result := &AccountSchedulerRunResult{}
+	probeModels := s.accountSchedulerGroupPrimaryModels(ctx, groups)
 	for _, account := range accounts {
 		if input.AccountID > 0 && account.ID != input.AccountID {
 			continue
@@ -541,10 +570,7 @@ func (s *AccountSchedulerService) RunNow(ctx context.Context, input AccountSched
 			continue
 		}
 		setting := settings[account.GroupID]
-		model := strings.TrimSpace(setting.TestModel)
-		if model == "" && group != nil {
-			model = firstAccountSchedulerModel(group.ModelCandidates)
-		}
+		model := resolveAccountSchedulerProbeModel(setting, *group, probeModels[account.GroupID])
 		probe, err := s.runProbe(ctx, account, model)
 		if err != nil {
 			result.Failed++
@@ -593,6 +619,7 @@ func (s *AccountSchedulerService) RunScheduled(ctx context.Context) (*AccountSch
 	}
 
 	result := &AccountSchedulerRunResult{}
+	probeModels := s.accountSchedulerGroupPrimaryModels(ctx, groups)
 	var due []AccountSchedulerAccount
 	now := time.Now()
 	for _, account := range accounts {
@@ -618,10 +645,7 @@ func (s *AccountSchedulerService) RunScheduled(ctx context.Context) (*AccountSch
 		defer wg.Done()
 		setting := settings[account.GroupID]
 		group := findAccountSchedulerGroup(groups, account.GroupID)
-		model := strings.TrimSpace(setting.TestModel)
-		if model == "" && group != nil {
-			model = firstAccountSchedulerModel(group.ModelCandidates)
-		}
+		model := resolveAccountSchedulerProbeModel(setting, *group, probeModels[account.GroupID])
 		probe, err := s.runProbe(ctx, account, model)
 		mu.Lock()
 		defer mu.Unlock()
@@ -895,6 +919,42 @@ func firstAccountSchedulerModel(models []string) string {
 		}
 	}
 	return ""
+}
+
+func (s *AccountSchedulerService) accountSchedulerGroupPrimaryModels(
+	ctx context.Context,
+	groups []AccountSchedulerGroup,
+) map[int64]string {
+	reader, ok := s.repo.(accountSchedulerProbeProfileReader)
+	if !ok || len(groups) == 0 {
+		return map[int64]string{}
+	}
+	groupIDs := make([]int64, 0, len(groups))
+	for _, group := range groups {
+		if group.Platform == PlatformOpenAI {
+			groupIDs = append(groupIDs, group.ID)
+		}
+	}
+	models, err := reader.ListGroupPrimaryModels(ctx, groupIDs)
+	if err != nil {
+		logger.LegacyPrintf("service.account_scheduler", "[AccountScheduler] load monitor primary models failed: %v", err)
+		return map[int64]string{}
+	}
+	return models
+}
+
+func resolveAccountSchedulerProbeModel(
+	setting AccountSchedulerGroupSetting,
+	group AccountSchedulerGroup,
+	inheritedModel string,
+) string {
+	if model := strings.TrimSpace(setting.TestModel); model != "" {
+		return model
+	}
+	if model := strings.TrimSpace(inheritedModel); model != "" {
+		return model
+	}
+	return firstAccountSchedulerModel(group.ModelCandidates)
 }
 
 func isAccountSchedulerProbeModel(model string) bool {

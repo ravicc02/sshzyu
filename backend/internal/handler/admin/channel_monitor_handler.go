@@ -118,6 +118,11 @@ type channelMonitorResponse struct {
 	PrimaryStatus               string                               `json:"primary_status"`
 	IntelligenceStatus          string                               `json:"intelligence_status,omitempty"`
 	IntelligenceCheckedAt       *string                              `json:"intelligence_checked_at,omitempty"`
+	IntelligenceSource          string                               `json:"intelligence_source,omitempty"`
+	IntelligenceSamples         int64                                `json:"intelligence_samples,omitempty"`
+	IntelligencePassed          int64                                `json:"intelligence_passed,omitempty"`
+	IntelligenceFailed          int64                                `json:"intelligence_failed,omitempty"`
+	IntelligenceErrors          int64                                `json:"intelligence_errors,omitempty"`
 	PrimaryLatencyMs            *int                                 `json:"primary_latency_ms"`
 	Availability7d              float64                              `json:"availability_7d"`
 	ExtraModelsStatus           []dto.ChannelMonitorExtraModelStatus `json:"extra_models_status"`
@@ -298,12 +303,16 @@ func (h *ChannelMonitorHandler) batchSummaryFor(c *gin.Context, items []*service
 	ids := make([]int64, 0, len(items))
 	primaryByID := make(map[int64]string, len(items))
 	extrasByID := make(map[int64][]string, len(items))
+	groupByID := make(map[int64]int64, len(items))
 	for _, m := range items {
 		ids = append(ids, m.ID)
 		primaryByID[m.ID] = m.PrimaryModel
 		extrasByID[m.ID] = m.ExtraModels
+		if m.GroupID != nil {
+			groupByID[m.ID] = *m.GroupID
+		}
 	}
-	return h.monitorService.BatchMonitorStatusSummary(c.Request.Context(), ids, primaryByID, extrasByID)
+	return h.monitorService.BatchMonitorStatusSummary(c.Request.Context(), ids, primaryByID, extrasByID, groupByID)
 }
 
 // buildListItemResponse 把 monitor + summary 装成 admin list 的响应行。
@@ -316,6 +325,11 @@ func buildListItemResponse(m *service.ChannelMonitor, summary service.MonitorSta
 			checkedAt := summary.IntelligenceCheckedAt.UTC().Format(time.RFC3339)
 			resp.IntelligenceCheckedAt = &checkedAt
 		}
+		resp.IntelligenceSource = summary.IntelligenceSource
+		resp.IntelligenceSamples = summary.IntelligenceSamples
+		resp.IntelligencePassed = summary.IntelligencePassed
+		resp.IntelligenceFailed = summary.IntelligenceFailed
+		resp.IntelligenceErrors = summary.IntelligenceErrors
 	}
 	resp.PrimaryLatencyMs = summary.PrimaryLatencyMs
 	resp.Availability7d = summary.Availability7d

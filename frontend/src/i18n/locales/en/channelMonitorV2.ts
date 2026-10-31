@@ -32,6 +32,8 @@ export default {
       noData: 'No data', stale: 'Stale data', intelligencePending: 'Reasoning check not enabled',
       intelligenceActive: 'Active reasoning checks', intelligenceNotConfigured: 'OpenAI reasoning check not configured',
       intelligenceWaiting: 'Waiting for first result', intelligenceNotDegraded: 'Passed', intelligenceDegraded: 'Not passed', intelligenceError: 'Request error',
+      intelligenceAccountRate: 'Account aggregate {passed}/{samples} · {rate}%',
+      intelligenceAccountErrors: 'Account request errors {count}',
       multiplier: 'User multiplier {value}',
       providerBreakdown: 'Provider breakdown', providerCount: '{count} providers', providerNoData: 'No provider traffic',
       legend: { healthy: 'Healthy', warning: 'Warning', critical: 'Critical', noData: 'No records' },

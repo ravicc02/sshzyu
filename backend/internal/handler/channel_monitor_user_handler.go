@@ -69,6 +69,12 @@ type channelMonitorUserListItem struct {
 	Timeline             []channelMonitorUserTimelinePoint    `json:"timeline"`
 	IntelligenceTimeline []channelMonitorUserTimelinePoint    `json:"intelligence_timeline,omitempty"`
 	IntelligenceEnabled  bool                                 `json:"intelligence_enabled"`
+	IntelligenceStatus   string                               `json:"intelligence_status,omitempty"`
+	IntelligenceSource   string                               `json:"intelligence_source,omitempty"`
+	IntelligenceSamples  int64                                `json:"intelligence_samples,omitempty"`
+	IntelligencePassed   int64                                `json:"intelligence_passed,omitempty"`
+	IntelligenceFailed   int64                                `json:"intelligence_failed,omitempty"`
+	IntelligenceErrors   int64                                `json:"intelligence_errors,omitempty"`
 	// LatestQuota 主模型最近配额快照；channel_monitor_show_quota=false 时
 	// 由 userMonitorViewToItem 的调用方传入 false 剥离（服务端脱敏，非仅前端隐藏）。
 	LatestQuota *domain.MonitorQuotaSnapshot `json:"latest_quota,omitempty"`
@@ -129,6 +135,12 @@ func userMonitorViewToItem(v *service.UserMonitorView, includeQuota bool) channe
 		PrimaryModel:         v.PrimaryModel,
 		IntervalSeconds:      v.IntervalSeconds,
 		IntelligenceEnabled:  v.IntelligenceEnabled,
+		IntelligenceStatus:   v.IntelligenceStatus,
+		IntelligenceSource:   v.IntelligenceSource,
+		IntelligenceSamples:  v.IntelligenceSamples,
+		IntelligencePassed:   v.IntelligencePassed,
+		IntelligenceFailed:   v.IntelligenceFailed,
+		IntelligenceErrors:   v.IntelligenceErrors,
 		PrimaryStatus:        v.PrimaryStatus,
 		PrimaryLatencyMs:     v.PrimaryLatencyMs,
 		PrimaryPingLatencyMs: v.PrimaryPingLatencyMs,

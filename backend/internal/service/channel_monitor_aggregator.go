@@ -21,6 +21,7 @@ func (s *ChannelMonitorService) BatchMonitorStatusSummary(
 	ids []int64,
 	primaryByID map[int64]string,
 	extrasByID map[int64][]string,
+	groupByID map[int64]int64,
 ) map[int64]MonitorStatusSummary {
 	out := make(map[int64]MonitorStatusSummary, len(ids))
 	if len(ids) == 0 {
@@ -36,13 +37,29 @@ func (s *ChannelMonitorService) BatchMonitorStatusSummary(
 		slog.Warn("channel_monitor: batch compute availability failed", "error", err)
 		availMap = map[int64][]*ChannelMonitorAvailability{}
 	}
+	groupIDs := make([]int64, 0, len(groupByID))
+	modelByGroup := make(map[int64]string, len(groupByID))
+	for monitorID, groupID := range groupByID {
+		if groupID > 0 {
+			groupIDs = append(groupIDs, groupID)
+			modelByGroup[groupID] = primaryByID[monitorID]
+		}
+	}
+	accountDegradation := s.accountGroupDegradationSummaries(ctx, groupIDs, modelByGroup)
 
 	for _, id := range ids {
+		var accountSummary *GroupAccountDegradationSummary
+		if groupID := groupByID[id]; groupID > 0 {
+			if summary, ok := accountDegradation[groupID]; ok {
+				accountSummary = &summary
+			}
+		}
 		out[id] = buildStatusSummary(
 			indexLatestByModel(latestMap[id]),
 			indexAvailabilityByModel(availMap[id]),
 			primaryByID[id],
 			extrasByID[id],
+			accountSummary,
 		)
 	}
 	return out
@@ -64,8 +81,8 @@ func (s *ChannelMonitorService) ListUserView(ctx context.Context) ([]*UserMonito
 		return []*UserMonitorView{}, nil
 	}
 
-	ids, primaryByID, extrasByID := collectMonitorIndexes(monitors)
-	summaries := s.BatchMonitorStatusSummary(ctx, ids, primaryByID, extrasByID)
+	ids, primaryByID, extrasByID, groupByID := collectMonitorIndexes(monitors)
+	summaries := s.BatchMonitorStatusSummary(ctx, ids, primaryByID, extrasByID, groupByID)
 	latestMap := s.batchLatest(ctx, ids)
 	timelineMap := s.batchTimeline(ctx, ids, primaryByID)
 	intelligenceModels := make(map[int64]string)
@@ -83,8 +100,11 @@ func (s *ChannelMonitorService) ListUserView(ctx context.Context) ([]*UserMonito
 	for _, m := range monitors {
 		primaryLatest := pickLatest(latestMap[m.ID], m.PrimaryModel)
 		view := buildUserViewFromSummary(m, summaries[m.ID], primaryLatest, timelineMap[m.ID])
-		if _, ok := intelligenceModels[m.ID]; ok {
+		_, hasChannelIntelligence := intelligenceModels[m.ID]
+		if hasChannelIntelligence || summaries[m.ID].IntelligenceSource != "" {
 			view.IntelligenceEnabled = true
+		}
+		if hasChannelIntelligence {
 			view.IntelligenceTimeline = buildTimelinePoints(intelligenceTimeline[m.ID])
 		}
 		views = append(views, view)
@@ -93,16 +113,20 @@ func (s *ChannelMonitorService) ListUserView(ctx context.Context) ([]*UserMonito
 }
 
 // collectMonitorIndexes 把 monitors 列表按 ID 展开为聚合查询所需的三个索引结构。
-func collectMonitorIndexes(monitors []*ChannelMonitor) ([]int64, map[int64]string, map[int64][]string) {
+func collectMonitorIndexes(monitors []*ChannelMonitor) ([]int64, map[int64]string, map[int64][]string, map[int64]int64) {
 	ids := make([]int64, 0, len(monitors))
 	primaryByID := make(map[int64]string, len(monitors))
 	extrasByID := make(map[int64][]string, len(monitors))
+	groupByID := make(map[int64]int64, len(monitors))
 	for _, m := range monitors {
 		ids = append(ids, m.ID)
 		primaryByID[m.ID] = m.PrimaryModel
 		extrasByID[m.ID] = m.ExtraModels
+		if m.GroupID != nil {
+			groupByID[m.ID] = *m.GroupID
+		}
 	}
-	return ids, primaryByID, extrasByID
+	return ids, primaryByID, extrasByID, groupByID
 }
 
 // batchLatest 批量取 latest per model，失败仅日志（与现有 BatchMonitorStatusSummary 一致，不阻断列表渲染）。
@@ -213,11 +237,39 @@ func buildStatusSummary(
 	availByModel map[string]*ChannelMonitorAvailability,
 	primary string,
 	extras []string,
+	accountIntelligence *GroupAccountDegradationSummary,
 ) MonitorStatusSummary {
 	summary := MonitorStatusSummary{ExtraModels: make([]ExtraModelStatus, 0, len(extras))}
-	if l := latestByModel[monitorIntelligenceModel]; l != nil {
+	if accountIntelligence != nil && accountIntelligence.SampleCount+accountIntelligence.ErrorCount > 0 {
+		summary.IntelligenceSource = DegradationSourceAccountAggregate
+		summary.IntelligenceSamples = accountIntelligence.SampleCount
+		summary.IntelligencePassed = accountIntelligence.PassCount
+		summary.IntelligenceFailed = accountIntelligence.DegradedCount
+		summary.IntelligenceErrors = accountIntelligence.ErrorCount
+		summary.IntelligenceCheckedAt = accountIntelligence.LatestCheckedAt
+		switch rate := accountIntelligence.PassRate(); {
+		case accountIntelligence.SampleCount == 0:
+			summary.IntelligenceStatus = MonitorStatusError
+		case rate >= 0.8:
+			summary.IntelligenceStatus = MonitorStatusOperational
+		case rate >= 0.5:
+			summary.IntelligenceStatus = MonitorStatusDegraded
+		default:
+			summary.IntelligenceStatus = MonitorStatusFailed
+		}
+	} else if l := latestByModel[monitorIntelligenceModel]; l != nil {
 		summary.IntelligenceStatus = l.Status
 		summary.IntelligenceCheckedAt = &l.CheckedAt
+		summary.IntelligenceSource = DegradationSourceChannelFallback
+		summary.IntelligenceSamples = 1
+		if l.Status == MonitorStatusOperational {
+			summary.IntelligencePassed = 1
+		} else if l.Status == MonitorStatusError {
+			summary.IntelligenceErrors = 1
+			summary.IntelligenceSamples = 0
+		} else {
+			summary.IntelligenceFailed = 1
+		}
 	}
 	if primary != "" {
 		if l, ok := latestByModel[primary]; ok {
@@ -263,6 +315,12 @@ func buildUserViewFromSummary(
 		Availability7d:       summary.Availability7d,
 		ExtraModels:          summary.ExtraModels,
 		Timeline:             buildTimelinePoints(timelineEntries),
+		IntelligenceSource:   summary.IntelligenceSource,
+		IntelligenceStatus:   summary.IntelligenceStatus,
+		IntelligenceSamples:  summary.IntelligenceSamples,
+		IntelligencePassed:   summary.IntelligencePassed,
+		IntelligenceFailed:   summary.IntelligenceFailed,
+		IntelligenceErrors:   summary.IntelligenceErrors,
 	}
 	if primaryLatest != nil {
 		view.PrimaryPingLatencyMs = primaryLatest.PingLatencyMs

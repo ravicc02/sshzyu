@@ -72,6 +72,10 @@ type channelMonitorRecentTrafficReader interface {
 	HasRecentTrafficForGroup(ctx context.Context, groupID int64, since time.Time) (bool, error)
 }
 
+type channelMonitorAccountDegradationReader interface {
+	ListGroupAccountDegradationSummaries(ctx context.Context, groupIDs []int64, since time.Time, modelByGroup map[int64]string) (map[int64]GroupAccountDegradationSummary, error)
+}
+
 // ChannelMonitorService 渠道监控管理服务。
 type ChannelMonitorService struct {
 	repo      ChannelMonitorRepository
@@ -651,7 +655,16 @@ func (s *ChannelMonitorService) runCheck(ctx context.Context, id int64, schedule
 	var intelligence *CheckResult
 	var intelligenceGroup errgroup.Group
 	// A replace-mode request is static and cannot contain this question.
-	if shouldRunIntelligenceProbe(m) && (!scheduled || s.intelligenceCheckDue(ctx, m)) {
+	runIntelligence := shouldRunIntelligenceProbe(m)
+	if scheduled && runIntelligence {
+		groupID := int64(0)
+		if m.GroupID != nil {
+			groupID = *m.GroupID
+		}
+		runIntelligence = s.intelligenceCheckDue(ctx, m) &&
+			!s.hasFreshAccountDegradation(ctx, groupID, m.PrimaryModel)
+	}
+	if runIntelligence {
 		intelligenceGroup.Go(func() error {
 			intelligence = runIntelligenceCheckForModel(ctx, m.Endpoint, m.APIKey, m.PrimaryModel, &CheckOptions{
 				APIMode: m.APIMode, ExtraHeaders: m.ExtraHeaders,
@@ -721,6 +734,43 @@ func shouldRunIntelligenceProbe(m *ChannelMonitor) bool {
 	return m != nil && m.IntelligenceEnabled && m.Provider == MonitorProviderOpenAI &&
 		defaultCheckMode(m.CheckMode) != MonitorCheckModeQuota &&
 		m.BodyOverrideMode != MonitorBodyOverrideModeReplace
+}
+
+func (s *ChannelMonitorService) accountGroupDegradationSummaries(
+	ctx context.Context,
+	groupIDs []int64,
+	modelByGroup map[int64]string,
+) map[int64]GroupAccountDegradationSummary {
+	if len(groupIDs) == 0 {
+		return map[int64]GroupAccountDegradationSummary{}
+	}
+	reader, ok := s.repo.(channelMonitorAccountDegradationReader)
+	if !ok {
+		return map[int64]GroupAccountDegradationSummary{}
+	}
+	summaries, err := reader.ListGroupAccountDegradationSummaries(
+		ctx,
+		groupIDs,
+		time.Now().Add(-AccountDegradationReuseWindow),
+		modelByGroup,
+	)
+	if err != nil {
+		slog.Warn("channel_monitor: load account degradation summaries failed", "error", err)
+		return map[int64]GroupAccountDegradationSummary{}
+	}
+	return summaries
+}
+
+func (s *ChannelMonitorService) hasFreshAccountDegradation(ctx context.Context, groupID int64, model string) bool {
+	if groupID <= 0 {
+		return false
+	}
+	summary, ok := s.accountGroupDegradationSummaries(
+		ctx,
+		[]int64{groupID},
+		map[int64]string{groupID: strings.TrimSpace(model)},
+	)[groupID]
+	return ok && summary.IsFresh(time.Now())
 }
 
 func (s *ChannelMonitorService) persistIntelligenceResult(ctx context.Context, m *ChannelMonitor, result *CheckResult) {

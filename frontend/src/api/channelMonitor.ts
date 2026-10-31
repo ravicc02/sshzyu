@@ -39,6 +39,12 @@ export interface UserMonitorView {
   /** Separate OpenAI reasoning checks; never included in availability. */
   intelligence_timeline?: MonitorTimelinePoint[]
   intelligence_enabled?: boolean
+  intelligence_status?: MonitorStatus | ''
+  intelligence_source?: 'account_aggregate' | 'channel_fallback' | ''
+  intelligence_samples?: number
+  intelligence_passed?: number
+  intelligence_failed?: number
+  intelligence_errors?: number
   /**
    * 主模型最近配额快照。仅当系统开启 channel_monitor_show_quota 时
    * 服务端才会下发（关闭时服务端已剥离，前端 flag 仅作纵深防御）。
