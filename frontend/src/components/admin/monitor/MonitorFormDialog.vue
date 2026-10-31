@@ -577,7 +577,7 @@ watch(
     form.api_mode = API_MODE_CHAT_COMPLETIONS
     form.check_mode = CHECK_MODE_PROBE
     form.intelligence_enabled = false
-    if (!form.endpoint.trim()) form.endpoint = window.location.origin
+    if (!form.endpoint.trim()) form.endpoint = currentServiceEndpoint()
     void loadCompositeRoutes(groupId)
   },
   { immediate: true },
@@ -1071,8 +1071,13 @@ watch(
   { immediate: true },
 )
 
+function currentServiceEndpoint(): string {
+  const endpoint = appStore.apiBaseUrl.trim() || window.location.origin
+  return endpoint.replace(/\/+$/, '')
+}
+
 function useCurrentDomain() {
-  form.endpoint = window.location.origin
+  form.endpoint = currentServiceEndpoint()
 }
 
 async function openMyKeyPicker() {
