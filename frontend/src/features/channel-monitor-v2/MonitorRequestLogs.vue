@@ -18,67 +18,107 @@
     <p v-if="!groups.length" class="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400">
       {{ t('channelMonitorV2.requestLogs.selectGroups') }}
     </p>
-    <div v-else class="overflow-hidden rounded-lg border border-gray-200 dark:border-dark-700">
-      <div class="overflow-x-auto">
-        <table class="min-w-[860px] w-full text-left text-xs">
-          <thead class="bg-gray-50 text-[11px] font-semibold text-gray-500 dark:bg-dark-800 dark:text-gray-400">
-            <tr>
-              <th class="px-3 py-2.5">{{ t('channelMonitorV2.requestLogs.columns.time') }}</th>
-              <th class="px-3 py-2.5">{{ t('channelMonitorV2.requestLogs.columns.group') }}</th>
-              <th class="px-3 py-2.5">{{ t('channelMonitorV2.requestLogs.columns.key') }}</th>
-              <th class="px-3 py-2.5">{{ t('channelMonitorV2.requestLogs.columns.account') }}</th>
-              <th class="px-3 py-2.5">{{ t('channelMonitorV2.requestLogs.columns.model') }}</th>
-              <th class="px-3 py-2.5">{{ t('channelMonitorV2.requestLogs.columns.status') }}</th>
-              <th class="px-3 py-2.5">{{ t('channelMonitorV2.requestLogs.columns.intelligence') }}</th>
-              <th class="px-3 py-2.5 text-right">{{ t('channelMonitorV2.requestLogs.columns.action') }}</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
-            <tr v-if="loading && !items.length">
-              <td colspan="8" class="px-3 py-8 text-center text-gray-500">{{ t('common.loading') }}</td>
-            </tr>
-            <tr v-else-if="!items.length">
-              <td colspan="8" class="px-3 py-8 text-center text-gray-500">{{ t('channelMonitorV2.requestLogs.empty') }}</td>
-            </tr>
-            <template v-else>
-              <tr v-for="item in items" :key="item.id" class="hover:bg-gray-50/70 dark:hover:bg-dark-700/40">
-                <td class="whitespace-nowrap px-3 py-2.5 text-gray-500 dark:text-gray-400">{{ formatTime(item.created_at) }}</td>
-                <td class="max-w-[180px] px-3 py-2.5">
-                  <span class="block truncate font-medium text-gray-800 dark:text-gray-100" :title="item.group_name">{{ item.group_name || `#${item.group_id}` }}</span>
-                  <span class="mt-0.5 block text-[10px] text-gray-400">{{ item.group_platform }}</span>
-                </td>
-                <td class="max-w-[150px] px-3 py-2.5">
-                  <span class="block truncate text-gray-700 dark:text-gray-200" :title="item.api_key_name">{{ item.api_key_name || `#${item.api_key_id}` }}</span>
-                </td>
-                <td class="max-w-[150px] px-3 py-2.5">
-                  <span class="block truncate text-gray-700 dark:text-gray-200" :title="item.account_name">{{ item.account_name || `#${item.account_id}` }}</span>
-                  <span class="mt-0.5 block text-[10px] text-gray-400">{{ item.account_platform }}</span>
-                </td>
-                <td class="max-w-[190px] px-3 py-2.5">
-                  <span class="block truncate font-mono text-[11px] text-gray-700 dark:text-gray-200" :title="modelTitle(item)">{{ item.model }}</span>
-                </td>
-                <td class="px-3 py-2.5">
-                  <span class="rounded-full px-2 py-0.5 font-semibold" :class="requestStatusClass(item)">
-                    {{ item.success ? t('channelMonitorV2.requestLogs.success') : t('channelMonitorV2.requestLogs.failed') }}
-                  </span>
-                </td>
-                <td class="px-3 py-2.5">
-                  <span v-if="item.intelligence_status" class="rounded-full px-2 py-0.5 font-semibold" :class="intelligenceClass(item)">
-                    {{ intelligenceLabel(item) }}
-                  </span>
-                  <span v-else class="text-gray-400">—</span>
-                </td>
-                <td class="px-3 py-2.5 text-right">
-                  <button type="button" class="btn btn-ghost btn-sm" @click="selected = item">
-                    {{ t('channelMonitorV2.requestLogs.details') }}
-                  </button>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
+    <template v-else>
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="relative min-w-[180px] flex-1">
+          <Icon name="search" size="sm" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            v-model.trim="searchQuery"
+            type="search"
+            class="input w-full pl-9"
+            :placeholder="t('channelMonitorV2.requestLogs.searchPlaceholder')"
+            :aria-label="t('channelMonitorV2.requestLogs.searchPlaceholder')"
+          />
+        </label>
+        <select v-model="groupFilter" class="input w-full sm:w-[180px]" :aria-label="t('channelMonitorV2.requestLogs.filterGroup')">
+          <option value="">{{ t('channelMonitorV2.requestLogs.allGroups') }}</option>
+          <option v-for="group in groupOptions" :key="group.id" :value="String(group.id)">{{ group.name }}</option>
+        </select>
+        <select v-model="requestFilter" class="input w-full sm:w-[140px]" :aria-label="t('channelMonitorV2.requestLogs.filterResult')">
+          <option value="">{{ t('channelMonitorV2.requestLogs.allResults') }}</option>
+          <option value="success">{{ t('channelMonitorV2.requestLogs.success') }}</option>
+          <option value="failed">{{ t('channelMonitorV2.requestLogs.failed') }}</option>
+        </select>
+        <select v-model="intelligenceFilter" class="input w-full sm:w-[150px]" :aria-label="t('channelMonitorV2.requestLogs.filterIntelligence')">
+          <option value="">{{ t('channelMonitorV2.requestLogs.allIntelligence') }}</option>
+          <option value="operational">{{ t('channelMonitorV2.groupCards.intelligenceNotDegraded') }}</option>
+          <option value="failed">{{ t('channelMonitorV2.groupCards.intelligenceDegraded') }}</option>
+          <option value="error">{{ t('channelMonitorV2.groupCards.intelligenceError') }}</option>
+          <option value="none">{{ t('channelMonitorV2.requestLogs.noIntelligence') }}</option>
+        </select>
       </div>
-    </div>
+
+      <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-dark-700">
+        <div class="overflow-x-auto">
+          <table class="min-w-[720px] w-full text-left text-xs">
+            <thead class="bg-gray-50 text-[11px] font-semibold text-gray-500 dark:bg-dark-800 dark:text-gray-400">
+              <tr>
+                <th class="px-3 py-2.5">{{ t('channelMonitorV2.requestLogs.columns.time') }}</th>
+                <th class="px-3 py-2.5">{{ t('channelMonitorV2.requestLogs.columns.group') }}</th>
+                <th class="px-3 py-2.5">{{ t('channelMonitorV2.requestLogs.columns.account') }}</th>
+                <th class="px-3 py-2.5">{{ t('channelMonitorV2.requestLogs.columns.model') }}</th>
+                <th class="px-3 py-2.5">{{ t('channelMonitorV2.requestLogs.columns.status') }}</th>
+                <th class="px-3 py-2.5">{{ t('channelMonitorV2.requestLogs.columns.intelligence') }}</th>
+                <th class="px-3 py-2.5 text-right">{{ t('channelMonitorV2.requestLogs.columns.action') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
+              <tr v-if="loading && !items.length">
+                <td colspan="7" class="px-3 py-8 text-center text-gray-500">{{ t('common.loading') }}</td>
+              </tr>
+              <tr v-else-if="!filteredItems.length">
+                <td colspan="7" class="px-3 py-8 text-center text-gray-500">{{ t('channelMonitorV2.requestLogs.filteredEmpty') }}</td>
+              </tr>
+              <template v-else>
+                <tr v-for="item in pagedItems" :key="item.id" class="hover:bg-gray-50/70 dark:hover:bg-dark-700/40">
+                  <td class="whitespace-nowrap px-3 py-2.5 text-gray-500 dark:text-gray-400">{{ formatTime(item.created_at) }}</td>
+                  <td class="max-w-[180px] px-3 py-2.5">
+                    <span class="block truncate font-medium text-gray-800 dark:text-gray-100" :title="item.group_name">{{ item.group_name || `#${item.group_id}` }}</span>
+                    <span class="mt-0.5 block text-[10px] text-gray-400">{{ item.group_platform }}</span>
+                  </td>
+                  <td class="max-w-[150px] px-3 py-2.5">
+                    <span class="block truncate text-gray-700 dark:text-gray-200" :title="item.account_name">{{ item.account_name || `#${item.account_id}` }}</span>
+                    <span class="mt-0.5 block text-[10px] text-gray-400">{{ item.account_platform }}</span>
+                  </td>
+                  <td class="max-w-[190px] px-3 py-2.5">
+                    <span class="block truncate font-mono text-[11px] text-gray-700 dark:text-gray-200" :title="modelTitle(item)">{{ item.model }}</span>
+                  </td>
+                  <td class="px-3 py-2.5">
+                    <span class="rounded-full px-2 py-0.5 font-semibold" :class="requestStatusClass(item)">
+                      {{ item.success ? t('channelMonitorV2.requestLogs.success') : t('channelMonitorV2.requestLogs.failed') }}
+                    </span>
+                  </td>
+                  <td class="px-3 py-2.5">
+                    <span v-if="item.intelligence_status" class="rounded-full px-2 py-0.5 font-semibold" :class="intelligenceClass(item)">
+                      {{ intelligenceLabel(item) }}
+                    </span>
+                    <span v-else class="text-gray-400">—</span>
+                  </td>
+                  <td class="px-3 py-2.5 text-right">
+                    <button type="button" class="btn btn-ghost btn-sm" @click="selected = item">
+                      {{ t('channelMonitorV2.requestLogs.details') }}
+                    </button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
+        <span>{{ t('channelMonitorV2.requestLogs.retained', { count: items.length }) }}</span>
+        <div class="flex items-center gap-2">
+          <button type="button" class="btn btn-ghost btn-sm" :aria-label="t('channelMonitorV2.requestLogs.previousPage')" :disabled="page <= 1" @click="page--">
+            <Icon name="chevronLeft" size="sm" />
+          </button>
+          <span class="min-w-12 text-center tabular-nums">{{ page }} / {{ pageCount }}</span>
+          <button type="button" class="btn btn-ghost btn-sm" :aria-label="t('channelMonitorV2.requestLogs.nextPage')" :disabled="page >= pageCount" @click="page++">
+            <Icon name="chevronRight" size="sm" />
+          </button>
+        </div>
+      </div>
+    </template>
 
     <BaseDialog
       :show="selected != null"
@@ -99,10 +139,6 @@
           <div>
             <dt class="text-xs text-gray-500">{{ t('channelMonitorV2.requestLogs.columns.group') }}</dt>
             <dd class="mt-1 font-medium text-gray-900 dark:text-gray-100">{{ selected.group_name || `#${selected.group_id}` }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs text-gray-500">{{ t('channelMonitorV2.requestLogs.columns.key') }}</dt>
-            <dd class="mt-1 font-medium text-gray-900 dark:text-gray-100">{{ selected.api_key_name || `#${selected.api_key_id}` }}</dd>
           </div>
           <div>
             <dt class="text-xs text-gray-500">{{ t('channelMonitorV2.requestLogs.columns.account') }}</dt>
@@ -150,7 +186,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { AdminGroup } from '@/types'
 import type { MonitorRequestLog } from '@/api/channelMonitorV2'
@@ -171,8 +207,39 @@ const appStore = useAppStore()
 const loading = ref(false)
 const items = ref<MonitorRequestLog[]>([])
 const selected = ref<MonitorRequestLog | null>(null)
+const searchQuery = ref('')
+const groupFilter = ref('')
+const requestFilter = ref('')
+const intelligenceFilter = ref('')
+const page = ref(1)
+const pageSize = 10
 let controller: AbortController | null = null
 let timer: number | null = null
+
+const groupOptions = computed(() => {
+  const groups = new Map<number, string>()
+  for (const item of items.value) groups.set(item.group_id, item.group_name || `#${item.group_id}`)
+  return [...groups].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+})
+
+const filteredItems = computed(() => {
+  const query = searchQuery.value.toLowerCase()
+  return items.value.filter((item) => {
+    const matchesQuery = !query || [item.group_name, item.account_name, item.model, item.upstream_model]
+      .some((value) => value?.toLowerCase().includes(query))
+    const matchesGroup = !groupFilter.value || String(item.group_id) === groupFilter.value
+    const matchesRequest = requestFilter.value === 'success' ? item.success : requestFilter.value === 'failed' ? !item.success : true
+    const matchesIntelligence =
+      intelligenceFilter.value === 'none' ? !item.intelligence_status :
+      intelligenceFilter.value === 'error' ? ['error', 'degraded'].includes(item.intelligence_status) :
+      intelligenceFilter.value ? item.intelligence_status === intelligenceFilter.value :
+      true
+    return matchesQuery && matchesGroup && matchesRequest && matchesIntelligence
+  })
+})
+
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredItems.value.length / pageSize)))
+const pagedItems = computed(() => filteredItems.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 
 function groupScope() {
   return [...new Set(props.groups.map(group => group.id).filter(id => id > 0))].sort((a, b) => a - b)
@@ -195,7 +262,7 @@ async function load() {
       platforms: [],
       groupIds,
       models: [],
-    }, true, 100, request.signal)
+    }, true, 50, request.signal)
     items.value = result.items || []
   } catch (error) {
     if ((error as { name?: string }).name !== 'CanceledError') {
@@ -245,6 +312,14 @@ watch(
   () => void load(),
   { immediate: true },
 )
+
+watch([searchQuery, groupFilter, requestFilter, intelligenceFilter], () => {
+  page.value = 1
+})
+
+watch(pageCount, (count) => {
+  if (page.value > count) page.value = count
+})
 
 onMounted(() => {
   timer = window.setInterval(() => {
