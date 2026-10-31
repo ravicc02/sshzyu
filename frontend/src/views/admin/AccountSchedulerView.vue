@@ -171,7 +171,7 @@
                 <span class="section-label">实时排名</span>
                 <strong>账号调度顺序</strong>
               </div>
-              <p>错误请求单独计数，不进入降智率。</p>
+              <p>单次未通过不等同账号降智；错误请求单独计数，不进入降智率。</p>
             </div>
 
             <div class="ranking-table-wrap">
@@ -438,7 +438,7 @@ function platformLabel(platform: string) {
 }
 
 function probeStatusLabel(status: string) {
-  return ({ pass: '通过', degraded: '降智', error: '请求失败' } as Record<string, string>)[status] || '未测试'
+  return ({ pass: '通过', degraded: '未通过', error: '请求失败' } as Record<string, string>)[status] || '未测试'
 }
 
 function formatRate(rate?: number) {

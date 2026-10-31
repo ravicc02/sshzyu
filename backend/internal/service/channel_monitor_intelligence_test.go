@@ -60,12 +60,12 @@ func TestIntelligenceRequestBodyPreservesQuestionAndEnoughOutputTokens(t *testin
 			if mode == MonitorAPIModeResponses {
 				require.Equal(t, monitorIntelligencePrompt, data["input"])
 				require.Equal(t, float64(2048), data["max_output_tokens"])
-				require.Equal(t, "high", data["reasoning"].(map[string]any)["effort"])
+				require.Equal(t, "medium", data["reasoning"].(map[string]any)["effort"])
 			} else {
 				messages := data["messages"].([]any)
 				require.Equal(t, monitorIntelligencePrompt, messages[0].(map[string]any)["content"])
 				require.Equal(t, float64(2048), data["max_tokens"])
-				require.Equal(t, "high", data["reasoning_effort"])
+				require.Equal(t, "medium", data["reasoning_effort"])
 			}
 		})
 	}

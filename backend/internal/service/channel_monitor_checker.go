@@ -476,10 +476,10 @@ func buildRequestBody(adapter providerAdapter, provider, apiMode, model, prompt 
 		if apiMode == MonitorAPIModeResponses {
 			reasoningBody["max_output_tokens"] = 2048
 			reasoningBody["instructions"] = "Return only the single final numerical answer. Do not include reasoning, labels, units, or any other number."
-			reasoningBody["reasoning"] = map[string]any{"effort": "high"}
+			reasoningBody["reasoning"] = map[string]any{"effort": "medium"}
 		} else {
 			reasoningBody["max_tokens"] = 2048
-			reasoningBody["reasoning_effort"] = "high"
+			reasoningBody["reasoning_effort"] = "medium"
 		}
 		defaultBody, err = json.Marshal(reasoningBody)
 		if err != nil {

@@ -31,7 +31,7 @@ export default {
       buckets: '20 intervals', recentChecks: 'Latest 20 active probes',
       noData: 'No data', stale: 'Stale data', intelligencePending: 'Reasoning check not enabled',
       intelligenceActive: 'Active reasoning checks', intelligenceNotConfigured: 'OpenAI reasoning check not configured',
-      intelligenceWaiting: 'Waiting for first result', intelligenceNotDegraded: 'Not degraded', intelligenceDegraded: 'Degraded', intelligenceError: 'Check error',
+      intelligenceWaiting: 'Waiting for first result', intelligenceNotDegraded: 'Passed', intelligenceDegraded: 'Not passed', intelligenceError: 'Request error',
       multiplier: 'User multiplier {value}',
       providerBreakdown: 'Provider breakdown', providerCount: '{count} providers', providerNoData: 'No provider traffic',
       legend: { healthy: 'Healthy', warning: 'Warning', critical: 'Critical', noData: 'No records' },
