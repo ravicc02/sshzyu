@@ -25,7 +25,10 @@ const (
 	accountSchedulerProbeWorkers           = 4
 )
 
-var ErrAccountSchedulerInvalidSetting = errors.New("invalid account scheduler setting")
+var (
+	ErrAccountSchedulerInvalidSetting = errors.New("invalid account scheduler setting")
+	ErrAccountSchedulerOpenAIOnly     = errors.New("degradation probes only support OpenAI groups")
+)
 
 type AccountSchedulerGroup struct {
 	ID              int64
@@ -115,17 +118,18 @@ type AccountSchedulerOverview struct {
 }
 
 type AccountSchedulerGroupView struct {
-	ID                 int64                 `json:"id"`
-	Name               string                `json:"name"`
-	Platform           string                `json:"platform"`
-	Status             string                `json:"status"`
-	DegradationEnabled bool                  `json:"degradation_enabled"`
-	IntervalSeconds    int                   `json:"interval_seconds"`
-	TestModel          string                `json:"test_model"`
-	ModelCandidates    []string              `json:"model_candidates"`
-	OAuthFirst         bool                  `json:"oauth_first"`
-	LowestAccountID    *int64                `json:"lowest_account_id,omitempty"`
-	Accounts           []AccountSchedulerRow `json:"accounts"`
+	ID                   int64                 `json:"id"`
+	Name                 string                `json:"name"`
+	Platform             string                `json:"platform"`
+	DegradationSupported bool                  `json:"degradation_supported"`
+	Status               string                `json:"status"`
+	DegradationEnabled   bool                  `json:"degradation_enabled"`
+	IntervalSeconds      int                   `json:"interval_seconds"`
+	TestModel            string                `json:"test_model"`
+	ModelCandidates      []string              `json:"model_candidates"`
+	OAuthFirst           bool                  `json:"oauth_first"`
+	LowestAccountID      *int64                `json:"lowest_account_id,omitempty"`
+	Accounts             []AccountSchedulerRow `json:"accounts"`
 }
 
 type AccountSchedulerRow struct {
@@ -321,16 +325,7 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 
 	for _, group := range groups {
 		groupAccounts := accountsByGroup[group.ID]
-		hasScoredAccount := false
-		for _, account := range groupAccounts {
-			if (&Account{Platform: account.Platform}).IsOpenAICompatible() {
-				hasScoredAccount = true
-				break
-			}
-		}
-		if !hasScoredAccount {
-			continue
-		}
+		degradationSupported := accountSchedulerGroupSupportsDegradation(group)
 		setting := settings[group.ID]
 		if setting.GroupID == 0 {
 			setting = AccountSchedulerGroupSetting{
@@ -342,15 +337,26 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 		if setting.IntervalSeconds <= 0 {
 			setting.IntervalSeconds = accountSchedulerDefaultIntervalSeconds
 		}
-		if strings.TrimSpace(setting.TestModel) == "" {
+		if degradationSupported && strings.TrimSpace(setting.TestModel) == "" {
 			setting.TestModel = firstAccountSchedulerModel(group.ModelCandidates)
+		}
+		if !degradationSupported {
+			setting.DegradationEnabled = false
+			setting.TestModel = ""
 		}
 
 		rows := make([]AccountSchedulerRow, 0, len(groupAccounts))
 		oauthFirst := false
 		availableCount := 0
+		groupHasStats := false
 		for _, account := range groupAccounts {
-			stat := statsByKey[accountSchedulerStatKey(group.ID, account.ID)]
+			stat := AccountDegradationStat{}
+			if degradationSupported {
+				stat = statsByKey[accountSchedulerStatKey(group.ID, account.ID)]
+				if stat.SampleCount() > 0 || stat.ErrorCount > 0 {
+					groupHasStats = true
+				}
+			}
 			available, reason := accountSchedulerAccountAvailability(account)
 			if available {
 				availableCount++
@@ -374,30 +380,37 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 				LatestStatus:       stat.LatestStatus,
 				LatestCheckedAt:    stat.LatestCheckedAt,
 				AverageLatencyMs:   stat.AverageLatencyMs,
-				ScoreWeight:        weight,
 			}
-			if rate, ok := stat.DegradationRate(); ok {
-				row.DegradationRate = &rate
-				row.DegradationFactor = 1 - rate
-			} else {
-				row.DegradationFactor = 0.5
+			if degradationSupported {
+				row.ScoreWeight = weight
+				if rate, ok := stat.DegradationRate(); ok {
+					row.DegradationRate = &rate
+					row.DegradationFactor = 1 - rate
+				} else {
+					row.DegradationFactor = 0.5
+				}
 			}
 			rows = append(rows, row)
 		}
 
-		s.applyScores(ctx, group.ID, groupAccounts, rows)
-		markLowestAccountDegradation(rows)
+		if degradationSupported {
+			s.applyScores(ctx, group.ID, groupAccounts, rows)
+			markLowestAccountDegradation(rows)
+		} else {
+			rankAccountSchedulerRowsByAvailability(rows)
+		}
 		groupView := AccountSchedulerGroupView{
-			ID:                 group.ID,
-			Name:               group.Name,
-			Platform:           group.Platform,
-			Status:             group.Status,
-			DegradationEnabled: setting.DegradationEnabled,
-			IntervalSeconds:    setting.IntervalSeconds,
-			TestModel:          setting.TestModel,
-			ModelCandidates:    group.ModelCandidates,
-			OAuthFirst:         oauthFirst,
-			Accounts:           rows,
+			ID:                   group.ID,
+			Name:                 group.Name,
+			Platform:             group.Platform,
+			DegradationSupported: degradationSupported,
+			Status:               group.Status,
+			DegradationEnabled:   setting.DegradationEnabled,
+			IntervalSeconds:      setting.IntervalSeconds,
+			TestModel:            setting.TestModel,
+			ModelCandidates:      group.ModelCandidates,
+			OAuthFirst:           oauthFirst,
+			Accounts:             rows,
 		}
 		for i := range rows {
 			if rows[i].LowestDegradation {
@@ -409,10 +422,10 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 		overview.Groups = append(overview.Groups, groupView)
 		overview.TotalAccounts += len(rows)
 		overview.AvailableAccounts += availableCount
-		if setting.DegradationEnabled {
+		if degradationSupported && setting.DegradationEnabled {
 			overview.EnabledGroups++
 		}
-		if len(stats) > 0 && len(rows) > 0 {
+		if degradationSupported && groupHasStats {
 			overview.TestedGroups++
 		}
 	}
@@ -423,6 +436,17 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 func (s *AccountSchedulerService) UpdateSetting(ctx context.Context, input AccountSchedulerSettingInput) (*AccountSchedulerGroupSetting, error) {
 	if input.GroupID <= 0 {
 		return nil, ErrAccountSchedulerInvalidSetting
+	}
+	groups, err := s.repo.ListGroups(ctx)
+	if err != nil {
+		return nil, err
+	}
+	group := findAccountSchedulerGroup(groups, input.GroupID)
+	if group == nil {
+		return nil, ErrAccountSchedulerInvalidSetting
+	}
+	if !accountSchedulerGroupSupportsDegradation(*group) {
+		return nil, ErrAccountSchedulerOpenAIOnly
 	}
 	settings, err := s.repo.ListGroupSettings(ctx)
 	if err != nil {
@@ -480,6 +504,13 @@ func (s *AccountSchedulerService) RunNow(ctx context.Context, input AccountSched
 	}
 	groupIDs := make([]int64, 0, len(groups))
 	if input.GroupID > 0 {
+		group := findAccountSchedulerGroup(groups, input.GroupID)
+		if group == nil {
+			return nil, ErrAccountSchedulerInvalidSetting
+		}
+		if !accountSchedulerGroupSupportsDegradation(*group) {
+			return nil, ErrAccountSchedulerOpenAIOnly
+		}
 		groupIDs = append(groupIDs, input.GroupID)
 	} else {
 		for _, group := range groups {
@@ -495,12 +526,19 @@ func (s *AccountSchedulerService) RunNow(ctx context.Context, input AccountSched
 		if input.AccountID > 0 && account.ID != input.AccountID {
 			continue
 		}
+		group := findAccountSchedulerGroup(groups, account.GroupID)
+		if group == nil || !accountSchedulerGroupSupportsDegradation(*group) {
+			if input.AccountID > 0 {
+				return nil, ErrAccountSchedulerOpenAIOnly
+			}
+			result.Skipped++
+			continue
+		}
 		setting := settings[account.GroupID]
 		if input.AccountID <= 0 && !setting.DegradationEnabled {
 			result.Skipped++
 			continue
 		}
-		group := findAccountSchedulerGroup(groups, account.GroupID)
 		model := strings.TrimSpace(setting.TestModel)
 		if model == "" && group != nil {
 			model = firstAccountSchedulerModel(group.ModelCandidates)
@@ -531,7 +569,8 @@ func (s *AccountSchedulerService) RunScheduled(ctx context.Context) (*AccountSch
 	}
 	groupIDs := make([]int64, 0)
 	for groupID, setting := range settings {
-		if setting.DegradationEnabled {
+		group := findAccountSchedulerGroup(groups, groupID)
+		if setting.DegradationEnabled && group != nil && accountSchedulerGroupSupportsDegradation(*group) {
 			groupIDs = append(groupIDs, groupID)
 		}
 	}
@@ -839,11 +878,58 @@ func accountSchedulerStatKey(groupID, accountID int64) string {
 
 func firstAccountSchedulerModel(models []string) string {
 	for _, model := range models {
-		if value := strings.TrimSpace(model); value != "" {
+		value := strings.TrimSpace(model)
+		if value == "" || !isAccountSchedulerProbeModel(value) {
+			continue
+		}
+		if strings.Contains(strings.ToLower(value), "-sol") {
+			return value
+		}
+	}
+	for _, model := range models {
+		value := strings.TrimSpace(model)
+		if value != "" && isAccountSchedulerProbeModel(value) {
 			return value
 		}
 	}
 	return ""
+}
+
+func isAccountSchedulerProbeModel(model string) bool {
+	lower := strings.ToLower(strings.TrimSpace(model))
+	if lower == "" {
+		return false
+	}
+	for _, excluded := range []string{
+		"codex-auto-review",
+		"embedding",
+		"tts",
+		"whisper",
+		"audio",
+		"image",
+		"realtime",
+	} {
+		if strings.Contains(lower, excluded) {
+			return false
+		}
+	}
+	return strings.HasPrefix(lower, "gpt-")
+}
+
+func accountSchedulerGroupSupportsDegradation(group AccountSchedulerGroup) bool {
+	return strings.EqualFold(strings.TrimSpace(group.Platform), PlatformOpenAI)
+}
+
+func rankAccountSchedulerRowsByAvailability(rows []AccountSchedulerRow) {
+	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i].Available != rows[j].Available {
+			return rows[i].Available
+		}
+		return rows[i].ID < rows[j].ID
+	})
+	for i := range rows {
+		rows[i].Rank = i + 1
+	}
 }
 
 func findAccountSchedulerGroup(groups []AccountSchedulerGroup, groupID int64) *AccountSchedulerGroup {

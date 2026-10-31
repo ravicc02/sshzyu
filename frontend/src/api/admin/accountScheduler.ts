@@ -27,6 +27,7 @@ export interface AccountSchedulerGroup {
   id: number
   name: string
   platform: string
+  degradation_supported: boolean
   status: string
   degradation_enabled: boolean
   interval_seconds: number

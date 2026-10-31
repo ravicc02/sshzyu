@@ -28,6 +28,7 @@
               {{ loading ? "刷新中" : "刷新" }}
             </button>
             <button
+              v-if="supportsDegradation"
               type="button"
               class="btn btn-primary"
               :disabled="!selectedGroup || !hasChanges || saving"
@@ -94,7 +95,7 @@
         >
           <Icon name="chartBar" size="lg" />
           <h2>暂无可调度分组</h2>
-          <p>分组关联 OpenAI 兼容账号后会出现在这里。</p>
+          <p>活跃分组及关联账号会出现在这里。</p>
         </section>
 
         <template v-else>
@@ -113,14 +114,26 @@
                       ? `${platformLabel(selectedGroup.platform)} · ${selectedGroup.accounts.length} 个账号`
                       : "请选择分组"
                   }}
-                  · 单次未通过不等同账号降智
+                  ·
+                  {{
+                    supportsDegradation
+                      ? "单次未通过不等同账号降智"
+                      : "仅按账号可用性排名"
+                  }}
                 </p>
               </div>
               <div class="actions">
                 <span v-if="selectedGroup" class="mode-label">
-                  {{ selectedGroup.oauth_first ? "OAuth 优先" : "统一评分池" }}
+                  {{
+                    supportsDegradation
+                      ? selectedGroup.oauth_first
+                        ? "OAuth 优先"
+                        : "统一评分池"
+                      : "仅可用性"
+                  }}
                 </span>
                 <button
+                  v-if="supportsDegradation"
                   type="button"
                   class="btn btn-secondary"
                   :disabled="!selectedGroup || running"
@@ -158,12 +171,12 @@
                 <option value="">全部可用性</option>
                 <option value="available">仅可用账号</option>
                 <option value="unavailable">仅不可用账号</option>
-                <option value="degraded">存在未通过记录</option>
+                <option v-if="supportsDegradation" value="degraded">存在未通过记录</option>
                 <option value="oauth">仅 OAuth 账号</option>
               </select>
             </div>
 
-            <div class="config-band">
+            <div v-if="supportsDegradation" class="config-band">
               <div class="config-intro">
                 <span>自动探测配置</span>
                 <strong :class="{ enabled: draft.enabled }">{{
@@ -227,18 +240,28 @@
                 </label>
               </div>
             </div>
+            <div v-else class="availability-note">
+              <Icon name="check" size="sm" />
+              <div>
+                <strong>按账号可用性排序</strong>
+                <span>该类型分组不执行降智探测，只显示可用、冷却和停调状态。</span>
+              </div>
+            </div>
 
             <div class="table-scroll">
-              <table class="ranking-table">
+              <table
+                class="ranking-table"
+                :class="{ 'availability-only': !supportsDegradation }"
+              >
                 <thead>
                   <tr>
                     <th class="rank-column">排名</th>
                     <th>账号</th>
                     <th>可用性</th>
-                    <th>最近降智率</th>
-                    <th>调度分</th>
-                    <th>最近探测</th>
-                    <th class="action-column">操作</th>
+                    <th v-if="supportsDegradation">最近降智率</th>
+                    <th v-if="supportsDegradation">调度分</th>
+                    <th v-if="supportsDegradation">最近探测</th>
+                    <th v-if="supportsDegradation" class="action-column">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -256,7 +279,7 @@
                           account.name
                         }}</strong>
                         <span
-                          v-if="account.lowest_degradation"
+                          v-if="supportsDegradation && account.lowest_degradation"
                           class="lowest-badge"
                           >最低降智</span
                         >
@@ -280,7 +303,7 @@
                       </span>
                       <small>{{ account.oauth ? "OAuth" : "API Key" }}</small>
                     </td>
-                    <td>
+                    <td v-if="supportsDegradation">
                       <div class="value-stack">
                         <strong :class="rateClass(account.degradation_rate)">
                           {{ formatRate(account.degradation_rate) }}
@@ -292,7 +315,7 @@
                         >
                       </div>
                     </td>
-                    <td>
+                    <td v-if="supportsDegradation">
                       <div class="value-stack">
                         <strong>{{ formatScore(account.score) }}</strong>
                         <small
@@ -301,7 +324,7 @@
                         >
                       </div>
                     </td>
-                    <td>
+                    <td v-if="supportsDegradation">
                       <div class="value-stack">
                         <span
                           class="probe-status"
@@ -314,7 +337,7 @@
                         }}</small>
                       </div>
                     </td>
-                    <td class="action-column">
+                    <td v-if="supportsDegradation" class="action-column">
                       <button
                         type="button"
                         class="icon-button"
@@ -328,7 +351,7 @@
                     </td>
                   </tr>
                   <tr v-if="filteredAccounts.length === 0">
-                    <td colspan="7" class="table-empty">
+                    <td :colspan="supportsDegradation ? 7 : 3" class="table-empty">
                       没有符合筛选条件的账号。
                     </td>
                   </tr>
@@ -340,11 +363,19 @@
                 >显示 {{ filteredAccounts.length }} /
                 {{ selectedGroup?.accounts.length ?? 0 }} 个账号</span
               >
-              <span>Priority 不参与排序 · OAuth 作为第一层路由</span>
+              <span>{{
+                supportsDegradation
+                  ? "Priority 不参与排序 · OAuth 作为第一层路由"
+                  : "Priority 不参与排序 · 仅按可用性排序"
+              }}</span>
             </footer>
           </section>
 
-          <section class="probe-section" aria-labelledby="probe-history-title">
+          <section
+            v-if="supportsDegradation"
+            class="probe-section"
+            aria-labelledby="probe-history-title"
+          >
             <header class="section-heading">
               <div>
                 <h2 id="probe-history-title">
@@ -496,6 +527,10 @@ const selectedGroup = computed<AccountSchedulerGroup | null>(() => {
   );
 });
 
+const supportsDegradation = computed(
+  () => selectedGroup.value?.degradation_supported === true,
+);
+
 const filteredAccounts = computed(() => {
   const accounts = selectedGroup.value?.accounts ?? [];
   const query = accountQuery.value.toLowerCase();
@@ -510,7 +545,8 @@ const filteredAccounts = computed(() => {
         ? account.available
         : availabilityFilter.value === "unavailable"
           ? !account.available
-          : availabilityFilter.value === "degraded"
+          : supportsDegradation.value &&
+              availabilityFilter.value === "degraded"
             ? account.degraded_count > 0
             : availabilityFilter.value === "oauth"
               ? account.oauth
@@ -544,7 +580,7 @@ const pagedProbes = computed(() => {
 
 const hasChanges = computed(() => {
   const group = selectedGroup.value;
-  if (!group || !overview.value) return false;
+  if (!group || !overview.value || !supportsDegradation.value) return false;
   return (
     draft.enabled !== group.degradation_enabled ||
     draft.intervalSeconds !== group.interval_seconds ||
@@ -557,9 +593,9 @@ watch(
   selectedGroup,
   (group) => {
     if (!group) return;
-    draft.enabled = group.degradation_enabled;
+    draft.enabled = group.degradation_supported && group.degradation_enabled;
     draft.intervalSeconds = group.interval_seconds || 600;
-    draft.testModel = group.test_model || "";
+    draft.testModel = group.degradation_supported ? group.test_model || "" : "";
   },
   { immediate: true },
 );
@@ -606,7 +642,7 @@ async function load() {
 }
 
 async function saveSettings() {
-  if (!selectedGroup.value) return;
+  if (!selectedGroup.value || !supportsDegradation.value) return;
   saving.value = true;
   try {
     await adminAPI.accountScheduler.updateSetting({
@@ -626,7 +662,7 @@ async function saveSettings() {
 }
 
 async function runGroup() {
-  if (!selectedGroup.value) return;
+  if (!selectedGroup.value || !supportsDegradation.value) return;
   running.value = true;
   try {
     const result = await adminAPI.accountScheduler.runNow({
@@ -644,7 +680,7 @@ async function runGroup() {
 }
 
 async function runAccount(accountID: number) {
-  if (!selectedGroup.value) return;
+  if (!selectedGroup.value || !supportsDegradation.value) return;
   runningAccountID.value = accountID;
   try {
     const result = await adminAPI.accountScheduler.runNow({
@@ -977,6 +1013,35 @@ select:focus {
   border-block: 1px solid var(--monitor-line);
   background: color-mix(in srgb, var(--monitor-soft) 72%, var(--monitor-bg));
 }
+.availability-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border-block: 1px solid var(--monitor-line);
+  color: var(--monitor-muted);
+  background: color-mix(in srgb, var(--monitor-soft) 58%, var(--monitor-bg));
+}
+.availability-note > :deep(svg) {
+  flex: none;
+  color: var(--monitor-positive);
+}
+.availability-note > div {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+}
+.availability-note strong {
+  color: var(--monitor-ink);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.availability-note span {
+  font-size: 11px;
+  line-height: 1.6;
+}
 .config-intro {
   display: grid;
   align-content: center;
@@ -1073,6 +1138,9 @@ select:focus {
   table-layout: fixed;
   font-size: 12px;
   text-align: left;
+}
+.ranking-table.availability-only {
+  min-width: 560px;
 }
 .ranking-table th {
   padding: 12px 13px;
@@ -1413,6 +1481,14 @@ select:focus {
   }
   .config-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .availability-note > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .availability-note strong {
+    white-space: normal;
   }
   .model-field {
     grid-column: 1 / -1;

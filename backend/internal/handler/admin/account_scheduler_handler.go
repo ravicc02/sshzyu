@@ -33,7 +33,8 @@ func (h *AccountSchedulerHandler) UpdateSetting(c *gin.Context) {
 	}
 	setting, err := h.service.UpdateSetting(c.Request.Context(), input)
 	if err != nil {
-		if errors.Is(err, service.ErrAccountSchedulerInvalidSetting) {
+		if errors.Is(err, service.ErrAccountSchedulerInvalidSetting) ||
+			errors.Is(err, service.ErrAccountSchedulerOpenAIOnly) {
 			response.BadRequest(c, err.Error())
 			return
 		}
@@ -51,7 +52,8 @@ func (h *AccountSchedulerHandler) Run(c *gin.Context) {
 	}
 	result, err := h.service.RunNow(c.Request.Context(), input)
 	if err != nil {
-		if errors.Is(err, service.ErrAccountSchedulerInvalidSetting) {
+		if errors.Is(err, service.ErrAccountSchedulerInvalidSetting) ||
+			errors.Is(err, service.ErrAccountSchedulerOpenAIOnly) {
 			response.BadRequest(c, err.Error())
 			return
 		}
