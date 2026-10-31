@@ -121,7 +121,7 @@
               </label>
 
               <label class="setting-field">
-                <span>降智率权重</span>
+                <span>降智率权重（全局）</span>
                 <input v-model.number="draft.degradationWeight" type="number" min="0" max="100" step="0.1" />
               </label>
 
@@ -544,7 +544,7 @@ onMounted(load)
 }
 .scheduler-workspace {
   display: grid;
-  grid-template-columns: 286px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr);
   min-height: 640px;
   overflow: hidden;
   border: 1px solid var(--border-color);
@@ -913,7 +913,7 @@ tbody tr:hover { background: var(--bg-hover); }
   border-radius: 8px;
   background: var(--bg-primary);
 }
-@media (max-width: 1100px) {
+@media (max-width: 1440px) {
   .settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .run-button { width: fit-content; }
 }

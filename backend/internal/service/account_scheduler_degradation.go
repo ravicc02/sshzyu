@@ -320,6 +320,17 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 	}
 
 	for _, group := range groups {
+		groupAccounts := accountsByGroup[group.ID]
+		hasScoredAccount := false
+		for _, account := range groupAccounts {
+			if (&Account{Platform: account.Platform}).IsOpenAICompatible() {
+				hasScoredAccount = true
+				break
+			}
+		}
+		if !hasScoredAccount {
+			continue
+		}
 		setting := settings[group.ID]
 		if setting.GroupID == 0 {
 			setting = AccountSchedulerGroupSetting{
@@ -335,7 +346,6 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 			setting.TestModel = firstAccountSchedulerModel(group.ModelCandidates)
 		}
 
-		groupAccounts := accountsByGroup[group.ID]
 		rows := make([]AccountSchedulerRow, 0, len(groupAccounts))
 		oauthFirst := false
 		availableCount := 0
