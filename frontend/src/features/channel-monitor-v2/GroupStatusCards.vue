@@ -367,7 +367,6 @@ function timelineSlots(row: MonitorMatrixRow) {
   const end = Date.parse(coverage.requested_end || coverage.data_through)
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return result
   const width = (end - start) / 20
-  const priority: Record<HealthState, number> = { unknown: 0, healthy: 1, warning: 2, critical: 3 }
   const points = probesForRow(row)
     .flatMap(probe => probe.timeline || [])
     .filter(point => Number.isFinite(Date.parse(point.checked_at)))
@@ -376,8 +375,7 @@ function timelineSlots(row: MonitorMatrixRow) {
     if (stamp < start || stamp >= end) continue
     const index = Math.min(19, Math.floor((stamp - start) / width))
     if (result[index]) continue
-    const probeSlot = probeTimelineSlot(point)
-    if (!result[index] || priority[probeSlot.state] > priority[result[index]!.state]) result[index] = probeSlot
+    result[index] = probeTimelineSlot(point)
   }
   return result
 }
