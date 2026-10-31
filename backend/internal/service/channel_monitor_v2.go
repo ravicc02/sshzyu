@@ -248,6 +248,7 @@ type ChannelMonitorV2ModelRow struct {
 
 type ChannelMonitorV2MatrixRow struct {
 	Platform       string                       `json:"platform"`
+	GroupPlatform  string                       `json:"group_platform,omitempty"`
 	RateMultiplier *float64                     `json:"rate_multiplier,omitempty"`
 	GroupID        *int64                       `json:"group_id,omitempty"`
 	GroupName      string                       `json:"group_name,omitempty"`

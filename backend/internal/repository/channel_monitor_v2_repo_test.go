@@ -100,6 +100,29 @@ func TestChannelMonitorV2WhereUsesConfiguredScopeAndEmptyFilterMeansAllConfigure
 	require.Len(t, args, 4)
 }
 
+func TestChannelMonitorV2WhereExpandsCompositeModelsToConcreteProviders(t *testing.T) {
+	filter := service.ChannelMonitorV2Filter{Start: time.Unix(1, 0), End: time.Unix(2, 0)}
+	cfg := service.ChannelMonitorV2Config{
+		Platforms: []service.ChannelMonitorV2PlatformConfig{
+			{Platform: service.PlatformComposite, Enabled: true, Models: []string{"deepseek-v4.1-flash", "glm-5.3-flash", "kimi-k3.1-pro"}},
+			{Platform: service.PlatformOpenAI, Enabled: true},
+		},
+		GroupIDs: []int64{65},
+	}
+	where, args := channelMonitorV2Where(filter, cfg, "m")
+	require.Contains(t, where, "m.platform = ANY($3)")
+	require.Contains(t, where, "m.model = ANY($4)")
+	require.Contains(t, where, " OR ")
+	require.Equal(t, pq.Array([]string{service.PlatformOpenAI}), args[2])
+	require.Equal(t, pq.Array([]string{"deepseek-v4.1-flash", "glm-5.3-flash", "kimi-k3.1-pro"}), args[3])
+
+	filter.Platforms = []string{service.PlatformComposite}
+	where, args = channelMonitorV2Where(filter, cfg, "m")
+	require.NotContains(t, where, "m.platform = ANY")
+	require.Contains(t, where, "m.model = ANY($3)")
+	require.Equal(t, pq.Array([]string{"deepseek-v4.1-flash", "glm-5.3-flash", "kimi-k3.1-pro"}), args[2])
+}
+
 func TestChannelMonitorV2WhereRejectsGroupFilterOutsideConfiguredScope(t *testing.T) {
 	filter := service.ChannelMonitorV2Filter{
 		Start: time.Unix(1, 0), End: time.Unix(2, 0), GroupIDs: []int64{9},
@@ -188,6 +211,23 @@ func TestChannelMonitorV2MatrixDoesNotSeedGroupsForEmptyViewerScope(t *testing.T
 		3: {name: "private"}, 9: {name: "other-private"},
 	})
 	require.Empty(t, accs)
+}
+
+func TestChannelMonitorV2SeedsCompositeTotalRow(t *testing.T) {
+	filter := service.ChannelMonitorV2Filter{}
+	cfg := service.ChannelMonitorV2Config{
+		Platforms: []service.ChannelMonitorV2PlatformConfig{
+			{Platform: service.PlatformDeepseek, Enabled: true},
+			{Platform: service.PlatformZhipu, Enabled: true},
+			{Platform: service.PlatformKimi, Enabled: true},
+		},
+	}
+	accs := seedChannelMonitorV2MatrixAccumulators(filter, cfg, service.ChannelMonitorV2GroupByPlatformGroup, map[int64]channelMonitorV2GroupInfo{
+		65: {name: "国模聚合分组", platform: service.PlatformComposite},
+	})
+	key := channelMonitorV2MatrixKey{platform: service.PlatformComposite, groupID: 65}
+	require.Contains(t, accs, key)
+	require.Equal(t, "国模聚合分组", accs[key].groupName)
 }
 
 func TestChannelMonitorV2EmptyRestrictedScopeReturnsEmptyInventory(t *testing.T) {

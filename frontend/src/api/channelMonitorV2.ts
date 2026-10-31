@@ -163,6 +163,7 @@ export interface MonitorMatrixBucket {
 
 export interface MonitorMatrixRow {
   platform: string
+  group_platform?: string
   group_id?: number
   group_name?: string
   rate_multiplier?: number

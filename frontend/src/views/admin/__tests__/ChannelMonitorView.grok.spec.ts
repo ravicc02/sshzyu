@@ -11,11 +11,13 @@ import {
   PROVIDER_GROK,
 } from '@/constants/channelMonitor'
 
-const { listTemplates, accountsList, accountsGetById, groupCandidates } = vi.hoisted(() => ({
+const { listTemplates, accountsList, accountsGetById, groupCandidates, groupList, compositeRoutes } = vi.hoisted(() => ({
   listTemplates: vi.fn(),
   accountsList: vi.fn(),
   accountsGetById: vi.fn(),
   groupCandidates: vi.fn(),
+  groupList: vi.fn(),
+  compositeRoutes: vi.fn(),
 }))
 
 
@@ -43,8 +45,9 @@ vi.mock('@/api/admin', () => ({
       getById: (...args: unknown[]) => accountsGetById(...args),
     },
     groups: {
-      getAllIncludingInactive: vi.fn().mockResolvedValue([]),
+      getAllIncludingInactive: groupList,
       getAvailableModels: groupCandidates,
+      listCompositeRoutes: compositeRoutes,
     },
   },
 }))
@@ -100,6 +103,8 @@ describe('channel monitor Grok provider', () => {
     accountsList.mockReset().mockResolvedValue({ items: [] })
     accountsGetById.mockReset()
     groupCandidates.mockReset().mockResolvedValue([])
+    groupList.mockReset().mockResolvedValue([])
+    compositeRoutes.mockReset().mockResolvedValue([])
   })
 
   it('offers Grok in the responsive provider grid and prefills its official defaults', async () => {
@@ -158,6 +163,36 @@ describe('channel monitor Grok provider', () => {
     await grokButton.trigger('click')
     expect((endpoint.element as HTMLInputElement).value).toBe(DEFAULT_GROK_ENDPOINT)
     expect((model.element as HTMLInputElement).value).toBe('grok-custom')
+  })
+
+  it('uses automatic routing for composite groups instead of a single provider', async () => {
+    groupList.mockResolvedValue([
+      { id: 65, name: '国模聚合分组', platform: 'composite', status: 'active' },
+    ])
+    groupCandidates.mockResolvedValue([
+      'deepseek-v4.1-flash',
+      'glm-5.3-flash',
+      'kimi-k3.1-pro',
+    ])
+    compositeRoutes.mockResolvedValue([
+      { id: 1, group_id: 65, public_model: 'deepseek-v4.1-flash', match_type: 'exact', target_platform: 'deepseek', upstream_model: 'deepseek-v4.1-flash', endpoint: 'chat_completions', priority: 1, enabled: true, notes: '' },
+      { id: 2, group_id: 65, public_model: 'glm-5.3-flash', match_type: 'exact', target_platform: 'zhipu', upstream_model: 'glm-5.3-flash', endpoint: 'chat_completions', priority: 2, enabled: true, notes: '' },
+      { id: 3, group_id: 65, public_model: 'kimi-k3.1-pro', match_type: 'exact', target_platform: 'kimi', upstream_model: 'kimi-k3.1-pro', endpoint: 'chat_completions', priority: 3, enabled: true, notes: '' },
+    ])
+
+    const wrapper = mountDialog({
+      initialGroup: { id: 65, name: '国模聚合分组', platform: 'composite', status: 'active' },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="monitor-composite-routing"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid^="monitor-provider-"]')).toHaveLength(0)
+    expect((wrapper.get('[data-testid="monitor-endpoint"]').element as HTMLInputElement).value).toBe(window.location.origin)
+    expect((wrapper.get('[data-testid="monitor-primary-model"]').element as HTMLInputElement).value).toBe('deepseek-v4.1-flash')
+    expect(wrapper.text()).toContain('admin.channelMonitor.form.compositeRoutingTitle')
+    expect(wrapper.text()).toContain('monitorCommon.providers.deepseek')
+    expect(wrapper.text()).toContain('monitorCommon.providers.zhipu')
+    expect(wrapper.text()).toContain('monitorCommon.providers.kimi')
   })
 
   it('prefills a newly selected group and its /v1/models catalog', async () => {

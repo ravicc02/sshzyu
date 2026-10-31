@@ -74,6 +74,47 @@ describe('GroupStatusCards', () => {
     expect(wrapper.findAll('article')[0]?.find('.bg-amber-400').exists()).toBe(true)
   })
 
+  it('shows one composite total card with concrete provider details', () => {
+    const total = { ...row('composite'), group_id: 65, group_name: '国模聚合分组', group_platform: 'composite' }
+    const deepseek = { ...row('deepseek'), group_id: 65, group_name: '国模聚合分组', group_platform: 'composite' }
+    const zhipu = { ...row('zhipu'), group_id: 65, group_name: '国模聚合分组', group_platform: 'composite' }
+    const kimi = { ...row('kimi'), group_id: 65, group_name: '国模聚合分组', group_platform: 'composite' }
+    const wrapper = mount(GroupStatusCards, { props: { rows: [total, deepseek, zhipu, kimi], coverage } })
+
+    expect(wrapper.findAll('article')).toHaveLength(1)
+    expect(wrapper.findAll('section[aria-label="channelMonitorV2.settings.compositePlatform"] article')).toHaveLength(1)
+    expect(wrapper.text()).toContain('channelMonitorV2.groupCards.providerBreakdown')
+    expect(wrapper.text()).toContain('DeepSeek')
+    expect(wrapper.text()).toContain('GLM')
+    expect(wrapper.text()).toContain('Kimi')
+  })
+
+  it('derives composite provider details from active probe models without traffic rows', () => {
+    const total = { ...row('composite', false), group_id: 65, group_name: '国模聚合分组', group_platform: 'composite' }
+    const compositeProbe = probe({
+      group_id: 65,
+      group_name: '国模聚合分组',
+      provider: 'openai',
+      primary_model: 'deepseek-v4.1-flash',
+      primary_status: 'operational',
+      extra_models: [
+        { model: 'glm-5.3-flash', status: 'degraded', latency_ms: 2100 },
+        { model: 'kimi-k3.1-pro', status: 'failed', latency_ms: null },
+      ],
+      probe_fallback_enabled: true,
+    })
+    const wrapper = mount(GroupStatusCards, {
+      props: { rows: [total], coverage, probes: [compositeProbe], hybrid: true },
+    })
+
+    expect(wrapper.findAll('article')).toHaveLength(1)
+    expect(wrapper.text()).toContain('DeepSeek')
+    expect(wrapper.text()).toContain('GLM')
+    expect(wrapper.text()).toContain('Kimi')
+    expect(wrapper.text()).toContain('channelMonitorV2.groupCards.states.activeFailed')
+    expect(wrapper.text()).toContain('channelMonitorV2.groupCards.states.activeDegraded')
+  })
+
   it('shows unobserved groups as empty without inventing healthy readings', () => {
     const wrapper = mount(GroupStatusCards, { props: { rows: [row('openai', false)], coverage } })
     expect(wrapper.findAll('article')).toHaveLength(1)

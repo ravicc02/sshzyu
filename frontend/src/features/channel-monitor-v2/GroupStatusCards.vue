@@ -40,6 +40,34 @@
               <div class="min-w-0 px-3"><div class="text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ latencyLabel(row) }}</div><strong class="mt-1.5 block text-sm tabular-nums text-gray-900 dark:text-gray-100">{{ latencyValue(row) }}</strong></div>
             </div>
 
+            <div v-if="row.platform === 'composite'" class="mt-3 rounded-[16px] border border-gray-200/70 bg-gray-50/65 p-2.5 dark:border-white/10 dark:bg-white/[0.035]">
+              <div class="mb-1.5 flex items-center justify-between gap-2 px-1">
+                <span class="text-[10px] font-semibold text-gray-600 dark:text-gray-300">{{ t('channelMonitorV2.groupCards.providerBreakdown') }}</span>
+                <span class="text-[10px] text-gray-400">{{ t('channelMonitorV2.groupCards.providerCount', { count: compositeProviderCount(row) }) }}</span>
+              </div>
+              <div v-if="compositeProviderRows(row).length" class="space-y-1">
+                <div v-for="child in compositeProviderRows(row)" :key="`${child.group_id}:${child.platform}`" class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg bg-white/75 px-2 py-1.5 dark:bg-dark-800/70">
+                  <span class="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-gray-700 dark:text-gray-200">
+                    <ProviderIcon :provider="child.platform" :size="13" />
+                    <span class="truncate">{{ platformLabel(child.platform) }}</span>
+                  </span>
+                  <span class="text-[10px] font-semibold" :class="availabilityClass(child)">{{ availabilityValue(child) }}</span>
+                  <span class="text-[10px] tabular-nums text-gray-500 dark:text-gray-400">{{ latencyValue(child) }}</span>
+                </div>
+              </div>
+              <div v-else-if="compositeProbeProviders(row).length" class="space-y-1">
+                <div v-for="provider in compositeProbeProviders(row)" :key="provider.platform" class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg bg-white/75 px-2 py-1.5 dark:bg-dark-800/70">
+                  <span class="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-gray-700 dark:text-gray-200">
+                    <ProviderIcon :provider="provider.platform" :size="13" />
+                    <span class="truncate">{{ platformLabel(provider.platform) }}</span>
+                  </span>
+                  <span class="text-[10px] font-semibold" :class="probeStateTextClass(provider.health)">{{ probeStateText(provider.health) }}</span>
+                  <span class="text-[10px] tabular-nums text-gray-500 dark:text-gray-400">{{ provider.latency_ms == null ? '—' : formatMonitorMs(provider.latency_ms) }}</span>
+                </div>
+              </div>
+              <p v-else class="px-1 py-1 text-[10px] text-gray-400">{{ t('channelMonitorV2.groupCards.providerNoData') }}</p>
+            </div>
+
             <div class="mt-4 flex items-center justify-between gap-2 text-[11px] text-gray-500 dark:text-gray-400">
               <span>{{ timelineWindowLabel(row) }}</span>
               <time v-if="lastUpdatedAt(row)" :datetime="lastUpdatedAt(row) || undefined">{{ formatTime(lastUpdatedAt(row) || '') }}</time>
@@ -85,6 +113,7 @@ const props = defineProps<{
 const { t } = useI18n()
 const showInactive = ref(false)
 const groupRows = computed(() => props.rows.filter(row => row.group_id != null && row.group_id > 0))
+const cardRows = computed(() => groupRows.value.filter(row => row.group_platform !== 'composite' || row.platform === 'composite'))
 const probesByGroupID = computed(() => {
   const result = new Map<number, UserMonitorView[]>()
   for (const probe of props.probes || []) {
@@ -106,12 +135,12 @@ const probesByGroupName = computed(() => {
   }
   return result
 })
-const inactiveCount = computed(() => groupRows.value.filter(row => !hasEffectiveData(row)).length)
-const platformOrder = ['openai', 'anthropic', 'gemini', 'deepseek', 'grok', 'kiro']
+const inactiveCount = computed(() => cardRows.value.filter(row => !hasEffectiveData(row)).length)
+const platformOrder = ['composite', 'openai', 'anthropic', 'gemini', 'deepseek', 'zhipu', 'kimi', 'grok', 'kiro']
 const legend = [{ key: 'healthy', value: 'healthy' }, { key: 'warning', value: 'warning' }, { key: 'critical', value: 'critical' }, { key: 'noData', value: null }] as const
 const sections = computed(() => {
   const byPlatform = new Map<string, MonitorMatrixRow[]>()
-  for (const row of groupRows.value.filter(row => groupRows.value.length <= 12 || showInactive.value || hasEffectiveData(row))) {
+  for (const row of cardRows.value.filter(row => cardRows.value.length <= 12 || showInactive.value || hasEffectiveData(row))) {
     const rows = byPlatform.get(row.platform) || []
     rows.push(row)
     byPlatform.set(row.platform, rows)
@@ -121,7 +150,71 @@ const sections = computed(() => {
     .map(([platform, rows]) => ({ platform, rows: rows.sort((a, b) => (a.group_name || '').localeCompare(b.group_name || '')) }))
 })
 function platformLabel(platform: string) {
-  return ({ openai: 'OpenAI', anthropic: 'Anthropic', gemini: 'Gemini', deepseek: 'DeepSeek', grok: 'Grok', kiro: 'Kiro' } as Record<string, string>)[platform] || platform
+  return ({
+    composite: t('channelMonitorV2.settings.compositePlatform'),
+    openai: 'OpenAI',
+    anthropic: 'Anthropic',
+    gemini: 'Gemini',
+    deepseek: 'DeepSeek',
+    zhipu: 'GLM',
+    kimi: 'Kimi',
+    grok: 'Grok',
+    kiro: 'Kiro',
+  } as Record<string, string>)[platform] || platform
+}
+function compositeProviderRows(row: MonitorMatrixRow): MonitorMatrixRow[] {
+  if (row.platform !== 'composite' || row.group_id == null) return []
+  return groupRows.value
+    .filter(child => child.group_id === row.group_id && child.group_platform === 'composite' && child.platform !== 'composite')
+    .sort((a, b) => platformOrder.indexOf(a.platform) - platformOrder.indexOf(b.platform) || a.platform.localeCompare(b.platform))
+}
+function compositeProbeProviders(row: MonitorMatrixRow) {
+  const providers = new Map<string, { platform: string; health: HealthState; latency_ms: number | null }>()
+  const severity: Record<HealthState, number> = { unknown: 0, healthy: 1, warning: 2, critical: 3 }
+  for (const probe of probesForRow(row)) {
+    const models = [
+      { model: probe.primary_model, status: probe.primary_status, latency_ms: probe.primary_latency_ms },
+      ...(probe.extra_models || []),
+    ]
+    for (const item of models) {
+      const platform = probeModelProvider(item.model, probe.provider)
+      const health = probeStatusToHealth(item.status)
+      const current = providers.get(platform)
+      if (!current || severity[health] > severity[current.health]) {
+        providers.set(platform, { platform, health, latency_ms: item.latency_ms ?? current?.latency_ms ?? null })
+      } else if (current.latency_ms == null && item.latency_ms != null) {
+        current.latency_ms = item.latency_ms
+      }
+    }
+  }
+  return [...providers.values()].sort((a, b) =>
+    platformOrder.indexOf(a.platform) - platformOrder.indexOf(b.platform) || a.platform.localeCompare(b.platform)
+  )
+}
+function compositeProviderCount(row: MonitorMatrixRow) {
+  return compositeProviderRows(row).length || compositeProbeProviders(row).length
+}
+function probeModelProvider(model: string, fallback: string): string {
+  if (/glm|zhipu/i.test(model)) return 'zhipu'
+  if (/kimi|moonshot/i.test(model)) return 'kimi'
+  if (/deepseek/i.test(model)) return 'deepseek'
+  if (/grok/i.test(model)) return 'grok'
+  if (/gemini/i.test(model)) return 'gemini'
+  if (/claude|anthropic/i.test(model)) return 'anthropic'
+  if (/gpt|openai/i.test(model)) return 'openai'
+  return fallback || 'unknown'
+}
+function probeStateText(health: HealthState) {
+  if (health === 'healthy') return t('channelMonitorV2.groupCards.states.activeOperational')
+  if (health === 'warning') return t('channelMonitorV2.groupCards.states.activeDegraded')
+  if (health === 'critical') return t('channelMonitorV2.groupCards.states.activeFailed')
+  return t('channelMonitorV2.groupCards.states.unknown')
+}
+function probeStateTextClass(health: HealthState) {
+  if (health === 'healthy') return 'text-emerald-700 dark:text-emerald-300'
+  if (health === 'warning') return 'text-amber-700 dark:text-amber-300'
+  if (health === 'critical') return 'text-rose-700 dark:text-rose-300'
+  return 'text-gray-500 dark:text-gray-400'
 }
 function providerTone(platform: string) {
   if (platform === 'anthropic') return 'bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300'

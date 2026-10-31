@@ -33,6 +33,7 @@ export default {
       intelligenceActive: 'Active reasoning checks', intelligenceNotConfigured: 'OpenAI reasoning check not configured',
       intelligenceWaiting: 'Waiting for first result', intelligenceNotDegraded: 'Not degraded', intelligenceDegraded: 'Degraded', intelligenceError: 'Check error',
       multiplier: 'User multiplier {value}',
+      providerBreakdown: 'Provider breakdown', providerCount: '{count} providers', providerNoData: 'No provider traffic',
       legend: { healthy: 'Healthy', warning: 'Warning', critical: 'Critical', noData: 'No records' },
       showInactive: 'Show inactive groups ({count})', hideInactive: 'Hide inactive groups ({count})',
       states: { healthy: 'Healthy', warning: 'Warning', critical: 'Critical', unknown: 'Insufficient samples', activeOperational: 'Probe healthy', activeDegraded: 'Probe slow', activeFailed: 'Probe failed' },

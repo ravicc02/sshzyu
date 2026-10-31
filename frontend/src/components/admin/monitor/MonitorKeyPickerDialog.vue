@@ -7,7 +7,7 @@
   >
     <div class="space-y-3">
       <p class="text-xs text-gray-500 dark:text-gray-400">
-        {{ t('admin.channelMonitor.form.selectKeyHint') }}
+        {{ groupId ? t('admin.channelMonitor.form.selectGroupKeyHint') : t('admin.channelMonitor.form.selectKeyHint') }}
       </p>
 
       <div class="relative">
@@ -86,6 +86,7 @@ const props = withDefaults(defineProps<{
   loading: boolean
   keys: ApiKey[]
   provider: Provider
+  groupId?: number | null
   userGroupRates?: Record<number, number>
 }>(), {
   userGroupRates: () => ({}),
@@ -107,7 +108,8 @@ watch(() => props.show, (shown) => {
 const filteredKeys = computed<ApiKey[]>(() => {
   const q = search.value.trim().toLowerCase()
   return props.keys.filter((k) => {
-    if (k.group?.platform !== props.provider) return false
+    if (props.groupId != null && k.group_id !== props.groupId) return false
+    if (props.groupId == null && k.group?.platform !== props.provider) return false
     if (!q) return true
     return (
       k.name.toLowerCase().includes(q) ||

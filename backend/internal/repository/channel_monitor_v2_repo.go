@@ -424,6 +424,23 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 		}
 		acc.total.addFact(fact)
 		bucket.addFact(fact)
+		if groupBy == service.ChannelMonitorV2GroupByPlatformGroup &&
+			groupInfo[fact.GroupID].platform == service.PlatformComposite {
+			compositeKey := channelMonitorV2MatrixKey{platform: service.PlatformComposite, groupID: fact.GroupID}
+			compositeAcc := accs[compositeKey]
+			if compositeAcc == nil {
+				compositeAcc = &channelMonitorV2MatrixAccumulator{total: newMetricAccumulator(), buckets: make(map[string]*metricAccumulator)}
+				accs[compositeKey] = compositeAcc
+			}
+			compositeAcc.groupName = fact.GroupName
+			compositeBucket := compositeAcc.buckets[fact.BucketStart]
+			if compositeBucket == nil {
+				compositeBucket = newMetricAccumulator()
+				compositeAcc.buckets[fact.BucketStart] = compositeBucket
+			}
+			compositeAcc.total.addFact(fact)
+			compositeBucket.addFact(fact)
+		}
 	}
 	for _, histogram := range histograms {
 		if !channelMonitorV2ModelSelected(filter, cfg, histogram.Platform, histogram.Model) {
@@ -442,6 +459,17 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 		if bucket := acc.buckets[histogram.BucketStart]; bucket != nil {
 			bucket.addHistogram(histogram)
 		}
+		if groupBy == service.ChannelMonitorV2GroupByPlatformGroup &&
+			groupInfo[histogram.GroupID].platform == service.PlatformComposite {
+			compositeKey := channelMonitorV2MatrixKey{platform: service.PlatformComposite, groupID: histogram.GroupID}
+			compositeAcc := accs[compositeKey]
+			if compositeAcc != nil {
+				compositeAcc.total.addHistogram(histogram)
+				if bucket := compositeAcc.buckets[histogram.BucketStart]; bucket != nil {
+					bucket.addHistogram(histogram)
+				}
+			}
+		}
 	}
 
 	result := &service.ChannelMonitorV2Matrix{GroupBy: groupBy, Coverage: *coverage, Items: make([]service.ChannelMonitorV2MatrixRow, 0, len(accs))}
@@ -450,6 +478,7 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 	if err != nil {
 		return nil, fmt.Errorf("load ignored error counts by matrix key: %w", err)
 	}
+	mergeCompositeIgnoredErrors(groupBy, groupInfo, ignoredByDimBucket, ignoredByDim)
 	for key, acc := range accs {
 		// platform_group views only emit rows with a real group_id.
 		if (groupBy == service.ChannelMonitorV2GroupByPlatformGroup || groupBy == service.ChannelMonitorV2GroupByPlatformGroupModel) &&
@@ -463,6 +492,7 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 			groupID := key.groupID
 			row.GroupID = &groupID
 			if info, ok := groupInfo[groupID]; ok {
+				row.GroupPlatform = info.platform
 				row.RateMultiplier = &info.rateMultiplier
 			}
 		}
@@ -562,6 +592,22 @@ func seedChannelMonitorV2MatrixAccumulators(filter service.ChannelMonitorV2Filte
 				}
 				if accs[key] == nil {
 					accs[key] = &channelMonitorV2MatrixAccumulator{groupName: info.name, total: newMetricAccumulator(), buckets: make(map[string]*metricAccumulator)}
+				}
+			}
+		}
+	}
+	if groupBy == service.ChannelMonitorV2GroupByPlatformGroup {
+		for _, groupID := range groupIDs {
+			info := groupInfo[groupID]
+			if groupID <= 0 || info.platform != service.PlatformComposite {
+				continue
+			}
+			key := channelMonitorV2MatrixKey{platform: service.PlatformComposite, groupID: groupID}
+			if accs[key] == nil {
+				accs[key] = &channelMonitorV2MatrixAccumulator{
+					groupName: info.name,
+					total:     newMetricAccumulator(),
+					buckets:   make(map[string]*metricAccumulator),
 				}
 			}
 		}
@@ -1167,13 +1213,36 @@ func channelMonitorV2WhereWithRollup(filter service.ChannelMonitorV2Filter, cfg 
 func channelMonitorV2Where(filter service.ChannelMonitorV2Filter, cfg service.ChannelMonitorV2Config, alias string) (string, []any) {
 	conditions := []string{alias + ".bucket_start >= $1", alias + ".bucket_start < $2"}
 	args := []any{filter.Start, filter.End}
-	platforms := channelMonitorV2EnabledPlatforms(cfg)
+	concretePlatforms := []string{}
+	compositeModels := []string{}
 	if len(filter.Platforms) > 0 {
-		platforms = intersectStrings(platforms, filter.Platforms)
+		for _, platform := range filter.Platforms {
+			if platform == service.PlatformComposite {
+				compositeModels = channelMonitorV2CompositeModels(cfg)
+			} else if strings.TrimSpace(platform) != "" {
+				concretePlatforms = append(concretePlatforms, platform)
+			}
+		}
+	} else {
+		for _, platform := range channelMonitorV2EnabledPlatforms(cfg) {
+			if platform == service.PlatformComposite {
+				compositeModels = channelMonitorV2CompositeModels(cfg)
+			} else {
+				concretePlatforms = append(concretePlatforms, platform)
+			}
+		}
 	}
-	if len(platforms) > 0 {
-		args = append(args, pq.Array(platforms))
-		conditions = append(conditions, fmt.Sprintf("%s.platform = ANY($%d)", alias, len(args)))
+	platformConditions := []string{}
+	if len(concretePlatforms) > 0 {
+		args = append(args, pq.Array(concretePlatforms))
+		platformConditions = append(platformConditions, fmt.Sprintf("%s.platform = ANY($%d)", alias, len(args)))
+	}
+	if len(compositeModels) > 0 {
+		args = append(args, pq.Array(compositeModels))
+		platformConditions = append(platformConditions, fmt.Sprintf("%s.model = ANY($%d)", alias, len(args)))
+	}
+	if len(platformConditions) > 0 {
+		conditions = append(conditions, "("+strings.Join(platformConditions, " OR ")+")")
 	} else {
 		conditions = append(conditions, "FALSE")
 	}
@@ -1195,6 +1264,15 @@ func channelMonitorV2EnabledPlatforms(cfg service.ChannelMonitorV2Config) []stri
 		}
 	}
 	return out
+}
+
+func channelMonitorV2CompositeModels(cfg service.ChannelMonitorV2Config) []string {
+	for _, platform := range cfg.Platforms {
+		if platform.Enabled && platform.Platform == service.PlatformComposite {
+			return append([]string(nil), platform.Models...)
+		}
+	}
+	return nil
 }
 
 // channelMonitorV2DisplayModel maps a raw model name for presentation.
@@ -1582,4 +1660,30 @@ func (r *channelMonitorV2Repository) loadIgnoredErrorCountsByMatrixKey(
 		byDimBucket[key][bucketKey] += count
 	}
 	return byDimBucket, byDim, rows.Err()
+}
+
+func mergeCompositeIgnoredErrors(
+	groupBy service.ChannelMonitorV2GroupBy,
+	groupInfo map[int64]channelMonitorV2GroupInfo,
+	byDimBucket map[channelMonitorV2MatrixKey]map[string]int64,
+	byDim map[channelMonitorV2MatrixKey]int64,
+) {
+	if groupBy != service.ChannelMonitorV2GroupByPlatformGroup {
+		return
+	}
+	for key, count := range byDim {
+		if key.groupID <= 0 || key.platform == service.PlatformComposite ||
+			groupInfo[key.groupID].platform != service.PlatformComposite {
+			continue
+		}
+		compositeKey := key
+		compositeKey.platform = service.PlatformComposite
+		byDim[compositeKey] += count
+		if byDimBucket[compositeKey] == nil {
+			byDimBucket[compositeKey] = map[string]int64{}
+		}
+		for bucket, bucketCount := range byDimBucket[key] {
+			byDimBucket[compositeKey][bucket] += bucketCount
+		}
+	}
 }

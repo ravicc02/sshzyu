@@ -146,20 +146,20 @@ describe('MonitorSettingsPanel platform and group workflow', () => {
     wrapper.unmount()
   })
 
-  it('only shows groups belonging to selected platforms and selects them together', async () => {
+  it('always exposes composite groups and selects them with matching concrete-platform groups', async () => {
     const wrapper = await panel({
       ...config([{ platform: 'openai', enabled: true, models: [] }]),
       group_ids: [1, 4],
     })
     expect(wrapper.text()).toContain('OpenAI 高缓存')
     expect(wrapper.text()).not.toContain('Claude 企业组')
-    expect(wrapper.text()).not.toContain('国模聚合')
+    expect(wrapper.text()).toContain('国模聚合')
 
     await button(wrapper, 'groupsSelectAll')!.trigger('click')
     await button(wrapper, 'save')!.trigger('click')
     await flushPromises()
     expect(mocks.updateConfig).toHaveBeenCalledWith(expect.objectContaining({
-      group_ids: [1, 2],
+      group_ids: [1, 2, 4],
     }))
     wrapper.unmount()
   })

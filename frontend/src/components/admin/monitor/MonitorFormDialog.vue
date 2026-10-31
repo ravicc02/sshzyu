@@ -34,7 +34,30 @@
 
       <div>
         <label class="input-label">{{ t('admin.channelMonitor.form.provider') }} <span class="text-red-500">*</span></label>
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div v-if="isCompositeGroup" class="rounded-xl border border-primary-200 bg-primary-50/70 p-4 dark:border-primary-800/60 dark:bg-primary-900/20" data-testid="monitor-composite-routing">
+          <div class="flex items-start gap-3">
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-primary-600 shadow-sm dark:bg-dark-800 dark:text-primary-300">
+              <ProviderIcon provider="composite" :size="22" />
+            </span>
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <strong class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.channelMonitor.form.compositeRoutingTitle') }}</strong>
+                <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-primary-700 ring-1 ring-primary-200 dark:bg-dark-800 dark:text-primary-300 dark:ring-primary-800">
+                  {{ t('admin.channelMonitor.form.compositeRoutingBadge') }}
+                </span>
+              </div>
+              <p class="mt-1 text-xs leading-5 text-gray-600 dark:text-gray-300">{{ t('admin.channelMonitor.form.compositeRoutingHint') }}</p>
+              <div v-if="compositeSelectedModels.length" class="mt-2 flex flex-wrap gap-1.5">
+                <span v-for="model in compositeSelectedModels" :key="model" class="inline-flex items-center gap-1.5 rounded-lg bg-white px-2 py-1 text-[11px] text-gray-700 ring-1 ring-gray-200 dark:bg-dark-800 dark:text-gray-200 dark:ring-dark-600">
+                  <ProviderIcon :provider="compositeRouteProvider(model)" :size="12" />
+                  {{ providerLabel(compositeRouteProvider(model)) }}
+                  <span class="max-w-44 truncate text-gray-400">{{ model }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <button
             v-for="opt in providerOptions"
             :key="opt.value"
@@ -78,7 +101,7 @@
         </p>
       </div>
 
-      <div v-if="form.provider === PROVIDER_OPENAI && usesProbePart" class="rounded-lg border border-blue-100 bg-blue-50/50 p-3 dark:border-blue-500/20 dark:bg-blue-500/10">
+      <div v-if="!isCompositeGroup && form.provider === PROVIDER_OPENAI && usesProbePart" class="rounded-lg border border-blue-100 bg-blue-50/50 p-3 dark:border-blue-500/20 dark:bg-blue-500/10">
         <label class="input-label">{{ t('admin.channelMonitor.form.apiMode') }}</label>
         <div class="grid gap-3 sm:grid-cols-2">
           <button
@@ -175,7 +198,7 @@
           </div>
           <Toggle v-model="form.probe_fallback_enabled" />
         </div>
-        <div v-if="form.provider === PROVIDER_OPENAI" class="border-t border-gray-200 pt-3 dark:border-dark-700">
+        <div v-if="!isCompositeGroup && form.provider === PROVIDER_OPENAI" class="border-t border-gray-200 pt-3 dark:border-dark-700">
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
               <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.channelMonitor.form.intelligenceEnabled') }}</p>
@@ -288,6 +311,7 @@
     :loading="myKeysLoading"
     :keys="myActiveKeys"
     :provider="form.provider"
+    :group-id="form.group_id"
     :user-group-rates="userGroupRates"
     @close="showKeyPicker = false"
     @pick="pickMyKey"
@@ -312,7 +336,7 @@ import type {
   UpdateParams,
 } from '@/api/admin/channelMonitor'
 import type { ChannelMonitorTemplate } from '@/api/admin/channelMonitorTemplate'
-import type { AdminGroup, ApiKey } from '@/types'
+import type { AdminGroup, ApiKey, CompositeModelRoute } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import Select from '@/components/common/Select.vue'
@@ -440,6 +464,7 @@ const form = reactive<MonitorForm>({
 // quota / quota_probe 需要关联账号；probe / quota_probe 需要探活字段。
 const usesQuotaMode = computed(() => form.check_mode !== CHECK_MODE_PROBE)
 const usesProbePart = computed(() => form.check_mode !== CHECK_MODE_QUOTA)
+const monitorProvider = computed<Provider>(() => isCompositeGroup.value ? PROVIDER_OPENAI : form.provider)
 
 const monitorGroups = ref<Array<{ id: number; name: string; platform: string; status?: string }>>([])
 const groupsLoading = ref(false)
@@ -449,6 +474,14 @@ const groupOptions = computed(() =>
     label: `${group.name} · ${group.platform}${group.status === 'inactive' ? ` · ${t('channelMonitorV2.settings.inactiveGroup')}` : ''}`,
   })),
 )
+const selectedGroup = computed(() => {
+  if (form.group_id == null) return null
+  return monitorGroups.value.find((item) => item.id === form.group_id)
+    ?? (props.initialGroup?.id === form.group_id ? props.initialGroup : null)
+})
+const isCompositeGroup = computed(() => selectedGroup.value?.platform === 'composite')
+const compositeRoutes = ref<CompositeModelRoute[]>([])
+const compositeSelectedModels = computed(() => [...new Set([form.primary_model, ...form.extra_models].map((model) => model.trim()).filter(Boolean))])
 const groupSelectValue = computed<string>({
   get: () => (form.group_id == null ? '' : String(form.group_id)),
   set: (raw: string) => {
@@ -464,6 +497,51 @@ const groupSelectValue = computed<string>({
     form.group_name = group.name
   },
 })
+
+function compositeRouteProvider(model: string): Provider {
+  const normalized = model.trim()
+  const exact = compositeRoutes.value.find((route) =>
+    route.enabled && route.match_type === 'exact' && route.public_model === normalized
+  )
+  if (exact) return monitorProviderFor(exact.target_platform)
+  const prefix = compositeRoutes.value
+    .filter((route) => route.enabled && route.match_type === 'prefix' && normalized.startsWith(route.public_model))
+    .sort((a, b) => b.public_model.length - a.public_model.length)[0]
+  if (prefix) return monitorProviderFor(prefix.target_platform)
+  if (/glm|zhipu/i.test(normalized)) return PROVIDER_ZHIPU
+  if (/kimi|moonshot/i.test(normalized)) return PROVIDER_KIMI
+  if (/deepseek/i.test(normalized)) return PROVIDER_DEEPSEEK
+  if (/grok/i.test(normalized)) return PROVIDER_GROK
+  if (/gemini/i.test(normalized)) return PROVIDER_GEMINI
+  if (/claude|anthropic/i.test(normalized)) return PROVIDER_ANTHROPIC
+  return PROVIDER_OPENAI
+}
+
+function monitorProviderFor(platform: string): Provider {
+  switch (platform) {
+    case PROVIDER_OPENAI:
+    case PROVIDER_ANTHROPIC:
+    case PROVIDER_GEMINI:
+    case PROVIDER_GROK:
+    case PROVIDER_ANTIGRAVITY:
+    case PROVIDER_KIMI:
+    case PROVIDER_ZHIPU:
+    case PROVIDER_DEEPSEEK:
+      return platform
+    default:
+      return PROVIDER_OPENAI
+  }
+}
+
+async function loadCompositeRoutes(groupId: number) {
+  compositeRoutes.value = []
+  if (!isCompositeGroup.value) return
+  try {
+    compositeRoutes.value = await adminAPI.groups.listCompositeRoutes(groupId)
+  } catch (error) {
+    console.warn('load composite monitor routes failed', error)
+  }
+}
 
 async function loadMonitorGroups() {
   if (groupsLoading.value) return
@@ -487,6 +565,23 @@ async function loadMonitorGroups() {
     groupsLoading.value = false
   }
 }
+
+watch(
+  () => [form.group_id, isCompositeGroup.value] as const,
+  ([groupId, composite]) => {
+    if (!composite || groupId == null) {
+      compositeRoutes.value = []
+      return
+    }
+    form.provider = PROVIDER_OPENAI
+    form.api_mode = API_MODE_CHAT_COMPLETIONS
+    form.check_mode = CHECK_MODE_PROBE
+    form.intelligence_enabled = false
+    if (!form.endpoint.trim()) form.endpoint = window.location.origin
+    void loadCompositeRoutes(groupId)
+  },
+  { immediate: true },
+)
 
 // jitter 上限与后端校验一致：interval - jitter 不得低于最小检测间隔 15 秒。
 const maxJitterSeconds = computed<number>(() => Math.max(0, (form.interval_seconds || 0) - 15))
@@ -604,6 +699,10 @@ const providerOptions = computed<ProviderOption[]>(() => [
   { value: PROVIDER_DEEPSEEK, label: t('monitorCommon.providers.deepseek') },
 ])
 
+function providerLabel(provider: Provider): string {
+  return providerOptions.value.find((option) => option.value === provider)?.label || provider
+}
+
 // 国产 provider 预填的官方 endpoint（仅探活侧；配额模式 endpoint 可留空）。
 const PROVIDER_DEFAULT_ENDPOINTS: Partial<Record<Provider, string>> = {
   [PROVIDER_KIMI]: DEFAULT_KIMI_ENDPOINT,
@@ -623,21 +722,19 @@ const checkModeOptions = computed<CheckModeOption[]>(() => [
     value: CHECK_MODE_PROBE,
     label: t('admin.channelMonitor.form.checkModeProbe'),
     hint: t('admin.channelMonitor.form.checkModeProbeHint'),
-    // antigravity 无探活 adapter，仅配额模式。
-    disabled: form.provider === PROVIDER_ANTIGRAVITY,
+    disabled: !isCompositeGroup.value && form.provider === PROVIDER_ANTIGRAVITY,
   },
   {
     value: CHECK_MODE_QUOTA,
     label: t('admin.channelMonitor.form.checkModeQuota'),
     hint: t('admin.channelMonitor.form.checkModeQuotaHint'),
-    disabled: false,
+    disabled: isCompositeGroup.value,
   },
   {
     value: CHECK_MODE_QUOTA_PROBE,
     label: t('admin.channelMonitor.form.checkModeQuotaProbe'),
     hint: t('admin.channelMonitor.form.checkModeQuotaProbeHint'),
-    // antigravity 无探活 adapter，只支持配额模式。
-    disabled: form.provider === PROVIDER_ANTIGRAVITY,
+    disabled: isCompositeGroup.value || form.provider === PROVIDER_ANTIGRAVITY,
   },
 ])
 
@@ -1010,8 +1107,8 @@ function pickMyKey(k: ApiKey) {
 function buildPayload(): CreateParams {
   return {
     name: form.name.trim(),
-    provider: form.provider,
-    api_mode: form.provider === PROVIDER_OPENAI ? form.api_mode : API_MODE_CHAT_COMPLETIONS,
+    provider: monitorProvider.value,
+    api_mode: monitorProvider.value === PROVIDER_OPENAI ? form.api_mode : API_MODE_CHAT_COMPLETIONS,
     check_mode: form.check_mode,
     account_id: usesQuotaMode.value ? form.account_id : null,
     endpoint: usesProbePart.value ? form.endpoint.trim() : '',
@@ -1021,7 +1118,7 @@ function buildPayload(): CreateParams {
     group_name: form.group_name.trim(),
     group_id: form.group_id,
     probe_fallback_enabled: form.probe_fallback_enabled,
-    intelligence_enabled: form.provider === PROVIDER_OPENAI ? form.intelligence_enabled : false,
+    intelligence_enabled: !isCompositeGroup.value && form.provider === PROVIDER_OPENAI ? form.intelligence_enabled : false,
     enabled: form.enabled,
     interval_seconds: form.interval_seconds,
     jitter_seconds: form.jitter_seconds || 0,

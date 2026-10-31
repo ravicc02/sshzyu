@@ -170,8 +170,7 @@
               </label>
             </div>
           </section>
-          <p v-if="draft.platforms.length === 0" class="empty-state py-8 text-sm text-gray-400">{{ t('channelMonitorV2.settings.groupsSelectPlatformFirst') }}</p>
-          <p v-else-if="selectableGroups.length === 0" class="empty-state py-8 text-sm text-gray-400">{{ t('channelMonitorV2.settings.groupsEmpty') }}</p>
+          <p v-if="selectableGroups.length === 0" class="empty-state py-8 text-sm text-gray-400">{{ t('channelMonitorV2.settings.groupsEmpty') }}</p>
           <p v-else-if="!groupedOptions.length" class="py-6 text-center text-xs text-gray-500">{{ t('channelMonitorV2.settings.noMatchingGroups') }}</p>
         </div>
       </div>
@@ -351,7 +350,9 @@ const syncingPlatforms = ref(false)
 const syncingPlatform = ref('')
 const refreshingGroups = ref(false)
 const selectedPlatformKeys = computed(() => new Set(draft.value?.platforms.map((item) => item.platform) || []))
-const selectableGroups = computed(() => groups.value.filter((group) => selectedPlatformKeys.value.has(group.platform)))
+const selectableGroups = computed(() => groups.value.filter((group) =>
+  group.platform === 'composite' || selectedPlatformKeys.value.has(group.platform)
+))
 const selectedMonitorGroups = computed(() => {
   const selected = new Set(draft.value?.group_ids || [])
   return selectableGroups.value.filter((group) => selected.has(group.id))
