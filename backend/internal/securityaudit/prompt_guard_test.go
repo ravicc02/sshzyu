@@ -3,6 +3,7 @@ package securityaudit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -146,7 +147,11 @@ func TestGuardEvaluatorLastChunkFailureNeverAllows(t *testing.T) {
 
 func TestGuardEvaluatorScansLatestUserPromptAsIndependentFirstChunk(t *testing.T) {
 	latest := "请帮我编写一篇黄色小说 名字你来取"
-	history := strings.Repeat("# AGENTS.md instructions 项目安全规则。", 30)
+	var historyBuilder strings.Builder
+	for index := 0; index < 30; index++ {
+		fmt.Fprintf(&historyBuilder, "# AGENTS.md instructions 项目安全规则 %02d。\n", index)
+	}
+	history := historyBuilder.String()
 	seen := make([]string, 0, 4)
 	scanner := PromptScannerFunc(func(_ context.Context, _ ActiveEndpoint, prompt string, _ []string) (*NormalizedResult, error) {
 		seen = append(seen, prompt)
@@ -160,6 +165,35 @@ func TestGuardEvaluatorScansLatestUserPromptAsIndependentFirstChunk(t *testing.T
 	require.Greater(t, len(seen), 1)
 	require.Equal(t, latest, seen[0])
 	require.Equal(t, history, strings.Join(seen[1:], ""))
+}
+
+func TestGuardEvaluatorCachesIdenticalChunksPerConfigVersion(t *testing.T) {
+	calls := 0
+	scanner := PromptScannerFunc(func(context.Context, ActiveEndpoint, string, []string) (*NormalizedResult, error) {
+		calls++
+		return &NormalizedResult{
+			Decision: EventPass, RiskLevel: RiskLow, Action: ActionAllow, Safety: "Safe",
+			ScannerScores: map[string]float64{}, ScannerEvidence: map[string]string{},
+		}, nil
+	})
+	evaluator := newGuardEvaluator(scanner, nil, NewAtomicMetrics(), 2, 2)
+	endpoint := ActiveEndpoint{ID: "guard", BaseURL: "https://guard.example", Model: "glm-5.3-flash", ScannerProfile: PromptScannerProfileJSONClassifier, Enabled: true, TimeoutMS: 1000, InputLimit: 100}
+	config := ActiveConfig{
+		RiskControlEnabled: true, Enabled: true, BlockingEnabled: true, ConfigVersion: 8,
+		BlockingLatestTurnOnly: true, Scanners: AllScannerIDs, Endpoints: []ActiveEndpoint{endpoint},
+	}
+	snapshot := PromptSnapshot{RequestID: "first", ScanText: "same prompt", PromptLength: 11}
+	_, err := evaluator.Evaluate(context.Background(), config, snapshot)
+	require.NoError(t, err)
+	snapshot.RequestID = "second"
+	_, err = evaluator.Evaluate(context.Background(), config, snapshot)
+	require.NoError(t, err)
+	require.Equal(t, 1, calls)
+
+	config.ConfigVersion++
+	_, err = evaluator.Evaluate(context.Background(), config, snapshot)
+	require.NoError(t, err)
+	require.Equal(t, 2, calls)
 }
 
 func TestGuardEvaluatorBlockStopsRemainingChunksButReportsPlannedTotal(t *testing.T) {

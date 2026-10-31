@@ -293,13 +293,13 @@ func TestPromptSnapshotIncludesClientControlledInstructions(t *testing.T) {
 	}
 }
 
-func TestBlockingPromptSnapshotLimitsInputToLatestUserAndPreviousOutput(t *testing.T) {
+func TestBlockingPromptSnapshotLimitsInputToCurrentUser(t *testing.T) {
 	tests := []struct {
 		name, protocol, body, want string
 		omitted                    []string
 	}{
 		{
-			name:     "chat keeps multipart latest user and prior assistant",
+			name:     "chat keeps multipart current user",
 			protocol: "openai_chat_completions",
 			body: `{"messages":[
 				{"role":"system","content":"system instruction"},
@@ -309,19 +309,19 @@ func TestBlockingPromptSnapshotLimitsInputToLatestUserAndPreviousOutput(t *testi
 				{"role":"assistant","content":"previous assistant output"},
 				{"role":"user","content":[{"type":"text","text":"latest user first part"},{"type":"text","text":"latest user second part"}]}
 			]}`,
-			want:    "latest user first part\n\nlatest user second part" + promptAuditPrioritySeparator + "previous assistant output",
-			omitted: []string{"system instruction", "older user input", "older assistant output", "tool payload"},
+			want:    "latest user first part\n\nlatest user second part",
+			omitted: []string{"system instruction", "older user input", "older assistant output", "tool payload", "previous assistant output"},
 		},
 		{
-			name:     "gemini keeps prior model output",
+			name:     "gemini keeps current user only",
 			protocol: "gemini",
 			body: `{"systemInstruction":{"parts":[{"text":"system instruction"}]},"contents":[
 				{"role":"user","parts":[{"text":"older user input"}]},
 				{"role":"model","parts":[{"text":"previous model output"}]},
 				{"role":"user","parts":[{"text":"latest user input"}]}
 			]}`,
-			want:    "latest user input" + promptAuditPrioritySeparator + "previous model output",
-			omitted: []string{"system instruction", "older user input"},
+			want:    "latest user input",
+			omitted: []string{"system instruction", "older user input", "previous model output"},
 		},
 	}
 	for _, tt := range tests {
@@ -363,9 +363,10 @@ func TestResponsesOutputTextIncludedInFullAndLatestTurnSnapshots(t *testing.T) {
 
 	latestTurn, err := ExtractBlockingPromptSnapshot(req, true)
 	require.NoError(t, err)
-	require.Equal(t, "captured latest user input"+promptAuditPrioritySeparator+"captured previous assistant output", latestTurn.ScanText)
-	require.Equal(t, 2, latestTurn.MessageCount)
+	require.Equal(t, "captured latest user input", latestTurn.ScanText)
+	require.Equal(t, 1, latestTurn.MessageCount)
 	require.NotContains(t, latestTurn.ScanText, "earlier user input")
+	require.NotContains(t, latestTurn.ScanText, "captured previous assistant output")
 }
 
 func TestBlockingPromptSnapshotPreservesFullScopeByDefaultAndWithoutUserInput(t *testing.T) {

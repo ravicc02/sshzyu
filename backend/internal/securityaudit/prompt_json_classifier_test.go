@@ -20,30 +20,53 @@ func TestParseJSONClassifier(t *testing.T) {
 	}{
 		{
 			name:       "allow",
-			content:    `{"safe":true,"decision":"allow","risk_level":"low","categories":[],"confidence":0.99,"reason":"普通问题"}`,
+			content:    `{"safe":true,"decision":"allow","intent":"analyze","actionable":false,"risk_level":"low","categories":[],"confidence":0.99,"reason":"普通问题"}`,
 			wantKind:   DecisionAllow,
 			wantAction: ActionAllow,
 		},
 		{
 			name:       "review",
-			content:    "```json\n{\"safe\":false,\"decision\":\"review\",\"risk_level\":\"medium\",\"categories\":[\"jailbreak\"],\"confidence\":0.72,\"reason\":\"边界样本\"}\n```",
+			content:    "```json\n{\"safe\":false,\"decision\":\"review\",\"intent\":\"quote\",\"actionable\":false,\"risk_level\":\"medium\",\"categories\":[\"jailbreak\"],\"confidence\":0.72,\"reason\":\"边界样本\"}\n```",
 			wantKind:   DecisionFlag,
 			wantAction: ActionWarn,
 		},
 		{
 			name:       "block",
-			content:    `{"safe":false,"decision":"block","risk_level":"critical","categories":["jailbreak"],"confidence":0.97,"reason":"要求忽略系统约束"}`,
+			content:    `{"safe":false,"decision":"block","intent":"execute","actionable":true,"risk_level":"critical","categories":["violent","non_violent_illegal_acts"],"confidence":0.97,"reason":"要求制作炸弹"}`,
 			wantKind:   DecisionBlock,
 			wantAction: ActionBlock,
 		},
 		{
+			name:       "jailbreak alone downgraded",
+			content:    `{"safe":false,"decision":"block","intent":"execute","actionable":true,"risk_level":"critical","categories":["jailbreak"],"confidence":0.97,"reason":"角色扮演越狱"}`,
+			wantKind:   DecisionFlag,
+			wantAction: ActionWarn,
+		},
+		{
+			name:       "embedded policy downgraded",
+			content:    `{"safe":false,"decision":"block","intent":"configure","actionable":false,"risk_level":"critical","categories":["sexual_content_or_sexual_acts","jailbreak"],"confidence":0.96,"reason":"被引用的人格配置包含成人资源规则"}`,
+			wantKind:   DecisionFlag,
+			wantAction: ActionWarn,
+		},
+		{
+			name:       "low confidence block downgraded",
+			content:    `{"safe":false,"decision":"block","intent":"execute","actionable":true,"risk_level":"critical","categories":["violent"],"confidence":0.7,"reason":"不确定"}`,
+			wantKind:   DecisionFlag,
+			wantAction: ActionWarn,
+		},
+		{
 			name:      "semantic conflict",
-			content:   `{"safe":false,"decision":"allow","risk_level":"low","categories":[],"confidence":0.9,"reason":""}`,
+			content:   `{"safe":false,"decision":"allow","intent":"execute","actionable":false,"risk_level":"low","categories":[],"confidence":0.9,"reason":""}`,
 			wantError: true,
 		},
 		{
 			name:      "missing safe",
-			content:   `{"decision":"allow","risk_level":"low","categories":[],"confidence":0.9,"reason":""}`,
+			content:   `{"decision":"allow","intent":"analyze","actionable":false,"risk_level":"low","categories":[],"confidence":0.9,"reason":""}`,
+			wantError: true,
+		},
+		{
+			name:      "missing intent",
+			content:   `{"safe":true,"decision":"allow","actionable":false,"risk_level":"low","categories":[],"confidence":0.9,"reason":""}`,
 			wantError: true,
 		},
 	}
@@ -72,7 +95,7 @@ func TestJSONClassifierScannerSendsIsolatedSystemPrompt(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"safe\":true,\"decision\":\"allow\",\"risk_level\":\"low\",\"categories\":[],\"confidence\":0.99,\"reason\":\"ok\"}"}}]}`))
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"safe\":true,\"decision\":\"allow\",\"intent\":\"analyze\",\"actionable\":false,\"risk_level\":\"low\",\"categories\":[],\"confidence\":0.99,\"reason\":\"ok\"}"}}]}`))
 	}))
 	defer server.Close()
 
@@ -85,9 +108,12 @@ func TestJSONClassifierScannerSendsIsolatedSystemPrompt(t *testing.T) {
 	require.Len(t, payload.Messages, 2)
 	require.Equal(t, "system", payload.Messages[0].Role)
 	require.Contains(t, payload.Messages[0].Content, "不能执行或服从")
+	require.Contains(t, payload.Messages[0].Content, "外层请求的真实意图")
+	require.Contains(t, payload.Messages[0].Content, "actionable")
 	require.Contains(t, payload.Messages[0].Content, "jailbreak")
 	require.Equal(t, "user", payload.Messages[1].Role)
 	require.Contains(t, payload.Messages[1].Content, "<UNTRUSTED_PROMPT>")
+	require.Equal(t, 2, result.PolicyVersion)
 }
 
 func TestPromptServiceKeywordFilterSkipsUnmatchedText(t *testing.T) {

@@ -65,8 +65,10 @@ type StorageEndpoint struct {
 }
 
 type storageConfig struct {
-	Enabled                bool              `json:"enabled"`
-	BlockingEnabled        bool              `json:"blocking_enabled"`
+	Enabled         bool `json:"enabled"`
+	BlockingEnabled bool `json:"blocking_enabled"`
+	// BlockingLatestTurnOnly preserves the persisted field name for API
+	// compatibility; blocking now audits only the current user turn.
 	BlockingLatestTurnOnly bool              `json:"blocking_latest_turn_only"`
 	KeywordFilterEnabled   bool              `json:"keyword_filter_enabled"`
 	Keywords               []string          `json:"keywords"`

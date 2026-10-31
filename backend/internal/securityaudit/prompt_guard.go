@@ -2,10 +2,23 @@ package securityaudit
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
+
+const (
+	guardResultCacheTTL        = 10 * time.Minute
+	guardResultCacheMaxEntries = 1024
+)
+
+type guardResultCacheEntry struct {
+	result   *NormalizedResult
+	storedAt time.Time
+}
 
 type GuardEvaluator struct {
 	scanner PromptScanner
@@ -17,6 +30,8 @@ type GuardEvaluator struct {
 	perNodeLimit int
 	nodeMu       sync.Mutex
 	nodes        map[string]chan struct{}
+	cacheMu      sync.Mutex
+	cache        map[string]guardResultCacheEntry
 }
 
 func NewGuardEvaluator(scanner PromptScanner, repo JobRepository, metrics Metrics) *GuardEvaluator {
@@ -31,7 +46,8 @@ func newGuardEvaluator(scanner PromptScanner, repo JobRepository, metrics Metric
 		perNodeLimit = 16
 	}
 	return &GuardEvaluator{scanner: scanner, repo: repo, metrics: metrics, clock: realClock{},
-		global: make(chan struct{}, globalLimit), perNodeLimit: perNodeLimit, nodes: map[string]chan struct{}{}}
+		global: make(chan struct{}, globalLimit), perNodeLimit: perNodeLimit, nodes: map[string]chan struct{}{},
+		cache: map[string]guardResultCacheEntry{}}
 }
 
 func (g *GuardEvaluator) Evaluate(ctx context.Context, cfg ActiveConfig, snapshot PromptSnapshot) (*PromptDecision, error) {
@@ -189,6 +205,10 @@ func logGuardFailure(snapshot PromptSnapshot, cfg ActiveConfig, kind DecisionKin
 }
 
 func (g *GuardEvaluator) scanChunk(ctx context.Context, cfg ActiveConfig, endpoints []ActiveEndpoint, chunk string) (*NormalizedResult, error) {
+	cacheKey := guardResultCacheKey(cfg, endpoints, chunk)
+	if cached := g.cachedResult(cacheKey); cached != nil {
+		return cached, nil
+	}
 	var lastErr error
 	for index, endpoint := range endpoints {
 		semaphore := g.nodeSemaphore(endpoint.ID)
@@ -209,6 +229,7 @@ func (g *GuardEvaluator) scanChunk(ctx context.Context, cfg ActiveConfig, endpoi
 		result, err := callPromptScanner(ctx, g.scanner, endpoint, chunk, cfg.Scanners)
 		<-semaphore
 		if err == nil && result != nil {
+			g.storeCachedResult(cacheKey, result)
 			return result, nil
 		}
 		if err == nil {
@@ -227,6 +248,72 @@ func (g *GuardEvaluator) scanChunk(ctx context.Context, cfg ActiveConfig, endpoi
 		lastErr = &GuardError{Code: ErrorCodeUnavailable}
 	}
 	return nil, lastErr
+}
+
+func guardResultCacheKey(cfg ActiveConfig, endpoints []ActiveEndpoint, chunk string) string {
+	var fingerprint strings.Builder
+	for _, endpoint := range endpoints {
+		fmt.Fprintf(&fingerprint, "%s|%s|%s|%s|%d|%d;",
+			endpoint.ID, endpoint.BaseURL, endpoint.Model, endpoint.ScannerProfile,
+			endpoint.TimeoutMS, endpoint.InputLimit)
+	}
+	sum := sha256.Sum256([]byte(chunk))
+	return fmt.Sprintf("%d|%s|%s|%x", cfg.ConfigVersion, strings.Join(cfg.Scanners, ","), fingerprint.String(), sum)
+}
+
+func (g *GuardEvaluator) cachedResult(key string) *NormalizedResult {
+	if g == nil || key == "" || guardResultCacheTTL <= 0 {
+		return nil
+	}
+	g.cacheMu.Lock()
+	defer g.cacheMu.Unlock()
+	entry, ok := g.cache[key]
+	if !ok {
+		return nil
+	}
+	if g.clock.Now().Sub(entry.storedAt) > guardResultCacheTTL {
+		delete(g.cache, key)
+		return nil
+	}
+	return cloneNormalizedResult(entry.result)
+}
+
+func (g *GuardEvaluator) storeCachedResult(key string, result *NormalizedResult) {
+	if g == nil || key == "" || result == nil || guardResultCacheTTL <= 0 || guardResultCacheMaxEntries <= 0 {
+		return
+	}
+	g.cacheMu.Lock()
+	defer g.cacheMu.Unlock()
+	if len(g.cache) >= guardResultCacheMaxEntries {
+		var oldestKey string
+		var oldestTime time.Time
+		for candidate, entry := range g.cache {
+			if oldestKey == "" || entry.storedAt.Before(oldestTime) {
+				oldestKey, oldestTime = candidate, entry.storedAt
+			}
+		}
+		delete(g.cache, oldestKey)
+	}
+	g.cache[key] = guardResultCacheEntry{result: cloneNormalizedResult(result), storedAt: g.clock.Now()}
+}
+
+func cloneNormalizedResult(result *NormalizedResult) *NormalizedResult {
+	if result == nil {
+		return nil
+	}
+	cloned := *result
+	cloned.Categories = append([]string(nil), result.Categories...)
+	cloned.MatchedScanners = append([]string(nil), result.MatchedScanners...)
+	cloned.UnknownCategories = append([]string(nil), result.UnknownCategories...)
+	cloned.ScannerScores = make(map[string]float64, len(result.ScannerScores))
+	for key, value := range result.ScannerScores {
+		cloned.ScannerScores[key] = value
+	}
+	cloned.ScannerEvidence = make(map[string]string, len(result.ScannerEvidence))
+	for key, value := range result.ScannerEvidence {
+		cloned.ScannerEvidence[key] = value
+	}
+	return &cloned
 }
 
 func callPromptScanner(ctx context.Context, scanner PromptScanner, endpoint ActiveEndpoint, chunk string, scanners []string) (result *NormalizedResult, err error) {
