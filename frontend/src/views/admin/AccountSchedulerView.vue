@@ -742,20 +742,6 @@ onMounted(load);
   background: var(--bg-secondary);
   color-scheme: light;
 }
-:global(.dark) .scheduler-page {
-  --monitor-bg: #1e1e21;
-  --monitor-soft: #28282c;
-  --monitor-input: #252528;
-  --monitor-ink: #f5f5f7;
-  --monitor-muted: #aaaab3;
-  --monitor-line: #35353b;
-  --monitor-selected: #22334a;
-  --monitor-accent: #8ac0ff;
-  --monitor-warning: #e8b668;
-  --monitor-danger: #ff9ba1;
-  --monitor-positive: #7bd4aa;
-  color-scheme: dark;
-}
 .scheduler-shell {
   display: grid;
   width: min(1440px, 100%);
@@ -1455,5 +1441,24 @@ select:focus {
   .switch > span {
     transition: none;
   }
+}
+</style>
+
+<style>
+/* Kept unscoped because Vue's production scoped-CSS compiler drops the
+   equivalent :global(.dark) rule and leaves the monitor tokens light. */
+.dark .scheduler-page {
+  --monitor-bg: #1e1e21;
+  --monitor-soft: #28282c;
+  --monitor-input: #252528;
+  --monitor-ink: #f5f5f7;
+  --monitor-muted: #aaaab3;
+  --monitor-line: #35353b;
+  --monitor-selected: #22334a;
+  --monitor-accent: #8ac0ff;
+  --monitor-warning: #e8b668;
+  --monitor-danger: #ff9ba1;
+  --monitor-positive: #7bd4aa;
+  color-scheme: dark;
 }
 </style>
