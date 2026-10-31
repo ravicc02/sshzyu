@@ -610,7 +610,7 @@ export default {
         probeFallbackEnabled: 'Enable active-probe fallback',
         probeFallbackEnabledHint: 'When a linked group has no real requests, use active probe status, availability, and latency as fallback.',
         intelligenceEnabled: 'Enable reasoning check',
-        intelligenceEnabledHint: 'OpenAI groups only. Runs a fixed reasoning challenge to detect model degradation.',
+        intelligenceEnabledHint: 'OpenAI groups only. A reply passes only when it contains 21 and no other number; otherwise it is degraded. Request errors are recorded separately.',
         intervalSeconds: 'Interval (seconds)',
         intervalSecondsHint: 'Range: 15 - 3600 seconds',
         jitterSeconds: 'Random Jitter (± seconds)',

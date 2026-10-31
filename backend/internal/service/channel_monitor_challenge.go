@@ -11,13 +11,25 @@ import (
 // Keep reasoning results separate from availability checks.
 const monitorIntelligenceModel = "__reasoning_probe__"
 
-// The 21-candy construction is the minimum guarantee; 29 is the common wrong
-// answer produced when the shape constraint is ignored.
+// The 21-candy construction is the minimum guarantee; 29 is a common wrong
+// answer produced when the participant is incorrectly assumed to draw without
+// using touch to control how many candies come from each shape.
 const monitorIntelligenceExpected = "21"
-const monitorIntelligencePrompt = `Provide only the numerical answer. The use of internet searches, command execution, or code files is not permitted. Problem: A black bag contains candies of three different flavors, with each flavor coming in two distinct shapes (circular and star-shaped; the shapes can be distinguished by touch). The distribution of these candies by flavor and shape is provided in the table below. Before beginning, a participant must decide how many candies to draw from the bag. What is the minimum number of candies that must be drawn to guarantee that the participant holds both an apple-flavored candy and a peach-flavored candy, with the two candies being of different shapes? (The condition is satisfied if the participant holds, for example, a circular apple-flavored candy and a star-shaped peach-flavored candy, or a circular peach-flavored candy and a star-shaped apple-flavored candy.) Apple-flavored | Peach-flavored | Watermelon-flavored | Circular: 7, 9, 8 | Star-shaped: 7, 6, 4`
+const monitorIntelligencePrompt = `请完成下面这道推理题，不要联网、不要执行代码。
+
+在一个黑色的袋子里放有三种口味的糖果，每种糖果有两种不同的形状（圆形和五角星形，不同的形状靠手感可以分辨）。现已知不同口味的糖和不同形状的数量统计如下表：
+
+口味形状  苹果味  桃子味  西瓜味
+圆形      7       9       8
+五角星形  7       6       4
+
+参赛者需要在活动前决定摸出的糖果总数，但摸取过程中可以靠手感控制从每种形状中各取多少颗，不能分辨口味。最少取出多少个糖果，才能保证手中同时拥有不同形状的苹果味和桃子味的糖？满足“圆形苹果味 + 五角星桃子味”或“圆形桃子味 + 五角星苹果味”任意一种即可。
+
+只输出最终答案这一个阿拉伯数字。不要输出推理过程、解释、单位或任何其他数字。`
 
 func validateIntelligenceResponse(response string) bool {
-	return strings.TrimSpace(response) == monitorIntelligenceExpected
+	numbers := monitorChallengeNumberRegex.FindAllString(strings.TrimSpace(response), -1)
+	return len(numbers) == 1 && numbers[0] == monitorIntelligenceExpected
 }
 
 // monitorChallengePromptTemplate 1:1 复刻 BingZi-233/check-cx 的 few-shot 模板。

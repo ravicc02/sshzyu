@@ -610,7 +610,7 @@ export default {
         probeFallbackEnabled: '开启主动探测兜底',
         probeFallbackEnabledHint: '分组没有真实请求样本时，用该监控的主动探测结果补充状态、可用率和延迟。',
         intelligenceEnabled: '开启降智测试',
-        intelligenceEnabledHint: '仅 OpenAI 分组生效；使用固定推理题主动检测模型是否被降智。',
+        intelligenceEnabledHint: '仅 OpenAI 分组生效；回复中有 21 且不能出现其他数字才判定通过，否则判定降智，请求失败单独记录。',
         intervalSeconds: '检测间隔 (秒)',
         intervalSecondsHint: '范围：15 - 3600 秒',
         jitterSeconds: '随机抖动 (± 秒)',
