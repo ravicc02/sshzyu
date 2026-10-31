@@ -3,10 +3,10 @@
   "upstream_release": "v0.2.19",
   "upstream_commit": "dece26153621959ccd7635814f4b2d08304e681a",
   "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.19",
-  "local_build_version": "0.2.19-r1",
+  "local_build_version": "0.2.19-r2",
   "integration_commit": "9b2da920e2201901d0c19472b66a76121e60db26",
   "integrated_at": "2026-10-31",
   "verified_at": "2026-10-31",
-  "note": "Integrated official v0.2.19 with scoped admin API keys, image-count billing, Grok model catalog diagnostics and the custom unified security audit preserved. Release preparation only: no production activation or migration execution.",
+  "note": "Integrated official v0.2.19 with scoped admin API keys, image-count billing, Grok model catalog diagnostics and the custom unified security audit preserved. r2 narrows blocking audit to the current user turn, adds a deterministic classifier policy gate, and adds composite provider-aware active probes and monitoring totals. Release preparation only: no production activation or migration execution.",
   "integration_status": "committed"
 }
