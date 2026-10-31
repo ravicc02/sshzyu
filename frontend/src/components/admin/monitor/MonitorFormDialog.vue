@@ -190,15 +190,8 @@
         </p>
       </div>
 
-      <div class="space-y-3 rounded-2xl border border-gray-200 bg-gray-50/70 p-4 dark:border-dark-700 dark:bg-dark-900/30">
-        <div class="flex items-start justify-between gap-4">
-          <div class="min-w-0">
-            <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.channelMonitor.form.probeFallbackEnabled') }}</p>
-            <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('admin.channelMonitor.form.probeFallbackEnabledHint') }}</p>
-          </div>
-          <Toggle v-model="form.probe_fallback_enabled" />
-        </div>
-        <div v-if="!isCompositeGroup && form.provider === PROVIDER_OPENAI" class="border-t border-gray-200 pt-3 dark:border-dark-700">
+      <div v-if="!isCompositeGroup && form.provider === PROVIDER_OPENAI" class="rounded-2xl border border-gray-200 bg-gray-50/70 p-4 dark:border-dark-700 dark:bg-dark-900/30">
+        <div>
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
               <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.channelMonitor.form.intelligenceEnabled') }}</p>
@@ -981,7 +974,7 @@ function loadFromMonitor(m: ChannelMonitor) {
   form.extra_models = [...(m.extra_models || [])]
   form.group_name = m.group_name || ''
   form.group_id = m.group_id ?? null
-  form.probe_fallback_enabled = m.probe_fallback_enabled !== false
+  form.probe_fallback_enabled = true
   form.intelligence_enabled = m.intelligence_enabled !== false
   form.interval_seconds = m.interval_seconds || systemDefaultInterval.value
   form.jitter_seconds = m.jitter_seconds || 0
@@ -1131,7 +1124,7 @@ function buildPayload(): CreateParams {
     extra_models: usesProbePart.value ? form.extra_models : [],
     group_name: form.group_name.trim(),
     group_id: form.group_id,
-    probe_fallback_enabled: form.probe_fallback_enabled,
+      probe_fallback_enabled: true,
     intelligence_enabled: !isCompositeGroup.value && form.provider === PROVIDER_OPENAI ? form.intelligence_enabled : false,
     enabled: form.enabled,
     interval_seconds: form.interval_seconds,

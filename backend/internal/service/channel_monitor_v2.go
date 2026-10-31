@@ -295,6 +295,34 @@ type ChannelMonitorV2UserRow struct {
 	Metrics      ChannelMonitorV2Metric `json:"metrics"`
 }
 
+type ChannelMonitorV2RequestLog struct {
+	ID                    int64      `json:"id"`
+	CreatedAt             time.Time  `json:"created_at"`
+	RequestID             string     `json:"request_id"`
+	GroupID               int64      `json:"group_id"`
+	GroupName             string     `json:"group_name"`
+	GroupPlatform         string     `json:"group_platform"`
+	APIKeyID              int64      `json:"api_key_id"`
+	APIKeyName            string     `json:"api_key_name"`
+	AccountID             int64      `json:"account_id"`
+	AccountName           string     `json:"account_name"`
+	AccountPlatform       string     `json:"account_platform"`
+	Model                 string     `json:"model"`
+	UpstreamModel         string     `json:"upstream_model"`
+	Success               bool       `json:"success"`
+	DurationMs            *int       `json:"duration_ms"`
+	FirstTokenMs          *int       `json:"first_token_ms"`
+	InputTokens           int64      `json:"input_tokens"`
+	OutputTokens          int64      `json:"output_tokens"`
+	IntelligenceStatus    string     `json:"intelligence_status"`
+	IntelligenceCheckedAt *time.Time `json:"intelligence_checked_at,omitempty"`
+	IntelligenceMessage   string     `json:"intelligence_message"`
+}
+
+type ChannelMonitorV2RequestLogs struct {
+	Items []ChannelMonitorV2RequestLog `json:"items"`
+}
+
 type ChannelMonitorV2List[T any] struct {
 	Coverage ChannelMonitorV2Coverage `json:"coverage"`
 	Items    []T                      `json:"items"`
@@ -315,6 +343,12 @@ type ChannelMonitorV2Repository interface {
 	// passive aggregator (and bootstrap progress). Missing row → zero value, nil error.
 	GetAggregationWatermark(ctx context.Context) (*ChannelMonitorV2AggregationWatermark, error)
 	RecomputeRange(ctx context.Context, start, end time.Time) error
+}
+
+// ChannelMonitorV2RequestLogRepository is deliberately separate from the main
+// repository contract so existing test doubles keep their narrow surface.
+type ChannelMonitorV2RequestLogRepository interface {
+	GetRequestLogs(ctx context.Context, filter ChannelMonitorV2Filter, config ChannelMonitorV2Config, limit int) (*ChannelMonitorV2RequestLogs, error)
 }
 
 // ChannelMonitorV2BootstrapProductWindow is the longest UI range that must be
@@ -736,6 +770,24 @@ func (s *ChannelMonitorV2Service) Users(ctx context.Context, filter ChannelMonit
 		row.DisplayLabel = fmt.Sprintf("Other user #%d", i+1)
 	}
 	return result, nil
+}
+
+func (s *ChannelMonitorV2Service) RequestLogs(ctx context.Context, filter ChannelMonitorV2Filter, limit int) (*ChannelMonitorV2RequestLogs, error) {
+	cfg, err := s.getEnabledConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	repo, ok := s.repo.(ChannelMonitorV2RequestLogRepository)
+	if !ok {
+		return &ChannelMonitorV2RequestLogs{Items: []ChannelMonitorV2RequestLog{}}, nil
+	}
+	return repo.GetRequestLogs(ctx, filter, *cfg, limit)
 }
 
 func channelMonitorV2TopUsersWithSelf(items []ChannelMonitorV2UserRow, selfIndex int, limit int) []ChannelMonitorV2UserRow {

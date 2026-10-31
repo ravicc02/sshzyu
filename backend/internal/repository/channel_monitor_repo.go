@@ -242,6 +242,23 @@ func (r *channelMonitorRepository) MarkChecked(ctx context.Context, id int64, ch
 	return nil
 }
 
+func (r *channelMonitorRepository) HasRecentTrafficForGroup(ctx context.Context, groupID int64, since time.Time) (bool, error) {
+	const query = `
+		SELECT EXISTS (
+			SELECT 1
+			FROM usage_logs
+			WHERE group_id = $1
+			  AND created_at >= $2
+			  AND COALESCE(user_agent, '') NOT LIKE $3
+			LIMIT 1
+		)`
+	var exists bool
+	if err := r.db.QueryRowContext(ctx, query, groupID, since, "%"+service.ChannelMonitorProbeUserAgentMarker+"%").Scan(&exists); err != nil {
+		return false, fmt.Errorf("check recent group traffic: %w", err)
+	}
+	return exists, nil
+}
+
 func (r *channelMonitorRepository) InsertHistoryBatch(ctx context.Context, rows []*service.ChannelMonitorHistoryRow) error {
 	if len(rows) == 0 {
 		return nil

@@ -9,6 +9,11 @@ import (
 // ChannelMonitor 全局常量。
 // 这些是 MVP 阶段的硬编码值，按需可以提到 config 中。
 const (
+	// ChannelMonitorProbeUserAgentMarker identifies probes that reach the local
+	// gateway. Usage-log based idle checks exclude these internal requests.
+	ChannelMonitorProbeUserAgentMarker = "SSHZYU-ChannelMonitor/"
+	monitorInternalUserAgent            = ChannelMonitorProbeUserAgentMarker + "1.0"
+
 	// monitorRequestTimeout 单次模型请求总超时（含 Body 读取）。
 	monitorRequestTimeout = 45 * time.Second
 	// monitorPingTimeout HEAD 请求 endpoint origin 的超时。
@@ -130,6 +135,9 @@ const (
 
 	// monitorRunOneBuffer runOne 的总超时缓冲（除请求超时与 ping 超时外的额外裕量）。
 	monitorRunOneBuffer = 10 * time.Second
+	// monitorIdleProbeThreshold 分组最近有真实调用时跳过主动探测；
+	// 连续 10 分钟无调用后才进入按需探测。
+	monitorIdleProbeThreshold = 10 * time.Minute
 
 	// monitorIdleConnTimeout HTTP transport 空闲连接关闭超时。
 	monitorIdleConnTimeout = 30 * time.Second

@@ -263,6 +263,21 @@ func (r *ChannelMonitorRunner) fire(ctx context.Context, task *scheduledMonitor)
 			return
 		}
 	}
+	if gate, ok := r.svc.(interface {
+		ShouldRunScheduledCheck(context.Context, int64) (bool, error)
+	}); ok {
+		shouldRun, err := gate.ShouldRunScheduledCheck(ctx, task.id)
+		if err != nil {
+			slog.Warn("channel_monitor: idle traffic gate failed",
+				"monitor_id", task.id, "name", task.name, "error", err)
+			return
+		}
+		if !shouldRun {
+			slog.Debug("channel_monitor: skip probe because group has recent traffic",
+				"monitor_id", task.id, "name", task.name)
+			return
+		}
+	}
 	if !r.tryAcquireInFlight(task.id) {
 		slog.Debug("channel_monitor: skip already in-flight",
 			"monitor_id", task.id, "name", task.name)

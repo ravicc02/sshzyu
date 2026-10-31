@@ -899,6 +899,7 @@ func registerChannelMonitorV2Routes(admin *gin.RouterGroup, h *handler.Handlers,
 			reads.GET("/matrix", h.ChannelMonitorV2.AdminMatrix)
 			reads.GET("/errors", h.ChannelMonitorV2.Errors)
 			reads.GET("/users", h.ChannelMonitorV2.AdminUsers)
+			reads.GET("/requests", h.ChannelMonitorV2.AdminRequests)
 		}
 	}
 }

@@ -68,6 +68,10 @@ type channelMonitorRuntimeReader interface {
 	GetChannelMonitorRuntime(ctx context.Context) ChannelMonitorRuntime
 }
 
+type channelMonitorRecentTrafficReader interface {
+	HasRecentTrafficForGroup(ctx context.Context, groupID int64, since time.Time) (bool, error)
+}
+
 // ChannelMonitorService 渠道监控管理服务。
 type ChannelMonitorService struct {
 	repo      ChannelMonitorRepository
@@ -634,6 +638,7 @@ func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*Chec
 			intelligence = runIntelligenceCheckForModel(ctx, m.Endpoint, m.APIKey, m.PrimaryModel, &CheckOptions{
 				APIMode: m.APIMode, ExtraHeaders: m.ExtraHeaders,
 				BodyOverrideMode: m.BodyOverrideMode, BodyOverride: m.BodyOverride, ReasoningProbe: true,
+				InternalProbe: true,
 			})
 			return nil
 		})
@@ -653,6 +658,28 @@ func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*Chec
 		s.persistIntelligenceResult(ctx, m, intelligence)
 	}
 	return results, nil
+}
+
+// ShouldRunScheduledCheck applies the hybrid idle rule without changing manual
+// "run now" behavior: scheduled probes only run after the linked group has had
+// no real request for monitorIdleProbeThreshold.
+func (s *ChannelMonitorService) ShouldRunScheduledCheck(ctx context.Context, id int64) (bool, error) {
+	m, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	if m == nil || m.GroupID == nil || *m.GroupID <= 0 {
+		return true, nil
+	}
+	reader, ok := s.repo.(channelMonitorRecentTrafficReader)
+	if !ok {
+		return true, nil
+	}
+	recent, err := reader.HasRecentTrafficForGroup(ctx, *m.GroupID, time.Now().Add(-monitorIdleProbeThreshold))
+	if err != nil {
+		return false, err
+	}
+	return !recent, nil
 }
 
 func shouldRunIntelligenceProbe(m *ChannelMonitor) bool {
@@ -745,6 +772,7 @@ func (s *ChannelMonitorService) runChecksConcurrent(ctx context.Context, m *Chan
 		ExtraHeaders:     m.ExtraHeaders,
 		BodyOverrideMode: m.BodyOverrideMode,
 		BodyOverride:     m.BodyOverride,
+		InternalProbe:    true,
 	}
 
 	var eg errgroup.Group

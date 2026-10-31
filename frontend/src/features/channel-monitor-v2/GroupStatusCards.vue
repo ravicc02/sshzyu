@@ -245,7 +245,7 @@ function matchedProbesForRow(row: MonitorMatrixRow): UserMonitorView[] {
 }
 
 function probesForRow(row: MonitorMatrixRow): UserMonitorView[] {
-  return matchedProbesForRow(row).filter(probe => probe.probe_fallback_enabled !== false)
+  return matchedProbesForRow(row)
 }
 
 function hasProbe(row: MonitorMatrixRow) {
@@ -263,11 +263,9 @@ function hasEffectiveData(row: MonitorMatrixRow) {
 }
 
 function sourceLabel(row: MonitorMatrixRow) {
-  return hasTraffic(row)
-    ? t('channelMonitorV2.groupCards.realRequests')
-    : hasProbe(row)
-      ? t('channelMonitorV2.groupCards.activeProbe')
-      : t('channelMonitorV2.groupCards.noData')
+  return hasTraffic(row) || hasProbe(row)
+    ? t('channelMonitorV2.groupCards.combined')
+    : t('channelMonitorV2.groupCards.noData')
 }
 
 function probeState(row: MonitorMatrixRow): HealthState {
@@ -361,19 +359,39 @@ function probeStatusToHealth(status: MonitorTimelinePoint['status']): HealthStat
 }
 
 function timelineSlots(row: MonitorMatrixRow) {
-  return hasTraffic(row) ? realSlots(row) : activeSlots(row)
+  if (!hasTraffic(row)) return activeSlots(row)
+  const result = realSlots(row)
+  const coverage = props.coverage
+  if (!coverage || !hasProbe(row)) return result
+  const start = Date.parse(coverage.requested_start)
+  const end = Date.parse(coverage.requested_end || coverage.data_through)
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return result
+  const width = (end - start) / 20
+  const priority: Record<HealthState, number> = { unknown: 0, healthy: 1, warning: 2, critical: 3 }
+  const points = probesForRow(row)
+    .flatMap(probe => probe.timeline || [])
+    .filter(point => Number.isFinite(Date.parse(point.checked_at)))
+  for (const point of points) {
+    const stamp = Date.parse(point.checked_at)
+    if (stamp < start || stamp >= end) continue
+    const index = Math.min(19, Math.floor((stamp - start) / width))
+    if (result[index]) continue
+    const probeSlot = probeTimelineSlot(point)
+    if (!result[index] || priority[probeSlot.state] > priority[result[index]!.state]) result[index] = probeSlot
+  }
+  return result
 }
 
 function timelineAria(row: MonitorMatrixRow) {
-  if (hasTraffic(row)) return t('channelMonitorV2.groupCards.realRequests')
-  return hasProbe(row) ? t('channelMonitorV2.groupCards.activeProbe') : t('channelMonitorV2.groupCards.noData')
+  return hasTraffic(row) || hasProbe(row)
+    ? t('channelMonitorV2.groupCards.combined')
+    : t('channelMonitorV2.groupCards.noData')
 }
 
 function timelineWindowLabel(row: MonitorMatrixRow) {
-  if (hasTraffic(row)) {
-    return `${t('channelMonitorV2.groupCards.buckets')} · ${t('channelMonitorV2.ranges.90m')}`
-  }
-  return hasProbe(row) ? t('channelMonitorV2.groupCards.recentChecks') : t('channelMonitorV2.groupCards.noData')
+  return hasTraffic(row) || hasProbe(row)
+    ? t('channelMonitorV2.groupCards.combinedWindow')
+    : t('channelMonitorV2.groupCards.noData')
 }
 
 function slotTitle(slot: TimelineSlot | null) {

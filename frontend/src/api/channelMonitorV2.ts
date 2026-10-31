@@ -213,6 +213,30 @@ export interface MonitorUserRow {
   metrics: MonitorMetric
 }
 
+export interface MonitorRequestLog {
+  id: number
+  created_at: string
+  request_id: string
+  group_id: number
+  group_name: string
+  group_platform: string
+  api_key_id: number
+  api_key_name: string
+  account_id: number
+  account_name: string
+  account_platform: string
+  model: string
+  upstream_model: string
+  success: boolean
+  duration_ms: number | null
+  first_token_ms: number | null
+  input_tokens: number
+  output_tokens: number
+  intelligence_status: '' | 'operational' | 'degraded' | 'failed' | 'error'
+  intelligence_checked_at?: string | null
+  intelligence_message: string
+}
+
 function params(filter: MonitorFilter) {
   return {
     range: filter.range,
@@ -256,6 +280,13 @@ export async function getMatrix(filter: MonitorFilter, groupBy: MonitorMatrixGro
 }
 export async function getModels(filter: MonitorFilter, admin = false, signal?: AbortSignal) {
   const { data } = await apiClient.get<{ coverage: MonitorCoverage; items: MonitorModelRow[] }>(`${base(admin)}/models`, requestConfig(filter, signal))
+  return data
+}
+export async function getRequestLogs(filter: MonitorFilter, admin = false, limit = 100, signal?: AbortSignal) {
+  const { data } = await apiClient.get<{ items: MonitorRequestLog[] }>(
+    `${base(admin)}/requests`,
+    requestConfig(filter, signal, { limit }),
+  )
   return data
 }
 export async function getErrors(filter: MonitorFilter, admin = false, signal?: AbortSignal) {

@@ -22,6 +22,7 @@
               @configure="openProbeDetails"
               @toggle="toggleGroupProbe"
             />
+            <MonitorRequestLogs :groups="groups" />
           </section>
         </template>
       </MonitorSettingsPanel>
@@ -51,6 +52,7 @@ import Icon from '@/components/icons/Icon.vue'
 import MonitorFormDialog from '@/components/admin/monitor/MonitorFormDialog.vue'
 import MonitorSettingsPanel from '@/features/channel-monitor-v2/MonitorSettingsPanel.vue'
 import ActiveProbeGroupList from '@/features/channel-monitor-v2/ActiveProbeGroupList.vue'
+import MonitorRequestLogs from '@/features/channel-monitor-v2/MonitorRequestLogs.vue'
 
 const { t } = useI18n()
 const appStore = useAppStore()

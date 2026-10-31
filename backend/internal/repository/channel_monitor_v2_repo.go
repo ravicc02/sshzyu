@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -215,6 +216,100 @@ func (r *channelMonitorV2Repository) GetDimensions(ctx context.Context, filter s
 	sort.Slice(result.Models, func(i, j int) bool { return result.Models[i].RequestCount > result.Models[j].RequestCount })
 	sort.Slice(result.Groups, func(i, j int) bool { return result.Groups[i].RequestCount > result.Groups[j].RequestCount })
 	return result, rows.Err()
+}
+
+func (r *channelMonitorV2Repository) GetRequestLogs(
+	ctx context.Context,
+	filter service.ChannelMonitorV2Filter,
+	cfg service.ChannelMonitorV2Config,
+	limit int,
+) (*service.ChannelMonitorV2RequestLogs, error) {
+	result := &service.ChannelMonitorV2RequestLogs{Items: []service.ChannelMonitorV2RequestLog{}}
+	groups, groupScopeEmpty := channelMonitorV2ScopedGroupIDs(filter, cfg)
+	if groupScopeEmpty {
+		return result, nil
+	}
+	args := []any{filter.Start, filter.End}
+	conditions := []string{"ul.created_at >= $1", "ul.created_at < $2"}
+	if len(groups) > 0 {
+		args = append(args, pq.Array(groups))
+		conditions = append(conditions, fmt.Sprintf("ul.group_id = ANY($%d)", len(args)))
+	}
+	args = append(args, "%"+service.ChannelMonitorProbeUserAgentMarker+"%")
+	conditions = append(conditions, fmt.Sprintf("COALESCE(ul.user_agent, '') NOT LIKE $%d", len(args)))
+	args = append(args, limit)
+	query := `
+		SELECT
+			ul.id,
+			ul.created_at,
+			COALESCE(NULLIF(ul.request_id, ''), 'usage:' || ul.id::text),
+			COALESCE(ul.group_id, 0),
+			COALESCE(g.name, ''),
+			lower(COALESCE(NULLIF(TRIM(g.platform), ''), 'unknown')),
+			ul.api_key_id,
+			COALESCE(k.name, ''),
+			ul.account_id,
+			COALESCE(a.name, ''),
+			lower(COALESCE(NULLIF(TRIM(a.platform), ''), 'unknown')),
+			COALESCE(NULLIF(TRIM(ul.requested_model), ''), NULLIF(TRIM(ul.model), ''), 'unknown'),
+			COALESCE(ul.upstream_model, ''),
+			CASE WHEN ` + usageLogSuccessFilterUL + ` THEN TRUE ELSE FALSE END,
+			ul.duration_ms,
+			ul.first_token_ms,
+			ul.input_tokens,
+			ul.output_tokens,
+			COALESCE(probe.status, ''),
+			probe.checked_at,
+			COALESCE(probe.message, '')
+		FROM usage_logs ul
+		LEFT JOIN groups g ON g.id = ul.group_id
+		LEFT JOIN api_keys k ON k.id = ul.api_key_id
+		LEFT JOIN accounts a ON a.id = ul.account_id
+		LEFT JOIN LATERAL (
+			SELECT h.status, h.checked_at, h.message
+			FROM channel_monitors cm
+			JOIN channel_monitor_histories h ON h.monitor_id = cm.id
+			WHERE cm.group_id = ul.group_id
+			  AND h.model = '__reasoning_probe__'
+			  AND h.checked_at >= ul.created_at - INTERVAL '10 minutes'
+			  AND h.checked_at <= ul.created_at + INTERVAL '10 minutes'
+			ORDER BY ABS(EXTRACT(EPOCH FROM (h.checked_at - ul.created_at))), h.id DESC
+			LIMIT 1
+		) probe ON TRUE
+		WHERE ` + strings.Join(conditions, " AND ") + `
+		ORDER BY ul.created_at DESC, ul.id DESC
+		LIMIT $` + strconv.Itoa(len(args))
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query channel monitor request logs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var item service.ChannelMonitorV2RequestLog
+		var duration, firstToken sql.NullInt64
+		var checkedAt sql.NullTime
+		if err := rows.Scan(
+			&item.ID, &item.CreatedAt, &item.RequestID,
+			&item.GroupID, &item.GroupName, &item.GroupPlatform,
+			&item.APIKeyID, &item.APIKeyName,
+			&item.AccountID, &item.AccountName, &item.AccountPlatform,
+			&item.Model, &item.UpstreamModel, &item.Success,
+			&duration, &firstToken, &item.InputTokens, &item.OutputTokens,
+			&item.IntelligenceStatus, &checkedAt, &item.IntelligenceMessage,
+		); err != nil {
+			return nil, fmt.Errorf("scan channel monitor request log: %w", err)
+		}
+		assignNullInt(&item.DurationMs, duration)
+		assignNullInt(&item.FirstTokenMs, firstToken)
+		if checkedAt.Valid {
+			item.IntelligenceCheckedAt = &checkedAt.Time
+		}
+		result.Items = append(result.Items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (r *channelMonitorV2Repository) GetSnapshot(ctx context.Context, filter service.ChannelMonitorV2Filter, cfg service.ChannelMonitorV2Config, admin bool) (*service.ChannelMonitorV2Snapshot, error) {
