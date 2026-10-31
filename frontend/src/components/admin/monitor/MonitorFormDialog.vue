@@ -1072,6 +1072,15 @@ watch(
 )
 
 function currentServiceEndpoint(): string {
+  const origin = window.location.origin
+  try {
+    const hostname = new URL(origin).hostname.toLowerCase()
+    if (hostname === 'localhost' || hostname === '::1' || hostname.startsWith('127.')) {
+      return origin.replace(/\/+$/, '')
+    }
+  } catch {
+    // Fall through to the configured service endpoint.
+  }
   const endpoint = appStore.apiBaseUrl.trim() || window.location.origin
   return endpoint.replace(/\/+$/, '')
 }

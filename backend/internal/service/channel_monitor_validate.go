@@ -121,7 +121,7 @@ func validateJitter(jitterSec, intervalSec int) error {
 }
 
 // validateEndpoint 校验 endpoint：
-//   - scheme 强制 https（拒绝 http，避免明文凭证 + 部分 SSRF 利用面）
+//   - scheme 强制 https（本地 compose 可显式允许回环地址使用 http）
 //   - 允许上游路径前缀（如 /anthropic），不允许 query/fragment
 //   - hostname 不能是 localhost/metadata 等已知元数据 hostname
 //   - 解析所有 IP，任一落在 loopback/RFC1918/link-local/ULA 段即拒绝（防 SSRF）
@@ -136,7 +136,7 @@ func validateEndpoint(ep string) error {
 	if err != nil {
 		return ErrChannelMonitorInvalidEndpoint
 	}
-	if u.Scheme != "https" {
+	if u.Scheme != "https" && !(monitorAllowLoopbackEndpoints && u.Scheme == "http") {
 		return ErrChannelMonitorEndpointScheme
 	}
 	if u.Host == "" {
@@ -147,6 +147,9 @@ func validateEndpoint(ep string) error {
 	}
 
 	hostname := u.Hostname()
+	if monitorAllowLoopbackEndpoints && isLoopbackHostname(hostname) {
+		return nil
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), monitorEndpointResolveTimeout)
 	defer cancel()
 	blocked, err := isPrivateOrLoopbackHost(ctx, hostname)

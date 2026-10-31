@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"net"
+	"os"
 	"strings"
 )
 
@@ -19,6 +20,30 @@ var monitorBlockedHostnames = map[string]struct{}{
 	"metadata.goog":              {},
 	"instance-data":              {},
 	"instance-data.ec2.internal": {},
+}
+
+const monitorAllowLoopbackEndpointsEnv = "CHANNEL_MONITOR_ALLOW_LOOPBACK_ENDPOINTS"
+
+// monitorAllowLoopbackEndpoints is enabled only by the local compose stack.
+// Production leaves it unset, so the public HTTPS + SSRF policy remains intact.
+var monitorAllowLoopbackEndpoints = envFlagEnabled(monitorAllowLoopbackEndpointsEnv)
+
+func envFlagEnabled(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func isLoopbackHostname(hostname string) bool {
+	hostname = strings.TrimSpace(strings.Trim(hostname, "[]"))
+	if strings.EqualFold(hostname, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(hostname)
+	return ip != nil && ip.IsLoopback()
 }
 
 // CIDR 列表：包含所有需要拒绝的 IPv4/IPv6 段。
@@ -115,6 +140,9 @@ func safeDialContext(ctx context.Context, network, address string) (net.Conn, er
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
+	}
+	if monitorAllowLoopbackEndpoints && isLoopbackHostname(host) {
+		return monitorDialer.DialContext(ctx, network, address)
 	}
 	// 字面量 IP 走快速路径。
 	if ip := net.ParseIP(host); ip != nil {
