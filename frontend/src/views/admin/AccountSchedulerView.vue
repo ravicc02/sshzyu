@@ -712,6 +712,7 @@ onMounted(load)
   gap: 8px;
   padding: 8px 8px 8px 10px;
   border: 1px solid transparent;
+  border-bottom-color: color-mix(in srgb, var(--border-color) 72%, transparent);
   border-radius: 6px;
   color: var(--text-primary);
   background: transparent;
@@ -770,7 +771,11 @@ onMounted(load)
   text-align: center;
 }
 .group-workspace {
+  display: flex;
   min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+  background: color-mix(in srgb, var(--bg-secondary) 88%, var(--bg-primary));
 }
 .group-header {
   display: flex;
@@ -779,7 +784,7 @@ onMounted(load)
   justify-content: space-between;
   gap: 20px;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color);
+  border-block: 1px solid var(--border-color);
   background:
     linear-gradient(90deg, color-mix(in srgb, #2563eb 5%, transparent), transparent 55%),
     var(--bg-primary);
@@ -841,7 +846,7 @@ onMounted(load)
 }
 .detection-config {
   padding: 0;
-  border-bottom: 1px solid var(--border-color);
+  border-block: 1px solid var(--border-color);
   background: color-mix(in srgb, var(--bg-secondary) 62%, var(--bg-primary));
 }
 .config-title {
@@ -961,7 +966,7 @@ onMounted(load)
 }
 .ranking-section {
   padding: 0 0 12px;
-  border-bottom: 1px solid var(--border-color);
+  border-block: 1px solid var(--border-color);
   background: var(--bg-primary);
 }
 .ranking-heading {
@@ -1010,6 +1015,10 @@ onMounted(load)
   background: color-mix(in srgb, var(--bg-secondary) 82%, var(--bg-primary));
   border-bottom: 1px solid var(--border-color);
 }
+.ranking-table th + th,
+.ranking-table td + td {
+  border-left: 1px solid var(--border-color);
+}
 .ranking-table td {
   height: 54px;
   padding: 7px 8px;
@@ -1019,8 +1028,14 @@ onMounted(load)
 .ranking-table tbody tr:hover {
   background: var(--bg-hover);
 }
+.ranking-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--bg-secondary) 24%, transparent);
+}
 .ranking-table tbody tr.lowest {
   background: color-mix(in srgb, #f59e0b 5%, transparent);
+}
+.ranking-table tbody tr:last-child td {
+  border-bottom: 1px solid var(--border-color);
 }
 .rank-column {
   width: 34px;
@@ -1173,7 +1188,7 @@ onMounted(load)
 }
 .probe-history {
   margin: 0;
-  border-bottom: 1px solid var(--border-color);
+  border-block: 1px solid var(--border-color);
   background: color-mix(in srgb, var(--bg-secondary) 48%, var(--bg-primary));
 }
 .probe-history summary {
