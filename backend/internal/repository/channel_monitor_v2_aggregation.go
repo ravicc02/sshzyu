@@ -10,6 +10,18 @@ import (
 // Platform is derived from group/account (usage_logs has no provider column on upstream schema).
 const channelMonitorV2PlatformSQL = `lower(` + usageLogEffectivePlatformExpr + `)`
 const channelMonitorV2ModelSQL = `COALESCE(NULLIF(TRIM(ul.requested_model), ''), NULLIF(TRIM(ul.model), ''), 'unknown')`
+const channelMonitorV2ErrorModelKeySQL = `lower(concat_ws(' ', current_error.requested_model, current_error.model))`
+const channelMonitorV2ErrorPlatformInferenceSQL = `CASE
+  WHEN ` + channelMonitorV2ErrorModelKeySQL + ` LIKE '%glm%' OR ` + channelMonitorV2ErrorModelKeySQL + ` LIKE '%zhipu%' THEN 'zhipu'
+  WHEN ` + channelMonitorV2ErrorModelKeySQL + ` LIKE '%kimi%' OR ` + channelMonitorV2ErrorModelKeySQL + ` LIKE '%moonshot%' THEN 'kimi'
+  WHEN ` + channelMonitorV2ErrorModelKeySQL + ` LIKE '%deepseek%' THEN 'deepseek'
+  WHEN ` + channelMonitorV2ErrorModelKeySQL + ` LIKE '%claude%' OR ` + channelMonitorV2ErrorModelKeySQL + ` LIKE '%anthropic%' THEN 'anthropic'
+  WHEN ` + channelMonitorV2ErrorModelKeySQL + ` LIKE '%gemini%' THEN 'gemini'
+  WHEN ` + channelMonitorV2ErrorModelKeySQL + ` LIKE '%grok%' THEN 'grok'
+  WHEN ` + channelMonitorV2ErrorModelKeySQL + ` LIKE '%gpt%' OR ` + channelMonitorV2ErrorModelKeySQL + ` LIKE '%openai%' THEN 'openai'
+  WHEN ` + channelMonitorV2ErrorModelKeySQL + ` LIKE '%minimax%' THEN 'minimax'
+  ELSE NULL
+END`
 
 // Tiered retention balances UI windows against storage:
 //
@@ -255,7 +267,7 @@ WITH dedup AS (
     -- group errors aggregate under platform 'composite', which is never an
     -- enabled config platform, and are filtered out of every monitor v2 query.
     lower(CASE
-      WHEN g.platform = 'composite' THEN COALESCE(NULLIF(TRIM(a.platform), ''), NULLIF(NULLIF(lower(TRIM(current_error.platform)), ''), 'composite'), 'unknown')
+      WHEN g.platform = 'composite' THEN COALESCE(NULLIF(TRIM(a.platform), ''), ` + channelMonitorV2ErrorPlatformInferenceSQL + `, NULLIF(NULLIF(lower(TRIM(current_error.platform)), ''), 'composite'), 'unknown')
       ELSE COALESCE(NULLIF(TRIM(current_error.platform), ''), 'unknown')
     END) AS platform,
     COALESCE(current_error.group_id, 0) AS group_id,

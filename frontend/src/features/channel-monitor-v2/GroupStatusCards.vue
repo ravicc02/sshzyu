@@ -35,7 +35,7 @@
             </header>
 
             <div class="mt-4 grid grid-cols-3 divide-x divide-gray-200/80 rounded-[18px] border border-gray-200/70 bg-white/75 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:divide-white/10 dark:border-white/10 dark:bg-white/[0.045] dark:shadow-none">
-              <div class="min-w-0 px-3"><div class="text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ t('channelMonitorV2.metrics.cacheRate') }}</div><strong class="mt-1.5 block text-sm tabular-nums text-gray-900 dark:text-gray-100">{{ hasTraffic(row) ? formatMonitorPercent(row.metrics.cache_rate) : '—' }}</strong></div>
+              <div class="min-w-0 px-3"><div class="text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ t('channelMonitorV2.metrics.cacheRate') }}</div><strong class="mt-1.5 block text-sm tabular-nums text-gray-900 dark:text-gray-100" :title="cacheRateTitle(row)">{{ cacheRateDisplay(row) }}</strong></div>
               <div class="min-w-0 px-3"><div class="text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ t('channelMonitorV2.groupCards.availability') }}</div><strong class="mt-1.5 block text-sm tabular-nums" :class="availabilityClass(row)">{{ availabilityValue(row) }}</strong></div>
               <div class="min-w-0 px-3"><div class="text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ latencyLabel(row) }}</div><strong class="mt-1.5 block text-sm tabular-nums text-gray-900 dark:text-gray-100">{{ latencyValue(row) }}</strong></div>
             </div>
@@ -254,8 +254,33 @@ function hasProbe(row: MonitorMatrixRow) {
 
 function hasTraffic(row: MonitorMatrixRow) {
   return row.metrics.has_requests === true || row.metrics.rpm > 0 || row.metrics.request_count > 0 || row.metrics.ttft.p50_ms != null ||
-    row.metrics.cache_rate > 0 || row.health.overall !== 'unknown' ||
-    row.buckets.some(bucket => bucket.metrics.rpm > 0 || bucket.metrics.request_count > 0 || bucket.metrics.ttft.p50_ms != null || bucket.health.overall !== 'unknown')
+    row.metrics.cache_rate > 0 || row.metrics.cache_rate_denominator > 0 || row.health.overall !== 'unknown' ||
+    row.buckets.some(bucket => bucket.metrics.rpm > 0 || bucket.metrics.request_count > 0 || bucket.metrics.ttft.p50_ms != null || bucket.metrics.cache_rate_denominator > 0 || bucket.health.overall !== 'unknown')
+}
+
+function cacheRateValue(row: MonitorMatrixRow): number | null {
+  if (!hasTraffic(row)) return null
+  const minimumSample = Math.max(1, row.health.thresholds?.minimum_sample ?? 50)
+  if (row.metrics.cache_rate_denominator >= minimumSample) return row.metrics.cache_rate
+  const buckets = [...row.buckets].sort((a, b) => Date.parse(b.bucket_start) - Date.parse(a.bucket_start))
+  const representative = buckets.find((bucket) => bucket.metrics.cache_rate_denominator >= minimumSample) ||
+    buckets.find((bucket) => bucket.metrics.cache_rate_denominator > 0)
+  if (representative) return representative.metrics.cache_rate
+  return row.metrics.cache_rate_denominator > 0 ? row.metrics.cache_rate : null
+}
+
+function cacheRateDisplay(row: MonitorMatrixRow) {
+  const value = cacheRateValue(row)
+  return value == null ? '—' : formatMonitorPercent(value)
+}
+
+function cacheRateTitle(row: MonitorMatrixRow) {
+  const value = cacheRateValue(row)
+  if (value == null) return t('channelMonitorV2.groupCards.cacheRateEmpty')
+  const minimumSample = Math.max(1, row.health.thresholds?.minimum_sample ?? 50)
+  return row.metrics.cache_rate_denominator < minimumSample
+    ? t('channelMonitorV2.groupCards.cacheRateFallback')
+    : t('channelMonitorV2.metrics.cacheRate')
 }
 
 function hasEffectiveData(row: MonitorMatrixRow) {

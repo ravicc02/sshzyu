@@ -951,6 +951,7 @@ func (r *channelMonitorV2Repository) loadErrorDetails(ctx context.Context, filte
 		if err := rows.Scan(&platform, &groupID, &model, &errorType, &owner, &source, &statusCode, &upstreamStatusCode, &message, &count); err != nil {
 			return nil, err
 		}
+		platform = channelMonitorV2NormalizePlatform(platform, model)
 		if !channelMonitorV2ModelSelected(filter, cfg, platform, model) {
 			continue
 		}
@@ -1112,10 +1113,39 @@ func (r *channelMonitorV2Repository) loadFacts(ctx context.Context, filter servi
 		if err := rows.Scan(&bucket, &f.Platform, &f.GroupID, &f.GroupName, &f.Model, &f.Success, &f.Errors, &f.UpstreamAffected, &f.UpstreamAttempts, &f.Input, &f.Output, &f.CacheCreation, &f.CacheRead, &f.TTFTSum, &f.TTFTCount, &f.DurationSum, &f.DurationCount); err != nil {
 			return nil, err
 		}
+		f.Platform = channelMonitorV2NormalizePlatform(f.Platform, f.Model)
 		f.BucketStart = bucket.UTC().Format(time.RFC3339Nano)
 		facts = append(facts, f)
 	}
 	return facts, rows.Err()
+}
+
+func channelMonitorV2NormalizePlatform(platform, model string) string {
+	normalized := strings.ToLower(strings.TrimSpace(platform))
+	if normalized != "" && normalized != "unknown" && normalized != service.PlatformComposite {
+		return normalized
+	}
+	modelKey := strings.ToLower(strings.TrimSpace(model))
+	switch {
+	case strings.Contains(modelKey, "glm"), strings.Contains(modelKey, "zhipu"):
+		return service.PlatformZhipu
+	case strings.Contains(modelKey, "kimi"), strings.Contains(modelKey, "moonshot"):
+		return service.PlatformKimi
+	case strings.Contains(modelKey, "deepseek"):
+		return service.PlatformDeepseek
+	case strings.Contains(modelKey, "claude"), strings.Contains(modelKey, "anthropic"):
+		return service.PlatformAnthropic
+	case strings.Contains(modelKey, "gemini"):
+		return service.PlatformGemini
+	case strings.Contains(modelKey, "grok"):
+		return service.PlatformGrok
+	case strings.Contains(modelKey, "gpt"), strings.Contains(modelKey, "openai"):
+		return service.PlatformOpenAI
+	case strings.Contains(modelKey, "minimax"):
+		return service.PlatformMiniMax
+	default:
+		return normalized
+	}
 }
 
 func (r *channelMonitorV2Repository) loadHistograms(ctx context.Context, filter service.ChannelMonitorV2Filter, cfg service.ChannelMonitorV2Config, userID int64, byBucket bool) ([]channelMonitorV2Histogram, error) {
@@ -1153,6 +1183,7 @@ func (r *channelMonitorV2Repository) loadHistograms(ctx context.Context, filter 
 		if err := rows.Scan(&bucket, &h.Platform, &h.GroupID, &h.Model, &h.UserID, &h.Metric, &h.UpperBound, &h.Count); err != nil {
 			return nil, err
 		}
+		h.Platform = channelMonitorV2NormalizePlatform(h.Platform, h.Model)
 		h.BucketStart = bucket.UTC().Format(time.RFC3339Nano)
 		out = append(out, h)
 	}
@@ -1647,6 +1678,7 @@ func (r *channelMonitorV2Repository) loadIgnoredErrorCounts(
 		if err := rows.Scan(&bucket, &platform, &model, &count); err != nil {
 			return byBucket, 0, err
 		}
+		platform = channelMonitorV2NormalizePlatform(platform, model)
 		if !channelMonitorV2ModelSelected(filter, cfg, platform, model) {
 			continue
 		}
@@ -1689,6 +1721,7 @@ func (r *channelMonitorV2Repository) loadIgnoredErrorCountsByPlatformModel(
 		if err := rows.Scan(&platform, &model, &count); err != nil {
 			return byPM, 0, err
 		}
+		platform = channelMonitorV2NormalizePlatform(platform, model)
 		if !channelMonitorV2ModelSelected(filter, cfg, platform, model) {
 			continue
 		}
@@ -1743,6 +1776,7 @@ func (r *channelMonitorV2Repository) loadIgnoredErrorCountsByMatrixKey(
 		if err := rows.Scan(&bucket, &platform, &groupID, &model, &count); err != nil {
 			return byDimBucket, byDim, err
 		}
+		platform = channelMonitorV2NormalizePlatform(platform, model)
 		if !channelMonitorV2ModelSelected(filter, cfg, platform, model) {
 			continue
 		}

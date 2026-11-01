@@ -30,6 +30,7 @@ export default {
       availability: '可用率', realRequests: '真实请求', activeProbe: '按需探测', activeLatency: '探测延迟', combined: '综合监控', combinedWindow: '综合监控 · 最近 90 分钟', latency: '延迟', availabilityValue: '可用率 {value}',
       buckets: '20 个时间段', recentChecks: '最近 20 次主动探测',
       noData: '暂无数据', stale: '数据过期', intelligencePending: '测智尚未启用',
+      cacheRateFallback: '当前窗口样本不足，显示最近一次有效缓存样本', cacheRateEmpty: '当前窗口暂无有效缓存样本',
       intelligenceActive: '主动测智', intelligenceNotConfigured: '未配置 OpenAI 主动测智',
       intelligenceWaiting: '等待首次测智结果', intelligenceNotDegraded: '通过', intelligenceDegraded: '未通过', intelligenceError: '请求错误',
       intelligenceAccountRate: '账号聚合 {passed}/{samples} · {rate}%',

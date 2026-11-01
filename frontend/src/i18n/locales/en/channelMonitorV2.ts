@@ -30,6 +30,7 @@ export default {
       availability: 'Availability', realRequests: 'Real requests', activeProbe: 'On-demand probe', activeLatency: 'Probe latency', combined: 'Combined monitoring', combinedWindow: 'Combined monitoring · last 90 minutes', latency: 'Latency', availabilityValue: 'Availability {value}',
       buckets: '20 intervals', recentChecks: 'Latest 20 active probes',
       noData: 'No data', stale: 'Stale data', intelligencePending: 'Reasoning check not enabled',
+      cacheRateFallback: 'Current window has too few samples; showing the latest valid cache sample', cacheRateEmpty: 'No valid cache sample in the current window',
       intelligenceActive: 'Active reasoning checks', intelligenceNotConfigured: 'OpenAI reasoning check not configured',
       intelligenceWaiting: 'Waiting for first result', intelligenceNotDegraded: 'Passed', intelligenceDegraded: 'Not passed', intelligenceError: 'Request error',
       intelligenceAccountRate: 'Account aggregate {passed}/{samples} · {rate}%',
