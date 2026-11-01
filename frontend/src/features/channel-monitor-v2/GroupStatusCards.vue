@@ -99,7 +99,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { HealthState, MonitorCoverage, MonitorMatrixRow } from '@/api/channelMonitorV2'
 import type { MonitorTimelinePoint, UserMonitorView } from '@/api/channelMonitor'
-import { formatMonitorMs, formatMonitorPercent } from './monitorFormat'
+import { formatMonitorCacheRate, formatMonitorMs, formatMonitorPercent } from './monitorFormat'
 import ProviderIcon from '@/components/user/monitor/ProviderIcon.vue'
 import Icon from '@/components/icons/Icon.vue'
 
@@ -345,8 +345,7 @@ function cacheRateValue(row: MonitorMatrixRow): number | null {
 }
 
 function cacheRateDisplay(row: MonitorMatrixRow) {
-  const value = cacheRateValue(row)
-  return value == null ? '—' : formatMonitorPercent(value)
+  return formatMonitorCacheRate(cacheRateValue(row))
 }
 
 function cacheRateTitle(row: MonitorMatrixRow) {

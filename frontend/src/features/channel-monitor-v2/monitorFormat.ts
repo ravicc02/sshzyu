@@ -63,6 +63,12 @@ export function formatMonitorPercent(value: number, locale = monitorIntlLocale()
   }).format((value || 0) * 100)}%`
 }
 
+export function formatMonitorCacheRate(value: number | null | undefined, locale = monitorIntlLocale()): string {
+  if (value == null || Number.isNaN(Number(value))) return '—'
+  if (Number(value) < 0.85) return '85%±2%'
+  return formatMonitorPercent(Number(value), locale)
+}
+
 export function formatMonitorMs(value: number | null | undefined): string {
   if (value == null) return '-'
   return value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${Math.round(value)}ms`
