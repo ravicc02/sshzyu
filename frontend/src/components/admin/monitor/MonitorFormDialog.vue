@@ -472,8 +472,7 @@ const selectedGroup = computed(() => {
 })
 const isCompositeGroup = computed(() => selectedGroup.value?.platform === 'composite')
 const groupSupportsIntelligence = computed(() =>
-  selectedGroup.value?.platform === PROVIDER_OPENAI &&
-  monitorGroups.value.find((item) => item.id === selectedGroup.value?.id)?.degradation_factor_enabled === true
+  selectedGroup.value?.platform === PROVIDER_OPENAI
 )
 const compositeRoutes = ref<CompositeModelRoute[]>([])
 const compositeSelectedModels = computed(() => [...new Set([form.primary_model, ...form.extra_models].map((model) => model.trim()).filter(Boolean))])
@@ -1004,7 +1003,7 @@ function loadFromMonitor(m: ChannelMonitor) {
 
 async function loadInitialGroupModels(group: AdminGroup) {
   try {
-    const models = await adminAPI.groups.getAvailableModels(group.id)
+    const models = await loadGroupModels(group.id)
     if (!props.show || props.monitor || props.initialGroup?.id !== group.id || models.length === 0) return
     form.primary_model = models[0] || ''
     form.extra_models = models.slice(1)
@@ -1023,7 +1022,7 @@ async function openGroupModelPicker() {
   groupModelSearch.value = ''
   groupModelChoices.value = []
   try {
-    groupModelOptions.value = await adminAPI.groups.getAvailableModels(form.group_id)
+    groupModelOptions.value = await loadGroupModels(form.group_id)
     const current = new Set([form.primary_model.trim(), ...form.extra_models].filter(Boolean))
     groupModelChoices.value = groupModelOptions.value.filter((model) => current.has(model))
   } catch (error) {
@@ -1032,6 +1031,12 @@ async function openGroupModelPicker() {
   } finally {
     groupModelsLoading.value = false
   }
+}
+
+async function loadGroupModels(groupID: number): Promise<string[]> {
+  const exactModels = await adminAPI.groups.getAvailableModels(groupID)
+  if (exactModels.length > 0) return exactModels
+  return adminAPI.groups.getModelAllowlistCandidates(groupID)
 }
 
 function toggleGroupModelChoice(model: string) {

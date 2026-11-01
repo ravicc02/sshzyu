@@ -286,34 +286,8 @@
                 :class="{ 'single-factor': !draft.degradationFactorEnabled }"
               >
                 <div
-                  v-if="draft.degradationFactorEnabled"
                   class="config-toggle"
                 >
-                  <span>自动探测</span>
-                  <button
-                    type="button"
-                    class="switch"
-                    :class="{ on: draft.enabled }"
-                    :aria-pressed="draft.enabled"
-                    @click="draft.enabled = !draft.enabled"
-                  >
-                    <span />
-                  </button>
-                </div>
-                <label
-                  v-if="draft.degradationFactorEnabled"
-                  class="config-field"
-                >
-                  <span>测试间隔</span>
-                  <select v-model.number="draft.intervalSeconds">
-                    <option :value="300">5 分钟</option>
-                    <option :value="600">10 分钟</option>
-                    <option :value="1800">30 分钟</option>
-                    <option :value="3600">1 小时</option>
-                    <option :value="21600">6 小时</option>
-                  </select>
-                </label>
-                <div class="config-toggle">
                   <span>降智因子计入调度</span>
                   <button
                     type="button"
@@ -324,6 +298,36 @@
                   >
                     <span />
                   </button>
+                </div>
+                <div
+                  v-if="draft.degradationFactorEnabled"
+                  class="config-probe-column"
+                >
+                  <div class="config-toggle">
+                    <span>自动探测</span>
+                    <button
+                      type="button"
+                      class="switch"
+                      :class="{ on: draft.enabled }"
+                      :aria-pressed="draft.enabled"
+                      @click="draft.enabled = !draft.enabled"
+                    >
+                      <span />
+                    </button>
+                  </div>
+                  <label
+                    v-if="draft.enabled"
+                    class="config-field"
+                  >
+                    <span>测试间隔</span>
+                    <select v-model.number="draft.intervalSeconds">
+                      <option :value="300">5 分钟</option>
+                      <option :value="600">10 分钟</option>
+                      <option :value="1800">30 分钟</option>
+                      <option :value="3600">1 小时</option>
+                      <option :value="21600">6 小时</option>
+                    </select>
+                  </label>
                 </div>
               </div>
             </div>
@@ -1327,12 +1331,17 @@ select:focus {
 }
 .config-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: end;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
   gap: 10px;
 }
 .config-grid.single-factor {
   grid-template-columns: minmax(0, 280px);
+}
+.config-probe-column {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
 }
 .config-field,
 .config-toggle {
