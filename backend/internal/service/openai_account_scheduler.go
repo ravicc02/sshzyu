@@ -996,6 +996,13 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 	plan.loadSkew = calcLoadSkewByMoments(loadRateSum, loadRateSumSquares, len(candidates))
 
 	weights := s.service.openAIWSSchedulerWeightsForRequest(ctx)
+	if weights.Degradation > 0 &&
+		req.GroupID != nil &&
+		*req.GroupID > 0 &&
+		s.service.accountDegradation != nil &&
+		!s.service.accountDegradation.DegradationFactorEnabled(ctx, *req.GroupID) {
+		weights.Degradation = 0
+	}
 	now := time.Now()
 	degradationFactors := map[int64]float64(nil)
 	if weights.Degradation > 0 && req.GroupID != nil && *req.GroupID > 0 && s.service.accountDegradation != nil {
@@ -2792,9 +2799,7 @@ func (s *OpenAIGatewayService) openAIWSSchedulerWeightsForRequest(ctx context.Co
 	// 同 openAIWSLBTopKForRequest：总开关关闭时不应用 DB 覆盖值。
 	if !settings.enabled {
 		weights.Priority = 0
-		if degradation, ok := settings.weightOverrides["degradation"]; ok {
-			weights.Degradation = degradation
-		}
+		weights.Degradation = accountSchedulerDegradationWeight
 		return weights
 	}
 	overridden := applyOpenAIAdvancedSchedulerWeightOverrides(weights, settings.weightOverrides)
@@ -2805,6 +2810,7 @@ func (s *OpenAIGatewayService) openAIWSSchedulerWeightsForRequest(ctx context.Co
 	// Priority is no longer a routing input. OAuth remains a hard first tier,
 	// and all same-tier accounts are ordered by the score factors below.
 	overridden.Priority = 0
+	overridden.Degradation = accountSchedulerDegradationWeight
 	return overridden
 }
 
@@ -3083,6 +3089,12 @@ func (s *OpenAIGatewayService) BuildOpenAIAccountSchedulerScoreSnapshots(
 		return nil
 	}
 	weights := s.openAIWSSchedulerWeightsForRequest(ctx)
+	if weights.Degradation > 0 &&
+		groupID > 0 &&
+		s.accountDegradation != nil &&
+		!s.accountDegradation.DegradationFactorEnabled(ctx, groupID) {
+		weights.Degradation = 0
+	}
 	degradationFactors := map[int64]float64(nil)
 	if weights.Degradation > 0 && groupID > 0 && s.accountDegradation != nil {
 		accountIDs := make([]int64, 0, len(accounts))

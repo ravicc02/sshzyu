@@ -22,7 +22,7 @@
               type="button"
               class="btn btn-secondary"
               :disabled="loading"
-              @click="load"
+              @click="load()"
             >
               <Icon name="refresh" size="sm" :class="{ spinning: loading }" />
               {{ loading ? "刷新中" : "刷新" }}
@@ -74,11 +74,6 @@
             <p class="overview-context" :title="selectedGroup?.name">
               {{ selectedGroup?.name || "暂无分组" }}
             </p>
-          </div>
-          <div>
-            <span>降智率权重</span>
-            <strong>{{ formatWeight(overview?.degradation_weight) }}</strong>
-            <p>降低降智率在调度评分中的占比</p>
           </div>
         </section>
 
@@ -132,15 +127,52 @@
                       : "仅可用性"
                   }}
                 </span>
+                <label
+                  v-if="supportsDegradation && selectedGroup"
+                  class="test-model-select"
+                >
+                  <span>测试模型</span>
+                  <select
+                    v-if="selectedGroup.model_candidates.length"
+                    v-model="draft.testModel"
+                    :disabled="running"
+                    aria-label="统一测试模型"
+                  >
+                    <option value="">自动模型</option>
+                    <option
+                      v-if="
+                        draft.testModel &&
+                        !selectedGroup.model_candidates.includes(draft.testModel)
+                      "
+                      :value="draft.testModel"
+                    >
+                      {{ draft.testModel }}
+                    </option>
+                    <option
+                      v-for="model in selectedGroup.model_candidates"
+                      :key="model"
+                      :value="model"
+                    >
+                      {{ model }}
+                    </option>
+                  </select>
+                  <input
+                    v-else
+                    v-model.trim="draft.testModel"
+                    :disabled="running"
+                    placeholder="填写测试模型"
+                    aria-label="统一测试模型"
+                  />
+                </label>
                 <button
                   v-if="supportsDegradation"
                   type="button"
-                  class="btn btn-secondary"
+                  class="btn btn-primary"
                   :disabled="!selectedGroup || running"
                   @click="runGroup"
                 >
                   <Icon name="play" size="sm" />
-                  {{ running ? "测试中" : "立即测试" }}
+                  {{ running ? "测试中" : "统一测试" }}
                 </button>
               </div>
             </header>
@@ -207,37 +239,21 @@
                     <option :value="21600">6 小时</option>
                   </select>
                 </label>
-                <label class="config-field model-field">
-                  <span>测试模型</span>
-                  <select
-                    v-if="selectedGroup?.model_candidates.length"
-                    v-model="draft.testModel"
+                <div class="config-toggle">
+                  <span>降智因子计入调度</span>
+                  <button
+                    type="button"
+                    class="switch"
+                    :class="{ on: draft.degradationFactorEnabled }"
+                    :aria-pressed="draft.degradationFactorEnabled"
+                    @click="
+                      draft.degradationFactorEnabled =
+                        !draft.degradationFactorEnabled
+                    "
                   >
-                    <option value="">自动选择</option>
-                    <option
-                      v-for="model in selectedGroup.model_candidates"
-                      :key="model"
-                      :value="model"
-                    >
-                      {{ model }}
-                    </option>
-                  </select>
-                  <input
-                    v-else
-                    v-model.trim="draft.testModel"
-                    placeholder="填写分组可用模型"
-                  />
-                </label>
-                <label class="config-field weight-field">
-                  <span>全局权重</span>
-                  <input
-                    v-model.number="draft.degradationWeight"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                  />
-                </label>
+                    <span />
+                  </button>
+                </div>
               </div>
             </div>
             <div v-else class="availability-note">
@@ -258,10 +274,10 @@
                     <th class="rank-column">排名</th>
                     <th>账号</th>
                     <th>可用性</th>
+                    <th>调度次数</th>
                     <th v-if="supportsDegradation">通过率 / 降智率</th>
                     <th v-if="supportsDegradation">调度分</th>
                     <th v-if="supportsDegradation">最近探测</th>
-                    <th v-if="supportsDegradation" class="action-column">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -303,6 +319,19 @@
                       </span>
                       <small>{{ account.oauth ? "OAuth" : "API Key" }}</small>
                     </td>
+                    <td class="dispatch-cell">
+                      <div class="value-stack">
+                        <strong>{{ formatCount(account.dispatch_count) }}</strong>
+                        <small>近 24 小时</small>
+                      </div>
+                      <span
+                        v-if="account.active_dispatches > 0"
+                        class="active-dispatch"
+                      >
+                        <i />
+                        正在调度
+                      </span>
+                    </td>
                     <td v-if="supportsDegradation">
                       <div class="value-stack">
                         <strong :class="passRateClass(account.pass_count, account.sample_count)">
@@ -323,10 +352,11 @@
                             / {{ formatScore(selectedGroup?.score_max) }}
                           </span>
                         </strong>
-                        <small
-                          >降智因子
-                          {{ account.degradation_factor.toFixed(2) }}</small
-                        >
+                        <small v-if="selectedGroup?.degradation_factor_enabled">
+                          降智因子
+                          {{ account.degradation_factor.toFixed(2) }}
+                        </small>
+                        <small v-else>降智因子未计入</small>
                       </div>
                     </td>
                     <td v-if="supportsDegradation">
@@ -342,21 +372,9 @@
                         }}</small>
                       </div>
                     </td>
-                    <td v-if="supportsDegradation" class="action-column">
-                      <button
-                        type="button"
-                        class="icon-button"
-                        :disabled="runningAccountID === account.id"
-                        title="测试此账号"
-                        :aria-label="`测试账号 ${account.name}`"
-                        @click="runAccount(account.id)"
-                      >
-                        <Icon name="play" size="sm" />
-                      </button>
-                    </td>
                   </tr>
                   <tr v-if="filteredAccounts.length === 0">
-                    <td :colspan="supportsDegradation ? 7 : 3" class="table-empty">
+                    <td :colspan="supportsDegradation ? 7 : 4" class="table-empty">
                       没有符合筛选条件的账号。
                     </td>
                   </tr>
@@ -400,7 +418,7 @@
                   class="icon-button"
                   title="刷新记录"
                   aria-label="刷新记录"
-                  @click="load"
+                  @click="load()"
                 >
                   <Icon
                     name="refresh"
@@ -495,7 +513,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import Icon from "@/components/icons/Icon.vue";
 import { adminAPI } from "@/api/admin";
@@ -516,13 +534,14 @@ const probePageSize = 10;
 const loading = ref(false);
 const saving = ref(false);
 const running = ref(false);
-const runningAccountID = ref<number | null>(null);
 const draft = reactive({
   enabled: false,
+  degradationFactorEnabled: true,
   intervalSeconds: 600,
   testModel: "",
-  degradationWeight: 1.5,
 });
+let overviewTimer: number | undefined;
+let overviewRequestInFlight = false;
 
 const selectedGroup = computed<AccountSchedulerGroup | null>(() => {
   if (!overview.value || selectedGroupID.value === null) return null;
@@ -588,27 +607,20 @@ const hasChanges = computed(() => {
   if (!group || !overview.value || !supportsDegradation.value) return false;
   return (
     draft.enabled !== group.degradation_enabled ||
+    draft.degradationFactorEnabled !== group.degradation_factor_enabled ||
     draft.intervalSeconds !== group.interval_seconds ||
-    draft.testModel !== group.test_model ||
-    draft.degradationWeight !== overview.value.degradation_weight
+    draft.testModel !== group.test_model
   );
 });
 
 watch(
   selectedGroup,
-  (group) => {
-    if (!group) return;
+  (group, previousGroup) => {
+    if (!group || previousGroup?.id === group.id) return;
     draft.enabled = group.degradation_supported && group.degradation_enabled;
+    draft.degradationFactorEnabled = group.degradation_factor_enabled;
     draft.intervalSeconds = group.interval_seconds || 600;
     draft.testModel = group.degradation_supported ? group.test_model || "" : "";
-  },
-  { immediate: true },
-);
-
-watch(
-  () => overview.value?.degradation_weight,
-  (weight) => {
-    if (typeof weight === "number") draft.degradationWeight = weight;
   },
   { immediate: true },
 );
@@ -628,8 +640,10 @@ watch(probePageCount, (count) => {
   if (probePage.value > count) probePage.value = count;
 });
 
-async function load() {
-  loading.value = true;
+async function load(silent = false) {
+  if (overviewRequestInFlight) return;
+  overviewRequestInFlight = true;
+  if (!silent) loading.value = true;
   try {
     const data = await adminAPI.accountScheduler.getOverview();
     overview.value = data;
@@ -640,9 +654,12 @@ async function load() {
         : (data.groups[0]?.id ?? null);
     selectedGroupID.value = preferred;
   } catch (error: any) {
-    appStore.showError(error?.message || "账号调度数据加载失败");
+    if (!silent) {
+      appStore.showError(error?.message || "账号调度数据加载失败");
+    }
   } finally {
-    loading.value = false;
+    overviewRequestInFlight = false;
+    if (!silent) loading.value = false;
   }
 }
 
@@ -653,12 +670,12 @@ async function saveSettings() {
     await adminAPI.accountScheduler.updateSetting({
       group_id: selectedGroup.value.id,
       degradation_enabled: draft.enabled,
+      degradation_factor_enabled: draft.degradationFactorEnabled,
       interval_seconds: draft.intervalSeconds,
       test_model: draft.testModel,
-      degradation_weight: draft.degradationWeight,
     });
     appStore.showSuccess("账号调度配置已保存");
-    await load();
+    await load(true);
   } catch (error: any) {
     appStore.showError(error?.message || "保存失败");
   } finally {
@@ -672,6 +689,7 @@ async function runGroup() {
   try {
     const result = await adminAPI.accountScheduler.runNow({
       group_id: selectedGroup.value.id,
+      model: draft.testModel,
     });
     const summary = `测试完成：${result.run} 条，跳过 ${result.skipped} 条，失败 ${result.failed} 条`;
     const errorMessage = firstRunError(result);
@@ -682,40 +700,11 @@ async function runGroup() {
     } else {
       appStore.showSuccess(summary);
     }
-    await load();
+    await load(true);
   } catch (error: any) {
     appStore.showError(error?.message || "立即测试失败");
   } finally {
     running.value = false;
-  }
-}
-
-async function runAccount(accountID: number) {
-  if (!selectedGroup.value || !supportsDegradation.value) return;
-  runningAccountID.value = accountID;
-  try {
-    const result = await adminAPI.accountScheduler.runNow({
-      group_id: selectedGroup.value.id,
-      account_id: accountID,
-    });
-    const errorMessage = firstRunError(result);
-    if (errorMessage) {
-      appStore.showError(`账号测试失败：${errorMessage}`);
-    } else if (result.run > 0) {
-      const probe = result.results[0];
-      appStore.showSuccess(
-        probe?.status === "degraded"
-          ? "账号测试已记录：未通过"
-          : "账号测试已记录：通过",
-      );
-    } else {
-      appStore.showError(`账号测试未完成，跳过 ${result.skipped} 条`);
-    }
-    await load();
-  } catch (error: any) {
-    appStore.showError(error?.message || "账号测试失败");
-  } finally {
-    runningAccountID.value = null;
   }
 }
 
@@ -776,8 +765,8 @@ function formatScore(score?: number) {
     : "-";
 }
 
-function formatWeight(weight?: number) {
-  return typeof weight === "number" ? weight.toFixed(1) : "-";
+function formatCount(value: number) {
+  return new Intl.NumberFormat("zh-CN").format(value || 0);
 }
 
 function formatLatency(value: number) {
@@ -796,7 +785,16 @@ function formatTime(value?: string, withDate = false) {
   ).format(date);
 }
 
-onMounted(load);
+onMounted(() => {
+  void load();
+  overviewTimer = window.setInterval(() => void load(true), 15000);
+});
+
+onBeforeUnmount(() => {
+  if (overviewTimer !== undefined) {
+    window.clearInterval(overviewTimer);
+  }
+});
 </script>
 
 <style scoped>
@@ -917,7 +915,7 @@ onMounted(load);
 }
 .overview {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   padding-bottom: 26px;
   border-bottom: 1px solid var(--monitor-line);
 }
@@ -998,6 +996,22 @@ onMounted(load);
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
+}
+.test-model-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.test-model-select > span {
+  color: var(--monitor-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.test-model-select select,
+.test-model-select input {
+  width: 160px;
+  min-height: 34px;
+  padding-block: 6px;
 }
 .filters {
   margin: 18px 0 14px;
@@ -1106,10 +1120,7 @@ select:focus {
 }
 .config-grid {
   display: grid;
-  grid-template-columns: minmax(120px, 0.7fr) minmax(120px, 0.65fr) minmax(
-      190px,
-      1.35fr
-    ) minmax(100px, 0.55fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: end;
   gap: 10px;
 }
@@ -1173,7 +1184,7 @@ select:focus {
 }
 .ranking-table {
   width: 100%;
-  min-width: 820px;
+  min-width: 900px;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 12px;
@@ -1206,10 +1217,6 @@ select:focus {
 }
 .rank-column {
   width: 62px;
-}
-.action-column {
-  width: 58px;
-  text-align: right;
 }
 .account-column {
   width: 30%;
@@ -1274,6 +1281,26 @@ select:focus {
 }
 .state-cell {
   min-width: 120px;
+}
+.dispatch-cell {
+  min-width: 118px;
+}
+.active-dispatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  color: var(--monitor-positive);
+  font-size: 10px;
+  font-weight: 600;
+}
+.active-dispatch i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--monitor-positive) 13%, transparent);
 }
 .status-pill {
   display: inline-flex;

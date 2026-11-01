@@ -255,10 +255,16 @@ apiClient.interceptors.response.use(
       })
     }
 
-    // Network error
+    // Network error / request timeout
+    const isTimeout =
+      error.code === 'ECONNABORTED' ||
+      String(error.message || '').toLowerCase().includes('timeout')
     return Promise.reject({
       status: 0,
-      message: 'Network error. Please check your connection.'
+      code: error.code,
+      message: isTimeout
+        ? 'Request timed out. The backend may still be running; refresh to check the result.'
+        : 'Network error. Please check your connection.'
     })
   }
 )

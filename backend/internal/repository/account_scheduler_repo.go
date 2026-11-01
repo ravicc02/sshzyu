@@ -66,7 +66,13 @@ func (r *accountSchedulerRepository) ListGroups(ctx context.Context) ([]service.
 
 func (r *accountSchedulerRepository) ListGroupSettings(ctx context.Context) (map[int64]service.AccountSchedulerGroupSetting, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT group_id, degradation_enabled, interval_seconds, test_model, updated_at
+		SELECT
+			group_id,
+			degradation_enabled,
+			degradation_factor_enabled,
+			interval_seconds,
+			test_model,
+			updated_at
 		FROM account_scheduler_group_settings
 	`)
 	if err != nil {
@@ -80,6 +86,7 @@ func (r *accountSchedulerRepository) ListGroupSettings(ctx context.Context) (map
 		if err := rows.Scan(
 			&setting.GroupID,
 			&setting.DegradationEnabled,
+			&setting.DegradationFactorEnabled,
 			&setting.IntervalSeconds,
 			&setting.TestModel,
 			&setting.UpdatedAt,
@@ -132,20 +139,35 @@ func (r *accountSchedulerRepository) UpsertGroupSetting(
 ) (*service.AccountSchedulerGroupSetting, error) {
 	row := r.db.QueryRowContext(ctx, `
 		INSERT INTO account_scheduler_group_settings (
-			group_id, degradation_enabled, interval_seconds, test_model, created_at, updated_at
+			group_id, degradation_enabled, degradation_factor_enabled,
+			interval_seconds, test_model, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, NOW(), NOW())
+		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
 		ON CONFLICT (group_id) DO UPDATE SET
 			degradation_enabled = EXCLUDED.degradation_enabled,
+			degradation_factor_enabled = EXCLUDED.degradation_factor_enabled,
 			interval_seconds = EXCLUDED.interval_seconds,
 			test_model = EXCLUDED.test_model,
 			updated_at = NOW()
-		RETURNING group_id, degradation_enabled, interval_seconds, test_model, updated_at
-	`, setting.GroupID, setting.DegradationEnabled, setting.IntervalSeconds, setting.TestModel)
+		RETURNING
+			group_id,
+			degradation_enabled,
+			degradation_factor_enabled,
+			interval_seconds,
+			test_model,
+			updated_at
+	`,
+		setting.GroupID,
+		setting.DegradationEnabled,
+		setting.DegradationFactorEnabled,
+		setting.IntervalSeconds,
+		setting.TestModel,
+	)
 	out := &service.AccountSchedulerGroupSetting{}
 	if err := row.Scan(
 		&out.GroupID,
 		&out.DegradationEnabled,
+		&out.DegradationFactorEnabled,
 		&out.IntervalSeconds,
 		&out.TestModel,
 		&out.UpdatedAt,
@@ -163,6 +185,16 @@ func (r *accountSchedulerRepository) ListGroupAccounts(
 		return nil, nil
 	}
 	rows, err := r.db.QueryContext(ctx, `
+		WITH dispatch_counts AS (
+			SELECT
+				group_id,
+				account_id,
+				COUNT(*) AS dispatch_count
+			FROM usage_logs
+			WHERE created_at >= NOW() - INTERVAL '24 hours'
+				AND group_id = ANY($1)
+			GROUP BY group_id, account_id
+		)
 		SELECT
 			a.id,
 			ag.group_id,
@@ -180,9 +212,13 @@ func (r *accountSchedulerRepository) ListGroupAccounts(
 			a.temp_unschedulable_until,
 			COALESCE(a.temp_unschedulable_reason, ''),
 			a.expires_at,
-			a.auto_pause_on_expired
+			a.auto_pause_on_expired,
+			COALESCE(dc.dispatch_count, 0)
 		FROM account_groups ag
 		JOIN accounts a ON a.id = ag.account_id
+		LEFT JOIN dispatch_counts dc
+			ON dc.group_id = ag.group_id
+			AND dc.account_id = a.id
 		WHERE ag.group_id = ANY($1)
 			AND a.deleted_at IS NULL
 		ORDER BY ag.group_id ASC, ag.priority ASC, a.priority ASC, a.id ASC
@@ -213,6 +249,7 @@ func (r *accountSchedulerRepository) ListGroupAccounts(
 			&account.TempUnschedulableReason,
 			&account.ExpiresAt,
 			&account.AutoPauseOnExpired,
+			&account.DispatchCount,
 		); err != nil {
 			return nil, err
 		}

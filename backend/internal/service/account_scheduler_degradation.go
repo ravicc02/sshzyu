@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,6 +23,7 @@ const (
 	accountSchedulerMaximumIntervalSeconds = 86400
 	accountSchedulerHistoryWindow          = 24 * time.Hour
 	accountSchedulerProbeWorkers           = 4
+	accountSchedulerDegradationWeight      = 1.5
 	AccountDegradationReuseWindow          = 30 * time.Minute
 	DegradationSourceAccountAggregate      = "account_aggregate"
 	DegradationSourceChannelFallback       = "channel_fallback"
@@ -43,11 +43,12 @@ type AccountSchedulerGroup struct {
 }
 
 type AccountSchedulerGroupSetting struct {
-	GroupID            int64
-	DegradationEnabled bool
-	IntervalSeconds    int
-	TestModel          string
-	UpdatedAt          time.Time
+	GroupID                  int64
+	DegradationEnabled       bool
+	DegradationFactorEnabled bool
+	IntervalSeconds          int
+	TestModel                string
+	UpdatedAt                time.Time
 }
 
 type AccountSchedulerAccount struct {
@@ -68,6 +69,7 @@ type AccountSchedulerAccount struct {
 	TempUnschedulableReason string
 	ExpiresAt               *time.Time
 	AutoPauseOnExpired      bool
+	DispatchCount           int64
 }
 
 type AccountDegradationStat struct {
@@ -143,19 +145,20 @@ type AccountSchedulerOverview struct {
 }
 
 type AccountSchedulerGroupView struct {
-	ID                   int64                 `json:"id"`
-	Name                 string                `json:"name"`
-	Platform             string                `json:"platform"`
-	DegradationSupported bool                  `json:"degradation_supported"`
-	Status               string                `json:"status"`
-	DegradationEnabled   bool                  `json:"degradation_enabled"`
-	IntervalSeconds      int                   `json:"interval_seconds"`
-	TestModel            string                `json:"test_model"`
-	ScoreMax             float64               `json:"score_max"`
-	ModelCandidates      []string              `json:"model_candidates"`
-	OAuthFirst           bool                  `json:"oauth_first"`
-	LowestAccountID      *int64                `json:"lowest_account_id,omitempty"`
-	Accounts             []AccountSchedulerRow `json:"accounts"`
+	ID                       int64                 `json:"id"`
+	Name                     string                `json:"name"`
+	Platform                 string                `json:"platform"`
+	DegradationSupported     bool                  `json:"degradation_supported"`
+	Status                   string                `json:"status"`
+	DegradationEnabled       bool                  `json:"degradation_enabled"`
+	DegradationFactorEnabled bool                  `json:"degradation_factor_enabled"`
+	IntervalSeconds          int                   `json:"interval_seconds"`
+	TestModel                string                `json:"test_model"`
+	ScoreMax                 float64               `json:"score_max"`
+	ModelCandidates          []string              `json:"model_candidates"`
+	OAuthFirst               bool                  `json:"oauth_first"`
+	LowestAccountID          *int64                `json:"lowest_account_id,omitempty"`
+	Accounts                 []AccountSchedulerRow `json:"accounts"`
 }
 
 type AccountSchedulerRow struct {
@@ -166,6 +169,8 @@ type AccountSchedulerRow struct {
 	OAuth              bool       `json:"oauth"`
 	Available          bool       `json:"available"`
 	AvailabilityReason string     `json:"availability_reason"`
+	DispatchCount      int64      `json:"dispatch_count"`
+	ActiveDispatches   int        `json:"active_dispatches"`
 	DegradationRate    *float64   `json:"degradation_rate,omitempty"`
 	SampleCount        int64      `json:"sample_count"`
 	PassCount          int64      `json:"pass_count"`
@@ -182,16 +187,18 @@ type AccountSchedulerRow struct {
 }
 
 type AccountSchedulerSettingInput struct {
-	GroupID            int64    `json:"group_id"`
-	DegradationEnabled *bool    `json:"degradation_enabled"`
-	IntervalSeconds    *int     `json:"interval_seconds"`
-	TestModel          *string  `json:"test_model"`
-	DegradationWeight  *float64 `json:"degradation_weight"`
+	GroupID                  int64    `json:"group_id"`
+	DegradationEnabled       *bool    `json:"degradation_enabled"`
+	DegradationFactorEnabled *bool    `json:"degradation_factor_enabled"`
+	IntervalSeconds          *int     `json:"interval_seconds"`
+	TestModel                *string  `json:"test_model"`
+	DegradationWeight        *float64 `json:"degradation_weight"`
 }
 
 type AccountSchedulerRunInput struct {
-	GroupID   int64 `json:"group_id"`
-	AccountID int64 `json:"account_id,omitempty"`
+	GroupID   int64  `json:"group_id"`
+	AccountID int64  `json:"account_id,omitempty"`
+	Model     string `json:"model,omitempty"`
 }
 
 type AccountSchedulerRunResult struct {
@@ -210,6 +217,7 @@ type AccountDegradationScore struct {
 
 type AccountDegradationScoreProvider interface {
 	AccountDegradationScores(ctx context.Context, groupID int64, accountIDs []int64) map[int64]AccountDegradationScore
+	DegradationFactorEnabled(ctx context.Context, groupID int64) bool
 }
 
 type AccountSchedulerRepository interface {
@@ -243,8 +251,9 @@ type AccountSchedulerService struct {
 }
 
 type accountDegradationScoreCacheEntry struct {
-	expiresAt time.Time
-	scores    map[int64]AccountDegradationScore
+	expiresAt     time.Time
+	scores        map[int64]AccountDegradationScore
+	factorEnabled bool
 }
 
 func NewAccountSchedulerService(
@@ -325,6 +334,7 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 	if err != nil {
 		return nil, err
 	}
+	activeDispatches := s.activeAccountDispatches(ctx, accounts)
 	stats, err := s.repo.ListDegradationStats(ctx, time.Now().Add(-accountSchedulerHistoryWindow))
 	if err != nil {
 		return nil, err
@@ -365,8 +375,9 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 		setting := settings[group.ID]
 		if setting.GroupID == 0 {
 			setting = AccountSchedulerGroupSetting{
-				GroupID:         group.ID,
-				IntervalSeconds: accountSchedulerDefaultIntervalSeconds,
+				GroupID:                  group.ID,
+				DegradationFactorEnabled: true,
+				IntervalSeconds:          accountSchedulerDefaultIntervalSeconds,
 			}
 		}
 		if setting.IntervalSeconds <= 0 {
@@ -408,6 +419,8 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 				OAuth:              isOAuth,
 				Available:          available,
 				AvailabilityReason: reason,
+				DispatchCount:      account.DispatchCount,
+				ActiveDispatches:   activeDispatches[account.ID],
 				SampleCount:        stat.SampleCount(),
 				PassCount:          stat.PassCount,
 				DegradedCount:      stat.DegradedCount,
@@ -417,7 +430,9 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 				AverageLatencyMs:   stat.AverageLatencyMs,
 			}
 			if degradationSupported {
-				row.ScoreWeight = weight
+				if setting.DegradationFactorEnabled {
+					row.ScoreWeight = weight
+				}
 				if rate, ok := stat.DegradationRate(); ok {
 					row.DegradationRate = &rate
 					row.DegradationFactor = 1 - rate
@@ -430,23 +445,30 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 
 		if degradationSupported {
 			s.applyScores(ctx, group.ID, groupAccounts, rows)
-			markLowestAccountDegradation(rows)
+			if setting.DegradationFactorEnabled {
+				markLowestAccountDegradation(rows)
+			}
 		} else {
 			rankAccountSchedulerRowsByAvailability(rows)
 		}
+		groupScoreMax := scoreMax
+		if degradationSupported && !setting.DegradationFactorEnabled && groupScoreMax >= weight {
+			groupScoreMax -= weight
+		}
 		groupView := AccountSchedulerGroupView{
-			ID:                   group.ID,
-			Name:                 group.Name,
-			Platform:             group.Platform,
-			DegradationSupported: degradationSupported,
-			Status:               group.Status,
-			DegradationEnabled:   setting.DegradationEnabled,
-			IntervalSeconds:      setting.IntervalSeconds,
-			TestModel:            setting.TestModel,
-			ScoreMax:             scoreMax,
-			ModelCandidates:      group.ModelCandidates,
-			OAuthFirst:           oauthFirst,
-			Accounts:             rows,
+			ID:                       group.ID,
+			Name:                     group.Name,
+			Platform:                 group.Platform,
+			DegradationSupported:     degradationSupported,
+			Status:                   group.Status,
+			DegradationEnabled:       setting.DegradationEnabled,
+			DegradationFactorEnabled: setting.DegradationFactorEnabled,
+			IntervalSeconds:          setting.IntervalSeconds,
+			TestModel:                setting.TestModel,
+			ScoreMax:                 groupScoreMax,
+			ModelCandidates:          group.ModelCandidates,
+			OAuthFirst:               oauthFirst,
+			Accounts:                 rows,
 		}
 		for i := range rows {
 			if rows[i].LowestDegradation {
@@ -491,12 +513,16 @@ func (s *AccountSchedulerService) UpdateSetting(ctx context.Context, input Accou
 	setting := settings[input.GroupID]
 	if setting.GroupID == 0 {
 		setting = AccountSchedulerGroupSetting{
-			GroupID:         input.GroupID,
-			IntervalSeconds: accountSchedulerDefaultIntervalSeconds,
+			GroupID:                  input.GroupID,
+			DegradationFactorEnabled: true,
+			IntervalSeconds:          accountSchedulerDefaultIntervalSeconds,
 		}
 	}
 	if input.DegradationEnabled != nil {
 		setting.DegradationEnabled = *input.DegradationEnabled
+	}
+	if input.DegradationFactorEnabled != nil {
+		setting.DegradationFactorEnabled = *input.DegradationFactorEnabled
 	}
 	if input.IntervalSeconds != nil {
 		setting.IntervalSeconds = *input.IntervalSeconds
@@ -506,17 +532,6 @@ func (s *AccountSchedulerService) UpdateSetting(ctx context.Context, input Accou
 	}
 	if setting.IntervalSeconds < accountSchedulerMinimumIntervalSeconds || setting.IntervalSeconds > accountSchedulerMaximumIntervalSeconds {
 		return nil, ErrAccountSchedulerInvalidSetting
-	}
-	if input.DegradationWeight != nil {
-		weight := *input.DegradationWeight
-		if math.IsNaN(weight) || math.IsInf(weight, 0) || weight < 0 || weight > 100 {
-			return nil, ErrAccountSchedulerInvalidSetting
-		}
-		if err := s.settingRepo.SetMultiple(ctx, map[string]string{
-			SettingKeyOpenAIAdvancedSchedulerWeightDegradation: strconv.FormatFloat(weight, 'f', -1, 64),
-		}); err != nil {
-			return nil, err
-		}
 	}
 	updated, err := s.repo.UpsertGroupSetting(ctx, setting)
 	if err != nil {
@@ -573,6 +588,9 @@ func (s *AccountSchedulerService) RunNow(ctx context.Context, input AccountSched
 		}
 		setting := settings[account.GroupID]
 		model := resolveAccountSchedulerProbeModel(setting, *group, probeModels[account.GroupID])
+		if strings.TrimSpace(input.Model) != "" {
+			model = strings.TrimSpace(input.Model)
+		}
 		probe, err := s.runProbe(ctx, account, model)
 		if err != nil {
 			result.Failed++
@@ -696,17 +714,39 @@ func (s *AccountSchedulerService) AccountDegradationScores(ctx context.Context, 
 	if s == nil || s.repo == nil || groupID <= 0 || len(accountIDs) == 0 {
 		return nil
 	}
+	entry, ok := s.accountDegradationScoreEntry(ctx, groupID)
+	if !ok {
+		return nil
+	}
+	return filterAccountDegradationScores(entry.scores, accountIDs)
+}
+
+func (s *AccountSchedulerService) DegradationFactorEnabled(ctx context.Context, groupID int64) bool {
+	if s == nil || s.repo == nil || groupID <= 0 {
+		return true
+	}
+	entry, ok := s.accountDegradationScoreEntry(ctx, groupID)
+	if !ok {
+		return true
+	}
+	return entry.factorEnabled
+}
+
+func (s *AccountSchedulerService) accountDegradationScoreEntry(
+	ctx context.Context,
+	groupID int64,
+) (accountDegradationScoreCacheEntry, bool) {
 	now := time.Now()
 	s.cacheMu.RLock()
 	entry, ok := s.cache[groupID]
 	s.cacheMu.RUnlock()
 	if ok && now.Before(entry.expiresAt) {
-		return filterAccountDegradationScores(entry.scores, accountIDs)
+		return entry, true
 	}
 
 	stats, err := s.repo.ListDegradationStats(ctx, now.Add(-accountSchedulerHistoryWindow))
 	if err != nil {
-		return nil
+		logger.LegacyPrintf("service.account_scheduler", "[AccountScheduler] load degradation scores failed: %v", err)
 	}
 	scores := make(map[int64]AccountDegradationScore)
 	for _, stat := range stats {
@@ -720,13 +760,23 @@ func (s *AccountSchedulerService) AccountDegradationScores(ctx context.Context, 
 			Samples:    stat.SampleCount(),
 		}
 	}
-	s.cacheMu.Lock()
-	s.cache[groupID] = accountDegradationScoreCacheEntry{
-		expiresAt: now.Add(30 * time.Second),
-		scores:    scores,
+
+	factorEnabled := true
+	settings, settingsErr := s.repo.ListGroupSettings(ctx)
+	if settingsErr != nil {
+		logger.LegacyPrintf("service.account_scheduler", "[AccountScheduler] load group degradation setting failed: %v", settingsErr)
+	} else if setting, exists := settings[groupID]; exists {
+		factorEnabled = setting.DegradationFactorEnabled
 	}
+	entry = accountDegradationScoreCacheEntry{
+		expiresAt:     now.Add(30 * time.Second),
+		scores:        scores,
+		factorEnabled: factorEnabled,
+	}
+	s.cacheMu.Lock()
+	s.cache[groupID] = entry
 	s.cacheMu.Unlock()
-	return filterAccountDegradationScores(scores, accountIDs)
+	return entry, true
 }
 
 func (s *AccountSchedulerService) runProbe(ctx context.Context, account AccountSchedulerAccount, model string) (*AccountDegradationProbe, error) {
@@ -817,23 +867,8 @@ func (s *AccountSchedulerService) applyScores(
 	}
 }
 
-func (s *AccountSchedulerService) degradationWeight(ctx context.Context) (float64, error) {
-	if s.settingRepo == nil {
-		return 1.5, nil
-	}
-	values, err := s.settingRepo.GetMultiple(ctx, []string{SettingKeyOpenAIAdvancedSchedulerWeightDegradation})
-	if err != nil {
-		return 1.5, err
-	}
-	raw := strings.TrimSpace(values[SettingKeyOpenAIAdvancedSchedulerWeightDegradation])
-	if raw == "" {
-		return 1.5, nil
-	}
-	value, err := strconv.ParseFloat(raw, 64)
-	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 100 {
-		return 1.5, nil
-	}
-	return value, nil
+func (s *AccountSchedulerService) degradationWeight(context.Context) (float64, error) {
+	return accountSchedulerDegradationWeight, nil
 }
 
 func (s *AccountSchedulerService) advancedSchedulerEnabled(ctx context.Context) (bool, error) {
@@ -855,6 +890,25 @@ func (s *AccountSchedulerService) invalidateCache(groupID int64) {
 		return
 	}
 	clear(s.cache)
+}
+
+func (s *AccountSchedulerService) activeAccountDispatches(
+	ctx context.Context,
+	accounts []AccountSchedulerAccount,
+) map[int64]int {
+	if s == nil || s.gateway == nil || s.gateway.concurrencyService == nil || len(accounts) == 0 {
+		return nil
+	}
+	accountIDs := make([]int64, 0, len(accounts))
+	for _, account := range accounts {
+		accountIDs = append(accountIDs, account.ID)
+	}
+	counts, err := s.gateway.concurrencyService.GetAccountConcurrencyBatch(ctx, accountIDs)
+	if err != nil {
+		logger.LegacyPrintf("service.account_scheduler", "[AccountScheduler] load active dispatches failed: %v", err)
+		return nil
+	}
+	return counts
 }
 
 func accountSchedulerAccountAvailability(account AccountSchedulerAccount) (bool, string) {

@@ -8,6 +8,8 @@ export interface AccountSchedulerRow {
   oauth: boolean
   available: boolean
   availability_reason: string
+  dispatch_count: number
+  active_dispatches: number
   degradation_rate?: number
   sample_count: number
   pass_count: number
@@ -30,6 +32,7 @@ export interface AccountSchedulerGroup {
   degradation_supported: boolean
   status: string
   degradation_enabled: boolean
+  degradation_factor_enabled: boolean
   interval_seconds: number
   test_model: string
   score_max?: number
@@ -56,7 +59,6 @@ export interface AccountSchedulerOverview {
   scoring_mode: string
   oauth_first: boolean
   priority_ignored: boolean
-  degradation_weight: number
   advanced_enabled: boolean
   tested_groups: number
   enabled_groups: number
@@ -70,9 +72,9 @@ export interface AccountSchedulerOverview {
 export interface AccountSchedulerSettingInput {
   group_id: number
   degradation_enabled?: boolean
+  degradation_factor_enabled?: boolean
   interval_seconds?: number
   test_model?: string
-  degradation_weight?: number
 }
 
 export async function getOverview(): Promise<AccountSchedulerOverview> {
@@ -86,14 +88,16 @@ export async function updateSetting(
   await apiClient.put('/admin/account-scheduler/settings', input)
 }
 
-export async function runNow(input: { group_id: number; account_id?: number }): Promise<{
+export async function runNow(input: { group_id: number; account_id?: number; model?: string }): Promise<{
   run: number
   skipped: number
   failed: number
   results: AccountDegradationProbe[]
   errors?: string[]
 }> {
-  const { data } = await apiClient.post('/admin/account-scheduler/run', input)
+  const { data } = await apiClient.post('/admin/account-scheduler/run', input, {
+    timeout: 5 * 60 * 1000,
+  })
   return data
 }
 
