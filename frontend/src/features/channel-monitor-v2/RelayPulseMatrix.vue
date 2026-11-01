@@ -79,7 +79,7 @@
             <strong
               class="summary-value bg-white text-xs font-medium tabular-nums text-gray-600 dark:bg-dark-800 dark:text-gray-300"
             >
-              {{ formatCacheRate(entry.row.metrics.cache_rate) }}
+              {{ formatCacheRate(entry.row.metrics.cache_rate, rowKey(entry.row)) }}
             </strong>
             <div class="pulse-track grid items-stretch" :style="pulseStyle">
               <span
@@ -92,12 +92,12 @@
                 ]"
                 tabindex="0"
                 role="img"
-                :title="slot.bucket ? bucketTooltip(slot.bucket) : t('channelMonitorV2.matrix.noTrafficAt', { time: formatBucketRange(slot.start) })"
-                :aria-label="slot.bucket ? bucketTooltip(slot.bucket) : t('channelMonitorV2.matrix.noTrafficAt', { time: formatBucketRange(slot.start) })"
-                @mouseenter="showTooltip($event, slot)"
+                :title="slot.bucket ? bucketTooltip(slot.bucket, `${rowKey(entry.row)}:${slot.start}`) : t('channelMonitorV2.matrix.noTrafficAt', { time: formatBucketRange(slot.start) })"
+                :aria-label="slot.bucket ? bucketTooltip(slot.bucket, `${rowKey(entry.row)}:${slot.start}`) : t('channelMonitorV2.matrix.noTrafficAt', { time: formatBucketRange(slot.start) })"
+                @mouseenter="showTooltip($event, slot, `${rowKey(entry.row)}:${slot.start}`)"
                 @mousemove="moveTooltip($event)"
                 @mouseleave="hideTooltip"
-                @focus="showTooltip($event, slot)"
+                @focus="showTooltip($event, slot, `${rowKey(entry.row)}:${slot.start}`)"
                 @blur="hideTooltip"
               >
                 <span class="pulse-tooltip" role="tooltip">
@@ -107,7 +107,7 @@
                     <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.successRateValue', { value: successRate(slot.bucket.metrics) }) }}</span>
                     <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.ttftValue', { value: latencyPrivacy(slot.bucket.metrics.ttft) }) }}</span>
                     <span v-if="showThroughput" class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.tpsValue', { value: formatTps(slot.bucket.metrics.tpm) }) }}</span>
-                    <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.cacheRateValue', { value: formatCacheRate(slot.bucket.metrics.cache_rate) }) }}</span>
+                    <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.cacheRateValue', { value: formatCacheRate(slot.bucket.metrics.cache_rate, `${rowKey(entry.row)}:${slot.start}`) }) }}</span>
                     <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.errorRateValue', { value: formatPercent(slot.bucket.metrics.error_rate) }) }}</span>
                     <span v-if="showThroughput" class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.rpmValue', { value: formatRate(slot.bucket.metrics.rpm) }) }}</span>
                     <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.durationValue', { value: latencyPrivacy(slot.bucket.metrics.duration) }) }}</span>
@@ -374,11 +374,11 @@ function formatScore(health: MonitorHealth): string {
   return `${Math.round(score)}`
 }
 
-function bucketTooltip(bucket: MonitorMatrixBucket): string {
-  return bucketTooltipLines(bucket).join('\n')
+function bucketTooltip(bucket: MonitorMatrixBucket, key: string): string {
+  return bucketTooltipLines(bucket, key).join('\n')
 }
 
-function bucketTooltipLines(bucket: MonitorMatrixBucket): string[] {
+function bucketTooltipLines(bucket: MonitorMatrixBucket, key: string): string[] {
   const metrics = bucket.metrics
   const lines = [
     formatBucketRange(bucket.bucket_start),
@@ -390,7 +390,7 @@ function bucketTooltipLines(bucket: MonitorMatrixBucket): string[] {
     lines.push(t('channelMonitorV2.metrics.tpsValue', { value: formatTps(metrics.tpm) }))
   }
   lines.push(
-    t('channelMonitorV2.metrics.cacheRateValue', { value: formatCacheRate(metrics.cache_rate) }),
+    t('channelMonitorV2.metrics.cacheRateValue', { value: formatCacheRate(metrics.cache_rate, key) }),
     t('channelMonitorV2.metrics.errorRateValue', { value: formatPercent(metrics.error_rate) }),
   )
   if (props.showThroughput) {
@@ -403,8 +403,8 @@ function emptyTooltipLines(start: string): string[] {
   return [formatBucketRange(start), t('channelMonitorV2.matrix.noTraffic')]
 }
 
-function showTooltip(event: MouseEvent | FocusEvent, slot: AlignedSlot) {
-  floatingTooltip.lines = slot.bucket ? bucketTooltipLines(slot.bucket) : emptyTooltipLines(slot.start)
+function showTooltip(event: MouseEvent | FocusEvent, slot: AlignedSlot, key: string) {
+  floatingTooltip.lines = slot.bucket ? bucketTooltipLines(slot.bucket, key) : emptyTooltipLines(slot.start)
   floatingTooltip.visible = true
   positionTooltip(event)
 }
@@ -439,8 +439,8 @@ function formatPercent(value: number) {
   return formatMonitorPercent(value)
 }
 
-function formatCacheRate(value: number) {
-  return formatMonitorCacheRate(value)
+function formatCacheRate(value: number, key: string) {
+  return formatMonitorCacheRate(value, key)
 }
 
 function formatRate(value: number) {

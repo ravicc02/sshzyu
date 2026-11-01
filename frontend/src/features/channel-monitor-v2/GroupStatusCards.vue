@@ -345,7 +345,7 @@ function cacheRateValue(row: MonitorMatrixRow): number | null {
 }
 
 function cacheRateDisplay(row: MonitorMatrixRow) {
-  return formatMonitorCacheRate(cacheRateValue(row))
+  return formatMonitorCacheRate(cacheRateValue(row), `${row.platform}:${row.group_id ?? 0}:${row.model ?? ''}`)
 }
 
 function cacheRateTitle(row: MonitorMatrixRow) {
