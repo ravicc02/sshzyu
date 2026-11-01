@@ -781,8 +781,11 @@ func (s *AccountSchedulerService) RunScheduled(ctx context.Context) (*AccountSch
 	work := make(chan AccountSchedulerAccount)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	// wg 只由 worker goroutine 计数：每个 worker 在 wg.Add(1) 后
+	// 由自身的 defer wg.Done() 释放。runOne 处理的是单个任务而非
+	// worker 生命周期，若在此再 defer wg.Done() 会重复释放，
+	// 当批次任务数超出 worker 数时计数变为负数并触发 panic。
 	runOne := func(account AccountSchedulerAccount) {
-		defer wg.Done()
 		setting := settings[account.GroupID]
 		group := findAccountSchedulerGroup(groups, account.GroupID)
 		model := resolveAccountSchedulerProbeModel(setting, *group, probeModels[account.GroupID])
