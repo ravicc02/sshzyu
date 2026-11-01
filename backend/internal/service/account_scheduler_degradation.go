@@ -115,16 +115,16 @@ func (s AccountDegradationStat) DegradationRate() (float64, bool) {
 }
 
 type AccountDegradationProbe struct {
-	ID           int64
-	AccountID    int64
-	AccountName  string
-	GroupID      int64
-	Model        string
-	Status       string
-	ResponseText string
-	ErrorMessage string
-	LatencyMs    int64
-	CheckedAt    time.Time
+	ID           int64     `json:"id"`
+	AccountID    int64     `json:"account_id"`
+	AccountName  string    `json:"account_name"`
+	GroupID      int64     `json:"group_id"`
+	Model        string    `json:"model"`
+	Status       string    `json:"status"`
+	ResponseText string    `json:"response_text"`
+	ErrorMessage string    `json:"error_message"`
+	LatencyMs    int64     `json:"latency_ms"`
+	CheckedAt    time.Time `json:"checked_at"`
 }
 
 type AccountSchedulerOverview struct {
