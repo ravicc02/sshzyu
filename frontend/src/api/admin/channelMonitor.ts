@@ -77,11 +77,11 @@ export interface ChannelMonitor {
   group_id?: number | null
   /** Whether active probe data may fill a group with no real traffic. */
   probe_fallback_enabled?: boolean
-  /** Whether the OpenAI reasoning probe runs for this monitor. */
+  /** Whether this monitor displays the linked account scheduler's aggregate degradation result. */
   intelligence_enabled?: boolean
-  /** Independent cadence for the OpenAI reasoning probe. */
+  /** Legacy field retained for compatibility; display cadence comes from the account scheduler. */
   intelligence_interval_seconds?: number
-  /** Reasoning effort used by the OpenAI reasoning probe. */
+  /** Legacy field retained for compatibility; the account scheduler owns probe settings. */
   intelligence_reasoning_effort?: string
   enabled: boolean
   interval_seconds: number

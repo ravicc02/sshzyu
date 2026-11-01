@@ -53,28 +53,29 @@ func (h *ChannelMonitorUserHandler) quotaVisible(c *gin.Context) bool {
 // --- Response ---
 
 type channelMonitorUserListItem struct {
-	ID                   int64                                `json:"id"`
-	Name                 string                               `json:"name"`
-	Provider             string                               `json:"provider"`
-	GroupName            string                               `json:"group_name"`
-	GroupID              *int64                               `json:"group_id"`
-	ProbeFallbackEnabled bool                                 `json:"probe_fallback_enabled"`
-	PrimaryModel         string                               `json:"primary_model"`
-	IntervalSeconds      int                                  `json:"interval_seconds"`
-	PrimaryStatus        string                               `json:"primary_status"`
-	PrimaryLatencyMs     *int                                 `json:"primary_latency_ms"`
-	PrimaryPingLatencyMs *int                                 `json:"primary_ping_latency_ms"`
-	Availability7d       float64                              `json:"availability_7d"`
-	ExtraModels          []dto.ChannelMonitorExtraModelStatus `json:"extra_models"`
-	Timeline             []channelMonitorUserTimelinePoint    `json:"timeline"`
-	IntelligenceTimeline []channelMonitorUserTimelinePoint    `json:"intelligence_timeline,omitempty"`
-	IntelligenceEnabled  bool                                 `json:"intelligence_enabled"`
-	IntelligenceStatus   string                               `json:"intelligence_status,omitempty"`
-	IntelligenceSource   string                               `json:"intelligence_source,omitempty"`
-	IntelligenceSamples  int64                                `json:"intelligence_samples,omitempty"`
-	IntelligencePassed   int64                                `json:"intelligence_passed,omitempty"`
-	IntelligenceFailed   int64                                `json:"intelligence_failed,omitempty"`
-	IntelligenceErrors   int64                                `json:"intelligence_errors,omitempty"`
+	ID                          int64                                `json:"id"`
+	Name                        string                               `json:"name"`
+	Provider                    string                               `json:"provider"`
+	GroupName                   string                               `json:"group_name"`
+	GroupID                     *int64                               `json:"group_id"`
+	ProbeFallbackEnabled        bool                                 `json:"probe_fallback_enabled"`
+	PrimaryModel                string                               `json:"primary_model"`
+	IntervalSeconds             int                                  `json:"interval_seconds"`
+	PrimaryStatus               string                               `json:"primary_status"`
+	PrimaryLatencyMs            *int                                 `json:"primary_latency_ms"`
+	PrimaryPingLatencyMs        *int                                 `json:"primary_ping_latency_ms"`
+	Availability7d              float64                              `json:"availability_7d"`
+	ExtraModels                 []dto.ChannelMonitorExtraModelStatus `json:"extra_models"`
+	Timeline                    []channelMonitorUserTimelinePoint    `json:"timeline"`
+	IntelligenceTimeline        []channelMonitorUserTimelinePoint    `json:"intelligence_timeline,omitempty"`
+	IntelligenceEnabled         bool                                 `json:"intelligence_enabled"`
+	IntelligenceStatus          string                               `json:"intelligence_status,omitempty"`
+	IntelligenceSource          string                               `json:"intelligence_source,omitempty"`
+	IntelligenceIntervalSeconds int                                  `json:"intelligence_interval_seconds,omitempty"`
+	IntelligenceSamples         int64                                `json:"intelligence_samples,omitempty"`
+	IntelligencePassed          int64                                `json:"intelligence_passed,omitempty"`
+	IntelligenceFailed          int64                                `json:"intelligence_failed,omitempty"`
+	IntelligenceErrors          int64                                `json:"intelligence_errors,omitempty"`
 	// LatestQuota 主模型最近配额快照；channel_monitor_show_quota=false 时
 	// 由 userMonitorViewToItem 的调用方传入 false 剥离（服务端脱敏，非仅前端隐藏）。
 	LatestQuota *domain.MonitorQuotaSnapshot `json:"latest_quota,omitempty"`
@@ -126,27 +127,28 @@ func userMonitorViewToItem(v *service.UserMonitorView, includeQuota bool) channe
 		})
 	}
 	item := channelMonitorUserListItem{
-		ID:                   v.ID,
-		Name:                 v.Name,
-		Provider:             v.Provider,
-		GroupName:            v.GroupName,
-		GroupID:              v.GroupID,
-		ProbeFallbackEnabled: v.ProbeFallbackEnabled,
-		PrimaryModel:         v.PrimaryModel,
-		IntervalSeconds:      v.IntervalSeconds,
-		IntelligenceEnabled:  v.IntelligenceEnabled,
-		IntelligenceStatus:   v.IntelligenceStatus,
-		IntelligenceSource:   v.IntelligenceSource,
-		IntelligenceSamples:  v.IntelligenceSamples,
-		IntelligencePassed:   v.IntelligencePassed,
-		IntelligenceFailed:   v.IntelligenceFailed,
-		IntelligenceErrors:   v.IntelligenceErrors,
-		PrimaryStatus:        v.PrimaryStatus,
-		PrimaryLatencyMs:     v.PrimaryLatencyMs,
-		PrimaryPingLatencyMs: v.PrimaryPingLatencyMs,
-		Availability7d:       v.Availability7d,
-		ExtraModels:          extras,
-		Timeline:             timeline,
+		ID:                          v.ID,
+		Name:                        v.Name,
+		Provider:                    v.Provider,
+		GroupName:                   v.GroupName,
+		GroupID:                     v.GroupID,
+		ProbeFallbackEnabled:        v.ProbeFallbackEnabled,
+		PrimaryModel:                v.PrimaryModel,
+		IntervalSeconds:             v.IntervalSeconds,
+		IntelligenceEnabled:         v.IntelligenceEnabled,
+		IntelligenceStatus:          v.IntelligenceStatus,
+		IntelligenceSource:          v.IntelligenceSource,
+		IntelligenceIntervalSeconds: v.IntelligenceIntervalSeconds,
+		IntelligenceSamples:         v.IntelligenceSamples,
+		IntelligencePassed:          v.IntelligencePassed,
+		IntelligenceFailed:          v.IntelligenceFailed,
+		IntelligenceErrors:          v.IntelligenceErrors,
+		PrimaryStatus:               v.PrimaryStatus,
+		PrimaryLatencyMs:            v.PrimaryLatencyMs,
+		PrimaryPingLatencyMs:        v.PrimaryPingLatencyMs,
+		Availability7d:              v.Availability7d,
+		ExtraModels:                 extras,
+		Timeline:                    timeline,
 	}
 	if includeQuota {
 		item.LatestQuota = v.LatestQuota

@@ -163,28 +163,29 @@ type CheckResult struct {
 
 // UserMonitorView 用户只读视图：监控概览（含主模型最近状态 + 7d 可用率 + 附加模型最近状态）。
 type UserMonitorView struct {
-	ID                   int64
-	Name                 string
-	Provider             string
-	GroupName            string
-	GroupID              *int64
-	ProbeFallbackEnabled bool
-	PrimaryModel         string
-	IntervalSeconds      int
-	PrimaryStatus        string
-	PrimaryLatencyMs     *int
-	PrimaryPingLatencyMs *int    // 主模型最近一次 ping 延迟
-	Availability7d       float64 // 0-100
-	ExtraModels          []ExtraModelStatus
-	Timeline             []UserMonitorTimelinePoint // 主模型最近 N 个历史点（按 checked_at DESC，最新在前）
-	IntelligenceTimeline []UserMonitorTimelinePoint // OpenAI 主模型的独立推理检测，未配置时为空
-	IntelligenceEnabled  bool
-	IntelligenceStatus   string
-	IntelligenceSource   string
-	IntelligenceSamples  int64
-	IntelligencePassed   int64
-	IntelligenceFailed   int64
-	IntelligenceErrors   int64
+	ID                          int64
+	Name                        string
+	Provider                    string
+	GroupName                   string
+	GroupID                     *int64
+	ProbeFallbackEnabled        bool
+	PrimaryModel                string
+	IntervalSeconds             int
+	PrimaryStatus               string
+	PrimaryLatencyMs            *int
+	PrimaryPingLatencyMs        *int    // 主模型最近一次 ping 延迟
+	Availability7d              float64 // 0-100
+	ExtraModels                 []ExtraModelStatus
+	Timeline                    []UserMonitorTimelinePoint // 主模型最近 N 个历史点（按 checked_at DESC，最新在前）
+	IntelligenceTimeline        []UserMonitorTimelinePoint // OpenAI 主模型的独立推理检测，未配置时为空
+	IntelligenceEnabled         bool
+	IntelligenceStatus          string
+	IntelligenceSource          string
+	IntelligenceIntervalSeconds int
+	IntelligenceSamples         int64
+	IntelligencePassed          int64
+	IntelligenceFailed          int64
+	IntelligenceErrors          int64
 	// LatestQuota 主模型最近一次配额快照；channel_monitor_show_quota=false
 	// 时由 handler 服务端剥离。
 	LatestQuota *domain.MonitorQuotaSnapshot
@@ -273,16 +274,17 @@ type ChannelMonitorAvailability struct {
 // PrimaryStatus / PrimaryLatencyMs 描述主模型最近状态；Availability7d 是主模型 7 天可用率；
 // ExtraModels 描述附加模型最近状态（用于 hover 展示）。
 type MonitorStatusSummary struct {
-	PrimaryStatus         string // 空字符串表示无历史
-	IntelligenceStatus    string // 与主模型可用性独立
-	IntelligenceCheckedAt *time.Time
-	IntelligenceSource    string
-	IntelligenceSamples   int64
-	IntelligencePassed    int64
-	IntelligenceFailed    int64
-	IntelligenceErrors    int64
-	PrimaryLatencyMs      *int
-	Availability7d        float64 // 0-100，无历史时为 0
-	ExtraModels           []ExtraModelStatus
-	LatestQuota           *domain.MonitorQuotaSnapshot // 主模型最近配额快照（配额模式）
+	PrimaryStatus               string // 空字符串表示无历史
+	IntelligenceStatus          string // 与主模型可用性独立
+	IntelligenceCheckedAt       *time.Time
+	IntelligenceSource          string
+	IntelligenceIntervalSeconds int
+	IntelligenceSamples         int64
+	IntelligencePassed          int64
+	IntelligenceFailed          int64
+	IntelligenceErrors          int64
+	PrimaryLatencyMs            *int
+	Availability7d              float64 // 0-100，无历史时为 0
+	ExtraModels                 []ExtraModelStatus
+	LatestQuota                 *domain.MonitorQuotaSnapshot // 主模型最近配额快照（配额模式）
 }

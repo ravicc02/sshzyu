@@ -264,33 +264,79 @@ func (r *channelMonitorRepository) ListGroupAccountDegradationSummaries(
 	ctx context.Context,
 	groupIDs []int64,
 	since time.Time,
-	modelByGroup map[int64]string,
 ) (map[int64]service.GroupAccountDegradationSummary, error) {
 	if len(groupIDs) == 0 {
 		return map[int64]service.GroupAccountDegradationSummary{}, nil
 	}
-	modelFilter, err := json.Marshal(modelByGroup)
-	if err != nil {
-		return nil, fmt.Errorf("marshal degradation model filter: %w", err)
-	}
 	const query = `
+		WITH group_settings AS (
+			SELECT
+				group_id,
+				degradation_factor_enabled,
+				interval_seconds,
+				test_model,
+				test_reasoning_effort
+			FROM account_scheduler_group_settings
+			WHERE group_id = ANY($1)
+		),
+		eligible_accounts AS (
+			SELECT
+				ag.group_id,
+				a.id AS account_id
+			FROM account_groups ag
+			JOIN accounts a ON a.id = ag.account_id
+			WHERE ag.group_id = ANY($1)
+			  AND a.deleted_at IS NULL
+			  AND a.status = 'active'
+			  AND a.schedulable = true
+		),
+		latest_probe AS (
+			SELECT
+				p.group_id,
+				p.account_id,
+				p.status,
+				p.model,
+				p.checked_at,
+				ROW_NUMBER() OVER (
+					PARTITION BY p.group_id, p.account_id
+					ORDER BY p.checked_at DESC, p.id DESC
+				) AS row_number
+			FROM account_degradation_probes p
+			JOIN group_settings gs ON gs.group_id = p.group_id
+			JOIN eligible_accounts ea
+			  ON ea.group_id = p.group_id
+			 AND ea.account_id = p.account_id
+			WHERE p.group_id = ANY($1)
+			  AND p.checked_at >= $2
+			  AND (
+				NULLIF(BTRIM(gs.test_model), '') IS NULL
+				OR p.model = gs.test_model
+			  )
+		)
 		SELECT
-			group_id,
-			COUNT(*) FILTER (WHERE status = 'pass') AS pass_count,
-			COUNT(*) FILTER (WHERE status = 'degraded') AS degraded_count,
-			COUNT(*) FILTER (WHERE status = 'error') AS error_count,
-			MAX(checked_at) AS latest_checked_at,
-			(ARRAY_AGG(model ORDER BY checked_at DESC, id DESC))[1] AS latest_model
-		FROM account_degradation_probes
-		WHERE group_id = ANY($1)
-		  AND checked_at >= $2
-		  AND (
-			NULLIF($3::jsonb ->> group_id::text, '') IS NULL
-			OR model = ($3::jsonb ->> group_id::text)
-		  )
-		GROUP BY group_id
+			gs.group_id,
+			gs.degradation_factor_enabled,
+			gs.interval_seconds,
+			gs.test_model,
+			gs.test_reasoning_effort,
+			COUNT(lp.account_id) FILTER (WHERE lp.row_number = 1 AND lp.status = 'pass') AS pass_count,
+			COUNT(lp.account_id) FILTER (WHERE lp.row_number = 1 AND lp.status = 'degraded') AS degraded_count,
+			COUNT(lp.account_id) FILTER (WHERE lp.row_number = 1 AND lp.status = 'error') AS error_count,
+			MAX(lp.checked_at) AS latest_checked_at,
+			COALESCE(
+				(ARRAY_AGG(lp.model ORDER BY lp.checked_at DESC) FILTER (WHERE lp.row_number = 1))[1],
+				gs.test_model
+			) AS latest_model
+		FROM group_settings gs
+		LEFT JOIN latest_probe lp ON lp.group_id = gs.group_id
+		GROUP BY
+			gs.group_id,
+			gs.degradation_factor_enabled,
+			gs.interval_seconds,
+			gs.test_model,
+			gs.test_reasoning_effort
 	`
-	rows, err := r.db.QueryContext(ctx, query, pq.Array(groupIDs), since, string(modelFilter))
+	rows, err := r.db.QueryContext(ctx, query, pq.Array(groupIDs), since)
 	if err != nil {
 		return nil, fmt.Errorf("group account degradation summaries: %w", err)
 	}
@@ -299,18 +345,28 @@ func (r *channelMonitorRepository) ListGroupAccountDegradationSummaries(
 	out := make(map[int64]service.GroupAccountDegradationSummary, len(groupIDs))
 	for rows.Next() {
 		var summary service.GroupAccountDegradationSummary
-		var latest time.Time
+		var latest sql.NullTime
+		var latestModel sql.NullString
 		if err := rows.Scan(
 			&summary.GroupID,
+			&summary.FactorEnabled,
+			&summary.IntervalSeconds,
+			&summary.TestModel,
+			&summary.ReasoningEffort,
 			&summary.PassCount,
 			&summary.DegradedCount,
 			&summary.ErrorCount,
 			&latest,
-			&summary.LatestModel,
+			&latestModel,
 		); err != nil {
 			return nil, err
 		}
-		summary.LatestCheckedAt = &latest
+		if latest.Valid {
+			summary.LatestCheckedAt = &latest.Time
+		}
+		if latestModel.Valid {
+			summary.LatestModel = latestModel.String
+		}
 		summary.SampleCount = summary.PassCount + summary.DegradedCount
 		out[summary.GroupID] = summary
 	}

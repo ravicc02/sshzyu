@@ -36,11 +36,12 @@ export interface UserMonitorView {
   availability_7d: number
   extra_models: UserMonitorExtraModel[]
   timeline: MonitorTimelinePoint[]
-  /** Separate OpenAI reasoning checks; never included in availability. */
+  /** Account scheduler aggregate status point; never included in availability. */
   intelligence_timeline?: MonitorTimelinePoint[]
   intelligence_enabled?: boolean
   intelligence_status?: MonitorStatus | ''
   intelligence_source?: 'account_aggregate' | 'channel_fallback' | ''
+  intelligence_interval_seconds?: number
   intelligence_samples?: number
   intelligence_passed?: number
   intelligence_failed?: number

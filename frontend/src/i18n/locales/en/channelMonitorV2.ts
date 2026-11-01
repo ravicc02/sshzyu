@@ -33,6 +33,7 @@ export default {
       intelligenceActive: 'Active reasoning checks', intelligenceNotConfigured: 'OpenAI reasoning check not configured',
       intelligenceWaiting: 'Waiting for first result', intelligenceNotDegraded: 'Passed', intelligenceDegraded: 'Not passed', intelligenceError: 'Request error',
       intelligenceAccountRate: 'Account aggregate {passed}/{samples} · {rate}%',
+      intelligenceAccountVote: 'Not degraded {passed}/{samples}',
       intelligenceAccountErrors: 'Account request errors {count}',
       multiplier: 'User multiplier {value}',
       providerBreakdown: 'Provider breakdown', providerCount: '{count} providers', providerNoData: 'No provider traffic',

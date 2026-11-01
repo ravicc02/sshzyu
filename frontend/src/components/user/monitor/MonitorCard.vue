@@ -46,7 +46,12 @@
         <strong class="font-semibold text-gray-700 dark:text-gray-100">{{ t('channelStatus.intelligenceChecks') }}</strong>
         <span class="text-right" :class="intelligenceStatusClass">{{ intelligenceLabel }}</span>
       </div>
-      <MonitorStatusStrip v-if="item.intelligence_enabled" :label="formatMonitorModel(item.primary_model)" :points="item.intelligence_timeline || []" />
+      <div v-if="item.intelligence_enabled" class="flex flex-wrap items-center justify-between gap-2 rounded-md bg-gray-50 px-2.5 py-2 text-[11px] dark:bg-dark-700/60">
+        <span class="font-semibold text-gray-700 dark:text-gray-200">{{ intelligenceVoteLabel }}</span>
+        <span v-if="item.intelligence_errors" class="text-amber-700 dark:text-amber-300">
+          {{ t('channelStatus.intelligenceErrors', { count: item.intelligence_errors }) }}
+        </span>
+      </div>
     </div>
   </button>
 </template>
@@ -83,17 +88,32 @@ function stale(point?: MonitorTimelinePoint): boolean {
   return !Number.isFinite(time) || Date.now() - time > Math.max(150, (props.item.interval_seconds || 60) * 2.5) * 1000
 }
 const healthStale = computed(() => stale(props.item.timeline?.[0]))
-const intelligenceStale = computed(() => stale(props.item.intelligence_timeline?.[0]))
+const intelligenceStale = computed(() => {
+  const point = props.item.intelligence_timeline?.[0]
+  if (!point) return true
+  const time = Date.parse(point.checked_at)
+  const interval = Math.max(30, props.item.intelligence_interval_seconds || props.item.interval_seconds || 60)
+  return !Number.isFinite(time) || Date.now() - time > interval * 1000 * 2
+})
+const intelligenceState = computed(() => props.item.intelligence_status || props.item.intelligence_timeline?.[0]?.status)
 const intelligenceLabel = computed(() => {
   if (!props.item.intelligence_enabled) return t('channelStatus.intelligenceUnavailable')
-  if (!props.item.intelligence_timeline?.length) return t('channelStatus.intelligencePending')
+  if (!intelligenceState.value) return t('channelStatus.intelligencePending')
   if (intelligenceStale.value) return t('channelStatus.intelligenceStale')
-  if (props.item.intelligence_timeline[0]?.status === 'error') return t('channelStatus.intelligenceError')
-  return props.item.intelligence_timeline[0]?.status === 'operational'
+  if (intelligenceState.value === 'error') return t('channelStatus.intelligenceError')
+  return intelligenceState.value === 'operational'
     ? t('channelStatus.intelligencePassed') : t('channelStatus.intelligenceFailed')
+})
+const intelligenceVoteLabel = computed(() => {
+  const samples = props.item.intelligence_samples || 0
+  if (samples <= 0) return t('channelStatus.intelligencePending')
+  return t('channelStatus.intelligenceVote', {
+    passed: props.item.intelligence_passed || 0,
+    samples,
+  })
 })
 const intelligenceStatusClass = computed(() =>
   !props.item.intelligence_enabled || intelligenceStale.value ? 'text-gray-500 dark:text-gray-400'
-    : props.item.intelligence_timeline?.[0]?.status === 'operational' ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300'
+    : intelligenceState.value === 'operational' ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300'
 )
 </script>

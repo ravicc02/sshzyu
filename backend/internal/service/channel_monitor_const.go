@@ -202,6 +202,10 @@ var (
 		"CHANNEL_MONITOR_INVALID_INTELLIGENCE_REASONING_EFFORT",
 		"intelligence_reasoning_effort must be a supported reasoning level",
 	)
+	ErrChannelMonitorIntelligenceRequiresSchedulerFactor = infraerrors.BadRequest(
+		"CHANNEL_MONITOR_INTELLIGENCE_REQUIRES_SCHEDULER_FACTOR",
+		"intelligence display requires the linked group to enable the account scheduler degradation factor",
+	)
 	ErrChannelMonitorInvalidEndpoint = infraerrors.BadRequest(
 		"CHANNEL_MONITOR_INVALID_ENDPOINT", "endpoint must be a valid https URL",
 	)

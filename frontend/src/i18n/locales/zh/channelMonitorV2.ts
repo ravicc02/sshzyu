@@ -33,6 +33,7 @@ export default {
       intelligenceActive: '主动测智', intelligenceNotConfigured: '未配置 OpenAI 主动测智',
       intelligenceWaiting: '等待首次测智结果', intelligenceNotDegraded: '通过', intelligenceDegraded: '未通过', intelligenceError: '请求错误',
       intelligenceAccountRate: '账号聚合 {passed}/{samples} · {rate}%',
+      intelligenceAccountVote: '不降 {passed}/{samples}',
       intelligenceAccountErrors: '账号请求错误 {count}',
       multiplier: '用户倍率 {value}',
       providerBreakdown: '供应商明细', providerCount: '{count} 个供应商', providerNoData: '暂无供应商流量',

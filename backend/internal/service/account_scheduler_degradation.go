@@ -87,6 +87,10 @@ type AccountDegradationStat struct {
 
 type GroupAccountDegradationSummary struct {
 	GroupID         int64
+	FactorEnabled   bool
+	IntervalSeconds int
+	TestModel       string
+	ReasoningEffort string
 	SampleCount     int64
 	PassCount       int64
 	DegradedCount   int64

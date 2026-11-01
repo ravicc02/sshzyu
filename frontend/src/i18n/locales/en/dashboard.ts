@@ -617,6 +617,8 @@ export default {
     intelligenceFailed: 'Last failed',
     intelligenceError: 'Check error',
     intelligencePending: 'Awaiting first check',
+    intelligenceVote: 'Not degraded {passed}/{samples}',
+    intelligenceErrors: 'Errors {count}',
     intelligenceDisabled: 'Disabled',
     recentChecks: 'Last 20',
     refreshIn: 'Refresh in {n}s',

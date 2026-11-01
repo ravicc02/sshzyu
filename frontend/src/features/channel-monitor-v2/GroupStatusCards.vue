@@ -79,7 +79,7 @@
 
             <div v-if="row.platform === 'openai' && (!hybrid || hasIntelligenceMonitor(row))" class="mt-4 border-t border-gray-100 pt-3 text-xs dark:border-dark-600">
               <div class="flex items-center justify-between gap-2"><strong class="text-gray-700 dark:text-gray-100">{{ t('channelStatus.intelligenceChecks') }}</strong><span :class="intelligenceSummaryClass(row)">{{ intelligenceSummary(row) }}</span></div>
-              <div v-if="hybrid && intelligenceProbe(row)" class="mt-3 grid h-2 grid-cols-[repeat(20,minmax(0,1fr))] gap-1" :aria-label="t('channelMonitorV2.groupCards.intelligenceActive')">
+              <div v-if="hybrid && intelligenceProbe(row) && intelligenceProbe(row)?.intelligence_source !== 'account_aggregate'" class="mt-3 grid h-2 grid-cols-[repeat(20,minmax(0,1fr))] gap-1" :aria-label="t('channelMonitorV2.groupCards.intelligenceActive')">
                 <span v-for="(slot, index) in intelligenceSlots(row)" :key="index" class="rounded-full" :class="slotColor(slot?.state || null)" :title="slotTitle(slot)" />
               </div>
             </div>
@@ -492,13 +492,13 @@ function intelligenceSummary(row: MonitorMatrixRow) {
   const probe = intelligenceProbe(row)
   if (!probe) return t('channelMonitorV2.groupCards.intelligenceNotConfigured')
   if (probe.intelligence_source === 'account_aggregate') {
+    if (intelligenceProbeStale(probe)) return t('channelStatus.intelligenceStale')
     const samples = probe.intelligence_samples || 0
     const passed = probe.intelligence_passed || 0
     if (samples > 0) {
-      return t('channelMonitorV2.groupCards.intelligenceAccountRate', {
+      return t('channelMonitorV2.groupCards.intelligenceAccountVote', {
         passed,
         samples,
-        rate: Math.round((passed / samples) * 100),
       })
     }
     if ((probe.intelligence_errors || 0) > 0) {
@@ -512,6 +512,14 @@ function intelligenceSummary(row: MonitorMatrixRow) {
   if (latest.status === 'operational') return t('channelMonitorV2.groupCards.intelligenceNotDegraded')
   if (latest.status === 'failed') return t('channelMonitorV2.groupCards.intelligenceDegraded')
   return t('channelMonitorV2.groupCards.intelligenceError')
+}
+
+function intelligenceProbeStale(probe: UserMonitorView): boolean {
+  const checkedAt = probe.intelligence_timeline?.[0]?.checked_at
+  if (!checkedAt) return false
+  const timestamp = Date.parse(checkedAt)
+  const interval = Math.max(30, probe.intelligence_interval_seconds || probe.interval_seconds || 60)
+  return !Number.isFinite(timestamp) || Date.now() - timestamp > interval * 1000 * 2
 }
 
 function intelligenceSummaryClass(row: MonitorMatrixRow) {

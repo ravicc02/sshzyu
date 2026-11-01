@@ -308,15 +308,24 @@ func (h *ChannelMonitorHandler) batchSummaryFor(c *gin.Context, items []*service
 	primaryByID := make(map[int64]string, len(items))
 	extrasByID := make(map[int64][]string, len(items))
 	groupByID := make(map[int64]int64, len(items))
+	intelligenceEnabledByID := make(map[int64]bool, len(items))
 	for _, m := range items {
 		ids = append(ids, m.ID)
 		primaryByID[m.ID] = m.PrimaryModel
 		extrasByID[m.ID] = m.ExtraModels
+		intelligenceEnabledByID[m.ID] = m.IntelligenceEnabled
 		if m.GroupID != nil {
 			groupByID[m.ID] = *m.GroupID
 		}
 	}
-	return h.monitorService.BatchMonitorStatusSummary(c.Request.Context(), ids, primaryByID, extrasByID, groupByID)
+	return h.monitorService.BatchMonitorStatusSummary(
+		c.Request.Context(),
+		ids,
+		primaryByID,
+		extrasByID,
+		groupByID,
+		intelligenceEnabledByID,
+	)
 }
 
 // buildListItemResponse 把 monitor + summary 装成 admin list 的响应行。
@@ -381,7 +390,7 @@ func (h *ChannelMonitorHandler) Create(c *gin.Context) {
 	if req.ProbeFallbackEnabled != nil {
 		probeFallbackEnabled = *req.ProbeFallbackEnabled
 	}
-	intelligenceEnabled := true
+	intelligenceEnabled := false
 	if req.IntelligenceEnabled != nil {
 		intelligenceEnabled = *req.IntelligenceEnabled
 	}

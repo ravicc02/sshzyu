@@ -73,7 +73,7 @@ type channelMonitorRecentTrafficReader interface {
 }
 
 type channelMonitorAccountDegradationReader interface {
-	ListGroupAccountDegradationSummaries(ctx context.Context, groupIDs []int64, since time.Time, modelByGroup map[int64]string) (map[int64]GroupAccountDegradationSummary, error)
+	ListGroupAccountDegradationSummaries(ctx context.Context, groupIDs []int64, since time.Time) (map[int64]GroupAccountDegradationSummary, error)
 }
 
 // ChannelMonitorService 渠道监控管理服务。
@@ -200,6 +200,9 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 		BodyOverride:     p.BodyOverride,
 		CheckMode:        checkMode,
 		AccountID:        cloneInt64Pointer(p.AccountID),
+	}
+	if err := s.validateIntelligenceSchedulerFactor(ctx, m); err != nil {
+		return nil, err
 	}
 	if err := s.repo.Create(ctx, m); err != nil {
 		return nil, fmt.Errorf("create channel monitor: %w", err)
@@ -479,6 +482,15 @@ func (s *ChannelMonitorService) Update(ctx context.Context, id int64, p ChannelM
 			return nil, err
 		}
 	}
+	if p.IntelligenceEnabled != nil && *p.IntelligenceEnabled {
+		if err := s.validateIntelligenceSchedulerFactor(ctx, existing); err != nil {
+			return nil, err
+		}
+	} else if existing.IntelligenceEnabled && (p.GroupID != nil || p.Provider != nil) {
+		if err := s.validateIntelligenceSchedulerFactor(ctx, existing); err != nil {
+			existing.IntelligenceEnabled = false
+		}
+	}
 
 	if err := s.repo.Update(ctx, existing); err != nil {
 		return nil, fmt.Errorf("update channel monitor: %w", err)
@@ -637,8 +649,8 @@ func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*Chec
 	return s.runCheck(ctx, id, false)
 }
 
-// RunScheduledCheck executes the normal availability probe and runs the
-// reasoning probe only when its independent interval is due.
+// RunScheduledCheck executes the normal availability probe. Degradation
+// results are read from the account scheduler and never probed here.
 func (s *ChannelMonitorService) RunScheduledCheck(ctx context.Context, id int64) ([]*CheckResult, error) {
 	return s.runCheck(ctx, id, true)
 }
@@ -661,29 +673,6 @@ func (s *ChannelMonitorService) runCheck(ctx context.Context, id int64, schedule
 	}
 
 	var results []*CheckResult
-	var intelligence *CheckResult
-	var intelligenceGroup errgroup.Group
-	// A replace-mode request is static and cannot contain this question.
-	runIntelligence := shouldRunIntelligenceProbe(m)
-	if scheduled && runIntelligence {
-		groupID := int64(0)
-		if m.GroupID != nil {
-			groupID = *m.GroupID
-		}
-		runIntelligence = s.intelligenceCheckDue(ctx, m) &&
-			!s.hasFreshAccountDegradation(ctx, groupID, m.PrimaryModel)
-	}
-	if runIntelligence {
-		intelligenceGroup.Go(func() error {
-			intelligence = runIntelligenceCheckForModel(ctx, m.Endpoint, m.APIKey, m.PrimaryModel, &CheckOptions{
-				APIMode: m.APIMode, ExtraHeaders: m.ExtraHeaders,
-				BodyOverrideMode: m.BodyOverrideMode, BodyOverride: m.BodyOverride, ReasoningProbe: true,
-				ReasoningEffort: m.IntelligenceReasoningEffort,
-				InternalProbe:   true,
-			})
-			return nil
-		})
-	}
 	switch checkMode {
 	case MonitorCheckModeQuota:
 		results = s.runQuotaOnlyCheck(ctx, m)
@@ -693,29 +682,8 @@ func (s *ChannelMonitorService) runCheck(ctx context.Context, id int64, schedule
 	default:
 		results = s.runChecksConcurrent(ctx, m)
 	}
-	_ = intelligenceGroup.Wait()
 	s.persistCheckResults(ctx, m, results)
-	if intelligence != nil {
-		s.persistIntelligenceResult(ctx, m, intelligence)
-	}
 	return results, nil
-}
-
-func (s *ChannelMonitorService) intelligenceCheckDue(ctx context.Context, m *ChannelMonitor) bool {
-	if m == nil {
-		return false
-	}
-	interval := time.Duration(normalizeChannelMonitorIntelligenceInterval(m.IntelligenceIntervalSeconds)) * time.Second
-	latest, err := s.repo.ListHistory(ctx, m.ID, monitorIntelligenceModel, 1)
-	if err != nil {
-		slog.Warn("channel_monitor: load latest intelligence history failed",
-			"monitor_id", m.ID, "error", err)
-		return true
-	}
-	if len(latest) == 0 {
-		return true
-	}
-	return time.Since(latest[0].CheckedAt) >= interval
 }
 
 // ShouldRunScheduledCheck applies the hybrid idle rule without changing manual
@@ -740,6 +708,9 @@ func (s *ChannelMonitorService) ShouldRunScheduledCheck(ctx context.Context, id 
 	return !recent, nil
 }
 
+// shouldRunIntelligenceProbe is retained for legacy configuration parsing.
+// Channel monitor checks no longer launch their own degradation probes; the
+// status view consumes the account scheduler aggregate instead.
 func shouldRunIntelligenceProbe(m *ChannelMonitor) bool {
 	return m != nil && m.IntelligenceEnabled && m.Provider == MonitorProviderOpenAI &&
 		defaultCheckMode(m.CheckMode) != MonitorCheckModeQuota &&
@@ -749,7 +720,6 @@ func shouldRunIntelligenceProbe(m *ChannelMonitor) bool {
 func (s *ChannelMonitorService) accountGroupDegradationSummaries(
 	ctx context.Context,
 	groupIDs []int64,
-	modelByGroup map[int64]string,
 ) map[int64]GroupAccountDegradationSummary {
 	if len(groupIDs) == 0 {
 		return map[int64]GroupAccountDegradationSummary{}
@@ -761,8 +731,7 @@ func (s *ChannelMonitorService) accountGroupDegradationSummaries(
 	summaries, err := reader.ListGroupAccountDegradationSummaries(
 		ctx,
 		groupIDs,
-		time.Now().Add(-AccountDegradationReuseWindow),
-		modelByGroup,
+		time.Now().Add(-accountSchedulerHistoryWindow),
 	)
 	if err != nil {
 		slog.Warn("channel_monitor: load account degradation summaries failed", "error", err)
@@ -771,25 +740,18 @@ func (s *ChannelMonitorService) accountGroupDegradationSummaries(
 	return summaries
 }
 
-func (s *ChannelMonitorService) hasFreshAccountDegradation(ctx context.Context, groupID int64, model string) bool {
-	if groupID <= 0 {
-		return false
+func (s *ChannelMonitorService) validateIntelligenceSchedulerFactor(ctx context.Context, m *ChannelMonitor) error {
+	if m == nil || !m.IntelligenceEnabled {
+		return nil
 	}
-	summary, ok := s.accountGroupDegradationSummaries(
-		ctx,
-		[]int64{groupID},
-		map[int64]string{groupID: strings.TrimSpace(model)},
-	)[groupID]
-	return ok && summary.IsFresh(time.Now())
-}
-
-func (s *ChannelMonitorService) persistIntelligenceResult(ctx context.Context, m *ChannelMonitor, result *CheckResult) {
-	if err := s.repo.InsertHistoryBatch(ctx, []*ChannelMonitorHistoryRow{{
-		MonitorID: m.ID, Model: monitorIntelligenceModel, Status: result.Status,
-		LatencyMs: result.LatencyMs, Message: result.Message, CheckedAt: result.CheckedAt,
-	}}); err != nil {
-		slog.Error("channel_monitor: insert reasoning history failed", "monitor_id", m.ID, "error", err)
+	if m.Provider != MonitorProviderOpenAI || m.GroupID == nil || *m.GroupID <= 0 {
+		return ErrChannelMonitorIntelligenceRequiresSchedulerFactor
 	}
+	summary, ok := s.accountGroupDegradationSummaries(ctx, []int64{*m.GroupID})[*m.GroupID]
+	if !ok || !summary.FactorEnabled {
+		return ErrChannelMonitorIntelligenceRequiresSchedulerFactor
+	}
+	return nil
 }
 
 // runQuotaOnlyCheck quota 模式：一次配额抓取 → 单条 CheckResult

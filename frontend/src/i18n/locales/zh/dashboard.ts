@@ -622,6 +622,8 @@ export default {
     intelligenceFailed: '最近未通过',
     intelligenceError: '检测异常',
     intelligencePending: '等待首次检测',
+    intelligenceVote: '不降 {passed}/{samples}',
+    intelligenceErrors: '错误 {count}',
     intelligenceDisabled: '已停用',
     recentChecks: '最近 20 次',
     refreshIn: '{n} 秒后刷新',

@@ -190,33 +190,13 @@
         </p>
       </div>
 
-      <div v-if="!isCompositeGroup && form.provider === PROVIDER_OPENAI" class="rounded-2xl border border-gray-200 bg-gray-50/70 p-4 dark:border-dark-700 dark:bg-dark-900/30">
+      <div v-if="!isCompositeGroup && form.provider === PROVIDER_OPENAI && groupSupportsIntelligence" class="rounded-2xl border border-gray-200 bg-gray-50/70 p-4 dark:border-dark-700 dark:bg-dark-900/30">
         <div class="flex items-center justify-between gap-4">
-          <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.channelMonitor.form.intelligenceEnabled') }}</p>
-          <Toggle v-model="form.intelligence_enabled" />
-        </div>
-        <div v-if="form.intelligence_enabled" class="mt-3 border-t border-gray-200 pt-3 dark:border-dark-700">
-          <div class="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label class="input-label">{{ t('admin.channelMonitor.form.intelligenceIntervalMinutes') }}</label>
-              <input
-                v-model.number="intelligenceIntervalMinutes"
-                type="number"
-                min="5"
-                max="1440"
-                step="5"
-                class="input"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{ t('admin.channelMonitor.form.intelligenceReasoningEffort') }}</label>
-              <select v-model="form.intelligence_reasoning_effort" class="input">
-                <option v-for="effort in REASONING_EFFORT_LEVELS" :key="effort" :value="effort">
-                  {{ formatReasoningEffort(effort) }}
-                </option>
-              </select>
-            </div>
+          <div>
+            <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.channelMonitor.form.intelligenceEnabled') }}</p>
+            <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('admin.channelMonitor.form.intelligenceEnabledHint') }}</p>
           </div>
+          <Toggle v-model="form.intelligence_enabled" />
         </div>
       </div>
 
@@ -354,8 +334,6 @@ import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ModelTagInput from '@/components/admin/channel/ModelTagInput.vue'
 import { getPlatformTextClass } from '@/components/admin/channel/types'
-import { REASONING_EFFORT_LEVELS } from '@/constants/channel'
-import { formatReasoningEffort } from '@/utils/format'
 import MonitorKeyPickerDialog from '@/components/admin/monitor/MonitorKeyPickerDialog.vue'
 import MonitorAdvancedRequestConfig from '@/components/admin/monitor/MonitorAdvancedRequestConfig.vue'
 import ProviderIcon from '@/components/user/monitor/ProviderIcon.vue'
@@ -441,8 +419,6 @@ interface MonitorForm {
   group_id: number | null
   probe_fallback_enabled: boolean
   intelligence_enabled: boolean
-  intelligence_interval_seconds: number
-  intelligence_reasoning_effort: string
   interval_seconds: number
   jitter_seconds: number
   enabled: boolean
@@ -466,9 +442,7 @@ const form = reactive<MonitorForm>({
   group_name: '',
   group_id: null,
   probe_fallback_enabled: true,
-  intelligence_enabled: true,
-  intelligence_interval_seconds: 1800,
-  intelligence_reasoning_effort: 'medium',
+  intelligence_enabled: false,
   interval_seconds: systemDefaultInterval.value,
   jitter_seconds: 0,
   enabled: true,
@@ -478,20 +452,12 @@ const form = reactive<MonitorForm>({
   body_override: null,
 })
 
-const intelligenceIntervalMinutes = computed({
-  get: () => Math.max(5, Math.round(form.intelligence_interval_seconds / 60)),
-  set: (value: number) => {
-    const minutes = Math.min(1440, Math.max(5, Math.round(Number(value) || 30)))
-    form.intelligence_interval_seconds = minutes * 60
-  },
-})
-
 // quota / quota_probe 需要关联账号；probe / quota_probe 需要探活字段。
 const usesQuotaMode = computed(() => form.check_mode !== CHECK_MODE_PROBE)
 const usesProbePart = computed(() => form.check_mode !== CHECK_MODE_QUOTA)
 const monitorProvider = computed<Provider>(() => isCompositeGroup.value ? PROVIDER_OPENAI : form.provider)
 
-const monitorGroups = ref<Array<{ id: number; name: string; platform: string; status?: string }>>([])
+const monitorGroups = ref<Array<{ id: number; name: string; platform: string; status?: string; degradation_factor_enabled: boolean }>>([])
 const groupsLoading = ref(false)
 const groupOptions = computed(() =>
   monitorGroups.value.map((group) => ({
@@ -505,6 +471,10 @@ const selectedGroup = computed(() => {
     ?? (props.initialGroup?.id === form.group_id ? props.initialGroup : null)
 })
 const isCompositeGroup = computed(() => selectedGroup.value?.platform === 'composite')
+const groupSupportsIntelligence = computed(() =>
+  selectedGroup.value?.platform === PROVIDER_OPENAI &&
+  monitorGroups.value.find((item) => item.id === selectedGroup.value?.id)?.degradation_factor_enabled === true
+)
 const compositeRoutes = ref<CompositeModelRoute[]>([])
 const compositeSelectedModels = computed(() => [...new Set([form.primary_model, ...form.extra_models].map((model) => model.trim()).filter(Boolean))])
 const groupSelectValue = computed<string>({
@@ -574,11 +544,21 @@ async function loadMonitorGroups() {
   try {
     if (!adminAPI.groups?.getAllIncludingInactive) return
     const rows = await adminAPI.groups.getAllIncludingInactive()
+    let degradationFactorByGroup = new Map<number, boolean>()
+    try {
+      const scheduler = await adminAPI.accountScheduler.getOverview()
+      degradationFactorByGroup = new Map(
+        scheduler.groups.map((group) => [group.id, group.degradation_factor_enabled])
+      )
+    } catch (error) {
+      console.warn('load account scheduler degradation settings failed', error)
+    }
     monitorGroups.value = rows.map((group) => ({
       id: group.id,
       name: group.name,
       platform: group.platform,
       status: group.status,
+      degradation_factor_enabled: degradationFactorByGroup.get(group.id) === true,
     }))
     if (form.group_id == null && form.group_name.trim()) {
       const legacy = monitorGroups.value.find((group) => group.name === form.group_name.trim())
@@ -607,6 +587,10 @@ watch(
   },
   { immediate: true },
 )
+
+watch(groupSupportsIntelligence, (supported) => {
+  if (!supported) form.intelligence_enabled = false
+})
 
 // jitter 上限与后端校验一致：interval - jitter 不得低于最小检测间隔 15 秒。
 const maxJitterSeconds = computed<number>(() => Math.max(0, (form.interval_seconds || 0) - 15))
@@ -982,9 +966,7 @@ function resetForm() {
   form.group_name = ''
   form.group_id = null
   form.probe_fallback_enabled = true
-  form.intelligence_enabled = true
-  form.intelligence_interval_seconds = 1800
-  form.intelligence_reasoning_effort = 'medium'
+  form.intelligence_enabled = false
   form.interval_seconds = systemDefaultInterval.value
   form.jitter_seconds = 0
   form.enabled = true
@@ -1010,8 +992,6 @@ function loadFromMonitor(m: ChannelMonitor) {
   form.group_id = m.group_id ?? null
   form.probe_fallback_enabled = true
   form.intelligence_enabled = m.intelligence_enabled !== false
-  form.intelligence_interval_seconds = m.intelligence_interval_seconds || 1800
-  form.intelligence_reasoning_effort = m.intelligence_reasoning_effort || 'medium'
   form.interval_seconds = m.interval_seconds || systemDefaultInterval.value
   form.jitter_seconds = m.jitter_seconds || 0
   form.enabled = m.enabled
@@ -1160,10 +1140,12 @@ function buildPayload(): CreateParams {
     extra_models: usesProbePart.value ? form.extra_models : [],
     group_name: form.group_name.trim(),
     group_id: form.group_id,
-      probe_fallback_enabled: true,
-    intelligence_enabled: !isCompositeGroup.value && form.provider === PROVIDER_OPENAI ? form.intelligence_enabled : false,
-    intelligence_interval_seconds: form.intelligence_interval_seconds,
-    intelligence_reasoning_effort: form.intelligence_reasoning_effort,
+    probe_fallback_enabled: true,
+    intelligence_enabled:
+      !isCompositeGroup.value &&
+      form.provider === PROVIDER_OPENAI &&
+      groupSupportsIntelligence.value &&
+      form.intelligence_enabled,
     enabled: form.enabled,
     interval_seconds: form.interval_seconds,
     jitter_seconds: form.jitter_seconds || 0,
