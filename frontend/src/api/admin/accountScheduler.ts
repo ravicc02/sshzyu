@@ -91,6 +91,7 @@ export async function runNow(input: { group_id: number; account_id?: number }): 
   skipped: number
   failed: number
   results: AccountDegradationProbe[]
+  errors?: string[]
 }> {
   const { data } = await apiClient.post('/admin/account-scheduler/run', input)
   return data

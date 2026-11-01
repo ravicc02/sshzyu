@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"sort"
 	"strconv"
@@ -198,6 +199,7 @@ type AccountSchedulerRunResult struct {
 	Skipped int                       `json:"skipped"`
 	Failed  int                       `json:"failed"`
 	Results []AccountDegradationProbe `json:"results"`
+	Errors  []string                  `json:"errors,omitempty"`
 }
 
 type AccountDegradationScore struct {
@@ -574,10 +576,17 @@ func (s *AccountSchedulerService) RunNow(ctx context.Context, input AccountSched
 		probe, err := s.runProbe(ctx, account, model)
 		if err != nil {
 			result.Failed++
+			result.Errors = append(result.Errors, fmt.Sprintf("%s (#%d): %s", account.Name, account.ID, err.Error()))
 			continue
 		}
 		result.Run++
 		result.Results = append(result.Results, *probe)
+		if probe.Status == AccountDegradationStatusError {
+			result.Failed++
+			if strings.TrimSpace(probe.ErrorMessage) != "" {
+				result.Errors = append(result.Errors, fmt.Sprintf("%s (#%d): %s", account.Name, account.ID, probe.ErrorMessage))
+			}
+		}
 	}
 	s.invalidateCache(input.GroupID)
 	return result, nil
@@ -651,10 +660,17 @@ func (s *AccountSchedulerService) RunScheduled(ctx context.Context) (*AccountSch
 		defer mu.Unlock()
 		if err != nil {
 			result.Failed++
+			result.Errors = append(result.Errors, fmt.Sprintf("%s (#%d): %s", account.Name, account.ID, err.Error()))
 			return
 		}
 		result.Run++
 		result.Results = append(result.Results, *probe)
+		if probe.Status == AccountDegradationStatusError {
+			result.Failed++
+			if strings.TrimSpace(probe.ErrorMessage) != "" {
+				result.Errors = append(result.Errors, fmt.Sprintf("%s (#%d): %s", account.Name, account.ID, probe.ErrorMessage))
+			}
+		}
 	}
 	for i := 0; i < accountSchedulerProbeWorkers; i++ {
 		wg.Add(1)

@@ -3316,7 +3316,146 @@ func (s *AccountTestService) RunTestBackground(ctx context.Context, accountID in
 // whether the returned text passes the challenge; transport failures stay
 // distinct from an incorrect answer.
 func (s *AccountTestService) RunDegradationProbe(ctx context.Context, accountID int64, modelID, prompt string) (*ScheduledTestResult, error) {
-	return s.runTestBackground(ctx, accountID, modelID, prompt)
+	result, err := s.runTestBackground(ctx, accountID, modelID, prompt)
+	if err != nil || !shouldFallbackDegradationProbe(result) || s == nil || s.accountRepo == nil {
+		return result, err
+	}
+
+	account, accountErr := s.accountRepo.GetByID(ctx, accountID)
+	if accountErr != nil || account == nil || !account.IsOpenAIApiKey() ||
+		!openai_compat.ShouldUseResponsesAPI(account.Extra) {
+		return result, nil
+	}
+
+	fallbackResult, fallbackErr := s.runChatCompletionsDegradationProbe(ctx, account, modelID, prompt)
+	if fallbackErr != nil {
+		return result, nil
+	}
+	if fallbackResult == nil {
+		return result, nil
+	}
+
+	fallbackResult.StartedAt = result.StartedAt
+	fallbackResult.FinishedAt = time.Now()
+	fallbackResult.LatencyMs = fallbackResult.FinishedAt.Sub(fallbackResult.StartedAt).Milliseconds()
+	if fallbackResult.Status == "success" && strings.TrimSpace(fallbackResult.ResponseText) != "" {
+		return fallbackResult, nil
+	}
+
+	if fallbackResult.Status == "success" {
+		fallbackResult.Status = "failed"
+		fallbackResult.ErrorMessage = "Chat Completions fallback completed without response text"
+	}
+	fallbackResult.ErrorMessage = combineDegradationProbeErrors(result.ErrorMessage, fallbackResult.ErrorMessage)
+	return fallbackResult, nil
+}
+
+func shouldFallbackDegradationProbe(result *ScheduledTestResult) bool {
+	if result == nil || result.Status == "success" || strings.TrimSpace(result.ResponseText) != "" {
+		return false
+	}
+	message := strings.ToLower(strings.TrimSpace(result.ErrorMessage))
+	if message == "" {
+		return false
+	}
+	for _, marker := range []string{
+		"request failed:",
+		"stream ended before response.completed",
+		"stream read error",
+		"api returned 404",
+		"api returned 405",
+		"api returned 500",
+		"api returned 502",
+		"api returned 503",
+		"api returned 504",
+	} {
+		if strings.Contains(message, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func combineDegradationProbeErrors(responsesError, chatError string) string {
+	responsesError = strings.TrimSpace(responsesError)
+	chatError = strings.TrimSpace(chatError)
+	switch {
+	case responsesError != "" && chatError != "":
+		return fmt.Sprintf(
+			"Responses probe failed before returning text: %s; Chat Completions fallback failed: %s",
+			responsesError,
+			chatError,
+		)
+	case responsesError != "":
+		return responsesError
+	case chatError != "":
+		return chatError
+	default:
+		return "degradation probe failed"
+	}
+}
+
+func (s *AccountTestService) runChatCompletionsDegradationProbe(
+	ctx context.Context,
+	account *Account,
+	modelID string,
+	prompt string,
+) (*ScheduledTestResult, error) {
+	startedAt := time.Now()
+
+	testModelID := strings.TrimSpace(modelID)
+	if testModelID == "" {
+		testModelID = openai.DefaultTestModel
+	}
+	testModelID = account.GetMappedModel(testModelID)
+
+	credentialAccount := account
+	if account.IsCredentialShadow() {
+		resolved, err := resolveCredentialAccount(ctx, s.accountRepo, account)
+		if err != nil {
+			return failedScheduledTestResult(startedAt, fmt.Sprintf("Failed to resolve account credentials: %s", err.Error())), nil
+		}
+		credentialAccount = resolved
+	}
+
+	authToken := credentialAccount.GetOpenAIProtocolAPIKey()
+	if authToken == "" {
+		return failedScheduledTestResult(startedAt, "No API key available for Chat Completions fallback"), nil
+	}
+	baseURL := credentialAccount.GetOpenAIBaseURL()
+	if baseURL == "" {
+		baseURL = "https://api.openai.com"
+	}
+	normalizedBaseURL, err := s.validateUpstreamBaseURL(baseURL)
+	if err != nil {
+		return failedScheduledTestResult(startedAt, fmt.Sprintf("Invalid base URL: %s", err.Error())), nil
+	}
+
+	w := httptest.NewRecorder()
+	ginCtx, _ := gin.CreateTestContext(w)
+	ginCtx.Request = (&http.Request{}).WithContext(ctx)
+	ginCtx.Set(accountTestBackgroundKey, true)
+
+	testErr := s.testOpenAIChatCompletionsConnection(
+		ginCtx,
+		account,
+		testModelID,
+		prompt,
+		normalizedBaseURL,
+		authToken,
+	)
+	return scheduledTestResultFromCapture(startedAt, testErr, w.Body.String()), nil
+}
+
+func failedScheduledTestResult(startedAt time.Time, message string) *ScheduledTestResult {
+	finishedAt := time.Now()
+	return &ScheduledTestResult{
+		Status:       "failed",
+		ErrorMessage: message,
+		LatencyMs:    finishedAt.Sub(startedAt).Milliseconds(),
+		StartedAt:    startedAt,
+		FinishedAt:   finishedAt,
+	}
 }
 
 func (s *AccountTestService) runTestBackground(ctx context.Context, accountID int64, modelID, prompt string) (*ScheduledTestResult, error) {
@@ -3328,9 +3467,11 @@ func (s *AccountTestService) runTestBackground(ctx context.Context, accountID in
 	ginCtx.Set(accountTestBackgroundKey, true)
 
 	testErr := s.TestAccountConnection(ginCtx, accountID, modelID, prompt, AccountTestModeDefault)
+	return scheduledTestResultFromCapture(startedAt, testErr, w.Body.String()), nil
+}
 
+func scheduledTestResultFromCapture(startedAt time.Time, testErr error, body string) *ScheduledTestResult {
 	finishedAt := time.Now()
-	body := w.Body.String()
 	responseText, errMsg := parseTestSSEOutput(body)
 
 	status := "success"
@@ -3348,7 +3489,7 @@ func (s *AccountTestService) runTestBackground(ctx context.Context, accountID in
 		LatencyMs:    finishedAt.Sub(startedAt).Milliseconds(),
 		StartedAt:    startedAt,
 		FinishedAt:   finishedAt,
-	}, nil
+	}
 }
 
 // parseTestSSEOutput extracts response text and error message from captured SSE output.

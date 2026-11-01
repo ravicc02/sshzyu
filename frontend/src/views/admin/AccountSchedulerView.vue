@@ -673,9 +673,15 @@ async function runGroup() {
     const result = await adminAPI.accountScheduler.runNow({
       group_id: selectedGroup.value.id,
     });
-    appStore.showSuccess(
-      `测试完成：${result.run} 条，跳过 ${result.skipped} 条，失败 ${result.failed} 条`,
-    );
+    const summary = `测试完成：${result.run} 条，跳过 ${result.skipped} 条，失败 ${result.failed} 条`;
+    const errorMessage = firstRunError(result);
+    if (errorMessage) {
+      appStore.showError(`${summary}；错误：${errorMessage}`);
+    } else if (result.run === 0) {
+      appStore.showError(`没有执行测试，跳过 ${result.skipped} 条`);
+    } else {
+      appStore.showSuccess(summary);
+    }
     await load();
   } catch (error: any) {
     appStore.showError(error?.message || "立即测试失败");
@@ -692,8 +698,19 @@ async function runAccount(accountID: number) {
       group_id: selectedGroup.value.id,
       account_id: accountID,
     });
-    if (result.run > 0) appStore.showSuccess("账号测试已记录");
-    else appStore.showError("账号测试未完成");
+    const errorMessage = firstRunError(result);
+    if (errorMessage) {
+      appStore.showError(`账号测试失败：${errorMessage}`);
+    } else if (result.run > 0) {
+      const probe = result.results[0];
+      appStore.showSuccess(
+        probe?.status === "degraded"
+          ? "账号测试已记录：未通过"
+          : "账号测试已记录：通过",
+      );
+    } else {
+      appStore.showError(`账号测试未完成，跳过 ${result.skipped} 条`);
+    }
     await load();
   } catch (error: any) {
     appStore.showError(error?.message || "账号测试失败");
@@ -724,6 +741,16 @@ function probeStatusLabel(status: string) {
       >
     )[status] || "未测试"
   );
+}
+
+function firstRunError(result: {
+  errors?: string[];
+  results: Array<{ status: string; error_message: string }>;
+}) {
+  const probeError = result.results.find(
+    (probe) => probe.status === "error" && probe.error_message,
+  )?.error_message;
+  return result.errors?.[0] || probeError || "";
 }
 
 function formatRate(rate?: number) {
