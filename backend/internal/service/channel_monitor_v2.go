@@ -105,6 +105,7 @@ type ChannelMonitorV2Metric struct {
 	CacheRate                float64                 `json:"cache_rate"`
 	CacheRateNumerator       int64                   `json:"cache_rate_numerator"`
 	CacheRateDenominator     int64                   `json:"cache_rate_denominator"`
+	CacheRateRequestCount    int64                   `json:"cache_rate_request_count"`
 	TTFT                     ChannelMonitorV2Latency `json:"ttft"`
 	Duration                 ChannelMonitorV2Latency `json:"duration"`
 	UpstreamAffectedRequests *int64                  `json:"upstream_affected_requests,omitempty"`

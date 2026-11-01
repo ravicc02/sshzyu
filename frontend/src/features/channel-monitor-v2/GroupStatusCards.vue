@@ -338,14 +338,9 @@ function hasTraffic(row: MonitorMatrixRow) {
 function cacheRateValue(row: MonitorMatrixRow): number | null {
   if (!hasTraffic(row)) return null
   const minimumSample = Math.max(1, row.health.thresholds?.minimum_sample ?? 50)
-  if (row.metrics.request_count >= minimumSample && row.metrics.cache_rate_denominator > 0) {
+  if (row.metrics.cache_rate_request_count >= minimumSample && row.metrics.cache_rate_denominator > 0) {
     return row.metrics.cache_rate
   }
-  const buckets = [...row.buckets].sort((a, b) => Date.parse(b.bucket_start) - Date.parse(a.bucket_start))
-  const representative = buckets.find((bucket) =>
-    bucket.metrics.request_count >= minimumSample && bucket.metrics.cache_rate_denominator > 0
-  )
-  if (representative) return representative.metrics.cache_rate
   return null
 }
 
@@ -358,9 +353,7 @@ function cacheRateTitle(row: MonitorMatrixRow) {
   const value = cacheRateValue(row)
   const minimumSample = Math.max(1, row.health.thresholds?.minimum_sample ?? 50)
   if (value == null) return t('channelMonitorV2.groupCards.cacheRateAwaitingSamples', { count: minimumSample })
-  return row.metrics.request_count < minimumSample
-    ? t('channelMonitorV2.groupCards.cacheRateFallback')
-    : t('channelMonitorV2.metrics.cacheRate')
+  return t('channelMonitorV2.metrics.cacheRate')
 }
 
 function hasEffectiveData(row: MonitorMatrixRow) {

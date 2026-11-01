@@ -47,6 +47,7 @@ export interface MonitorMetric {
   cache_rate: number
   cache_rate_numerator: number
   cache_rate_denominator: number
+  cache_rate_request_count: number
   ttft: LatencyMetric
   duration: LatencyMetric
   upstream_affected_requests?: number

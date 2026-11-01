@@ -460,6 +460,12 @@ type channelMonitorV2MatrixAccumulator struct {
 	buckets   map[string]*metricAccumulator
 }
 
+type channelMonitorV2StableCache struct {
+	requests    int64
+	numerator   int64
+	denominator int64
+}
+
 func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter service.ChannelMonitorV2Filter, cfg service.ChannelMonitorV2Config, groupBy service.ChannelMonitorV2GroupBy, admin bool) (*service.ChannelMonitorV2Matrix, error) {
 	if channelMonitorV2RestrictedGroupScopeEmpty(filter, cfg) {
 		return &service.ChannelMonitorV2Matrix{GroupBy: groupBy, Items: []service.ChannelMonitorV2MatrixRow{}}, nil
@@ -490,6 +496,10 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 		seedGroupIDs = allIDs
 	}
 	groupInfo, err := r.loadChannelMonitorV2GroupInfo(ctx, seedGroupIDs)
+	if err != nil {
+		return nil, err
+	}
+	stableCache, err := r.loadStableCacheRates(ctx, filter, cfg, groupBy, groupInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -582,6 +592,12 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 		}
 		metrics := acc.total.metric(minutes, admin)
 		applyIgnoredErrors(&metrics, ignoredByDim[key])
+		if stable, ok := stableCache[key]; ok && stable.denominator > 0 {
+			metrics.CacheRateRequestCount = stable.requests
+			metrics.CacheRateNumerator = stable.numerator
+			metrics.CacheRateDenominator = stable.denominator
+			metrics.CacheRate = float64(stable.numerator) / float64(stable.denominator)
+		}
 		row := service.ChannelMonitorV2MatrixRow{Platform: key.platform, GroupName: acc.groupName, Model: key.model, Metrics: metrics, Health: service.ChannelMonitorV2HealthForWithThresholds(metrics, cfg.HealthThresholds), Buckets: []service.ChannelMonitorV2TrendPoint{}}
 		if key.groupID > 0 {
 			groupID := key.groupID
@@ -621,6 +637,74 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 		return a.Model < b.Model
 	})
 	return result, nil
+}
+
+func (r *channelMonitorV2Repository) loadStableCacheRates(
+	ctx context.Context,
+	filter service.ChannelMonitorV2Filter,
+	cfg service.ChannelMonitorV2Config,
+	groupBy service.ChannelMonitorV2GroupBy,
+	groupInfo map[int64]channelMonitorV2GroupInfo,
+) (map[channelMonitorV2MatrixKey]channelMonitorV2StableCache, error) {
+	out := map[channelMonitorV2MatrixKey]channelMonitorV2StableCache{}
+	end := filter.End
+	if end.IsZero() {
+		return out, nil
+	}
+	cacheFilter := filter
+	cacheFilter.Start = end.Add(-24 * time.Hour)
+	cacheFilter.End = end
+	cacheFilter.Bucket = time.Hour
+	where, args, bucketSeconds := channelMonitorV2WhereWithRollup(cacheFilter, cfg, "c")
+	if bucketSeconds == 0 {
+		return out, nil
+	}
+	query := `
+		SELECT
+			c.platform,
+			c.group_id,
+			c.model,
+			SUM(c.success_requests + c.error_requests),
+			SUM(c.cache_read_tokens),
+			SUM(c.input_tokens + c.cache_creation_tokens + c.cache_read_tokens)
+		FROM channel_monitor_v2_metrics_rollup c ` + where + `
+		GROUP BY c.platform, c.group_id, c.model
+	`
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("load stable cache rates: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	add := func(platform string, groupID int64, model string, requests, numerator, denominator int64) {
+		key := channelMonitorV2MatrixDimensionKey(groupBy, cfg, platform, groupID, model)
+		value := out[key]
+		value.requests += requests
+		value.numerator += numerator
+		value.denominator += denominator
+		out[key] = value
+	}
+	for rows.Next() {
+		var platform, model string
+		var groupID, requests, numerator, denominator int64
+		if err := rows.Scan(&platform, &groupID, &model, &requests, &numerator, &denominator); err != nil {
+			return nil, err
+		}
+		platform = channelMonitorV2NormalizePlatform(platform, model)
+		if !channelMonitorV2ModelSelected(filter, cfg, platform, model) {
+			continue
+		}
+		if (groupBy == service.ChannelMonitorV2GroupByPlatformGroup || groupBy == service.ChannelMonitorV2GroupByPlatformGroupModel) &&
+			groupID <= 0 {
+			continue
+		}
+		add(platform, groupID, model, requests, numerator, denominator)
+		if groupBy == service.ChannelMonitorV2GroupByPlatformGroup &&
+			groupInfo[groupID].platform == service.PlatformComposite {
+			add(service.PlatformComposite, groupID, "", requests, numerator, denominator)
+		}
+	}
+	return out, rows.Err()
 }
 
 func channelMonitorV2MatrixDimensionKey(groupBy service.ChannelMonitorV2GroupBy, cfg service.ChannelMonitorV2Config, platform string, groupID int64, model string) channelMonitorV2MatrixKey {
@@ -1556,7 +1640,7 @@ func (a *metricAccumulator) metric(minutes float64, admin bool) service.ChannelM
 	if minutes <= 0 {
 		minutes = 1
 	}
-	m := service.ChannelMonitorV2Metric{SuccessRequests: a.success, ErrorRequests: a.errors, RequestCount: requests, HasRequests: requests > 0, InputTokens: a.input, OutputTokens: a.output, CacheCreationTokens: a.cacheCreation, CacheReadTokens: a.cacheRead, TokenCount: tokens, RPM: float64(requests) / minutes, TPM: float64(tokens) / minutes, CacheRateNumerator: a.cacheRead, CacheRateDenominator: denom, TTFT: latencyMetric(a.ttftSum, a.ttftCount, a.hist["ttft"]), Duration: latencyMetric(a.durationSum, a.durationCount, a.hist["duration"])}
+	m := service.ChannelMonitorV2Metric{SuccessRequests: a.success, ErrorRequests: a.errors, RequestCount: requests, HasRequests: requests > 0, InputTokens: a.input, OutputTokens: a.output, CacheCreationTokens: a.cacheCreation, CacheReadTokens: a.cacheRead, TokenCount: tokens, RPM: float64(requests) / minutes, TPM: float64(tokens) / minutes, CacheRateNumerator: a.cacheRead, CacheRateDenominator: denom, CacheRateRequestCount: requests, TTFT: latencyMetric(a.ttftSum, a.ttftCount, a.hist["ttft"]), Duration: latencyMetric(a.durationSum, a.durationCount, a.hist["duration"])}
 	if requests > 0 {
 		m.ErrorRate = float64(a.errors) / float64(requests)
 		m.SuccessRate = float64(a.success) / float64(requests)
