@@ -111,8 +111,10 @@
                   }}
                   ·
                   {{
-                    supportsDegradation
+                    showDegradationMetrics
                       ? "单次未通过不等同账号降智"
+                      : supportsDegradation
+                        ? "手动测试可用 · 按评分调度"
                       : "仅按账号可用性排名"
                   }}
                 </p>
@@ -229,14 +231,21 @@
 
             <div v-if="supportsDegradation" class="config-band">
               <div class="config-intro">
-                <span>自动探测配置</span>
-                <strong :class="{ enabled: draft.enabled }">{{
-                  draft.enabled ? "自动运行" : "仅手动运行"
+                <span>测试策略</span>
+                <strong :class="{ enabled: draft.degradationFactorEnabled }">{{
+                  draft.degradationFactorEnabled ? "计入调度评分" : "仅手动测试"
                 }}</strong>
-                <small>固定使用同一提示词与判定标准，按分组独立配置。</small>
+                <small>{{
+                  draft.degradationFactorEnabled
+                    ? "可启用自动探测，并将降智因子计入调度评分。"
+                    : "降智数据不计入调度，也不会在账号表中展示。"
+                }}</small>
               </div>
-              <div class="config-grid">
-                <div class="config-toggle">
+              <div
+                class="config-grid"
+                :class="{ 'single-factor': !draft.degradationFactorEnabled }"
+              >
+                <div v-if="draft.degradationFactorEnabled" class="config-toggle">
                   <span>自动探测</span>
                   <button
                     type="button"
@@ -248,7 +257,7 @@
                     <span />
                   </button>
                 </div>
-                <label class="config-field">
+                <label v-if="draft.degradationFactorEnabled" class="config-field">
                   <span>测试间隔</span>
                   <select v-model.number="draft.intervalSeconds">
                     <option :value="300">5 分钟</option>
@@ -265,10 +274,7 @@
                     class="switch"
                     :class="{ on: draft.degradationFactorEnabled }"
                     :aria-pressed="draft.degradationFactorEnabled"
-                    @click="
-                      draft.degradationFactorEnabled =
-                        !draft.degradationFactorEnabled
-                    "
+                    @click="toggleDegradationFactor"
                   >
                     <span />
                   </button>
@@ -306,7 +312,7 @@
                   <tr
                     v-for="account in filteredAccounts"
                     :key="account.id"
-                    :class="{ lowest: account.lowest_degradation }"
+                    :class="{ lowest: showDegradationMetrics && account.lowest_degradation }"
                   >
                     <td class="rank-column">
                       <span class="rank-number">{{ account.rank }}</span>
@@ -667,6 +673,12 @@ watch(selectedGroupID, () => {
   probePage.value = 1;
 });
 
+watch(showDegradationMetrics, (visible) => {
+  if (!visible && availabilityFilter.value === "degraded") {
+    availabilityFilter.value = "";
+  }
+});
+
 watch(probeStatusFilter, () => {
   probePage.value = 1;
 });
@@ -719,6 +731,13 @@ async function saveSettings() {
   }
 }
 
+function toggleDegradationFactor() {
+  draft.degradationFactorEnabled = !draft.degradationFactorEnabled;
+  if (!draft.degradationFactorEnabled) {
+    draft.enabled = false;
+  }
+}
+
 async function runGroup() {
   if (!selectedGroup.value || !supportsDegradation.value) return;
   running.value = true;
@@ -728,7 +747,11 @@ async function runGroup() {
       model: draft.testModel,
       reasoning_effort: draft.testReasoningEffort,
     });
-    const summary = `测试完成：${result.run} 条，跳过 ${result.skipped} 条，失败 ${result.failed} 条`;
+    const passed = result.results.filter((probe) => probe.status === "pass").length;
+    const degraded = result.results.filter(
+      (probe) => probe.status === "degraded",
+    ).length;
+    const summary = `通过 ${passed}，未通过 ${degraded}，失败 ${result.failed}，跳过 ${result.skipped}`;
     const errorMessage = firstRunError(result);
     if (errorMessage) {
       appStore.showError(`${summary}；错误：${errorMessage}`);
@@ -1161,6 +1184,9 @@ select:focus {
   align-items: end;
   gap: 10px;
 }
+.config-grid.single-factor {
+  grid-template-columns: minmax(0, 280px);
+}
 .config-field,
 .config-toggle {
   display: grid;
@@ -1567,6 +1593,18 @@ select:focus {
   .section-heading > .actions {
     width: 100%;
   }
+  .test-model-select {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .test-model-select select,
+  .test-model-select input,
+  .section-heading > .actions .btn {
+    width: 100%;
+    min-height: 44px;
+  }
   .overview {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     row-gap: 24px;
@@ -1593,6 +1631,12 @@ select:focus {
   }
   .config-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .config-grid.single-factor {
+    grid-template-columns: 1fr;
+  }
+  .config-toggle {
+    min-height: 44px;
   }
   .availability-note > div {
     align-items: flex-start;

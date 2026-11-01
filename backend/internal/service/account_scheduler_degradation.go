@@ -750,11 +750,11 @@ func (s *AccountSchedulerService) AccountDegradationScores(ctx context.Context, 
 
 func (s *AccountSchedulerService) DegradationFactorEnabled(ctx context.Context, groupID int64) bool {
 	if s == nil || s.repo == nil || groupID <= 0 {
-		return true
+		return false
 	}
 	entry, ok := s.accountDegradationScoreEntry(ctx, groupID)
 	if !ok {
-		return true
+		return false
 	}
 	return entry.factorEnabled
 }
@@ -788,7 +788,7 @@ func (s *AccountSchedulerService) accountDegradationScoreEntry(
 		}
 	}
 
-	factorEnabled := true
+	factorEnabled := false
 	settings, settingsErr := s.repo.ListGroupSettings(ctx)
 	if settingsErr != nil {
 		logger.LegacyPrintf("service.account_scheduler", "[AccountScheduler] load group degradation setting failed: %v", settingsErr)
