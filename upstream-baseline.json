@@ -3,10 +3,10 @@
   "upstream_release": "v0.2.19",
   "upstream_commit": "dece26153621959ccd7635814f4b2d08304e681a",
   "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.19",
-  "local_build_version": "0.2.19-r2",
+  "local_build_version": "0.2.19-r3",
   "integration_commit": "9b2da920e2201901d0c19472b66a76121e60db26",
   "integrated_at": "2026-10-31",
   "verified_at": "2026-11-01",
-  "note": "Integrated official v0.2.19 with scoped admin API keys, image-count billing, Grok model catalog diagnostics and the custom unified security audit preserved. r2 narrows blocking audit to the current user turn, adds account scheduler and shared degradation aggregation, provider-aware active probes, 24-hour cache reporting and the related scheduler migrations. Release preparation only: no production activation or migration execution.",
+  "note": "Integrated official v0.2.19 with scoped admin API keys, image-count billing, Grok model catalog diagnostics and the custom unified security audit preserved. r3 refines account-scheduler controls, decouples monitor degradation display from scheduler scoring, restores group model fallback loading, and compacts provider and degradation summaries. Release preparation only: no production activation or migration execution.",
   "integration_status": "committed"
 }
