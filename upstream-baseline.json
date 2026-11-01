@@ -3,10 +3,10 @@
   "upstream_release": "v0.2.19",
   "upstream_commit": "dece26153621959ccd7635814f4b2d08304e681a",
   "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.19",
-  "local_build_version": "0.2.19-r4",
+  "local_build_version": "0.2.19-r5",
   "integration_commit": "9b2da920e2201901d0c19472b66a76121e60db26",
   "integrated_at": "2026-10-31",
-  "verified_at": "2026-11-01",
-  "note": "Integrated official v0.2.19 with scoped admin API keys, image-count billing, Grok model catalog diagnostics and the custom unified security audit preserved. r4 fixes a production panic in account scheduler degradation probes: runOne called wg.Done() in addition to the worker goroutine, driving the WaitGroup counter negative whenever a probe batch exceeded the worker count (4) and crashing the container (sync: negative WaitGroup counter at account_scheduler_degradation.go). No schema changes.",
+  "verified_at": "2026-11-02",
+  "note": "Integrated official v0.2.19 with scoped admin API keys, image-count billing, Grok model catalog diagnostics and the custom unified security audit preserved. r4 fixed a production panic in account scheduler degradation probes (duplicate wg.Done drove the WaitGroup counter negative when a probe batch exceeded the worker count of 4). r5 renders the group degradation strip as a real time series: probes are aggregated into rounds (a new round starts when the gap between consecutive probes exceeds 75% of the configured interval), each strip cell is one round, and the verdict reuses the existing rule (pass >= degraded is healthy, otherwise degraded). Falls back to the previous account-ratio snapshot when fewer than two rounds exist. No schema changes.",
   "integration_status": "committed"
 }
