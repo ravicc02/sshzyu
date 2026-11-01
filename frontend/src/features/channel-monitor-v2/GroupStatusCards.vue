@@ -31,7 +31,7 @@
                   <span v-if="row.rate_multiplier != null" class="font-semibold text-teal-700 dark:text-teal-300">{{ t('channelMonitorV2.groupCards.multiplier', { value: formatMultiplier(row.rate_multiplier) }) }}</span>
                 </div>
                 <div v-if="probeModels(row).length" class="mt-1 flex min-w-0 items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400">
-                  <span class="shrink-0">{{ t('channelMonitorV2.groupCards.probeModelsLabel') }}</span>
+                  <span class="shrink-0">{{ t(probeModels(row).length > 1 ? 'channelMonitorV2.groupCards.probeModelsLabel' : 'channelMonitorV2.groupCards.primaryProbeModelLabel') }}</span>
                   <span class="truncate" :title="probeModels(row).join(', ')">{{ probeModels(row).join(', ') }}</span>
                 </div>
               </div>
@@ -49,22 +49,24 @@
                 <span class="text-[10px] font-semibold text-gray-600 dark:text-gray-300">{{ t('channelMonitorV2.groupCards.providerBreakdown') }}</span>
                 <span class="text-[10px] text-gray-400">{{ t('channelMonitorV2.groupCards.providerCount', { count: compositeProviderCount(row) }) }}</span>
               </div>
-              <div v-if="compositeProviderDetails(row).length" class="space-y-1">
-                <div class="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-1.5 px-2 text-[9px] text-gray-400">
-                  <span>{{ t('channelMonitorV2.groupCards.provider') }}</span>
-                  <span>{{ t('channelMonitorV2.groupCards.availability') }}</span>
-                  <span>{{ t('channelMonitorV2.groupCards.latency') }}</span>
-                  <span>{{ t('channelMonitorV2.groupCards.groupMultiplier') }}</span>
+              <div v-if="compositeProviderDetails(row).length">
+                <div class="grid grid-cols-3 gap-1.5">
+                  <div v-for="provider in visibleCompositeProviderDetails(row)" :key="provider.platform" class="min-w-0 rounded-lg bg-white/75 px-2 py-2 dark:bg-dark-800/70" :title="providerModelTitle(provider)">
+                    <div class="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-gray-700 dark:text-gray-200">
+                      <ProviderIcon :provider="provider.platform" :size="13" />
+                      <span class="truncate">{{ platformLabel(provider.platform) }}</span>
+                    </div>
+                    <div class="mt-1.5 grid grid-cols-2 gap-1 text-[9px] text-gray-400">
+                      <span>{{ t('channelMonitorV2.groupCards.availability') }}</span>
+                      <span>{{ t('channelMonitorV2.groupCards.groupMultiplier') }}</span>
+                      <strong class="truncate" :class="probeStateTextClass(provider.health)">{{ provider.availability }}</strong>
+                      <strong class="truncate tabular-nums text-teal-700 dark:text-teal-300">{{ provider.multiplier }}</strong>
+                    </div>
+                  </div>
                 </div>
-                <div v-for="provider in compositeProviderDetails(row)" :key="provider.platform" class="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-1.5 rounded-lg bg-white/75 px-2 py-1.5 dark:bg-dark-800/70" :title="providerModelTitle(provider)">
-                  <span class="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-gray-700 dark:text-gray-200">
-                    <ProviderIcon :provider="provider.platform" :size="13" />
-                    <span class="truncate">{{ platformLabel(provider.platform) }}</span>
-                  </span>
-                  <span class="text-[10px] font-semibold" :class="probeStateTextClass(provider.health)">{{ provider.availability }}</span>
-                  <span class="text-[10px] tabular-nums text-gray-500 dark:text-gray-400">{{ provider.latency }}</span>
-                  <span class="text-[10px] font-semibold tabular-nums text-teal-700 dark:text-teal-300">{{ provider.multiplier }}</span>
-                </div>
+                <button v-if="compositeProviderDetails(row).length > 3" type="button" class="mt-1.5 w-full rounded-lg border border-gray-200 py-1 text-[10px] font-medium text-gray-500 hover:text-gray-800 dark:border-white/10 dark:text-gray-400 dark:hover:text-gray-100" @click="toggleCompositeProviders(row)">
+                  {{ t(expandedCompositeProviders.has(compositeProviderKey(row)) ? 'channelMonitorV2.groupCards.hideAllProviders' : 'channelMonitorV2.groupCards.showAllProviders', { count: compositeProviderDetails(row).length }) }}
+                </button>
               </div>
               <p v-else class="px-1 py-1 text-[10px] text-gray-400">{{ t('channelMonitorV2.groupCards.providerNoData') }}</p>
             </div>
@@ -80,7 +82,7 @@
 
             <div v-if="row.platform === 'openai' && (!hybrid || hasIntelligenceMonitor(row))" class="mt-4 border-t border-gray-100 pt-3 text-xs dark:border-dark-600">
               <div class="flex items-center justify-between gap-2"><strong class="text-gray-700 dark:text-gray-100">{{ t('channelStatus.intelligenceChecks') }}</strong><span :class="intelligenceSummaryClass(row)">{{ intelligenceSummary(row) }}</span></div>
-              <div v-if="hybrid && intelligenceProbe(row) && intelligenceProbe(row)?.intelligence_source !== 'account_aggregate'" class="mt-3 grid h-2 grid-cols-[repeat(20,minmax(0,1fr))] gap-1" :aria-label="t('channelMonitorV2.groupCards.intelligenceActive')">
+              <div v-if="hybrid && intelligenceProbe(row)" class="mt-3 grid h-2 grid-cols-[repeat(20,minmax(0,1fr))] gap-1" :aria-label="t('channelMonitorV2.groupCards.intelligenceActive')">
                 <span v-for="(slot, index) in intelligenceSlots(row)" :key="index" class="rounded-full" :class="slotColor(slot?.state || null)" :title="slotTitle(slot)" />
               </div>
             </div>
@@ -113,6 +115,7 @@ const props = defineProps<{
 }>()
 const { t } = useI18n()
 const showInactive = ref(false)
+const expandedCompositeProviders = ref(new Set<number>())
 const groupRows = computed(() => props.rows.filter(row => row.group_id != null && row.group_id > 0))
 const cardRows = computed(() => groupRows.value.filter(row => row.group_platform !== 'composite' || row.platform === 'composite'))
 const probesByGroupID = computed(() => {
@@ -251,6 +254,26 @@ function compositeProviderDetails(row: MonitorMatrixRow): CompositeProviderDetai
 
 function compositeProviderCount(row: MonitorMatrixRow) {
   return compositeProviderDetails(row).length
+}
+
+function compositeProviderKey(row: MonitorMatrixRow) {
+  return row.group_id ?? -1
+}
+
+function visibleCompositeProviderDetails(row: MonitorMatrixRow) {
+  const providers = compositeProviderDetails(row)
+  if (providers.length <= 3 || expandedCompositeProviders.value.has(compositeProviderKey(row))) {
+    return providers
+  }
+  return providers.slice(0, 3)
+}
+
+function toggleCompositeProviders(row: MonitorMatrixRow) {
+  const key = compositeProviderKey(row)
+  const next = new Set(expandedCompositeProviders.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  expandedCompositeProviders.value = next
 }
 
 function providerMultiplier(value: number | null | undefined) {
@@ -492,7 +515,9 @@ function timelineWindowLabel(row: MonitorMatrixRow) {
 function slotTitle(slot: TimelineSlot | null) {
   if (!slot) return t('channelMonitorV2.groupCards.noData')
   const state = t(`channelMonitorV2.groupCards.states.${slot.state}`)
-  return `${new Date(slot.timestamp).toLocaleString()} · ${state}${slot.detail ? ` · ${slot.detail}` : ''}`
+  const timestamp = Date.parse(slot.timestamp)
+  const when = Number.isFinite(timestamp) ? `${new Date(timestamp).toLocaleString()} · ` : ''
+  return `${when}${state}${slot.detail ? ` · ${slot.detail}` : ''}`
 }
 
 function probeAvailability(row: MonitorMatrixRow): number | null {
@@ -567,6 +592,7 @@ function hasIntelligenceMonitor(row: MonitorMatrixRow): boolean {
 
 function intelligenceSlots(row: MonitorMatrixRow): Array<TimelineSlot | null> {
   const probe = intelligenceProbe(row)
+  if (probe?.intelligence_source === 'account_aggregate') return aggregateIntelligenceSlots(probe)
   const points = (probe?.intelligence_timeline || [])
     .filter(point => Number.isFinite(Date.parse(point.checked_at)))
     .sort((a, b) => Date.parse(a.checked_at) - Date.parse(b.checked_at))
@@ -584,19 +610,50 @@ function intelligenceSlots(row: MonitorMatrixRow): Array<TimelineSlot | null> {
   return result
 }
 
+function aggregateIntelligenceSlots(probe: UserMonitorView): Array<TimelineSlot | null> {
+  const passed = Math.max(0, probe.intelligence_passed || 0)
+  const failed = Math.max(0, probe.intelligence_failed || 0)
+  const errors = Math.max(0, probe.intelligence_errors || 0)
+  const total = passed + failed + errors
+  if (total === 0) return Array(20).fill(null)
+
+  const states: HealthState[] = []
+  if (total <= 20) {
+    states.push(...Array<HealthState>(passed).fill('healthy'))
+    states.push(...Array<HealthState>(failed).fill('warning'))
+    states.push(...Array<HealthState>(errors).fill('critical'))
+  } else {
+    for (let index = 0; index < 20; index += 1) {
+      const position = ((index + 0.5) / 20) * total
+      states.push(position < passed ? 'healthy' : position < passed + failed ? 'warning' : 'critical')
+    }
+  }
+
+  const timestamp = probe.intelligence_timeline?.[0]?.checked_at || ''
+  const slots: Array<TimelineSlot | null> = Array(Math.max(0, 20 - states.length)).fill(null)
+  slots.push(...states.map(state => ({
+    state,
+    timestamp,
+    detail: state === 'healthy'
+      ? t('channelMonitorV2.groupCards.intelligenceNotDegraded')
+      : state === 'warning'
+        ? t('channelMonitorV2.groupCards.intelligenceDegraded')
+        : t('channelMonitorV2.groupCards.intelligenceError'),
+  })))
+  return slots.slice(-20)
+}
+
 function intelligenceSummary(row: MonitorMatrixRow) {
   if (!props.hybrid) return t('channelMonitorV2.groupCards.intelligencePending')
   const probe = intelligenceProbe(row)
   if (!probe) return t('channelMonitorV2.groupCards.intelligenceNotConfigured')
   if (probe.intelligence_source === 'account_aggregate') {
     if (intelligenceProbeStale(probe)) return t('channelStatus.intelligenceStale')
-    const samples = probe.intelligence_samples || 0
     const passed = probe.intelligence_passed || 0
+    const failed = probe.intelligence_failed || 0
+    const samples = passed + failed
     if (samples > 0) {
-      return t('channelMonitorV2.groupCards.intelligenceAccountVote', {
-        passed,
-        samples,
-      })
+      return t('channelMonitorV2.groupCards.intelligencePassRate', { value: formatMonitorPercent(passed / samples) })
     }
     if ((probe.intelligence_errors || 0) > 0) {
       return t('channelMonitorV2.groupCards.intelligenceAccountErrors', {

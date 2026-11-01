@@ -55,7 +55,6 @@
               {{ overview?.available_accounts ?? 0 }}
               <small>/ {{ overview?.total_accounts ?? 0 }}</small>
             </strong>
-            <p>可用账号 / 账号总数</p>
           </div>
           <div>
             <span>自动探测</span>
@@ -63,7 +62,6 @@
               {{ overview?.enabled_groups ?? 0 }}
               <small>组</small>
             </strong>
-            <p>{{ overview?.tested_groups ?? 0 }} 个分组已有探测记录</p>
           </div>
           <div>
             <span>当前分组账号</span>
@@ -90,7 +88,6 @@
         >
           <Icon name="chartBar" size="lg" />
           <h2>暂无可调度分组</h2>
-          <p>活跃分组及关联账号会出现在这里。</p>
         </section>
 
         <template v-else>
@@ -103,21 +100,6 @@
                 <h2 id="account-ranking-title">
                   调度账号 <span>{{ filteredAccounts.length }}</span>
                 </h2>
-                <p>
-                  {{
-                    selectedGroup
-                      ? `${platformLabel(selectedGroup.platform)} · ${selectedGroup.accounts.length} 个账号`
-                      : "请选择分组"
-                  }}
-                  ·
-                  {{
-                    showDegradationMetrics
-                      ? "单次未通过不等同账号降智"
-                      : supportsDegradation
-                        ? "手动测试可用 · 按评分调度"
-                        : "仅按账号可用性排名"
-                  }}
-                </p>
               </div>
               <div class="actions">
                 <div
@@ -145,18 +127,6 @@
                   >
                     <span :style="{ width: `${runProgressPercent}%` }" />
                   </div>
-                  <small v-if="selectedProgress?.running">
-                    当前
-                    {{ selectedProgress.current_account_name || "准备中" }} ·
-                    跳过 {{ selectedProgress.skipped }}
-                  </small>
-                  <small v-else-if="selectedProgress">
-                    通过 {{ selectedProgress.passed }} · 未通过
-                    {{ selectedProgress.degraded }} · 失败
-                    {{ selectedProgress.failed }} · 跳过
-                    {{ selectedProgress.skipped }}
-                  </small>
-                  <small v-else>仅测试当前可调度账号</small>
                 </div>
                 <label
                   v-if="supportsDegradation && selectedGroup"
@@ -275,11 +245,6 @@
                 <strong :class="{ enabled: draft.degradationFactorEnabled }">{{
                   draft.degradationFactorEnabled ? "计入调度评分" : "仅手动测试"
                 }}</strong>
-                <small>{{
-                  draft.degradationFactorEnabled
-                    ? "可启用自动探测，并将降智因子计入调度评分。"
-                    : "降智数据不计入调度，也不会在账号表中展示。"
-                }}</small>
               </div>
               <div
                 class="config-grid"
@@ -331,16 +296,6 @@
                 </div>
               </div>
             </div>
-            <div v-else class="availability-note">
-              <Icon name="check" size="sm" />
-              <div>
-                <strong>按账号可用性排序</strong>
-                <span
-                  >该类型分组不执行降智探测，只显示可用、冷却和停调状态。</span
-                >
-              </div>
-            </div>
-
             <div class="table-scroll">
               <table
                 class="ranking-table"
@@ -491,11 +446,6 @@
                 >显示 {{ filteredAccounts.length }} /
                 {{ selectedGroup?.accounts.length ?? 0 }} 个账号</span
               >
-              <span>{{
-                supportsDegradation
-                  ? "Priority 不参与排序 · 统一测试仅覆盖可调度账号"
-                  : "Priority 不参与排序 · 仅按可用性排序"
-              }}</span>
             </footer>
           </section>
 
@@ -509,7 +459,6 @@
                 <h2 id="probe-history-title">
                   探测记录 <span>{{ filteredProbes.length }}</span>
                 </h2>
-                <p>记录模型回复、请求错误与固定提示词判定结果。</p>
               </div>
               <div class="actions">
                 <select v-model="probeStatusFilter" aria-label="筛选探测结果">

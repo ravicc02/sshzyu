@@ -235,7 +235,7 @@ func buildStatusSummary(
 	intelligenceEnabled bool,
 ) MonitorStatusSummary {
 	summary := MonitorStatusSummary{ExtraModels: make([]ExtraModelStatus, 0, len(extras))}
-	if intelligenceEnabled && accountIntelligence != nil && accountIntelligence.FactorEnabled {
+	if intelligenceEnabled && accountIntelligence != nil {
 		summary.IntelligenceSource = DegradationSourceAccountAggregate
 		summary.IntelligenceSamples = accountIntelligence.SampleCount
 		summary.IntelligencePassed = accountIntelligence.PassCount

@@ -747,10 +747,6 @@ func (s *ChannelMonitorService) validateIntelligenceSchedulerFactor(ctx context.
 	if m.Provider != MonitorProviderOpenAI || m.GroupID == nil || *m.GroupID <= 0 {
 		return ErrChannelMonitorIntelligenceRequiresSchedulerFactor
 	}
-	summary, ok := s.accountGroupDegradationSummaries(ctx, []int64{*m.GroupID})[*m.GroupID]
-	if !ok || !summary.FactorEnabled {
-		return ErrChannelMonitorIntelligenceRequiresSchedulerFactor
-	}
 	return nil
 }
 
