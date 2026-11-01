@@ -62,7 +62,7 @@ function probe(overrides: Partial<UserMonitorView> = {}): UserMonitorView {
 describe('GroupStatusCards', () => {
   it('shows real aggregate rates after redaction and reserves intelligence for OpenAI', () => {
     const wrapper = mount(GroupStatusCards, { props: { rows: [row('openai'), row('deepseek')], coverage } })
-    expect(wrapper.text()).toContain('36.0%')
+    expect(wrapper.text()).not.toContain('36.0%')
     expect(wrapper.text()).toContain('88.0%')
     expect(wrapper.text()).toContain('≈4.5s')
     expect(wrapper.text()).toContain('0.045×')
@@ -70,7 +70,7 @@ describe('GroupStatusCards', () => {
     expect(wrapper.findAll('section[aria-label="DeepSeek"] article')).toHaveLength(1)
     expect(wrapper.findAll('article')).toHaveLength(2)
     expect(wrapper.text().match(/channelStatus.intelligenceChecks/g)).toHaveLength(1)
-    expect(wrapper.findAll('article')[0]?.findAll('[aria-label="channelMonitorV2.groupCards.realRequests"] span')).toHaveLength(20)
+    expect(wrapper.findAll('article')[0]?.findAll('[aria-label="channelMonitorV2.groupCards.combined"] span')).toHaveLength(20)
     expect(wrapper.findAll('article')[0]?.find('.bg-amber-400').exists()).toBe(true)
   })
 
@@ -127,28 +127,28 @@ describe('GroupStatusCards', () => {
     const openai = row('openai')
     openai.buckets[0].health.thresholds = { warning_error_rate: 0.15, critical_error_rate: 0.25 } as MonitorMatrixRow['health']['thresholds']
     const wrapper = mount(GroupStatusCards, { props: { rows: [openai], coverage } })
-    expect(wrapper.get('[aria-label="channelMonitorV2.groupCards.realRequests"] .bg-emerald-500').exists()).toBe(true)
-    expect(wrapper.find('[aria-label="channelMonitorV2.groupCards.realRequests"] .bg-amber-400').exists()).toBe(false)
+    expect(wrapper.get('[aria-label="channelMonitorV2.groupCards.combined"] .bg-emerald-500').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="channelMonitorV2.groupCards.combined"] .bg-amber-400').exists()).toBe(false)
   })
 
   it('falls back to active probes only when the group has no real traffic', () => {
     const wrapper = mount(GroupStatusCards, {
       props: { rows: [row('openai', false)], coverage, probes: [probe()], hybrid: true },
     })
-    expect(wrapper.text()).toContain('channelMonitorV2.groupCards.activeProbe')
+    expect(wrapper.text()).toContain('channelMonitorV2.groupCards.combined')
     expect(wrapper.text()).toContain('50.0%')
     expect(wrapper.text()).toContain('1.2s')
     expect(wrapper.text()).toContain('channelMonitorV2.groupCards.intelligenceNotDegraded')
-    expect(wrapper.get('[aria-label="channelMonitorV2.groupCards.activeProbe"]').findAll('span')).toHaveLength(20)
+    expect(wrapper.get('[aria-label="channelMonitorV2.groupCards.combined"]').findAll('span')).toHaveLength(20)
   })
 
   it('keeps real traffic as the primary source when a probe is also linked', () => {
     const wrapper = mount(GroupStatusCards, {
       props: { rows: [row('openai')], coverage, probes: [probe()], hybrid: true },
     })
-    expect(wrapper.text()).toContain('channelMonitorV2.groupCards.realRequests')
+    expect(wrapper.text()).toContain('channelMonitorV2.groupCards.combined')
     expect(wrapper.text()).not.toContain('channelMonitorV2.groupCards.activeProbe')
-    expect(wrapper.get('[aria-label="channelMonitorV2.groupCards.realRequests"]').findAll('span')).toHaveLength(20)
+    expect(wrapper.get('[aria-label="channelMonitorV2.groupCards.combined"]').findAll('span')).toHaveLength(20)
   })
 
   it('does not attribute one probe to unrelated groups', () => {

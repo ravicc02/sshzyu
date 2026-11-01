@@ -362,7 +362,7 @@ func TestOpenAIGatewayService_OpenAIAdvancedSchedulerRuntimeSettings_DBOverrides
 	ctx := context.Background()
 	require.Equal(t, 3, svc.openAIWSLBTopKForRequest(ctx))
 	weights := svc.openAIWSSchedulerWeightsForRequest(ctx)
-	require.Equal(t, 2.5, weights.Priority)
+	require.Equal(t, 0.0, weights.Priority)
 	require.Equal(t, 2.0, weights.Load)
 	require.Equal(t, 8.0, weights.UpstreamCost)
 	require.Equal(t, 0.25, weights.Reset)
@@ -412,7 +412,9 @@ func TestOpenAIGatewayService_OpenAIAdvancedSchedulerRuntimeSettings_InvalidWeig
 			repo := &openAIAdvancedSchedulerSettingRepoStub{values: tt.values}
 			svc := &OpenAIGatewayService{cfg: cfg, rateLimitService: &RateLimitService{settingService: NewSettingService(repo, cfg)}}
 
-			require.Equal(t, (&OpenAIGatewayService{cfg: cfg}).openAIWSSchedulerWeights(), svc.openAIWSSchedulerWeightsForRequest(context.Background()))
+			want := (&OpenAIGatewayService{cfg: cfg}).openAIWSSchedulerWeights()
+			want.Priority = 0
+			require.Equal(t, want, svc.openAIWSSchedulerWeightsForRequest(context.Background()))
 		})
 	}
 }
@@ -3731,7 +3733,7 @@ func TestOpenAIGatewayService_SchedulerWrappersAndDefaults(t *testing.T) {
 	require.Equal(t, openaiStickySessionTTL, svc.openAIWSSessionStickyTTL())
 
 	defaultWeights := svc.openAIWSSchedulerWeights()
-	require.Equal(t, 1.0, defaultWeights.Priority)
+	require.Equal(t, 0.0, defaultWeights.Priority)
 	require.Equal(t, 1.0, defaultWeights.Load)
 	require.Equal(t, 0.7, defaultWeights.Queue)
 	require.Equal(t, 0.8, defaultWeights.ErrorRate)

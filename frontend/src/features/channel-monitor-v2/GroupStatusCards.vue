@@ -313,7 +313,7 @@ function matchedProbesForRow(row: MonitorMatrixRow): UserMonitorView[] {
 }
 
 function probesForRow(row: MonitorMatrixRow): UserMonitorView[] {
-  return matchedProbesForRow(row)
+  return matchedProbesForRow(row).filter(probe => probe.probe_fallback_enabled !== false)
 }
 
 function probeModels(row: MonitorMatrixRow): string[] {

@@ -74,6 +74,10 @@ func TestMigrationsUpgradeOfficial016From015PreservesCustomData(t *testing.T) {
 		"259_channel_monitor_group_link.sql":            true, "260_api_key_batches.sql": true,
 		"261_channel_monitor_hybrid_unified.sql": true, "262_scoped_admin_api_keys.sql": true,
 		"263_group_image_count_billing.sql": true,
+		"264_account_scheduler_degradation.sql": true,
+		"265_account_scheduler_group_degradation_factor.sql": true,
+		"266_account_scheduler_reasoning_effort.sql": true,
+		"267_account_scheduler_manual_astra_defaults.sql": true,
 	}
 	files, err := fs.Glob(dbmigrations.FS, "*.sql")
 	require.NoError(t, err)

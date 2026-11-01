@@ -58,7 +58,7 @@ describe('invitation transport failures', () => {
     wrapper = mountCell()
     await wrapper.get('[data-testid="referral-open"]').trigger('click')
     await flushPromises()
-    expect(wrapper.get('[role="alert"]').text()).toBe('Network error. Please check your connection.')
+    expect(wrapper.get('[role="alert"]').text()).toBe('Request timed out. The backend may still be running; refresh to check the result.')
     expect(wrapper.text()).not.toContain('admin.accounts.openaiReferral.sendUnknown')
     expect(wrapper.get('[data-testid="referral-send"]').attributes('disabled')).toBeDefined()
   })

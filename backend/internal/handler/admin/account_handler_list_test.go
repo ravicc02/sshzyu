@@ -150,7 +150,7 @@ func TestAccountHandlerListIncludesCreatedAt(t *testing.T) {
 	require.Equal(t, 0, offset)
 }
 
-func TestAccountHandlerListReturnsSchedulerScoresPerGroup(t *testing.T) {
+func TestAccountHandlerListReturnsSchedulerScoresPerGroupIgnoringPriority(t *testing.T) {
 	router, adminSvc := setupAccountListRouter()
 	now := time.Now().UTC()
 	groupID := int64(41)
@@ -242,7 +242,7 @@ func TestAccountHandlerListReturnsSchedulerScoresPerGroup(t *testing.T) {
 	require.Equal(t, "openai", high.SchedulerScores[0].GroupName)
 	require.Equal(t, 100, *high.SchedulerScores[0].GroupPriority)
 	require.Equal(t, 1, *low.SchedulerScores[0].GroupPriority)
-	require.Greater(t, high.SchedulerScores[0].BaseScore, low.SchedulerScores[0].BaseScore)
+	require.InDelta(t, high.SchedulerScores[0].BaseScore, low.SchedulerScores[0].BaseScore, 1e-9)
 }
 
 func TestAccountHandlerListSkipsSchedulerScoresByDefault(t *testing.T) {

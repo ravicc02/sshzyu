@@ -194,13 +194,11 @@ func TestRunCheck_QuotaProbeAttachesSnapshotToPrimaryRowOnly(t *testing.T) {
 	require.Equal(t, "usage", results[0].Quota.Source)
 	require.Nil(t, results[1].Quota, "extra model rows must not carry quota")
 
-	// 测智是独立模型行，不影响主模型可用性或配额快照。
-	require.Len(t, repo.history, 3)
+	// 降智结果由账号调度提供，监控不再额外写入独立测智模型行。
+	require.Len(t, repo.history, 2)
 	require.NotNil(t, repo.history[0].Quota)
 	require.Equal(t, "gpt-test", repo.history[0].Model)
 	require.Nil(t, repo.history[1].Quota)
-	require.Equal(t, monitorIntelligenceModel, repo.history[2].Model)
-	require.Nil(t, repo.history[2].Quota)
 }
 
 func TestRunCheck_QuotaProbeQuotaFailureKeepsProbeStatus(t *testing.T) {

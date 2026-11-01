@@ -42,7 +42,7 @@ func TestApplyChannelMonitorTemplatePreservesDuplicateOperationMetadataAtomicall
 		WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectExec(`(?s)UPDATE channel_monitors\s+SET extra_headers = \$1::jsonb \|\| CASE\s+WHEN COALESCE\(extra_headers, '\{\}'::jsonb\) \? \(\$2::text\)\s+THEN jsonb_build_object\(\$2::text, COALESCE\(extra_headers, '\{\}'::jsonb\) -> \(\$2::text\)\)\s+ELSE '\{\}'::jsonb\s+END\s+WHERE template_id = \$3\s+AND id = ANY\(\$4\)\s+AND provider = \$5\s+AND api_mode = \$6`).
 		WithArgs(
-			`{"User-Agent":"template-client"}`,
+			`{"User-Agent":"template-client","sub2api:intelligence_interval_seconds":"1800","sub2api:intelligence_reasoning_effort":"medium"}`,
 			service.ChannelMonitorDuplicateOperationIDMetadataKey,
 			templateID,
 			`{41,42}`,
@@ -75,7 +75,7 @@ func TestApplyChannelMonitorTemplateRollsBackWhenHeaderRowCountDiffers(t *testin
 		WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectExec(`(?s)UPDATE channel_monitors\s+SET extra_headers = \$1::jsonb \|\| CASE.*jsonb_build_object\(\$2::text,.*WHERE template_id = \$3.*AND id = ANY\(\$4\)`).
 		WithArgs(
-			`{"User-Agent":"template-client"}`,
+			`{"User-Agent":"template-client","sub2api:intelligence_interval_seconds":"1800","sub2api:intelligence_reasoning_effort":"medium"}`,
 			service.ChannelMonitorDuplicateOperationIDMetadataKey,
 			templateID,
 			`{41,42}`,
