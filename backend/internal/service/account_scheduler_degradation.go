@@ -24,6 +24,7 @@ const (
 	accountSchedulerHistoryWindow          = 24 * time.Hour
 	accountSchedulerProbeWorkers           = 4
 	accountSchedulerDegradationWeight      = 1.5
+	accountSchedulerDefaultTestModel       = "gpt-6-astra"
 	AccountDegradationReuseWindow          = 30 * time.Minute
 	DegradationSourceAccountAggregate      = "account_aggregate"
 	DegradationSourceChannelFallback       = "channel_fallback"
@@ -381,8 +382,9 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 		if setting.GroupID == 0 {
 			setting = AccountSchedulerGroupSetting{
 				GroupID:                  group.ID,
-				DegradationFactorEnabled: true,
+				DegradationFactorEnabled: false,
 				IntervalSeconds:          accountSchedulerDefaultIntervalSeconds,
+				TestModel:                accountSchedulerDefaultTestModel,
 				TestReasoningEffort:      "medium",
 			}
 		}
@@ -525,8 +527,9 @@ func (s *AccountSchedulerService) UpdateSetting(ctx context.Context, input Accou
 	if setting.GroupID == 0 {
 		setting = AccountSchedulerGroupSetting{
 			GroupID:                  input.GroupID,
-			DegradationFactorEnabled: true,
+			DegradationFactorEnabled: false,
 			IntervalSeconds:          accountSchedulerDefaultIntervalSeconds,
+			TestModel:                accountSchedulerDefaultTestModel,
 			TestReasoningEffort:      "medium",
 		}
 	}
@@ -1064,6 +1067,11 @@ func resolveAccountSchedulerProbeModel(
 ) string {
 	if model := strings.TrimSpace(setting.TestModel); model != "" {
 		return model
+	}
+	for _, model := range group.ModelCandidates {
+		if strings.EqualFold(strings.TrimSpace(model), accountSchedulerDefaultTestModel) {
+			return model
+		}
 	}
 	if model := strings.TrimSpace(inheritedModel); model != "" {
 		return model

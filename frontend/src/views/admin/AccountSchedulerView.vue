@@ -222,7 +222,7 @@
                 <option value="">全部可用性</option>
                 <option value="available">仅可用账号</option>
                 <option value="unavailable">仅不可用账号</option>
-                <option v-if="supportsDegradation" value="degraded">存在未通过记录</option>
+                <option v-if="showDegradationMetrics" value="degraded">存在未通过记录</option>
                 <option value="oauth">仅 OAuth 账号</option>
               </select>
             </div>
@@ -286,7 +286,10 @@
             <div class="table-scroll">
               <table
                 class="ranking-table"
-                :class="{ 'availability-only': !supportsDegradation }"
+                :class="{
+                  'availability-only': !supportsDegradation,
+                  'metrics-hidden': supportsDegradation && !showDegradationMetrics,
+                }"
               >
                 <thead>
                   <tr>
@@ -294,9 +297,9 @@
                     <th>账号</th>
                     <th>可用性</th>
                     <th>调度次数</th>
-                    <th v-if="supportsDegradation">通过率 / 降智率</th>
+                    <th v-if="showDegradationMetrics">通过率 / 降智率</th>
                     <th v-if="supportsDegradation">调度分</th>
-                    <th v-if="supportsDegradation">最近探测</th>
+                    <th v-if="showDegradationMetrics">最近探测</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -314,7 +317,7 @@
                           account.name
                         }}</strong>
                         <span
-                          v-if="supportsDegradation && account.lowest_degradation"
+                          v-if="showDegradationMetrics && account.lowest_degradation"
                           class="lowest-badge"
                           >最低降智</span
                         >
@@ -351,7 +354,7 @@
                         正在调度
                       </span>
                     </td>
-                    <td v-if="supportsDegradation">
+                    <td v-if="showDegradationMetrics">
                       <div class="value-stack">
                         <strong :class="passRateClass(account.pass_count, account.sample_count)">
                           {{ formatPassRate(account.pass_count, account.sample_count) }}
@@ -371,14 +374,13 @@
                             / {{ formatScore(selectedGroup?.score_max) }}
                           </span>
                         </strong>
-                        <small v-if="selectedGroup?.degradation_factor_enabled">
+                        <small v-if="showDegradationMetrics">
                           降智因子
                           {{ account.degradation_factor.toFixed(2) }}
                         </small>
-                        <small v-else>降智因子未计入</small>
                       </div>
                     </td>
-                    <td v-if="supportsDegradation">
+                    <td v-if="showDegradationMetrics">
                       <div class="value-stack">
                         <span
                           class="probe-status"
@@ -393,7 +395,7 @@
                     </td>
                   </tr>
                   <tr v-if="filteredAccounts.length === 0">
-                    <td :colspan="supportsDegradation ? 7 : 4" class="table-empty">
+                    <td :colspan="showDegradationMetrics ? 7 : supportsDegradation ? 5 : 4" class="table-empty">
                       没有符合筛选条件的账号。
                     </td>
                   </tr>
@@ -414,7 +416,7 @@
           </section>
 
           <section
-            v-if="supportsDegradation"
+            v-if="showDegradationMetrics"
             class="probe-section"
             aria-labelledby="probe-history-title"
           >
@@ -560,7 +562,7 @@ const saving = ref(false);
 const running = ref(false);
 const draft = reactive({
   enabled: false,
-  degradationFactorEnabled: true,
+  degradationFactorEnabled: false,
   intervalSeconds: 600,
   testModel: "",
   testReasoningEffort: "medium",
@@ -579,6 +581,9 @@ const selectedGroup = computed<AccountSchedulerGroup | null>(() => {
 const supportsDegradation = computed(
   () => selectedGroup.value?.degradation_supported === true,
 );
+const showDegradationMetrics = computed(
+  () => supportsDegradation.value && draft.degradationFactorEnabled,
+);
 
 const filteredAccounts = computed(() => {
   const accounts = selectedGroup.value?.accounts ?? [];
@@ -594,7 +599,7 @@ const filteredAccounts = computed(() => {
         ? account.available
         : availabilityFilter.value === "unavailable"
           ? !account.available
-          : supportsDegradation.value &&
+          : showDegradationMetrics.value &&
               availabilityFilter.value === "degraded"
             ? account.degraded_count > 0
             : availabilityFilter.value === "oauth"
@@ -646,7 +651,10 @@ watch(
     draft.enabled = group.degradation_supported && group.degradation_enabled;
     draft.degradationFactorEnabled = group.degradation_factor_enabled;
     draft.intervalSeconds = group.interval_seconds || 600;
-    draft.testModel = group.degradation_supported ? group.test_model || "" : "";
+    draft.testModel = group.degradation_supported
+      ? group.test_model ||
+        (group.model_candidates.includes("gpt-6-astra") ? "gpt-6-astra" : "")
+      : "";
     draft.testReasoningEffort = group.test_reasoning_effort || "medium";
   },
   { immediate: true },
@@ -1221,6 +1229,9 @@ select:focus {
 }
 .ranking-table.availability-only {
   min-width: 560px;
+}
+.ranking-table.metrics-hidden {
+  min-width: 760px;
 }
 .ranking-table th {
   padding: 12px 13px;
