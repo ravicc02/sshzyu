@@ -8,6 +8,7 @@ export interface AccountSchedulerRow {
   oauth: boolean
   available: boolean
   availability_reason: string
+  testable: boolean
   dispatch_count: number
   active_dispatches: number
   degradation_rate?: number
@@ -25,6 +26,21 @@ export interface AccountSchedulerRow {
   lowest_degradation: boolean
 }
 
+export interface AccountSchedulerRunProgress {
+  group_id: number
+  running: boolean
+  total: number
+  completed: number
+  passed: number
+  degraded: number
+  failed: number
+  skipped: number
+  current_account_id?: number
+  current_account_name?: string
+  started_at: string
+  finished_at?: string
+}
+
 export interface AccountSchedulerGroup {
   id: number
   name: string
@@ -40,6 +56,7 @@ export interface AccountSchedulerGroup {
   model_candidates: string[]
   oauth_first: boolean
   lowest_account_id?: number
+  test_progress?: AccountSchedulerRunProgress
   accounts: AccountSchedulerRow[]
 }
 

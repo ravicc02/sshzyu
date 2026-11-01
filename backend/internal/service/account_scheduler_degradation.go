@@ -148,21 +148,37 @@ type AccountSchedulerOverview struct {
 }
 
 type AccountSchedulerGroupView struct {
-	ID                       int64                 `json:"id"`
-	Name                     string                `json:"name"`
-	Platform                 string                `json:"platform"`
-	DegradationSupported     bool                  `json:"degradation_supported"`
-	Status                   string                `json:"status"`
-	DegradationEnabled       bool                  `json:"degradation_enabled"`
-	DegradationFactorEnabled bool                  `json:"degradation_factor_enabled"`
-	IntervalSeconds          int                   `json:"interval_seconds"`
-	TestModel                string                `json:"test_model"`
-	TestReasoningEffort      string                `json:"test_reasoning_effort"`
-	ScoreMax                 float64               `json:"score_max"`
-	ModelCandidates          []string              `json:"model_candidates"`
-	OAuthFirst               bool                  `json:"oauth_first"`
-	LowestAccountID          *int64                `json:"lowest_account_id,omitempty"`
-	Accounts                 []AccountSchedulerRow `json:"accounts"`
+	ID                       int64                        `json:"id"`
+	Name                     string                       `json:"name"`
+	Platform                 string                       `json:"platform"`
+	DegradationSupported     bool                         `json:"degradation_supported"`
+	Status                   string                       `json:"status"`
+	DegradationEnabled       bool                         `json:"degradation_enabled"`
+	DegradationFactorEnabled bool                         `json:"degradation_factor_enabled"`
+	IntervalSeconds          int                          `json:"interval_seconds"`
+	TestModel                string                       `json:"test_model"`
+	TestReasoningEffort      string                       `json:"test_reasoning_effort"`
+	ScoreMax                 float64                      `json:"score_max"`
+	ModelCandidates          []string                     `json:"model_candidates"`
+	OAuthFirst               bool                         `json:"oauth_first"`
+	LowestAccountID          *int64                       `json:"lowest_account_id,omitempty"`
+	TestProgress             *AccountSchedulerRunProgress `json:"test_progress,omitempty"`
+	Accounts                 []AccountSchedulerRow        `json:"accounts"`
+}
+
+type AccountSchedulerRunProgress struct {
+	GroupID            int64      `json:"group_id"`
+	Running            bool       `json:"running"`
+	Total              int        `json:"total"`
+	Completed          int        `json:"completed"`
+	Passed             int        `json:"passed"`
+	Degraded           int        `json:"degraded"`
+	Failed             int        `json:"failed"`
+	Skipped            int        `json:"skipped"`
+	CurrentAccountID   int64      `json:"current_account_id,omitempty"`
+	CurrentAccountName string     `json:"current_account_name,omitempty"`
+	StartedAt          time.Time  `json:"started_at"`
+	FinishedAt         *time.Time `json:"finished_at,omitempty"`
 }
 
 type AccountSchedulerRow struct {
@@ -173,6 +189,7 @@ type AccountSchedulerRow struct {
 	OAuth              bool       `json:"oauth"`
 	Available          bool       `json:"available"`
 	AvailabilityReason string     `json:"availability_reason"`
+	Testable           bool       `json:"testable"`
 	DispatchCount      int64      `json:"dispatch_count"`
 	ActiveDispatches   int        `json:"active_dispatches"`
 	DegradationRate    *float64   `json:"degradation_rate,omitempty"`
@@ -249,11 +266,13 @@ type AccountSchedulerService struct {
 	cacheMu sync.RWMutex
 	cache   map[int64]accountDegradationScoreCacheEntry
 
-	startOnce sync.Once
-	stopOnce  sync.Once
-	stopCh    chan struct{}
-	doneCh    chan struct{}
-	runMu     sync.Mutex
+	startOnce  sync.Once
+	stopOnce   sync.Once
+	stopCh     chan struct{}
+	doneCh     chan struct{}
+	runMu      sync.Mutex
+	progressMu sync.RWMutex
+	progress   map[int64]AccountSchedulerRunProgress
 }
 
 type accountDegradationScoreCacheEntry struct {
@@ -274,6 +293,7 @@ func NewAccountSchedulerService(
 		gateway:        gateway,
 		settingRepo:    settingRepo,
 		cache:          make(map[int64]accountDegradationScoreCacheEntry),
+		progress:       make(map[int64]AccountSchedulerRunProgress),
 		stopCh:         make(chan struct{}),
 		doneCh:         make(chan struct{}),
 	}
@@ -431,6 +451,7 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 				OAuth:              isOAuth,
 				Available:          available,
 				AvailabilityReason: reason,
+				Testable:           accountSchedulerAccountTestable(account),
 				DispatchCount:      account.DispatchCount,
 				ActiveDispatches:   activeDispatches[account.ID],
 				SampleCount:        stat.SampleCount(),
@@ -481,6 +502,7 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 			ScoreMax:                 groupScoreMax,
 			ModelCandidates:          group.ModelCandidates,
 			OAuthFirst:               oauthFirst,
+			TestProgress:             s.accountSchedulerRunProgress(group.ID),
 			Accounts:                 rows,
 		}
 		for i := range rows {
@@ -564,6 +586,9 @@ func (s *AccountSchedulerService) UpdateSetting(ctx context.Context, input Accou
 }
 
 func (s *AccountSchedulerService) RunNow(ctx context.Context, input AccountSchedulerRunInput) (*AccountSchedulerRunResult, error) {
+	s.runMu.Lock()
+	defer s.runMu.Unlock()
+
 	if input.GroupID <= 0 && input.AccountID <= 0 {
 		return nil, ErrAccountSchedulerInvalidSetting
 	}
@@ -595,6 +620,29 @@ func (s *AccountSchedulerService) RunNow(ctx context.Context, input AccountSched
 		return nil, err
 	}
 	result := &AccountSchedulerRunResult{}
+	progress := AccountSchedulerRunProgress{
+		GroupID:   input.GroupID,
+		Running:   true,
+		StartedAt: time.Now(),
+	}
+	for _, account := range accounts {
+		if input.AccountID > 0 && account.ID != input.AccountID {
+			continue
+		}
+		group := findAccountSchedulerGroup(groups, account.GroupID)
+		if group == nil || !accountSchedulerGroupSupportsDegradation(*group) {
+			progress.Skipped++
+			continue
+		}
+		if !accountSchedulerAccountTestable(account) {
+			progress.Skipped++
+			continue
+		}
+		progress.Total++
+	}
+	if input.GroupID > 0 {
+		s.saveAccountSchedulerRunProgress(progress)
+	}
 	probeModels := s.accountSchedulerGroupPrimaryModels(ctx, groups)
 	for _, account := range accounts {
 		if input.AccountID > 0 && account.ID != input.AccountID {
@@ -608,6 +656,10 @@ func (s *AccountSchedulerService) RunNow(ctx context.Context, input AccountSched
 			result.Skipped++
 			continue
 		}
+		if !accountSchedulerAccountTestable(account) {
+			result.Skipped++
+			continue
+		}
 		setting := settings[account.GroupID]
 		model := resolveAccountSchedulerProbeModel(setting, *group, probeModels[account.GroupID])
 		if strings.TrimSpace(input.Model) != "" {
@@ -617,20 +669,47 @@ func (s *AccountSchedulerService) RunNow(ctx context.Context, input AccountSched
 		if strings.TrimSpace(input.ReasoningEffort) != "" {
 			reasoningEffort = normalizeAccountSchedulerReasoningEffort(model, input.ReasoningEffort)
 		}
+		progress.CurrentAccountID = account.ID
+		progress.CurrentAccountName = account.Name
+		if input.GroupID > 0 {
+			s.saveAccountSchedulerRunProgress(progress)
+		}
 		probe, err := s.runProbe(ctx, account, model, reasoningEffort)
 		if err != nil {
 			result.Failed++
+			progress.Completed++
+			progress.Failed++
 			result.Errors = append(result.Errors, fmt.Sprintf("%s (#%d): %s", account.Name, account.ID, err.Error()))
+			if input.GroupID > 0 {
+				s.saveAccountSchedulerRunProgress(progress)
+			}
 			continue
 		}
 		result.Run++
 		result.Results = append(result.Results, *probe)
+		progress.Completed++
 		if probe.Status == AccountDegradationStatusError {
 			result.Failed++
+			progress.Failed++
 			if strings.TrimSpace(probe.ErrorMessage) != "" {
 				result.Errors = append(result.Errors, fmt.Sprintf("%s (#%d): %s", account.Name, account.ID, probe.ErrorMessage))
 			}
+		} else if probe.Status == AccountDegradationStatusPass {
+			progress.Passed++
+		} else {
+			progress.Degraded++
 		}
+		if input.GroupID > 0 {
+			s.saveAccountSchedulerRunProgress(progress)
+		}
+	}
+	if input.GroupID > 0 {
+		finishedAt := time.Now()
+		progress.Running = false
+		progress.CurrentAccountID = 0
+		progress.CurrentAccountName = ""
+		progress.FinishedAt = &finishedAt
+		s.saveAccountSchedulerRunProgress(progress)
 	}
 	s.invalidateCache(input.GroupID)
 	return result, nil
@@ -678,6 +757,10 @@ func (s *AccountSchedulerService) RunScheduled(ctx context.Context) (*AccountSch
 	for _, account := range accounts {
 		setting := settings[account.GroupID]
 		if !setting.DegradationEnabled {
+			continue
+		}
+		if !accountSchedulerAccountTestable(account) {
+			result.Skipped++
 			continue
 		}
 		latest := latestByKey[accountSchedulerStatKey(account.GroupID, account.ID)]
@@ -931,6 +1014,25 @@ func (s *AccountSchedulerService) invalidateCache(groupID int64) {
 	clear(s.cache)
 }
 
+func (s *AccountSchedulerService) saveAccountSchedulerRunProgress(progress AccountSchedulerRunProgress) {
+	s.progressMu.Lock()
+	defer s.progressMu.Unlock()
+	if s.progress == nil {
+		s.progress = make(map[int64]AccountSchedulerRunProgress)
+	}
+	s.progress[progress.GroupID] = progress
+}
+
+func (s *AccountSchedulerService) accountSchedulerRunProgress(groupID int64) *AccountSchedulerRunProgress {
+	s.progressMu.RLock()
+	defer s.progressMu.RUnlock()
+	progress, ok := s.progress[groupID]
+	if !ok {
+		return nil
+	}
+	return &progress
+}
+
 func (s *AccountSchedulerService) activeAccountDispatches(
 	ctx context.Context,
 	accounts []AccountSchedulerAccount,
@@ -971,6 +1073,10 @@ func accountSchedulerAccountAvailability(account AccountSchedulerAccount) (bool,
 	default:
 		return true, ""
 	}
+}
+
+func accountSchedulerAccountTestable(account AccountSchedulerAccount) bool {
+	return account.Status == StatusActive && account.Schedulable
 }
 
 func markLowestAccountDegradation(rows []AccountSchedulerRow) {

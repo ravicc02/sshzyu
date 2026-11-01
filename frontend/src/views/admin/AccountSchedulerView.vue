@@ -115,20 +115,49 @@
                       ? "单次未通过不等同账号降智"
                       : supportsDegradation
                         ? "手动测试可用 · 按评分调度"
-                      : "仅按账号可用性排名"
+                        : "仅按账号可用性排名"
                   }}
                 </p>
               </div>
               <div class="actions">
-                <span v-if="selectedGroup" class="mode-label">
-                  {{
-                    supportsDegradation
-                      ? selectedGroup.oauth_first
-                        ? "OAuth 优先"
-                        : "统一评分池"
-                      : "仅可用性"
-                  }}
-                </span>
+                <div
+                  v-if="selectedGroup"
+                  class="test-progress"
+                  :class="{ running: selectedProgress?.running }"
+                  aria-live="polite"
+                >
+                  <div class="test-progress-copy">
+                    <span>测试进度</span>
+                    <strong v-if="selectedProgress?.running">
+                      {{ selectedProgress.completed }}/{{
+                        selectedProgress.total
+                      }}
+                    </strong>
+                    <strong v-else-if="selectedProgress">
+                      {{ selectedProgress.total ? "已完成" : "无可测账号" }}
+                    </strong>
+                    <strong v-else>未开始</strong>
+                  </div>
+                  <div
+                    v-if="selectedProgress && selectedProgress.total > 0"
+                    class="test-progress-track"
+                    aria-hidden="true"
+                  >
+                    <span :style="{ width: `${runProgressPercent}%` }" />
+                  </div>
+                  <small v-if="selectedProgress?.running">
+                    当前
+                    {{ selectedProgress.current_account_name || "准备中" }} ·
+                    跳过 {{ selectedProgress.skipped }}
+                  </small>
+                  <small v-else-if="selectedProgress">
+                    通过 {{ selectedProgress.passed }} · 未通过
+                    {{ selectedProgress.degraded }} · 失败
+                    {{ selectedProgress.failed }} · 跳过
+                    {{ selectedProgress.skipped }}
+                  </small>
+                  <small v-else>仅测试当前可调度账号</small>
+                </div>
                 <label
                   v-if="supportsDegradation && selectedGroup"
                   class="test-model-select"
@@ -144,7 +173,9 @@
                     <option
                       v-if="
                         draft.testModel &&
-                        !selectedGroup.model_candidates.includes(draft.testModel)
+                        !selectedGroup.model_candidates.includes(
+                          draft.testModel,
+                        )
                       "
                       :value="draft.testModel"
                     >
@@ -189,11 +220,18 @@
                   v-if="supportsDegradation"
                   type="button"
                   class="btn btn-primary"
-                  :disabled="!selectedGroup || running"
+                  :disabled="
+                    !selectedGroup ||
+                    running ||
+                    selectedProgress?.running ||
+                    testableAccountCount === 0
+                  "
                   @click="runGroup"
                 >
                   <Icon name="play" size="sm" />
-                  {{ running ? "测试中" : "统一测试" }}
+                  {{
+                    running || selectedProgress?.running ? "测试中" : "统一测试"
+                  }}
                 </button>
               </div>
             </header>
@@ -224,7 +262,9 @@
                 <option value="">全部可用性</option>
                 <option value="available">仅可用账号</option>
                 <option value="unavailable">仅不可用账号</option>
-                <option v-if="showDegradationMetrics" value="degraded">存在未通过记录</option>
+                <option v-if="showDegradationMetrics" value="degraded">
+                  存在未通过记录
+                </option>
                 <option value="oauth">仅 OAuth 账号</option>
               </select>
             </div>
@@ -245,7 +285,10 @@
                 class="config-grid"
                 :class="{ 'single-factor': !draft.degradationFactorEnabled }"
               >
-                <div v-if="draft.degradationFactorEnabled" class="config-toggle">
+                <div
+                  v-if="draft.degradationFactorEnabled"
+                  class="config-toggle"
+                >
                   <span>自动探测</span>
                   <button
                     type="button"
@@ -257,7 +300,10 @@
                     <span />
                   </button>
                 </div>
-                <label v-if="draft.degradationFactorEnabled" class="config-field">
+                <label
+                  v-if="draft.degradationFactorEnabled"
+                  class="config-field"
+                >
                   <span>测试间隔</span>
                   <select v-model.number="draft.intervalSeconds">
                     <option :value="300">5 分钟</option>
@@ -285,7 +331,9 @@
               <Icon name="check" size="sm" />
               <div>
                 <strong>按账号可用性排序</strong>
-                <span>该类型分组不执行降智探测，只显示可用、冷却和停调状态。</span>
+                <span
+                  >该类型分组不执行降智探测，只显示可用、冷却和停调状态。</span
+                >
               </div>
             </div>
 
@@ -294,7 +342,8 @@
                 class="ranking-table"
                 :class="{
                   'availability-only': !supportsDegradation,
-                  'metrics-hidden': supportsDegradation && !showDegradationMetrics,
+                  'metrics-hidden':
+                    supportsDegradation && !showDegradationMetrics,
                 }"
               >
                 <thead>
@@ -312,7 +361,10 @@
                   <tr
                     v-for="account in filteredAccounts"
                     :key="account.id"
-                    :class="{ lowest: showDegradationMetrics && account.lowest_degradation }"
+                    :class="{
+                      lowest:
+                        showDegradationMetrics && account.lowest_degradation,
+                    }"
                   >
                     <td class="rank-column">
                       <span class="rank-number">{{ account.rank }}</span>
@@ -323,7 +375,9 @@
                           account.name
                         }}</strong>
                         <span
-                          v-if="showDegradationMetrics && account.lowest_degradation"
+                          v-if="
+                            showDegradationMetrics && account.lowest_degradation
+                          "
                           class="lowest-badge"
                           >最低降智</span
                         >
@@ -349,7 +403,9 @@
                     </td>
                     <td class="dispatch-cell">
                       <div class="value-stack">
-                        <strong>{{ formatCount(account.dispatch_count) }}</strong>
+                        <strong>{{
+                          formatCount(account.dispatch_count)
+                        }}</strong>
                         <small>近 24 小时</small>
                       </div>
                       <span
@@ -362,12 +418,25 @@
                     </td>
                     <td v-if="showDegradationMetrics">
                       <div class="value-stack">
-                        <strong :class="passRateClass(account.pass_count, account.sample_count)">
-                          {{ formatPassRate(account.pass_count, account.sample_count) }}
+                        <strong
+                          :class="
+                            passRateClass(
+                              account.pass_count,
+                              account.sample_count,
+                            )
+                          "
+                        >
+                          {{
+                            formatPassRate(
+                              account.pass_count,
+                              account.sample_count,
+                            )
+                          }}
                         </strong>
                         <small>
                           降智率 {{ formatRate(account.degradation_rate) }} ·
-                          {{ account.pass_count }}/{{ account.sample_count }} · 错误
+                          {{ account.pass_count }}/{{ account.sample_count }} ·
+                          错误
                           {{ account.error_count }}
                         </small>
                       </div>
@@ -401,7 +470,12 @@
                     </td>
                   </tr>
                   <tr v-if="filteredAccounts.length === 0">
-                    <td :colspan="showDegradationMetrics ? 7 : supportsDegradation ? 5 : 4" class="table-empty">
+                    <td
+                      :colspan="
+                        showDegradationMetrics ? 7 : supportsDegradation ? 5 : 4
+                      "
+                      class="table-empty"
+                    >
                       没有符合筛选条件的账号。
                     </td>
                   </tr>
@@ -415,7 +489,7 @@
               >
               <span>{{
                 supportsDegradation
-                  ? "Priority 不参与排序 · OAuth 作为第一层路由"
+                  ? "Priority 不参与排序 · 统一测试仅覆盖可调度账号"
                   : "Priority 不参与排序 · 仅按可用性排序"
               }}</span>
             </footer>
@@ -543,7 +617,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+} from "vue";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import Icon from "@/components/icons/Icon.vue";
 import { adminAPI } from "@/api/admin";
@@ -590,6 +671,19 @@ const supportsDegradation = computed(
 const showDegradationMetrics = computed(
   () => supportsDegradation.value && draft.degradationFactorEnabled,
 );
+const selectedProgress = computed(
+  () => selectedGroup.value?.test_progress ?? null,
+);
+const testableAccountCount = computed(
+  () =>
+    selectedGroup.value?.accounts.filter((account) => account.testable)
+      .length ?? 0,
+);
+const runProgressPercent = computed(() => {
+  const progress = selectedProgress.value;
+  if (!progress?.total) return 0;
+  return Math.min(100, Math.round((progress.completed / progress.total) * 100));
+});
 
 const filteredAccounts = computed(() => {
   const accounts = selectedGroup.value?.accounts ?? [];
@@ -739,7 +833,13 @@ function toggleDegradationFactor() {
 }
 
 async function runGroup() {
-  if (!selectedGroup.value || !supportsDegradation.value) return;
+  if (
+    !selectedGroup.value ||
+    !supportsDegradation.value ||
+    testableAccountCount.value === 0
+  ) {
+    return;
+  }
   running.value = true;
   try {
     const result = await adminAPI.accountScheduler.runNow({
@@ -747,7 +847,9 @@ async function runGroup() {
       model: draft.testModel,
       reasoning_effort: draft.testReasoningEffort,
     });
-    const passed = result.results.filter((probe) => probe.status === "pass").length;
+    const passed = result.results.filter(
+      (probe) => probe.status === "pass",
+    ).length;
     const degraded = result.results.filter(
       (probe) => probe.status === "degraded",
     ).length;
@@ -1045,17 +1147,62 @@ onBeforeUnmount(() => {
   font-size: 12px;
   line-height: 1.65;
 }
-.mode-label {
-  display: inline-flex;
-  min-height: 30px;
-  align-items: center;
-  padding: 0 9px;
-  border-radius: 6px;
-  color: var(--monitor-accent);
-  background: var(--monitor-selected);
+.test-progress {
+  display: grid;
+  width: 220px;
+  min-height: 48px;
+  align-content: center;
+  gap: 4px;
+  padding: 7px 10px;
+  border: 1px solid var(--monitor-line);
+  border-radius: 8px;
+  background: var(--monitor-input);
+}
+.test-progress.running {
+  border-color: color-mix(
+    in srgb,
+    var(--monitor-accent) 42%,
+    var(--monitor-line)
+  );
+}
+.test-progress-copy {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.test-progress-copy span,
+.test-progress small {
+  color: var(--monitor-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.test-progress-copy strong {
+  color: var(--monitor-ink);
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+.test-progress.running .test-progress-copy strong {
+  color: var(--monitor-accent);
+}
+.test-progress small {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+.test-progress-track {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--monitor-line);
+}
+.test-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--monitor-accent);
+  transition: width 0.2s ease-out;
 }
 .test-model-select {
   display: inline-flex;
@@ -1599,6 +1746,9 @@ select:focus {
     align-items: stretch;
     gap: 4px;
   }
+  .test-progress {
+    width: 100%;
+  }
   .test-model-select select,
   .test-model-select input,
   .section-heading > .actions .btn {
@@ -1671,6 +1821,9 @@ select:focus {
     animation: none;
   }
   .switch > span {
+    transition: none;
+  }
+  .test-progress-track > span {
     transition: none;
   }
 }
