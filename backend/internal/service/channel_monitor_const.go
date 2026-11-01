@@ -80,6 +80,7 @@ const (
 	// cadence for OpenAI reasoning probes. The regular availability interval
 	// remains unchanged.
 	DefaultChannelMonitorIntelligenceIntervalSeconds = 1800
+	DefaultChannelMonitorIntelligenceReasoningEffort = "medium"
 	channelMonitorIntelligenceMinIntervalSeconds     = 300
 	channelMonitorIntelligenceMaxIntervalSeconds     = 86400
 
@@ -196,6 +197,10 @@ var (
 	ErrChannelMonitorInvalidIntelligenceInterval = infraerrors.BadRequest(
 		"CHANNEL_MONITOR_INVALID_INTELLIGENCE_INTERVAL",
 		"intelligence_interval_seconds must be in [300, 86400]",
+	)
+	ErrChannelMonitorInvalidIntelligenceReasoningEffort = infraerrors.BadRequest(
+		"CHANNEL_MONITOR_INVALID_INTELLIGENCE_REASONING_EFFORT",
+		"intelligence_reasoning_effort must be a supported reasoning level",
 	)
 	ErrChannelMonitorInvalidEndpoint = infraerrors.BadRequest(
 		"CHANNEL_MONITOR_INVALID_ENDPOINT", "endpoint must be a valid https URL",

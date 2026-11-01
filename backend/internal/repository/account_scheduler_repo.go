@@ -72,6 +72,7 @@ func (r *accountSchedulerRepository) ListGroupSettings(ctx context.Context) (map
 			degradation_factor_enabled,
 			interval_seconds,
 			test_model,
+			test_reasoning_effort,
 			updated_at
 		FROM account_scheduler_group_settings
 	`)
@@ -89,6 +90,7 @@ func (r *accountSchedulerRepository) ListGroupSettings(ctx context.Context) (map
 			&setting.DegradationFactorEnabled,
 			&setting.IntervalSeconds,
 			&setting.TestModel,
+			&setting.TestReasoningEffort,
 			&setting.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -140,14 +142,15 @@ func (r *accountSchedulerRepository) UpsertGroupSetting(
 	row := r.db.QueryRowContext(ctx, `
 		INSERT INTO account_scheduler_group_settings (
 			group_id, degradation_enabled, degradation_factor_enabled,
-			interval_seconds, test_model, created_at, updated_at
+			interval_seconds, test_model, test_reasoning_effort, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
 		ON CONFLICT (group_id) DO UPDATE SET
 			degradation_enabled = EXCLUDED.degradation_enabled,
 			degradation_factor_enabled = EXCLUDED.degradation_factor_enabled,
 			interval_seconds = EXCLUDED.interval_seconds,
 			test_model = EXCLUDED.test_model,
+			test_reasoning_effort = EXCLUDED.test_reasoning_effort,
 			updated_at = NOW()
 		RETURNING
 			group_id,
@@ -155,6 +158,7 @@ func (r *accountSchedulerRepository) UpsertGroupSetting(
 			degradation_factor_enabled,
 			interval_seconds,
 			test_model,
+			test_reasoning_effort,
 			updated_at
 	`,
 		setting.GroupID,
@@ -162,6 +166,7 @@ func (r *accountSchedulerRepository) UpsertGroupSetting(
 		setting.DegradationFactorEnabled,
 		setting.IntervalSeconds,
 		setting.TestModel,
+		setting.TestReasoningEffort,
 	)
 	out := &service.AccountSchedulerGroupSetting{}
 	if err := row.Scan(
@@ -170,6 +175,7 @@ func (r *accountSchedulerRepository) UpsertGroupSetting(
 		&out.DegradationFactorEnabled,
 		&out.IntervalSeconds,
 		&out.TestModel,
+		&out.TestReasoningEffort,
 		&out.UpdatedAt,
 	); err != nil {
 		return nil, err
@@ -336,6 +342,7 @@ func (r *accountSchedulerRepository) ListRecentProbes(
 			COALESCE(a.name, ''),
 			p.group_id,
 			p.model,
+			p.reasoning_effort,
 			p.status,
 			p.response_text,
 			p.error_message,
@@ -361,6 +368,7 @@ func (r *accountSchedulerRepository) ListRecentProbes(
 			&probe.AccountName,
 			&probe.GroupID,
 			&probe.Model,
+			&probe.ReasoningEffort,
 			&probe.Status,
 			&probe.ResponseText,
 			&probe.ErrorMessage,
@@ -380,15 +388,16 @@ func (r *accountSchedulerRepository) InsertProbe(
 ) error {
 	row := r.db.QueryRowContext(ctx, `
 		INSERT INTO account_degradation_probes (
-			account_id, group_id, model, status, response_text, error_message,
+			account_id, group_id, model, reasoning_effort, status, response_text, error_message,
 			latency_ms, checked_at, created_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
 		RETURNING id
 	`,
 		probe.AccountID,
 		probe.GroupID,
 		probe.Model,
+		probe.ReasoningEffort,
 		probe.Status,
 		probe.ResponseText,
 		probe.ErrorMessage,

@@ -35,6 +35,7 @@ export interface AccountSchedulerGroup {
   degradation_factor_enabled: boolean
   interval_seconds: number
   test_model: string
+  test_reasoning_effort: string
   score_max?: number
   model_candidates: string[]
   oauth_first: boolean
@@ -48,6 +49,7 @@ export interface AccountDegradationProbe {
   account_name: string
   group_id: number
   model: string
+  reasoning_effort: string
   status: 'pass' | 'degraded' | 'error'
   response_text: string
   error_message: string
@@ -75,6 +77,7 @@ export interface AccountSchedulerSettingInput {
   degradation_factor_enabled?: boolean
   interval_seconds?: number
   test_model?: string
+  test_reasoning_effort?: string
 }
 
 export async function getOverview(): Promise<AccountSchedulerOverview> {
@@ -88,7 +91,12 @@ export async function updateSetting(
   await apiClient.put('/admin/account-scheduler/settings', input)
 }
 
-export async function runNow(input: { group_id: number; account_id?: number; model?: string }): Promise<{
+export async function runNow(input: {
+  group_id: number
+  account_id?: number
+  model?: string
+  reasoning_effort?: string
+}): Promise<{
   run: number
   skipped: number
   failed: number

@@ -164,6 +164,25 @@
                     aria-label="统一测试模型"
                   />
                 </label>
+                <label
+                  v-if="supportsDegradation && selectedGroup"
+                  class="test-model-select"
+                >
+                  <span>推理强度</span>
+                  <select
+                    v-model="draft.testReasoningEffort"
+                    :disabled="running"
+                    aria-label="统一测试推理强度"
+                  >
+                    <option
+                      v-for="effort in REASONING_EFFORT_LEVELS"
+                      :key="effort"
+                      :value="effort"
+                    >
+                      {{ formatReasoningEffort(effort) }}
+                    </option>
+                  </select>
+                </label>
                 <button
                   v-if="supportsDegradation"
                   type="button"
@@ -454,7 +473,10 @@
                     <strong>{{
                       probe.account_name || `账号 #${probe.account_id}`
                     }}</strong>
-                    <span class="tag">{{ probe.model || "自动模型" }}</span>
+                    <span class="tag">
+                      {{ probe.model || "自动模型" }}
+                      · {{ formatReasoningEffort(probe.reasoning_effort) }}
+                    </span>
                   </div>
                   <details>
                     <summary>
@@ -522,6 +544,8 @@ import type {
   AccountSchedulerOverview,
 } from "@/api/admin/accountScheduler";
 import { useAppStore } from "@/stores";
+import { REASONING_EFFORT_LEVELS } from "@/constants/channel";
+import { formatReasoningEffort } from "@/utils/format";
 
 const appStore = useAppStore();
 const overview = ref<AccountSchedulerOverview | null>(null);
@@ -539,6 +563,7 @@ const draft = reactive({
   degradationFactorEnabled: true,
   intervalSeconds: 600,
   testModel: "",
+  testReasoningEffort: "medium",
 });
 let overviewTimer: number | undefined;
 let overviewRequestInFlight = false;
@@ -609,7 +634,8 @@ const hasChanges = computed(() => {
     draft.enabled !== group.degradation_enabled ||
     draft.degradationFactorEnabled !== group.degradation_factor_enabled ||
     draft.intervalSeconds !== group.interval_seconds ||
-    draft.testModel !== group.test_model
+    draft.testModel !== group.test_model ||
+    draft.testReasoningEffort !== group.test_reasoning_effort
   );
 });
 
@@ -621,6 +647,7 @@ watch(
     draft.degradationFactorEnabled = group.degradation_factor_enabled;
     draft.intervalSeconds = group.interval_seconds || 600;
     draft.testModel = group.degradation_supported ? group.test_model || "" : "";
+    draft.testReasoningEffort = group.test_reasoning_effort || "medium";
   },
   { immediate: true },
 );
@@ -673,6 +700,7 @@ async function saveSettings() {
       degradation_factor_enabled: draft.degradationFactorEnabled,
       interval_seconds: draft.intervalSeconds,
       test_model: draft.testModel,
+      test_reasoning_effort: draft.testReasoningEffort,
     });
     appStore.showSuccess("账号调度配置已保存");
     await load(true);
@@ -690,6 +718,7 @@ async function runGroup() {
     const result = await adminAPI.accountScheduler.runNow({
       group_id: selectedGroup.value.id,
       model: draft.testModel,
+      reasoning_effort: draft.testReasoningEffort,
     });
     const summary = `测试完成：${result.run} 条，跳过 ${result.skipped} 条，失败 ${result.failed} 条`;
     const errorMessage = firstRunError(result);

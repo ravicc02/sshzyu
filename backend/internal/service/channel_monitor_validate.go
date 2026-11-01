@@ -135,6 +135,25 @@ func normalizeChannelMonitorIntelligenceInterval(seconds int) int {
 	return seconds
 }
 
+func validateChannelMonitorIntelligenceReasoningEffort(model, effort string) error {
+	effort = strings.TrimSpace(effort)
+	if effort == "" {
+		return nil
+	}
+	if normalizeOpenAIReasoningEffortForModel(effort, model) == "" {
+		return ErrChannelMonitorInvalidIntelligenceReasoningEffort
+	}
+	return nil
+}
+
+func normalizeChannelMonitorIntelligenceReasoningEffort(model, effort string) string {
+	normalized := normalizeOpenAIReasoningEffortForModel(strings.TrimSpace(effort), model)
+	if normalized == "" {
+		return DefaultChannelMonitorIntelligenceReasoningEffort
+	}
+	return normalized
+}
+
 // validateEndpoint 校验 endpoint：
 //   - scheme 强制 https（本地 compose 可显式允许回环地址使用 http）
 //   - 允许上游路径前缀（如 /anthropic），不允许 query/fragment

@@ -100,6 +100,7 @@ const maxChannelMonitorNameRunes = 100
 // ExtraHeaders to the service layer.
 const ChannelMonitorDuplicateOperationIDMetadataKey = "sub2api:duplicate_operation_id"
 const ChannelMonitorIntelligenceIntervalMetadataKey = "sub2api:intelligence_interval_seconds"
+const ChannelMonitorIntelligenceReasoningEffortMetadataKey = "sub2api:intelligence_reasoning_effort"
 
 // NewChannelMonitorService 创建渠道监控服务实例。
 func NewChannelMonitorService(repo ChannelMonitorRepository, encryptor SecretEncryptor) *ChannelMonitorService {
@@ -185,16 +186,20 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 		ProbeFallbackEnabled:        p.ProbeFallbackEnabled,
 		IntelligenceEnabled:         p.IntelligenceEnabled,
 		IntelligenceIntervalSeconds: normalizeChannelMonitorIntelligenceInterval(p.IntelligenceIntervalSeconds),
-		Enabled:                     p.Enabled,
-		IntervalSeconds:             p.IntervalSeconds,
-		JitterSeconds:               p.JitterSeconds,
-		CreatedBy:                   p.CreatedBy,
-		TemplateID:                  p.TemplateID,
-		ExtraHeaders:                emptyHeadersIfNil(p.ExtraHeaders),
-		BodyOverrideMode:            defaultBodyMode(p.BodyOverrideMode),
-		BodyOverride:                p.BodyOverride,
-		CheckMode:                   checkMode,
-		AccountID:                   cloneInt64Pointer(p.AccountID),
+		IntelligenceReasoningEffort: normalizeChannelMonitorIntelligenceReasoningEffort(
+			p.PrimaryModel,
+			p.IntelligenceReasoningEffort,
+		),
+		Enabled:          p.Enabled,
+		IntervalSeconds:  p.IntervalSeconds,
+		JitterSeconds:    p.JitterSeconds,
+		CreatedBy:        p.CreatedBy,
+		TemplateID:       p.TemplateID,
+		ExtraHeaders:     emptyHeadersIfNil(p.ExtraHeaders),
+		BodyOverrideMode: defaultBodyMode(p.BodyOverrideMode),
+		BodyOverride:     p.BodyOverride,
+		CheckMode:        checkMode,
+		AccountID:        cloneInt64Pointer(p.AccountID),
 	}
 	if err := s.repo.Create(ctx, m); err != nil {
 		return nil, fmt.Errorf("create channel monitor: %w", err)
@@ -256,6 +261,7 @@ func (s *ChannelMonitorService) Duplicate(
 		ProbeFallbackEnabled:        source.ProbeFallbackEnabled,
 		IntelligenceEnabled:         source.IntelligenceEnabled,
 		IntelligenceIntervalSeconds: source.IntelligenceIntervalSeconds,
+		IntelligenceReasoningEffort: source.IntelligenceReasoningEffort,
 		Enabled:                     false,
 		IntervalSeconds:             source.IntervalSeconds,
 		JitterSeconds:               source.JitterSeconds,
@@ -424,6 +430,9 @@ func validateCreateParams(p ChannelMonitorCreateParams) error {
 	}
 	if normalizeMonitorPrimaryModel(p.Provider, checkMode, p.PrimaryModel) == "" {
 		return ErrChannelMonitorMissingPrimaryModel
+	}
+	if err := validateChannelMonitorIntelligenceReasoningEffort(p.PrimaryModel, p.IntelligenceReasoningEffort); err != nil {
+		return err
 	}
 	return nil
 }
@@ -669,7 +678,8 @@ func (s *ChannelMonitorService) runCheck(ctx context.Context, id int64, schedule
 			intelligence = runIntelligenceCheckForModel(ctx, m.Endpoint, m.APIKey, m.PrimaryModel, &CheckOptions{
 				APIMode: m.APIMode, ExtraHeaders: m.ExtraHeaders,
 				BodyOverrideMode: m.BodyOverrideMode, BodyOverride: m.BodyOverride, ReasoningProbe: true,
-				InternalProbe: true,
+				ReasoningEffort: m.IntelligenceReasoningEffort,
+				InternalProbe:   true,
 			})
 			return nil
 		})
@@ -1084,6 +1094,10 @@ func applyMonitorUpdate(existing *ChannelMonitor, p ChannelMonitorUpdateParams) 
 			return ErrChannelMonitorMissingPrimaryModel
 		}
 		existing.PrimaryModel = primaryModel
+		existing.IntelligenceReasoningEffort = normalizeChannelMonitorIntelligenceReasoningEffort(
+			primaryModel,
+			existing.IntelligenceReasoningEffort,
+		)
 	} else if providerChanged && existing.Provider == MonitorProviderGrok {
 		existing.PrimaryModel = MonitorDefaultGrokModel
 	}
@@ -1112,6 +1126,18 @@ func applyMonitorUpdate(existing *ChannelMonitor, p ChannelMonitorUpdateParams) 
 			return err
 		}
 		existing.IntelligenceIntervalSeconds = *p.IntelligenceIntervalSeconds
+	}
+	if p.IntelligenceReasoningEffort != nil {
+		if err := validateChannelMonitorIntelligenceReasoningEffort(
+			existing.PrimaryModel,
+			*p.IntelligenceReasoningEffort,
+		); err != nil {
+			return err
+		}
+		existing.IntelligenceReasoningEffort = normalizeChannelMonitorIntelligenceReasoningEffort(
+			existing.PrimaryModel,
+			*p.IntelligenceReasoningEffort,
+		)
 	}
 	if p.Enabled != nil {
 		existing.Enabled = *p.Enabled

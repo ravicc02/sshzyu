@@ -68,8 +68,9 @@ type TestEvent struct {
 // AccountTestOptions carries optional media for admin connectivity tests.
 // ImageDataURL / AudioDataURL are full data URLs (data:<mime>;base64,...).
 type AccountTestOptions struct {
-	ImageDataURL string
-	AudioDataURL string
+	ImageDataURL    string
+	AudioDataURL    string
+	ReasoningEffort string
 }
 
 func firstAccountTestOptions(opts []AccountTestOptions) AccountTestOptions {
@@ -391,7 +392,9 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		case APIProtocolAdaptive:
 			return s.testCNProviderAdaptiveConnection(c, account, modelID, prompt)
 		case APIProtocolResponses:
-			return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
+			return s.testOpenAIAccountConnection(
+				c, account, modelID, prompt, normalizeAccountTestMode(mode), testOpts.ReasoningEffort,
+			)
 		case APIProtocolChatCompletions:
 			return s.testCNProviderChatCompletionsConnection(c, account, modelID, prompt)
 		case APIProtocolAnthropic:
@@ -400,7 +403,9 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	}
 
 	if account.IsOpenAI() {
-		return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
+		return s.testOpenAIAccountConnection(
+			c, account, modelID, prompt, normalizeAccountTestMode(mode), testOpts.ReasoningEffort,
+		)
 	}
 
 	if account.IsGemini() {
@@ -797,7 +802,14 @@ func (s *AccountTestService) testBedrockAccountConnection(c *gin.Context, ctx co
 }
 
 // testOpenAIAccountConnection tests an OpenAI account's connection
-func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account *Account, modelID string, prompt string, mode string) error {
+func (s *AccountTestService) testOpenAIAccountConnection(
+	c *gin.Context,
+	account *Account,
+	modelID string,
+	prompt string,
+	mode string,
+	reasoningEfforts ...string,
+) error {
 	ctx := c.Request.Context()
 	mode = normalizeAccountTestMode(mode)
 
@@ -812,6 +824,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	// /responses wire and does NOT apply the legacy compact-only mapping
 	// (post-#5641 semantics: compact_model_mapping is /responses/compact-only).
 	testModelID = account.GetMappedModel(testModelID)
+	reasoningEffort := normalizeOpenAIReasoningEffortForModel(firstNonEmpty(reasoningEfforts...), testModelID)
 	if mode == AccountTestModeCompact {
 		return s.testOpenAICompactConnection(c, account, testModelID)
 	}
@@ -870,7 +883,9 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid base URL: %s", err.Error()))
 		}
 		if !openai_compat.ShouldUseResponsesAPI(account.Extra) {
-			return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken)
+			return s.testOpenAIChatCompletionsConnection(
+				c, account, testModelID, prompt, normalizedBaseURL, authToken, reasoningEffort,
+			)
 		}
 		apiURL = buildOpenAIResponsesURLForPlatform(credentialAccount.Platform, normalizedBaseURL)
 	} else {
@@ -891,6 +906,9 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 		upstreamTestModelID = normalizeOpenAIModelForUpstream(credentialAccount, testModelID)
 	}
 	payload := createOpenAITestPayload(upstreamTestModelID, isOAuth, prompt)
+	if reasoningEffort != "" {
+		payload["reasoning"] = map[string]any{"effort": reasoningEffort}
+	}
 	payloadBytes, _ := json.Marshal(payload)
 
 	// Send test_start event once. A task-invalid Agent Identity response may
@@ -973,7 +991,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 				return s.sendErrorAndEnd(c, fmt.Sprintf("Agent Identity task recovery failed: %s", err.Error()))
 			}
 			c.Request = c.Request.WithContext(markAgentIdentityTaskRecoveryTried(ctx))
-			return s.testOpenAIAccountConnection(c, account, modelID, prompt, mode)
+			return s.testOpenAIAccountConnection(c, account, modelID, prompt, mode, reasoningEffort)
 		}
 		if resp.StatusCode == http.StatusTooManyRequests {
 			s.reconcileOpenAI429State(ctx, account, resp.Header, body)
@@ -2122,9 +2140,11 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 	prompt string,
 	normalizedBaseURL string,
 	authToken string,
+	reasoningEfforts ...string,
 ) error {
 	ctx := c.Request.Context()
 	apiURL := buildOpenAIChatCompletionsURL(normalizedBaseURL)
+	reasoningEffort := normalizeOpenAIReasoningEffortForModel(firstNonEmpty(reasoningEfforts...), testModelID)
 
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -2133,6 +2153,9 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 	c.Writer.Flush()
 
 	payload := createOpenAIChatCompletionsTestPayload(testModelID, prompt)
+	if reasoningEffort != "" {
+		payload["reasoning_effort"] = reasoningEffort
+	}
 	payloadBytes, _ := json.Marshal(payload)
 
 	s.sendEvent(c, TestEvent{Type: "test_start", Model: testModelID})
@@ -3315,8 +3338,27 @@ func (s *AccountTestService) RunTestBackground(ctx context.Context, accountID in
 // account test path used by administrator connection tests. The caller decides
 // whether the returned text passes the challenge; transport failures stay
 // distinct from an incorrect answer.
-func (s *AccountTestService) RunDegradationProbe(ctx context.Context, accountID int64, modelID, prompt string) (*ScheduledTestResult, error) {
-	result, err := s.runTestBackground(ctx, accountID, modelID, prompt)
+func (s *AccountTestService) RunDegradationProbe(
+	ctx context.Context,
+	accountID int64,
+	modelID string,
+	prompt string,
+	reasoningEfforts ...string,
+) (*ScheduledTestResult, error) {
+	reasoningEffort := normalizeOpenAIReasoningEffortForModel(
+		firstNonEmpty(reasoningEfforts...),
+		modelID,
+	)
+	if reasoningEffort == "" {
+		reasoningEffort = "medium"
+	}
+	result, err := s.runTestBackground(
+		ctx,
+		accountID,
+		modelID,
+		prompt,
+		AccountTestOptions{ReasoningEffort: reasoningEffort},
+	)
 	if err != nil || !shouldFallbackDegradationProbe(result) || s == nil || s.accountRepo == nil {
 		return result, err
 	}
@@ -3327,7 +3369,13 @@ func (s *AccountTestService) RunDegradationProbe(ctx context.Context, accountID 
 		return result, nil
 	}
 
-	fallbackResult, fallbackErr := s.runChatCompletionsDegradationProbe(ctx, account, modelID, prompt)
+	fallbackResult, fallbackErr := s.runChatCompletionsDegradationProbe(
+		ctx,
+		account,
+		modelID,
+		prompt,
+		reasoningEffort,
+	)
 	if fallbackErr != nil {
 		return result, nil
 	}
@@ -3400,6 +3448,7 @@ func (s *AccountTestService) runChatCompletionsDegradationProbe(
 	account *Account,
 	modelID string,
 	prompt string,
+	reasoningEffort string,
 ) (*ScheduledTestResult, error) {
 	startedAt := time.Now()
 
@@ -3443,6 +3492,7 @@ func (s *AccountTestService) runChatCompletionsDegradationProbe(
 		prompt,
 		normalizedBaseURL,
 		authToken,
+		reasoningEffort,
 	)
 	return scheduledTestResultFromCapture(startedAt, testErr, w.Body.String()), nil
 }
@@ -3458,7 +3508,13 @@ func failedScheduledTestResult(startedAt time.Time, message string) *ScheduledTe
 	}
 }
 
-func (s *AccountTestService) runTestBackground(ctx context.Context, accountID int64, modelID, prompt string) (*ScheduledTestResult, error) {
+func (s *AccountTestService) runTestBackground(
+	ctx context.Context,
+	accountID int64,
+	modelID string,
+	prompt string,
+	opts ...AccountTestOptions,
+) (*ScheduledTestResult, error) {
 	startedAt := time.Now()
 
 	w := httptest.NewRecorder()
@@ -3466,7 +3522,7 @@ func (s *AccountTestService) runTestBackground(ctx context.Context, accountID in
 	ginCtx.Request = (&http.Request{}).WithContext(ctx)
 	ginCtx.Set(accountTestBackgroundKey, true)
 
-	testErr := s.TestAccountConnection(ginCtx, accountID, modelID, prompt, AccountTestModeDefault)
+	testErr := s.TestAccountConnection(ginCtx, accountID, modelID, prompt, AccountTestModeDefault, opts...)
 	return scheduledTestResultFromCapture(startedAt, testErr, w.Body.String()), nil
 }
 

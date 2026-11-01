@@ -48,6 +48,7 @@ type AccountSchedulerGroupSetting struct {
 	DegradationFactorEnabled bool
 	IntervalSeconds          int
 	TestModel                string
+	TestReasoningEffort      string
 	UpdatedAt                time.Time
 }
 
@@ -117,16 +118,17 @@ func (s AccountDegradationStat) DegradationRate() (float64, bool) {
 }
 
 type AccountDegradationProbe struct {
-	ID           int64     `json:"id"`
-	AccountID    int64     `json:"account_id"`
-	AccountName  string    `json:"account_name"`
-	GroupID      int64     `json:"group_id"`
-	Model        string    `json:"model"`
-	Status       string    `json:"status"`
-	ResponseText string    `json:"response_text"`
-	ErrorMessage string    `json:"error_message"`
-	LatencyMs    int64     `json:"latency_ms"`
-	CheckedAt    time.Time `json:"checked_at"`
+	ID              int64     `json:"id"`
+	AccountID       int64     `json:"account_id"`
+	AccountName     string    `json:"account_name"`
+	GroupID         int64     `json:"group_id"`
+	Model           string    `json:"model"`
+	ReasoningEffort string    `json:"reasoning_effort"`
+	Status          string    `json:"status"`
+	ResponseText    string    `json:"response_text"`
+	ErrorMessage    string    `json:"error_message"`
+	LatencyMs       int64     `json:"latency_ms"`
+	CheckedAt       time.Time `json:"checked_at"`
 }
 
 type AccountSchedulerOverview struct {
@@ -154,6 +156,7 @@ type AccountSchedulerGroupView struct {
 	DegradationFactorEnabled bool                  `json:"degradation_factor_enabled"`
 	IntervalSeconds          int                   `json:"interval_seconds"`
 	TestModel                string                `json:"test_model"`
+	TestReasoningEffort      string                `json:"test_reasoning_effort"`
 	ScoreMax                 float64               `json:"score_max"`
 	ModelCandidates          []string              `json:"model_candidates"`
 	OAuthFirst               bool                  `json:"oauth_first"`
@@ -192,13 +195,15 @@ type AccountSchedulerSettingInput struct {
 	DegradationFactorEnabled *bool    `json:"degradation_factor_enabled"`
 	IntervalSeconds          *int     `json:"interval_seconds"`
 	TestModel                *string  `json:"test_model"`
+	TestReasoningEffort      *string  `json:"test_reasoning_effort"`
 	DegradationWeight        *float64 `json:"degradation_weight"`
 }
 
 type AccountSchedulerRunInput struct {
-	GroupID   int64  `json:"group_id"`
-	AccountID int64  `json:"account_id,omitempty"`
-	Model     string `json:"model,omitempty"`
+	GroupID         int64  `json:"group_id"`
+	AccountID       int64  `json:"account_id,omitempty"`
+	Model           string `json:"model,omitempty"`
+	ReasoningEffort string `json:"reasoning_effort,omitempty"`
 }
 
 type AccountSchedulerRunResult struct {
@@ -378,6 +383,7 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 				GroupID:                  group.ID,
 				DegradationFactorEnabled: true,
 				IntervalSeconds:          accountSchedulerDefaultIntervalSeconds,
+				TestReasoningEffort:      "medium",
 			}
 		}
 		if setting.IntervalSeconds <= 0 {
@@ -386,6 +392,10 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 		if degradationSupported && strings.TrimSpace(setting.TestModel) == "" {
 			setting.TestModel = resolveAccountSchedulerProbeModel(setting, group, probeModels[group.ID])
 		}
+		setting.TestReasoningEffort = normalizeAccountSchedulerReasoningEffort(
+			setting.TestModel,
+			setting.TestReasoningEffort,
+		)
 		if !degradationSupported {
 			setting.DegradationEnabled = false
 			setting.TestModel = ""
@@ -465,6 +475,7 @@ func (s *AccountSchedulerService) Overview(ctx context.Context) (*AccountSchedul
 			DegradationFactorEnabled: setting.DegradationFactorEnabled,
 			IntervalSeconds:          setting.IntervalSeconds,
 			TestModel:                setting.TestModel,
+			TestReasoningEffort:      setting.TestReasoningEffort,
 			ScoreMax:                 groupScoreMax,
 			ModelCandidates:          group.ModelCandidates,
 			OAuthFirst:               oauthFirst,
@@ -516,6 +527,7 @@ func (s *AccountSchedulerService) UpdateSetting(ctx context.Context, input Accou
 			GroupID:                  input.GroupID,
 			DegradationFactorEnabled: true,
 			IntervalSeconds:          accountSchedulerDefaultIntervalSeconds,
+			TestReasoningEffort:      "medium",
 		}
 	}
 	if input.DegradationEnabled != nil {
@@ -529,6 +541,13 @@ func (s *AccountSchedulerService) UpdateSetting(ctx context.Context, input Accou
 	}
 	if input.TestModel != nil {
 		setting.TestModel = strings.TrimSpace(*input.TestModel)
+	}
+	if input.TestReasoningEffort != nil {
+		rawEffort := strings.TrimSpace(*input.TestReasoningEffort)
+		if rawEffort != "" && normalizeOpenAIReasoningEffortForModel(rawEffort, setting.TestModel) == "" {
+			return nil, ErrAccountSchedulerInvalidSetting
+		}
+		setting.TestReasoningEffort = normalizeAccountSchedulerReasoningEffort(setting.TestModel, rawEffort)
 	}
 	if setting.IntervalSeconds < accountSchedulerMinimumIntervalSeconds || setting.IntervalSeconds > accountSchedulerMaximumIntervalSeconds {
 		return nil, ErrAccountSchedulerInvalidSetting
@@ -591,7 +610,11 @@ func (s *AccountSchedulerService) RunNow(ctx context.Context, input AccountSched
 		if strings.TrimSpace(input.Model) != "" {
 			model = strings.TrimSpace(input.Model)
 		}
-		probe, err := s.runProbe(ctx, account, model)
+		reasoningEffort := normalizeAccountSchedulerReasoningEffort(model, setting.TestReasoningEffort)
+		if strings.TrimSpace(input.ReasoningEffort) != "" {
+			reasoningEffort = normalizeAccountSchedulerReasoningEffort(model, input.ReasoningEffort)
+		}
+		probe, err := s.runProbe(ctx, account, model, reasoningEffort)
 		if err != nil {
 			result.Failed++
 			result.Errors = append(result.Errors, fmt.Sprintf("%s (#%d): %s", account.Name, account.ID, err.Error()))
@@ -673,7 +696,8 @@ func (s *AccountSchedulerService) RunScheduled(ctx context.Context) (*AccountSch
 		setting := settings[account.GroupID]
 		group := findAccountSchedulerGroup(groups, account.GroupID)
 		model := resolveAccountSchedulerProbeModel(setting, *group, probeModels[account.GroupID])
-		probe, err := s.runProbe(ctx, account, model)
+		reasoningEffort := normalizeAccountSchedulerReasoningEffort(model, setting.TestReasoningEffort)
+		probe, err := s.runProbe(ctx, account, model, reasoningEffort)
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
@@ -779,17 +803,29 @@ func (s *AccountSchedulerService) accountDegradationScoreEntry(
 	return entry, true
 }
 
-func (s *AccountSchedulerService) runProbe(ctx context.Context, account AccountSchedulerAccount, model string) (*AccountDegradationProbe, error) {
+func (s *AccountSchedulerService) runProbe(
+	ctx context.Context,
+	account AccountSchedulerAccount,
+	model string,
+	reasoningEffort string,
+) (*AccountDegradationProbe, error) {
 	startedAt := time.Now()
 	probe := &AccountDegradationProbe{
-		AccountID:   account.ID,
-		AccountName: account.Name,
-		GroupID:     account.GroupID,
-		Model:       model,
-		Status:      AccountDegradationStatusError,
-		CheckedAt:   startedAt,
+		AccountID:       account.ID,
+		AccountName:     account.Name,
+		GroupID:         account.GroupID,
+		Model:           model,
+		ReasoningEffort: reasoningEffort,
+		Status:          AccountDegradationStatusError,
+		CheckedAt:       startedAt,
 	}
-	result, err := s.accountTestSvc.RunDegradationProbe(ctx, account.ID, model, monitorIntelligencePrompt)
+	result, err := s.accountTestSvc.RunDegradationProbe(
+		ctx,
+		account.ID,
+		model,
+		monitorIntelligencePrompt,
+		reasoningEffort,
+	)
 	probe.LatencyMs = time.Since(startedAt).Milliseconds()
 	if err != nil || result == nil || result.Status != "success" {
 		if err != nil {
@@ -970,6 +1006,14 @@ func filterAccountDegradationScores(scores map[int64]AccountDegradationScore, ac
 
 func accountSchedulerStatKey(groupID, accountID int64) string {
 	return strconv.FormatInt(groupID, 10) + ":" + strconv.FormatInt(accountID, 10)
+}
+
+func normalizeAccountSchedulerReasoningEffort(model, effort string) string {
+	normalized := normalizeOpenAIReasoningEffortForModel(strings.TrimSpace(effort), model)
+	if normalized == "" {
+		return "medium"
+	}
+	return normalized
 }
 
 func firstAccountSchedulerModel(models []string) string {

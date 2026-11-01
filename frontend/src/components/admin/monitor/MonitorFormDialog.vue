@@ -196,15 +196,27 @@
           <Toggle v-model="form.intelligence_enabled" />
         </div>
         <div v-if="form.intelligence_enabled" class="mt-3 border-t border-gray-200 pt-3 dark:border-dark-700">
-          <label class="input-label">{{ t('admin.channelMonitor.form.intelligenceIntervalMinutes') }}</label>
-          <input
-            v-model.number="intelligenceIntervalMinutes"
-            type="number"
-            min="5"
-            max="1440"
-            step="5"
-            class="input"
-          />
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label class="input-label">{{ t('admin.channelMonitor.form.intelligenceIntervalMinutes') }}</label>
+              <input
+                v-model.number="intelligenceIntervalMinutes"
+                type="number"
+                min="5"
+                max="1440"
+                step="5"
+                class="input"
+              />
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.channelMonitor.form.intelligenceReasoningEffort') }}</label>
+              <select v-model="form.intelligence_reasoning_effort" class="input">
+                <option v-for="effort in REASONING_EFFORT_LEVELS" :key="effort" :value="effort">
+                  {{ formatReasoningEffort(effort) }}
+                </option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -342,6 +354,8 @@ import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ModelTagInput from '@/components/admin/channel/ModelTagInput.vue'
 import { getPlatformTextClass } from '@/components/admin/channel/types'
+import { REASONING_EFFORT_LEVELS } from '@/constants/channel'
+import { formatReasoningEffort } from '@/utils/format'
 import MonitorKeyPickerDialog from '@/components/admin/monitor/MonitorKeyPickerDialog.vue'
 import MonitorAdvancedRequestConfig from '@/components/admin/monitor/MonitorAdvancedRequestConfig.vue'
 import ProviderIcon from '@/components/user/monitor/ProviderIcon.vue'
@@ -428,6 +442,7 @@ interface MonitorForm {
   probe_fallback_enabled: boolean
   intelligence_enabled: boolean
   intelligence_interval_seconds: number
+  intelligence_reasoning_effort: string
   interval_seconds: number
   jitter_seconds: number
   enabled: boolean
@@ -453,6 +468,7 @@ const form = reactive<MonitorForm>({
   probe_fallback_enabled: true,
   intelligence_enabled: true,
   intelligence_interval_seconds: 1800,
+  intelligence_reasoning_effort: 'medium',
   interval_seconds: systemDefaultInterval.value,
   jitter_seconds: 0,
   enabled: true,
@@ -968,6 +984,7 @@ function resetForm() {
   form.probe_fallback_enabled = true
   form.intelligence_enabled = true
   form.intelligence_interval_seconds = 1800
+  form.intelligence_reasoning_effort = 'medium'
   form.interval_seconds = systemDefaultInterval.value
   form.jitter_seconds = 0
   form.enabled = true
@@ -994,6 +1011,7 @@ function loadFromMonitor(m: ChannelMonitor) {
   form.probe_fallback_enabled = true
   form.intelligence_enabled = m.intelligence_enabled !== false
   form.intelligence_interval_seconds = m.intelligence_interval_seconds || 1800
+  form.intelligence_reasoning_effort = m.intelligence_reasoning_effort || 'medium'
   form.interval_seconds = m.interval_seconds || systemDefaultInterval.value
   form.jitter_seconds = m.jitter_seconds || 0
   form.enabled = m.enabled
@@ -1145,6 +1163,7 @@ function buildPayload(): CreateParams {
       probe_fallback_enabled: true,
     intelligence_enabled: !isCompositeGroup.value && form.provider === PROVIDER_OPENAI ? form.intelligence_enabled : false,
     intelligence_interval_seconds: form.intelligence_interval_seconds,
+    intelligence_reasoning_effort: form.intelligence_reasoning_effort,
     enabled: form.enabled,
     interval_seconds: form.interval_seconds,
     jitter_seconds: form.jitter_seconds || 0,

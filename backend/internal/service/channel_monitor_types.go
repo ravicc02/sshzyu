@@ -47,6 +47,7 @@ type ChannelMonitor struct {
 	ProbeFallbackEnabled        bool
 	IntelligenceEnabled         bool
 	IntelligenceIntervalSeconds int
+	IntelligenceReasoningEffort string
 	Enabled                     bool
 	IntervalSeconds             int
 	JitterSeconds               int // 每次调度 ± [0, jitter] 的随机偏移（秒），0 = 固定间隔
@@ -100,6 +101,7 @@ type ChannelMonitorCreateParams struct {
 	ProbeFallbackEnabled        bool
 	IntelligenceEnabled         bool
 	IntelligenceIntervalSeconds int
+	IntelligenceReasoningEffort string
 	Enabled                     bool
 	IntervalSeconds             int
 	JitterSeconds               int
@@ -128,6 +130,7 @@ type ChannelMonitorUpdateParams struct {
 	ProbeFallbackEnabled        *bool
 	IntelligenceEnabled         *bool
 	IntelligenceIntervalSeconds *int
+	IntelligenceReasoningEffort *string
 	Enabled                     *bool
 	IntervalSeconds             *int
 	JitterSeconds               *int

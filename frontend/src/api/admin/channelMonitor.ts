@@ -81,6 +81,8 @@ export interface ChannelMonitor {
   intelligence_enabled?: boolean
   /** Independent cadence for the OpenAI reasoning probe. */
   intelligence_interval_seconds?: number
+  /** Reasoning effort used by the OpenAI reasoning probe. */
+  intelligence_reasoning_effort?: string
   enabled: boolean
   interval_seconds: number
   /** 每次调度在 interval 基础上 ± [0, jitter] 的随机偏移（秒），0 = 固定间隔 */
@@ -161,6 +163,7 @@ export interface CreateParams {
   probe_fallback_enabled?: boolean
   intelligence_enabled?: boolean
   intelligence_interval_seconds?: number
+  intelligence_reasoning_effort?: string
   enabled?: boolean
   interval_seconds: number
   jitter_seconds?: number

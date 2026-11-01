@@ -863,6 +863,11 @@ func entToServiceMonitor(row *dbent.ChannelMonitor) *service.ChannelMonitor {
 		}
 	}
 	delete(headers, service.ChannelMonitorIntelligenceIntervalMetadataKey)
+	intelligenceReasoningEffort := service.DefaultChannelMonitorIntelligenceReasoningEffort
+	if raw := strings.TrimSpace(headers[service.ChannelMonitorIntelligenceReasoningEffortMetadataKey]); raw != "" {
+		intelligenceReasoningEffort = raw
+	}
+	delete(headers, service.ChannelMonitorIntelligenceReasoningEffortMetadataKey)
 	out := &service.ChannelMonitor{
 		ID:                          row.ID,
 		Name:                        row.Name,
@@ -877,6 +882,7 @@ func entToServiceMonitor(row *dbent.ChannelMonitor) *service.ChannelMonitor {
 		ProbeFallbackEnabled:        row.ProbeFallbackEnabled,
 		IntelligenceEnabled:         row.IntelligenceEnabled,
 		IntelligenceIntervalSeconds: intelligenceInterval,
+		IntelligenceReasoningEffort: intelligenceReasoningEffort,
 		Enabled:                     row.Enabled,
 		IntervalSeconds:             row.IntervalSeconds,
 		JitterSeconds:               row.JitterSeconds,
@@ -913,10 +919,11 @@ func channelMonitorHeadersForPersistence(m *service.ChannelMonitor) map[string]s
 	if m == nil {
 		return map[string]string{}
 	}
-	headers := make(map[string]string, len(m.ExtraHeaders)+2)
+	headers := make(map[string]string, len(m.ExtraHeaders)+3)
 	for key, value := range m.ExtraHeaders {
 		if key == service.ChannelMonitorDuplicateOperationIDMetadataKey ||
-			key == service.ChannelMonitorIntelligenceIntervalMetadataKey {
+			key == service.ChannelMonitorIntelligenceIntervalMetadataKey ||
+			key == service.ChannelMonitorIntelligenceReasoningEffortMetadataKey {
 			continue
 		}
 		headers[key] = value
@@ -924,6 +931,11 @@ func channelMonitorHeadersForPersistence(m *service.ChannelMonitor) map[string]s
 	headers[service.ChannelMonitorIntelligenceIntervalMetadataKey] = strconv.Itoa(
 		normalizeChannelMonitorIntelligenceIntervalRepo(m.IntelligenceIntervalSeconds),
 	)
+	reasoningEffort := strings.TrimSpace(m.IntelligenceReasoningEffort)
+	if reasoningEffort == "" {
+		reasoningEffort = service.DefaultChannelMonitorIntelligenceReasoningEffort
+	}
+	headers[service.ChannelMonitorIntelligenceReasoningEffortMetadataKey] = reasoningEffort
 	if operationID := strings.TrimSpace(m.DuplicateOperationID); operationID != "" {
 		headers[service.ChannelMonitorDuplicateOperationIDMetadataKey] = operationID
 	}

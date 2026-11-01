@@ -51,6 +51,7 @@ type channelMonitorCreateRequest struct {
 	ProbeFallbackEnabled        *bool             `json:"probe_fallback_enabled"`
 	IntelligenceEnabled         *bool             `json:"intelligence_enabled"`
 	IntelligenceIntervalSeconds int               `json:"intelligence_interval_seconds" binding:"omitempty,min=300,max=86400"`
+	IntelligenceReasoningEffort string            `json:"intelligence_reasoning_effort" binding:"omitempty,oneof=none minimal low medium high xhigh max"`
 	Enabled                     *bool             `json:"enabled"`
 	IntervalSeconds             int               `json:"interval_seconds" binding:"required,min=15,max=3600"`
 	JitterSeconds               int               `json:"jitter_seconds" binding:"omitempty,min=0,max=3585"`
@@ -79,6 +80,7 @@ type channelMonitorUpdateRequest struct {
 	ProbeFallbackEnabled        *bool              `json:"probe_fallback_enabled"`
 	IntelligenceEnabled         *bool              `json:"intelligence_enabled"`
 	IntelligenceIntervalSeconds *int               `json:"intelligence_interval_seconds" binding:"omitempty,min=300,max=86400"`
+	IntelligenceReasoningEffort *string            `json:"intelligence_reasoning_effort" binding:"omitempty,oneof=none minimal low medium high xhigh max"`
 	Enabled                     *bool              `json:"enabled"`
 	IntervalSeconds             *int               `json:"interval_seconds" binding:"omitempty,min=15,max=3600"`
 	JitterSeconds               *int               `json:"jitter_seconds" binding:"omitempty,min=0,max=3585"`
@@ -108,6 +110,7 @@ type channelMonitorResponse struct {
 	ProbeFallbackEnabled        bool                                 `json:"probe_fallback_enabled"`
 	IntelligenceEnabled         bool                                 `json:"intelligence_enabled"`
 	IntelligenceIntervalSeconds int                                  `json:"intelligence_interval_seconds"`
+	IntelligenceReasoningEffort string                               `json:"intelligence_reasoning_effort"`
 	Enabled                     bool                                 `json:"enabled"`
 	IntervalSeconds             int                                  `json:"interval_seconds"`
 	JitterSeconds               int                                  `json:"jitter_seconds"`
@@ -195,6 +198,7 @@ func channelMonitorToResponse(m *service.ChannelMonitor) *channelMonitorResponse
 		ProbeFallbackEnabled:        m.ProbeFallbackEnabled,
 		IntelligenceEnabled:         m.IntelligenceEnabled,
 		IntelligenceIntervalSeconds: m.IntelligenceIntervalSeconds,
+		IntelligenceReasoningEffort: m.IntelligenceReasoningEffort,
 		Enabled:                     m.Enabled,
 		IntervalSeconds:             m.IntervalSeconds,
 		JitterSeconds:               m.JitterSeconds,
@@ -395,6 +399,7 @@ func (h *ChannelMonitorHandler) Create(c *gin.Context) {
 		ProbeFallbackEnabled:        probeFallbackEnabled,
 		IntelligenceEnabled:         intelligenceEnabled,
 		IntelligenceIntervalSeconds: req.IntelligenceIntervalSeconds,
+		IntelligenceReasoningEffort: req.IntelligenceReasoningEffort,
 		Enabled:                     enabled,
 		IntervalSeconds:             req.IntervalSeconds,
 		JitterSeconds:               req.JitterSeconds,
@@ -495,6 +500,7 @@ func (h *ChannelMonitorHandler) Update(c *gin.Context) {
 		ProbeFallbackEnabled:        req.ProbeFallbackEnabled,
 		IntelligenceEnabled:         req.IntelligenceEnabled,
 		IntelligenceIntervalSeconds: req.IntelligenceIntervalSeconds,
+		IntelligenceReasoningEffort: req.IntelligenceReasoningEffort,
 		Enabled:                     req.Enabled,
 		IntervalSeconds:             req.IntervalSeconds,
 		JitterSeconds:               req.JitterSeconds,
