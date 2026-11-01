@@ -30,6 +30,10 @@
                   <span v-if="hasTraffic(row) || hasProbe(row)" :class="hasTraffic(row) ? '' : 'text-sky-700 dark:text-sky-300'">{{ sourceLabel(row) }}</span>
                   <span v-if="row.rate_multiplier != null" class="font-semibold text-teal-700 dark:text-teal-300">{{ t('channelMonitorV2.groupCards.multiplier', { value: formatMultiplier(row.rate_multiplier) }) }}</span>
                 </div>
+                <div v-if="probeModels(row).length" class="mt-1 flex min-w-0 items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400">
+                  <span class="shrink-0">{{ t('channelMonitorV2.groupCards.probeModelsLabel') }}</span>
+                  <span class="truncate" :title="probeModels(row).join(', ')">{{ probeModels(row).join(', ') }}</span>
+                </div>
               </div>
               <span class="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ring-black/5 dark:ring-white/10" :class="stateClass(row)">{{ stale ? t('channelMonitorV2.groupCards.stale') : stateLabel(row) }}</span>
             </header>
@@ -45,24 +49,21 @@
                 <span class="text-[10px] font-semibold text-gray-600 dark:text-gray-300">{{ t('channelMonitorV2.groupCards.providerBreakdown') }}</span>
                 <span class="text-[10px] text-gray-400">{{ t('channelMonitorV2.groupCards.providerCount', { count: compositeProviderCount(row) }) }}</span>
               </div>
-              <div v-if="compositeProviderRows(row).length" class="space-y-1">
-                <div v-for="child in compositeProviderRows(row)" :key="`${child.group_id}:${child.platform}`" class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg bg-white/75 px-2 py-1.5 dark:bg-dark-800/70">
-                  <span class="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-gray-700 dark:text-gray-200">
-                    <ProviderIcon :provider="child.platform" :size="13" />
-                    <span class="truncate">{{ platformLabel(child.platform) }}</span>
-                  </span>
-                  <span class="text-[10px] font-semibold" :class="availabilityClass(child)">{{ availabilityValue(child) }}</span>
-                  <span class="text-[10px] tabular-nums text-gray-500 dark:text-gray-400">{{ latencyValue(child) }}</span>
+              <div v-if="compositeProviderDetails(row).length" class="space-y-1">
+                <div class="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-1.5 px-2 text-[9px] text-gray-400">
+                  <span>{{ t('channelMonitorV2.groupCards.provider') }}</span>
+                  <span>{{ t('channelMonitorV2.groupCards.availability') }}</span>
+                  <span>{{ t('channelMonitorV2.groupCards.latency') }}</span>
+                  <span>{{ t('channelMonitorV2.groupCards.groupMultiplier') }}</span>
                 </div>
-              </div>
-              <div v-else-if="compositeProbeProviders(row).length" class="space-y-1">
-                <div v-for="provider in compositeProbeProviders(row)" :key="provider.platform" class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg bg-white/75 px-2 py-1.5 dark:bg-dark-800/70">
+                <div v-for="provider in compositeProviderDetails(row)" :key="provider.platform" class="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-1.5 rounded-lg bg-white/75 px-2 py-1.5 dark:bg-dark-800/70" :title="providerModelTitle(provider)">
                   <span class="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-gray-700 dark:text-gray-200">
                     <ProviderIcon :provider="provider.platform" :size="13" />
                     <span class="truncate">{{ platformLabel(provider.platform) }}</span>
                   </span>
-                  <span class="text-[10px] font-semibold" :class="probeStateTextClass(provider.health)">{{ probeStateText(provider.health) }}</span>
-                  <span class="text-[10px] tabular-nums text-gray-500 dark:text-gray-400">{{ provider.latency_ms == null ? '—' : formatMonitorMs(provider.latency_ms) }}</span>
+                  <span class="text-[10px] font-semibold" :class="probeStateTextClass(provider.health)">{{ provider.availability }}</span>
+                  <span class="text-[10px] tabular-nums text-gray-500 dark:text-gray-400">{{ provider.latency }}</span>
+                  <span class="text-[10px] font-semibold tabular-nums text-teal-700 dark:text-teal-300">{{ provider.multiplier }}</span>
                 </div>
               </div>
               <p v-else class="px-1 py-1 text-[10px] text-gray-400">{{ t('channelMonitorV2.groupCards.providerNoData') }}</p>
@@ -168,8 +169,25 @@ function compositeProviderRows(row: MonitorMatrixRow): MonitorMatrixRow[] {
     .filter(child => child.group_id === row.group_id && child.group_platform === 'composite' && child.platform !== 'composite')
     .sort((a, b) => platformOrder.indexOf(a.platform) - platformOrder.indexOf(b.platform) || a.platform.localeCompare(b.platform))
 }
-function compositeProbeProviders(row: MonitorMatrixRow) {
-  const providers = new Map<string, { platform: string; health: HealthState; latency_ms: number | null }>()
+
+type CompositeProbeProvider = {
+  platform: string
+  health: HealthState
+  latency_ms: number | null
+  models: string[]
+}
+
+type CompositeProviderDetail = {
+  platform: string
+  health: HealthState
+  availability: string
+  latency: string
+  multiplier: string
+  models: string[]
+}
+
+function compositeProbeProviders(row: MonitorMatrixRow): CompositeProbeProvider[] {
+  const providers = new Map<string, CompositeProbeProvider>()
   const severity: Record<HealthState, number> = { unknown: 0, healthy: 1, warning: 2, critical: 3 }
   for (const probe of probesForRow(row)) {
     const models = [
@@ -181,9 +199,17 @@ function compositeProbeProviders(row: MonitorMatrixRow) {
       const health = probeStatusToHealth(item.status)
       const current = providers.get(platform)
       if (!current || severity[health] > severity[current.health]) {
-        providers.set(platform, { platform, health, latency_ms: item.latency_ms ?? current?.latency_ms ?? null })
+        providers.set(platform, {
+          platform,
+          health,
+          latency_ms: item.latency_ms ?? current?.latency_ms ?? null,
+          models: [...new Set([...(current?.models || []), item.model].filter(Boolean))],
+        })
       } else if (current.latency_ms == null && item.latency_ms != null) {
         current.latency_ms = item.latency_ms
+        current.models = [...new Set([...current.models, item.model].filter(Boolean))]
+      } else {
+        current.models = [...new Set([...current.models, item.model].filter(Boolean))]
       }
     }
   }
@@ -191,8 +217,50 @@ function compositeProbeProviders(row: MonitorMatrixRow) {
     platformOrder.indexOf(a.platform) - platformOrder.indexOf(b.platform) || a.platform.localeCompare(b.platform)
   )
 }
+
+function compositeProviderDetails(row: MonitorMatrixRow): CompositeProviderDetail[] {
+  const probes = new Map(compositeProbeProviders(row).map((provider) => [provider.platform, provider]))
+  const details = new Map<string, CompositeProviderDetail>()
+  for (const child of compositeProviderRows(row)) {
+    const probe = probes.get(child.platform)
+    const latency = latencyValue(child)
+    details.set(child.platform, {
+      platform: child.platform,
+      health: child.health.overall,
+      availability: availabilityValue(child),
+      latency: latency === '—' ? t('channelMonitorV2.groupCards.noLatencySample') : latency,
+      multiplier: providerMultiplier(child.rate_multiplier ?? row.rate_multiplier),
+      models: probe?.models || [],
+    })
+  }
+  for (const probe of probes.values()) {
+    if (details.has(probe.platform)) continue
+    details.set(probe.platform, {
+      platform: probe.platform,
+      health: probe.health,
+      availability: probeStateText(probe.health),
+      latency: probe.latency_ms == null ? t('channelMonitorV2.groupCards.noLatencySample') : formatMonitorMs(probe.latency_ms),
+      multiplier: providerMultiplier(row.rate_multiplier),
+      models: probe.models,
+    })
+  }
+  return [...details.values()].sort((a, b) =>
+    platformOrder.indexOf(a.platform) - platformOrder.indexOf(b.platform) || a.platform.localeCompare(b.platform)
+  )
+}
+
 function compositeProviderCount(row: MonitorMatrixRow) {
-  return compositeProviderRows(row).length || compositeProbeProviders(row).length
+  return compositeProviderDetails(row).length
+}
+
+function providerMultiplier(value: number | null | undefined) {
+  return value == null ? '—' : formatMultiplier(value)
+}
+
+function providerModelTitle(provider: CompositeProviderDetail) {
+  return provider.models.length
+    ? t('channelMonitorV2.groupCards.providerModels', { models: provider.models.join(', ') })
+    : t('channelMonitorV2.groupCards.providerModelsEmpty')
 }
 function probeModelProvider(model: string, fallback: string): string {
   if (/glm|zhipu/i.test(model)) return 'zhipu'
@@ -246,6 +314,15 @@ function matchedProbesForRow(row: MonitorMatrixRow): UserMonitorView[] {
 
 function probesForRow(row: MonitorMatrixRow): UserMonitorView[] {
   return matchedProbesForRow(row)
+}
+
+function probeModels(row: MonitorMatrixRow): string[] {
+  return [...new Set(
+    probesForRow(row)
+      .flatMap((probe) => [probe.primary_model, ...(probe.extra_models || []).map((model) => model.model)])
+      .map((model) => model?.trim())
+      .filter((model): model is string => Boolean(model)),
+  )]
 }
 
 function hasProbe(row: MonitorMatrixRow) {
