@@ -598,7 +598,7 @@ function intelligenceSlots(row: MonitorMatrixRow): Array<TimelineSlot | null> {
     .filter(point => Number.isFinite(Date.parse(point.checked_at)))
     .sort((a, b) => Date.parse(a.checked_at) - Date.parse(b.checked_at))
     .slice(-20)
-  if (points.length > 0) {
+  if (points.length >= 2) {
     const result: Array<TimelineSlot | null> = Array(Math.max(0, 20 - points.length)).fill(null)
     result.push(...points.map(point => ({
       state: probeStatusToHealth(point.status),
