@@ -76,6 +76,12 @@ type channelMonitorAccountDegradationReader interface {
 	ListGroupAccountDegradationSummaries(ctx context.Context, groupIDs []int64, since time.Time) (map[int64]GroupAccountDegradationSummary, error)
 }
 
+// channelMonitorDegradationRoundReader 读取按探测轮次聚合的降智历史，
+// 供用户视图时间条逐格展示每一轮的判定结果。
+type channelMonitorDegradationRoundReader interface {
+	ListGroupDegradationRounds(ctx context.Context, groupIDs []int64, since time.Time, limit int) (map[int64][]GroupDegradationRound, error)
+}
+
 // ChannelMonitorService 渠道监控管理服务。
 type ChannelMonitorService struct {
 	repo      ChannelMonitorRepository
@@ -738,6 +744,66 @@ func (s *ChannelMonitorService) accountGroupDegradationSummaries(
 		return map[int64]GroupAccountDegradationSummary{}
 	}
 	return summaries
+}
+
+// accountGroupDegradationRounds 读取各组最近 N 轮降智探测的判定结果（最新在前）。
+// 失败仅告警并返回空 map，不影响监控列表渲染。
+func (s *ChannelMonitorService) accountGroupDegradationRounds(
+	ctx context.Context,
+	groupIDs []int64,
+) map[int64][]GroupDegradationRound {
+	if len(groupIDs) == 0 {
+		return map[int64][]GroupDegradationRound{}
+	}
+	reader, ok := s.repo.(channelMonitorDegradationRoundReader)
+	if !ok {
+		return map[int64][]GroupDegradationRound{}
+	}
+	rounds, err := reader.ListGroupDegradationRounds(
+		ctx,
+		groupIDs,
+		time.Now().Add(-accountSchedulerHistoryWindow),
+		userIntelligenceTimelineLimit,
+	)
+	if err != nil {
+		slog.Warn("channel_monitor: load degradation rounds failed", "error", err)
+		return map[int64][]GroupDegradationRound{}
+	}
+	return rounds
+}
+
+// userIntelligenceTimelineLimit 用户视图降智时间条的格数上限，与前端 20 格对齐。
+const userIntelligenceTimelineLimit = 20
+
+// degradationRoundStatus 用与 GroupAccountDegradationSummary 相同的判定规则
+// 决定单轮状态：pass 数不少于 degraded 数即视为未降智。
+func degradationRoundStatus(round GroupDegradationRound) string {
+	if round.PassCount+round.DegradedCount == 0 {
+		if round.ErrorCount > 0 {
+			return MonitorStatusError
+		}
+		return ""
+	}
+	if round.PassCount >= round.DegradedCount {
+		return MonitorStatusOperational
+	}
+	return MonitorStatusDegraded
+}
+
+// buildIntelligenceTimeline 把按轮次聚合的结果转成时间条点（最新在前）。
+func buildIntelligenceTimeline(rounds []GroupDegradationRound) []UserMonitorTimelinePoint {
+	out := make([]UserMonitorTimelinePoint, 0, len(rounds))
+	for _, round := range rounds {
+		status := degradationRoundStatus(round)
+		if status == "" {
+			continue
+		}
+		out = append(out, UserMonitorTimelinePoint{
+			Status:    status,
+			CheckedAt: round.BucketStart,
+		})
+	}
+	return out
 }
 
 func (s *ChannelMonitorService) validateIntelligenceSchedulerFactor(ctx context.Context, m *ChannelMonitor) error {

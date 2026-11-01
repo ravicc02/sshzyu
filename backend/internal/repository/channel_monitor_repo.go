@@ -373,6 +373,130 @@ func (r *channelMonitorRepository) ListGroupAccountDegradationSummaries(
 	return out, rows.Err()
 }
 
+// ListGroupDegradationRounds 按探测轮次聚合降智结果，供用户视图时间条逐格展示。
+// 轮次划分不依赖固定时间桶：同一组内相邻探测间隔超过间隔的 75% 即视为新的一轮，
+// 这样即使某轮跨越整点/桶边界也不会被拆开。每组最多返回 limit 轮，最新在前。
+func (r *channelMonitorRepository) ListGroupDegradationRounds(
+	ctx context.Context,
+	groupIDs []int64,
+	since time.Time,
+	limit int,
+) (map[int64][]service.GroupDegradationRound, error) {
+	if len(groupIDs) == 0 {
+		return map[int64][]service.GroupDegradationRound{}, nil
+	}
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	const query = `
+		WITH group_settings AS (
+			SELECT group_id, interval_seconds, test_model
+			FROM account_scheduler_group_settings
+			WHERE group_id = ANY($1)
+		),
+		eligible_accounts AS (
+			SELECT
+				ag.group_id,
+				a.id AS account_id
+			FROM account_groups ag
+			JOIN accounts a ON a.id = ag.account_id
+			WHERE ag.group_id = ANY($1)
+			  AND a.deleted_at IS NULL
+			  AND a.status = 'active'
+			  AND a.schedulable = true
+		),
+		probes AS (
+			SELECT
+				p.group_id,
+				p.account_id,
+				p.status,
+				p.checked_at,
+				gs.interval_seconds,
+				EXTRACT(EPOCH FROM p.checked_at - LAG(p.checked_at) OVER (
+					PARTITION BY p.group_id ORDER BY p.checked_at
+				)) AS gap_seconds
+			FROM account_degradation_probes p
+			JOIN group_settings gs ON gs.group_id = p.group_id
+			JOIN eligible_accounts ea
+			  ON ea.group_id = p.group_id
+			 AND ea.account_id = p.account_id
+			WHERE p.group_id = ANY($1)
+			  AND p.checked_at >= $2
+			  AND (
+				NULLIF(BTRIM(gs.test_model), '') IS NULL
+				OR p.model = gs.test_model
+			  )
+		),
+		marked AS (
+			SELECT *,
+				CASE
+					WHEN gap_seconds IS NULL
+					  OR gap_seconds > GREATEST(interval_seconds, 60) * 0.75
+					THEN 1 ELSE 0
+				END AS new_round
+			FROM probes
+		),
+		numbered AS (
+			SELECT *,
+				SUM(new_round) OVER (
+					PARTITION BY group_id ORDER BY checked_at
+				) AS round_no
+			FROM marked
+		),
+		latest_per_account AS (
+			SELECT *,
+				ROW_NUMBER() OVER (
+					PARTITION BY group_id, round_no, account_id
+					ORDER BY checked_at DESC
+				) AS account_rank
+			FROM numbered
+		),
+		rounds AS (
+			SELECT
+				group_id,
+				round_no,
+				MIN(checked_at) AS bucket_start,
+				COUNT(*) FILTER (WHERE account_rank = 1 AND status = 'pass') AS pass_count,
+				COUNT(*) FILTER (WHERE account_rank = 1 AND status = 'degraded') AS degraded_count,
+				COUNT(*) FILTER (WHERE account_rank = 1 AND status = 'error') AS error_count
+			FROM latest_per_account
+			GROUP BY group_id, round_no
+		),
+		recent AS (
+			SELECT *,
+				ROW_NUMBER() OVER (
+					PARTITION BY group_id ORDER BY bucket_start DESC
+				) AS round_rank
+			FROM rounds
+		)
+		SELECT group_id, bucket_start, pass_count, degraded_count, error_count
+		FROM recent
+		WHERE round_rank <= $3
+		ORDER BY group_id, bucket_start DESC
+	`
+	rows, err := r.db.QueryContext(ctx, query, pq.Array(groupIDs), since, limit)
+	if err != nil {
+		return nil, fmt.Errorf("group degradation rounds: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make(map[int64][]service.GroupDegradationRound, len(groupIDs))
+	for rows.Next() {
+		var round service.GroupDegradationRound
+		if err := rows.Scan(
+			&round.GroupID,
+			&round.BucketStart,
+			&round.PassCount,
+			&round.DegradedCount,
+			&round.ErrorCount,
+		); err != nil {
+			return nil, err
+		}
+		out[round.GroupID] = append(out[round.GroupID], round)
+	}
+	return out, rows.Err()
+}
+
 func (r *channelMonitorRepository) InsertHistoryBatch(ctx context.Context, rows []*service.ChannelMonitorHistoryRow) error {
 	if len(rows) == 0 {
 		return nil

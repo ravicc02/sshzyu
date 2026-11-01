@@ -592,22 +592,28 @@ function hasIntelligenceMonitor(row: MonitorMatrixRow): boolean {
 
 function intelligenceSlots(row: MonitorMatrixRow): Array<TimelineSlot | null> {
   const probe = intelligenceProbe(row)
-  if (probe?.intelligence_source === 'account_aggregate') return aggregateIntelligenceSlots(probe)
-  const points = (probe?.intelligence_timeline || [])
+  if (!probe) return []
+  // 优先使用按探测轮次聚合的时间序列：每格代表一轮，判定规则与后端一致。
+  const points = (probe.intelligence_timeline || [])
     .filter(point => Number.isFinite(Date.parse(point.checked_at)))
     .sort((a, b) => Date.parse(a.checked_at) - Date.parse(b.checked_at))
     .slice(-20)
-  const result: Array<TimelineSlot | null> = Array(Math.max(0, 20 - points.length)).fill(null)
-  result.push(...points.map(point => ({
-    state: probeStatusToHealth(point.status),
-    timestamp: point.checked_at,
-    detail: point.status === 'operational'
-      ? t('channelMonitorV2.groupCards.intelligenceNotDegraded')
-      : point.status === 'failed'
-        ? t('channelMonitorV2.groupCards.intelligenceDegraded')
-        : t('channelMonitorV2.groupCards.intelligenceError'),
-  })))
-  return result
+  if (points.length > 0) {
+    const result: Array<TimelineSlot | null> = Array(Math.max(0, 20 - points.length)).fill(null)
+    result.push(...points.map(point => ({
+      state: probeStatusToHealth(point.status),
+      timestamp: point.checked_at,
+      detail: point.status === 'operational'
+        ? t('channelMonitorV2.groupCards.intelligenceNotDegraded')
+        : point.status === 'degraded'
+          ? t('channelMonitorV2.groupCards.intelligenceDegraded')
+          : t('channelMonitorV2.groupCards.intelligenceError'),
+    })))
+    return result
+  }
+  // 历史不足时回退到账号状态比例快照，避免整条空白。
+  if (probe.intelligence_source === 'account_aggregate') return aggregateIntelligenceSlots(probe)
+  return Array(20).fill(null)
 }
 
 function aggregateIntelligenceSlots(probe: UserMonitorView): Array<TimelineSlot | null> {

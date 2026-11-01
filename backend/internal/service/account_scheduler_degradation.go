@@ -85,6 +85,16 @@ type AccountDegradationStat struct {
 	AverageLatencyMs float64
 }
 
+// GroupDegradationRound 一轮降智探测的聚合结果：同一时间桶内各账号的最新状态。
+// BucketStart 是该轮最早一条探测的 checked_at，用作时间条上该格的时间戳。
+type GroupDegradationRound struct {
+	GroupID       int64
+	BucketStart   time.Time
+	PassCount     int64
+	DegradedCount int64
+	ErrorCount    int64
+}
+
 type GroupAccountDegradationSummary struct {
 	GroupID         int64
 	FactorEnabled   bool

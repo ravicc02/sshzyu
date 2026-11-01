@@ -90,16 +90,31 @@ func (s *ChannelMonitorService) ListUserView(ctx context.Context) ([]*UserMonito
 	latestMap := s.batchLatest(ctx, ids)
 	timelineMap := s.batchTimeline(ctx, ids, primaryByID)
 
+	degradationGroupIDs := make([]int64, 0, len(groupByID))
+	for _, groupID := range groupByID {
+		if groupID > 0 {
+			degradationGroupIDs = append(degradationGroupIDs, groupID)
+		}
+	}
+	degradationRounds := s.accountGroupDegradationRounds(ctx, degradationGroupIDs)
+
 	views := make([]*UserMonitorView, 0, len(monitors))
 	for _, m := range monitors {
 		primaryLatest := pickLatest(latestMap[m.ID], m.PrimaryModel)
 		view := buildUserViewFromSummary(m, summaries[m.ID], primaryLatest, timelineMap[m.ID])
 		view.IntelligenceEnabled = summaries[m.ID].IntelligenceSource != ""
-		if view.IntelligenceEnabled && summaries[m.ID].IntelligenceCheckedAt != nil {
-			view.IntelligenceTimeline = []UserMonitorTimelinePoint{{
-				Status:    summaries[m.ID].IntelligenceStatus,
-				CheckedAt: *summaries[m.ID].IntelligenceCheckedAt,
-			}}
+		if view.IntelligenceEnabled {
+			// 优先用按轮次聚合的真实时间序列；缺失时回退到单点摘要，
+			// 确保探测刚接入、历史不足的场景仍有状态可展示。
+			if groupID := groupByID[m.ID]; groupID > 0 {
+				view.IntelligenceTimeline = buildIntelligenceTimeline(degradationRounds[groupID])
+			}
+			if len(view.IntelligenceTimeline) == 0 && summaries[m.ID].IntelligenceCheckedAt != nil {
+				view.IntelligenceTimeline = []UserMonitorTimelinePoint{{
+					Status:    summaries[m.ID].IntelligenceStatus,
+					CheckedAt: *summaries[m.ID].IntelligenceCheckedAt,
+				}}
+			}
 		}
 		views = append(views, view)
 	}
