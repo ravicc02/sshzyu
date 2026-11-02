@@ -130,7 +130,7 @@ func (r *hostedOpenAIAccountRepository) Create(ctx context.Context, record *serv
 		record.ProxyID,
 		record.AccountName,
 		record.Model,
-		modelsJSON,
+		string(modelsJSON),
 		record.SupportsMessages,
 		record.Status,
 		record.AccountEmail,
@@ -226,7 +226,7 @@ func (r *hostedOpenAIAccountRepository) UpdateConfig(
 		SET proxy_id = $2, account_name = $3, model = $4, models = $5,
 		    supports_messages = $6, updated_at = NOW()
 		WHERE id = $1
-	`, id, proxyID, accountName, models[0], modelsJSON, supportsMessages)
+	`, id, proxyID, accountName, models[0], string(modelsJSON), supportsMessages)
 	if err != nil {
 		return fmt.Errorf("update hosted account config: %w", err)
 	}
