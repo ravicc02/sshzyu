@@ -138,24 +138,36 @@
             <input v-model.trim="editForm.account_name" class="input" />
           </label>
           <label class="field">
-            <span>模型白名单</span>
-            <ModelWhitelistSelector
-              v-model="editForm.models"
-              platform="openai"
-              :show-sync-button="false"
-            />
-          </label>
-          <label class="field">
             <span>代理</span>
             <select v-model="editForm.proxy_id" class="input">
               <option :value="null">直连</option>
               <option v-for="proxy in options.proxies" :key="proxy.id" :value="proxy.id">{{ proxy.name }}</option>
             </select>
           </label>
-          <label class="switch-row">
-            <span><strong>/v1/messages</strong></span>
-            <input v-model="editForm.supports_messages" type="checkbox" class="switch-input" />
-          </label>
+          <section class="settings-section">
+            <header class="settings-section-head">
+              <span class="section-icon"><Icon name="users" size="sm" /></span>
+              <div>
+                <strong>自动分配订阅分组</strong>
+                <p>这些配置直接作用于该托管账号对应的专属分组。</p>
+              </div>
+            </header>
+            <label class="field">
+              <span>模型白名单</span>
+              <ModelWhitelistSelector
+                v-model="editForm.models"
+                platform="openai"
+                :show-sync-button="false"
+              />
+            </label>
+            <label class="switch-row group-switch">
+              <span>
+                <strong>支持 /v1/messages</strong>
+                <small>允许 Claude 协议请求路由到该订阅分组</small>
+              </span>
+              <input v-model="editForm.supports_messages" type="checkbox" class="switch-input" />
+            </label>
+          </section>
         </div>
         <footer class="modal-foot">
           <button type="button" class="btn btn-secondary" @click="editing = null">取消</button>
@@ -362,8 +374,17 @@ tbody tr:hover { background: color-mix(in srgb, var(--primary-500) 3%, var(--sur
 .form-grid { display: grid; gap: 15px; padding: 20px 22px; }
 .field { display: grid; gap: 7px; }
 .field > span { color: var(--text-secondary); font-size: 11px; font-weight: 600; }
+.settings-section { display: grid; gap: 13px; padding: 14px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface-secondary); }
+.settings-section-head { display: flex; align-items: flex-start; gap: 10px; }
+.settings-section-head > div { display: grid; gap: 3px; }
+.settings-section-head strong { font-size: 12px; font-weight: 650; }
+.settings-section-head p { color: var(--text-tertiary); font-size: 10px; line-height: 1.45; }
+.section-icon { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto; border: 1px solid color-mix(in srgb, var(--primary-500) 18%, var(--border-color)); border-radius: 7px; color: var(--primary-600); background: color-mix(in srgb, var(--primary-500) 8%, var(--surface)); }
 .switch-row { display: flex; align-items: center; justify-content: space-between; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-secondary); }
+.switch-row span { display: grid; gap: 3px; }
 .switch-row strong { font-size: 12px; }
+.switch-row small { color: var(--text-tertiary); font-size: 10px; }
+.group-switch { background: var(--surface); }
 .switch-input { width: 34px; height: 19px; accent-color: var(--primary-600); }
 .modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--border-color); }
 .spinning { animation: spin 0.8s linear infinite; }

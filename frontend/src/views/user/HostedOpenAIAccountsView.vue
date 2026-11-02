@@ -109,15 +109,6 @@
           </label>
 
           <label class="field">
-            <span>模型白名单</span>
-            <ModelWhitelistSelector
-              v-model="createForm.models"
-              platform="openai"
-              :show-sync-button="false"
-            />
-          </label>
-
-          <label class="field">
             <span>代理</span>
             <select v-model="createForm.proxy_id" class="input">
               <option :value="null">直连</option>
@@ -125,29 +116,66 @@
             </select>
           </label>
 
-          <label class="switch-row">
-            <span>
-              <strong>支持 /v1/messages</strong>
-              <small>允许 Claude 协议请求路由到此账号</small>
-            </span>
-            <input v-model="createForm.supports_messages" type="checkbox" class="switch-input" />
-          </label>
+          <section class="settings-section">
+            <header class="settings-section-head">
+              <span class="section-icon"><Icon name="users" size="sm" /></span>
+              <div>
+                <strong>自动分配订阅分组</strong>
+                <p>创建后自动生成专属私密分组与订阅，以下选项作用于该分组。</p>
+              </div>
+            </header>
+            <label class="field">
+              <span>模型白名单</span>
+              <ModelWhitelistSelector
+                v-model="createForm.models"
+                platform="openai"
+                :show-sync-button="false"
+              />
+            </label>
+            <label class="switch-row group-switch">
+              <span>
+                <strong>支持 /v1/messages</strong>
+                <small>允许 Claude 协议请求路由到该订阅分组</small>
+              </span>
+              <input v-model="createForm.supports_messages" type="checkbox" class="switch-input" />
+            </label>
+          </section>
 
-          <div class="auth-step">
-            <button type="button" class="btn btn-secondary" :disabled="authLoading || !canCreateConfig" @click="generateAuth">
-              <Icon name="externalLink" size="sm" />
+          <section class="settings-section auth-section">
+            <header class="settings-section-head">
+              <span class="section-icon"><Icon name="key" size="sm" /></span>
+              <div>
+                <strong>OpenAI 授权</strong>
+                <p>生成登录链接并完成授权，再粘贴回调地址或 code。</p>
+              </div>
+            </header>
+            <button type="button" class="btn btn-secondary justify-self-start" :disabled="authLoading || !canCreateConfig" @click="generateAuth">
+              <Icon :name="authURL ? 'refresh' : 'externalLink'" size="sm" />
               {{ authURL ? '重新生成登录链接' : '生成登录链接' }}
             </button>
-            <a v-if="authURL" :href="authURL" target="_blank" rel="noopener noreferrer" class="auth-link">
-              打开 OpenAI 登录
-              <Icon name="externalLink" size="sm" />
-            </a>
-          </div>
-
-          <label v-if="sessionID" class="field">
-            <span>回调地址</span>
-            <textarea v-model.trim="createForm.callback_url" class="input callback-input" placeholder="https://localhost:1455/auth/callback?code=..." />
-          </label>
+            <div v-if="authURL" class="auth-url-panel">
+              <input :value="authURL" readonly class="input auth-url-input" aria-label="OpenAI 登录地址" />
+              <button type="button" class="icon-button copy-button" :title="copied ? '已复制' : '复制登录地址'" @click="copyAuthURL">
+                <Icon :name="copied ? 'check' : 'copy'" size="sm" />
+              </button>
+              <a :href="authURL" target="_blank" rel="noopener noreferrer" class="auth-link">
+                打开登录
+                <Icon name="externalLink" size="sm" />
+              </a>
+            </div>
+            <label v-if="sessionID" class="field">
+              <span>回调地址或授权码</span>
+              <textarea
+                v-model.trim="createForm.callback_url"
+                class="input callback-input"
+                placeholder="粘贴完整回调地址，或直接粘贴 code"
+              />
+              <small v-if="createCallback.code" class="callback-recognized">
+                <Icon name="checkCircle" size="xs" />
+                已识别授权码{{ createCallback.state ? '与 state' : '' }}
+              </small>
+            </label>
+          </section>
         </div>
 
         <footer class="modal-foot">
@@ -176,24 +204,36 @@
             <input v-model.trim="editForm.account_name" class="input" />
           </label>
           <label class="field">
-            <span>模型白名单</span>
-            <ModelWhitelistSelector
-              v-model="editForm.models"
-              platform="openai"
-              :show-sync-button="false"
-            />
-          </label>
-          <label class="field">
             <span>代理</span>
             <select v-model="editForm.proxy_id" class="input">
               <option :value="null">直连</option>
               <option v-for="proxy in options.proxies" :key="proxy.id" :value="proxy.id">{{ proxy.name }}</option>
             </select>
           </label>
-          <label class="switch-row">
-            <span><strong>支持 /v1/messages</strong></span>
-            <input v-model="editForm.supports_messages" type="checkbox" class="switch-input" />
-          </label>
+          <section class="settings-section">
+            <header class="settings-section-head">
+              <span class="section-icon"><Icon name="users" size="sm" /></span>
+              <div>
+                <strong>自动分配订阅分组</strong>
+                <p>这些设置直接作用于该托管账号对应的专属分组。</p>
+              </div>
+            </header>
+            <label class="field">
+              <span>模型白名单</span>
+              <ModelWhitelistSelector
+                v-model="editForm.models"
+                platform="openai"
+                :show-sync-button="false"
+              />
+            </label>
+            <label class="switch-row group-switch">
+              <span>
+                <strong>支持 /v1/messages</strong>
+                <small>允许 Claude 协议请求路由到该订阅分组</small>
+              </span>
+              <input v-model="editForm.supports_messages" type="checkbox" class="switch-input" />
+            </label>
+          </section>
         </div>
         <footer class="modal-foot">
           <button type="button" class="btn btn-secondary" @click="editAccount = null">取消</button>
@@ -216,22 +256,45 @@
           </button>
         </header>
         <div class="modal-body hosted-form">
-          <button type="button" class="btn btn-secondary" :disabled="authLoading" @click="generateReauth">
-            <Icon name="externalLink" size="sm" />
-            {{ reauthURL ? '重新生成登录链接' : '生成登录链接' }}
-          </button>
-          <a v-if="reauthURL" :href="reauthURL" target="_blank" rel="noopener noreferrer" class="auth-link">
-            打开 OpenAI 登录
-            <Icon name="externalLink" size="sm" />
-          </a>
-          <label v-if="reauthSessionID" class="field">
-            <span>回调地址</span>
-            <textarea v-model.trim="reauthCallback" class="input callback-input" />
-          </label>
+          <section class="settings-section auth-section">
+            <header class="settings-section-head">
+              <span class="section-icon"><Icon name="key" size="sm" /></span>
+              <div>
+                <strong>重新授权 OpenAI</strong>
+                <p>生成新的登录链接，授权后粘贴回调地址或 code。</p>
+              </div>
+            </header>
+            <button type="button" class="btn btn-secondary justify-self-start" :disabled="authLoading" @click="generateReauth">
+              <Icon :name="reauthURL ? 'refresh' : 'externalLink'" size="sm" />
+              {{ reauthURL ? '重新生成登录链接' : '生成登录链接' }}
+            </button>
+            <div v-if="reauthURL" class="auth-url-panel">
+              <input :value="reauthURL" readonly class="input auth-url-input" aria-label="OpenAI 重新授权地址" />
+              <button type="button" class="icon-button copy-button" :title="copied ? '已复制' : '复制登录地址'" @click="copyReauthURL">
+                <Icon :name="copied ? 'check' : 'copy'" size="sm" />
+              </button>
+              <a :href="reauthURL" target="_blank" rel="noopener noreferrer" class="auth-link">
+                打开登录
+                <Icon name="externalLink" size="sm" />
+              </a>
+            </div>
+            <label v-if="reauthSessionID" class="field">
+              <span>回调地址或授权码</span>
+              <textarea
+                v-model.trim="reauthCallback"
+                class="input callback-input"
+                placeholder="粘贴完整回调地址，或直接粘贴 code"
+              />
+              <small v-if="reauthCallbackParsed.code" class="callback-recognized">
+                <Icon name="checkCircle" size="xs" />
+                已识别授权码{{ reauthCallbackParsed.state ? '与 state' : '' }}
+              </small>
+            </label>
+          </section>
         </div>
         <footer class="modal-foot">
           <button type="button" class="btn btn-secondary" @click="closeReauth">取消</button>
-          <button type="button" class="btn btn-primary" :disabled="reauthing || !reauthCallback || !reauthSessionID" @click="saveReauth">
+          <button type="button" class="btn btn-primary" :disabled="reauthing || !canReauth" @click="saveReauth">
             {{ reauthing ? '验证中' : '更新授权' }}
           </button>
         </footer>
@@ -259,8 +322,11 @@ import {
 import QuotaBar from '@/components/hosted/QuotaBar.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import { useClipboard } from '@/composables/useClipboard'
+import { parseOAuthCallbackInput } from '@/utils/oauthCallback'
 
 const appStore = useAppStore()
+const { copied, copyToClipboard } = useClipboard()
 const loading = ref(true)
 const accounts = ref<HostedOpenAIAccount[]>([])
 const options = ref<HostedOpenAIOptions>({ proxies: [], suggested_models: [] })
@@ -270,6 +336,7 @@ const createOpen = ref(false)
 const creating = ref(false)
 const authLoading = ref(false)
 const authURL = ref('')
+const createAuthState = ref('')
 const sessionID = ref('')
 const createForm = reactive({
   account_name: '',
@@ -290,13 +357,25 @@ const editForm = reactive({
 
 const reauthAccount = ref<HostedOpenAIAccount | null>(null)
 const reauthURL = ref('')
+const reauthAuthState = ref('')
 const reauthSessionID = ref('')
 const reauthCallback = ref('')
 const reauthing = ref(false)
 
 const activeCount = computed(() => accounts.value.filter((item) => item.status === 'active').length)
 const canCreateConfig = computed(() => Boolean(createForm.account_name && createForm.models.length > 0))
-const canCreate = computed(() => Boolean(sessionID.value && createForm.callback_url && canCreateConfig.value))
+const createCallback = computed(() => parseOAuthCallbackInput(createForm.callback_url))
+const reauthCallbackParsed = computed(() => parseOAuthCallbackInput(reauthCallback.value))
+const createCode = computed(() => createCallback.value.code)
+const createState = computed(() => createCallback.value.state || createAuthState.value)
+const reauthCode = computed(() => reauthCallbackParsed.value.code)
+const reauthState = computed(() => reauthCallbackParsed.value.state || reauthAuthState.value)
+const canCreate = computed(() =>
+  Boolean(sessionID.value && createCode.value && createState.value && canCreateConfig.value)
+)
+const canReauth = computed(() =>
+  Boolean(reauthSessionID.value && reauthCode.value && reauthState.value)
+)
 
 async function load() {
   loading.value = true
@@ -319,6 +398,7 @@ function openCreate() {
   createForm.supports_messages = false
   createForm.callback_url = ''
   authURL.value = ''
+  createAuthState.value = ''
   sessionID.value = ''
 }
 
@@ -332,6 +412,7 @@ async function generateAuth() {
   try {
     const result = await generateHostedOpenAIAuthURL({ proxy_id: createForm.proxy_id })
     authURL.value = result.auth_url
+    createAuthState.value = oauthStateFromURL(result.auth_url)
     sessionID.value = result.session_id
   } catch (error) {
     appStore.showError(extractApiErrorMessage(error, '生成登录链接失败'))
@@ -346,6 +427,8 @@ async function createAccount() {
     const created = await createHostedOpenAIAccount({
       session_id: sessionID.value,
       callback_url: createForm.callback_url,
+      code: createCode.value,
+      state: createState.value,
       account_name: createForm.account_name,
       models: createForm.models,
       proxy_id: createForm.proxy_id,
@@ -403,6 +486,7 @@ async function refreshQuota(account: HostedOpenAIAccount) {
 function openReauth(account: HostedOpenAIAccount) {
   reauthAccount.value = account
   reauthURL.value = ''
+  reauthAuthState.value = ''
   reauthSessionID.value = ''
   reauthCallback.value = ''
 }
@@ -418,6 +502,7 @@ async function generateReauth() {
   try {
     const result = await generateHostedOpenAIAuthURL({ proxy_id: reauthAccount.value.proxy_id ?? null })
     reauthURL.value = result.auth_url
+    reauthAuthState.value = oauthStateFromURL(result.auth_url)
     reauthSessionID.value = result.session_id
   } catch (error) {
     appStore.showError(extractApiErrorMessage(error, '生成登录链接失败'))
@@ -432,7 +517,9 @@ async function saveReauth() {
   try {
     const updated = await reauthorizeHostedOpenAIAccount(reauthAccount.value.id, {
       session_id: reauthSessionID.value,
-      callback_url: reauthCallback.value
+      callback_url: reauthCallback.value,
+      code: reauthCode.value,
+      state: reauthState.value
     })
     replaceAccount(updated)
     reauthAccount.value = null
@@ -448,6 +535,26 @@ function replaceAccount(updated: HostedOpenAIAccount) {
   const index = accounts.value.findIndex((item) => item.id === updated.id)
   if (index >= 0) accounts.value.splice(index, 1, updated)
   else accounts.value.unshift(updated)
+}
+
+function oauthStateFromURL(value: string) {
+  try {
+    return new URL(value).searchParams.get('state')?.trim() || ''
+  } catch {
+    return ''
+  }
+}
+
+function copyAuthURL() {
+  if (authURL.value) {
+    void copyToClipboard(authURL.value, '登录地址已复制')
+  }
+}
+
+function copyReauthURL() {
+  if (reauthURL.value) {
+    void copyToClipboard(reauthURL.value, '登录地址已复制')
+  }
 }
 
 function initials(account: HostedOpenAIAccount) {
@@ -516,14 +623,26 @@ onMounted(load)
 .hosted-form { display: grid; gap: 15px; padding: 20px 22px; }
 .field { display: grid; gap: 7px; }
 .field > span { color: var(--text-secondary); font-size: 11px; font-weight: 600; }
+.settings-section { display: grid; gap: 13px; padding: 14px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface-secondary); }
+.settings-section-head { display: flex; align-items: flex-start; gap: 10px; }
+.settings-section-head > div { display: grid; gap: 3px; }
+.settings-section-head strong { font-size: 12px; font-weight: 650; }
+.settings-section-head p { color: var(--text-tertiary); font-size: 10px; line-height: 1.45; }
+.section-icon { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto; border: 1px solid color-mix(in srgb, var(--primary-500) 18%, var(--border-color)); border-radius: 7px; color: var(--primary-600); background: color-mix(in srgb, var(--primary-500) 8%, var(--surface)); }
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 54px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-secondary); }
+.group-switch { background: var(--surface); }
 .switch-row span { display: grid; gap: 3px; }
 .switch-row strong { font-size: 12px; font-weight: 600; }
 .switch-row small { color: var(--text-tertiary); font-size: 10px; }
 .switch-input { width: 34px; height: 19px; accent-color: var(--primary-600); }
-.auth-step { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 4px; }
+.auth-section { background: color-mix(in srgb, var(--primary-500) 3%, var(--surface)); }
+.auth-url-panel { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.auth-url-input { min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 10px; }
+.copy-button { background: var(--surface); }
+.auth-url-panel .auth-link { grid-column: 1 / -1; justify-self: start; }
 .auth-link { display: inline-flex; align-items: center; gap: 5px; color: var(--primary-600); font-size: 12px; font-weight: 600; }
 .callback-input { min-height: 82px; resize: vertical; line-height: 1.45; }
+.callback-recognized { display: inline-flex; align-items: center; gap: 5px; color: #087a55; font-size: 10px; font-weight: 600; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--border-color); }
 .spin, .spinning { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

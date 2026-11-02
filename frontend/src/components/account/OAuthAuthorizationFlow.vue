@@ -901,6 +901,7 @@ import Icon from '@/components/icons/Icon.vue'
 import type { AddMethod, AuthInputMethod } from '@/composables/useAccountOAuth'
 import type { AccountPlatform } from '@/types'
 import { adminAPI } from '@/api/admin'
+import { parseOAuthCallbackInput } from '@/utils/oauthCallback'
 
 interface Props {
   addMethod: AddMethod
@@ -1135,31 +1136,14 @@ watch(authCodeInput, (newVal) => {
   if (props.platform !== 'openai' && props.platform !== 'gemini' && props.platform !== 'antigravity' && props.platform !== 'grok') return
 
   const trimmed = newVal.trim()
-  // Check if it looks like a URL with code parameter
-  if (trimmed.includes('code=')) {
-    try {
-      // Try to parse as URL
-      const url = trimmed.includes('?') ? new URL(trimmed) : new URL(`http://localhost/callback?${trimmed.replace(/^\?/, '')}`)
-      const code = url.searchParams.get('code')
-      const stateParam = url.searchParams.get('state')
-      if ((props.platform === 'openai' || props.platform === 'gemini' || props.platform === 'antigravity' || props.platform === 'grok') && stateParam) {
-        oauthState.value = stateParam
-      }
-      if (code && code !== trimmed) {
-        // Replace the input with just the code
-        authCodeInput.value = code
-      }
-    } catch {
-      // If URL parsing fails, try regex extraction
-      const match = trimmed.match(/[?&]code=([^&]+)/)
-      const stateMatch = trimmed.match(/[?&]state=([^&]+)/)
-      if ((props.platform === 'openai' || props.platform === 'gemini' || props.platform === 'antigravity' || props.platform === 'grok') && stateMatch && stateMatch[1]) {
-        oauthState.value = stateMatch[1]
-      }
-      if (match && match[1] && match[1] !== trimmed) {
-        authCodeInput.value = match[1]
-      }
-    }
+  if (!trimmed.includes('code=')) return
+
+  const parsed = parseOAuthCallbackInput(trimmed)
+  if (parsed.state) {
+    oauthState.value = parsed.state
+  }
+  if (parsed.code && parsed.code !== trimmed) {
+    authCodeInput.value = parsed.code
   }
 })
 

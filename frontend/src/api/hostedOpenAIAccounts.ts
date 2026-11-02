@@ -114,7 +114,7 @@ export async function refreshHostedOpenAIQuota(id: number): Promise<HostedOpenAI
 
 export async function reauthorizeHostedOpenAIAccount(
   id: number,
-  payload: Pick<HostedCreatePayload, 'session_id' | 'callback_url' | 'redirect_uri'>
+  payload: Pick<HostedCreatePayload, 'session_id' | 'callback_url' | 'code' | 'state' | 'redirect_uri'>
 ): Promise<HostedOpenAIAccount> {
   const { data } = await apiClient.post<HostedOpenAIAccount>(`/hosted-openai-accounts/${id}/reauthorize`, payload)
   return data
