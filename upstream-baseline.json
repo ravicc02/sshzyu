@@ -3,10 +3,10 @@
   "upstream_release": "v0.2.19",
   "upstream_commit": "dece26153621959ccd7635814f4b2d08304e681a",
   "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.19",
-  "local_build_version": "0.2.19-r5",
+  "local_build_version": "0.2.19-r6",
   "integration_commit": "9b2da920e2201901d0c19472b66a76121e60db26",
   "integrated_at": "2026-10-31",
   "verified_at": "2026-11-02",
-  "note": "Integrated official v0.2.19 with scoped admin API keys, image-count billing, Grok model catalog diagnostics and the custom unified security audit preserved. r4 fixed a production panic in account scheduler degradation probes (duplicate wg.Done drove the WaitGroup counter negative when a probe batch exceeded the worker count of 4). r5 renders the group degradation strip as a real time series: probes are aggregated into rounds (a new round starts when the gap between consecutive probes exceeds 75% of the configured interval), each strip cell is one round, and the verdict reuses the existing rule (pass >= degraded is healthy, otherwise degraded). Falls back to the previous account-ratio snapshot when fewer than two rounds exist. No schema changes.",
+  "note": "Integrated official v0.2.19 with scoped admin API keys, image-count billing, Grok model catalog diagnostics and the custom unified security audit preserved. r4 fixed the scheduler degradation probe WaitGroup panic and r5 restored the per-round monitor timeline. r6 adds managed OpenAI account hosting and token quota limits, probes one primary model per composite provider, renders composite model-plaza pricing by provider using the channel rate from model pricing, fixes monitor degradation aggregation and hides proxy network addresses from user labels. Migrations 268-270 add token quotas and hosted OpenAI account fields; migration 271 adds channel_monitors.provider_models and backfills composite monitors.",
   "integration_status": "committed"
 }
