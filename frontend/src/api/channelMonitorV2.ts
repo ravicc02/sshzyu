@@ -165,6 +165,8 @@ export interface MonitorMatrixBucket {
 export interface MonitorMatrixRow {
   platform: string
   group_platform?: string
+  /** Composite groups: provider platform -> channel multiplier. */
+  provider_rates?: Record<string, number>
   group_id?: number
   group_name?: string
   rate_multiplier?: number

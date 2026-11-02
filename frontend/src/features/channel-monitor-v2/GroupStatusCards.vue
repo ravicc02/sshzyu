@@ -232,7 +232,9 @@ function compositeProviderDetails(row: MonitorMatrixRow): CompositeProviderDetai
       health: child.health.overall,
       availability: availabilityValue(child),
       latency: latency === '—' ? t('channelMonitorV2.groupCards.noLatencySample') : latency,
-      multiplier: providerMultiplier(child.rate_multiplier ?? row.rate_multiplier),
+      multiplier: providerMultiplier(
+        row.provider_rates?.[child.platform] ?? child.rate_multiplier ?? row.rate_multiplier
+      ),
       models: probe?.models || [],
     })
   }
@@ -243,7 +245,7 @@ function compositeProviderDetails(row: MonitorMatrixRow): CompositeProviderDetai
       health: probe.health,
       availability: probeStateText(probe.health),
       latency: probe.latency_ms == null ? t('channelMonitorV2.groupCards.noLatencySample') : formatMonitorMs(probe.latency_ms),
-      multiplier: providerMultiplier(row.rate_multiplier),
+      multiplier: providerMultiplier(row.provider_rates?.[probe.platform] ?? row.rate_multiplier),
       models: probe.models,
     })
   }

@@ -248,8 +248,11 @@ type ChannelMonitorV2ModelRow struct {
 }
 
 type ChannelMonitorV2MatrixRow struct {
-	Platform       string                       `json:"platform"`
-	GroupPlatform  string                       `json:"group_platform,omitempty"`
+	Platform      string `json:"platform"`
+	GroupPlatform string `json:"group_platform,omitempty"`
+	// ProviderRates 仅聚合分组返回：供应商平台 -> 渠道倍率。它与模型级
+	// RateMultiplier 分开，确保渠道倍率即使暂无流量也能展示最新配置。
+	ProviderRates  map[string]float64           `json:"provider_rates,omitempty"`
 	RateMultiplier *float64                     `json:"rate_multiplier,omitempty"`
 	GroupID        *int64                       `json:"group_id,omitempty"`
 	GroupName      string                       `json:"group_name,omitempty"`

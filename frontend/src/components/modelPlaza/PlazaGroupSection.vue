@@ -125,7 +125,7 @@
         <div class="flex flex-wrap items-center justify-between gap-2 bg-gray-50/70 px-5 py-3 text-xs text-gray-500 dark:bg-dark-900/30 dark:text-dark-400 sm:px-6">
           <span class="font-medium">{{ t('modelPlaza.card.pricingHint') }}</span>
           <span>
-            {{ hasModelRateOverrides
+            {{ hasChannelRateOverrides
               ? t('modelPlaza.card.defaultRate', { rate: effectiveRate })
               : t('modelPlaza.card.standardRate', { rate: effectiveRate }) }}
           </span>
@@ -137,6 +137,7 @@
             :platform="group.platform"
             :rate-multiplier="group.rate_multiplier"
             :user-rate-multiplier="group.user_rate_multiplier ?? null"
+            :channel-rate-multipliers="group.channel_rate_multipliers ?? {}"
             :image-rate-independent="group.image_rate_independent"
             :image-rate-multiplier="group.image_rate_multiplier"
             :peak-window="peakWindow"
@@ -183,9 +184,8 @@ const expanded = ref(false)
 
 const isCompositeGroup = computed(() => props.group.platform === 'composite')
 const effectiveRate = computed(() => props.group.user_rate_multiplier ?? props.group.rate_multiplier)
-const hasModelRateOverrides = computed(() =>
-  isCompositeGroup.value &&
-  props.group.models.some((model) => model.rate_multiplier != null && model.rate_multiplier > 0)
+const hasChannelRateOverrides = computed(() =>
+  isCompositeGroup.value && Object.keys(props.group.channel_rate_multipliers ?? {}).length > 0
 )
 
 interface ModelBucket {
@@ -207,12 +207,12 @@ const modelBuckets = computed<ModelBucket[]>(() => {
     else byProvider.set(model.platform, [model])
   }
   return [...byProvider.entries()].map(([platform, models]) => {
-    const rates = new Set(models.map((model) => model.rate_multiplier ?? effectiveRate.value))
+    const rate = props.group.channel_rate_multipliers?.[platform] ?? effectiveRate.value
     return {
       key: platform,
       platform,
       models,
-      rate: rates.size === 1 ? [...rates][0] : null,
+      rate,
       isProvider: true,
     }
   })
@@ -308,7 +308,7 @@ function modelRate(model: ModelPlazaGroup['models'][number]): number {
   const mode = billingMode(model)
   if (mode === BILLING_MODE_IMAGE && props.group.image_rate_independent) return props.group.image_rate_multiplier ?? 1
   if (mode === BILLING_MODE_VIDEO && props.group.video_rate_independent) return props.group.video_rate_multiplier ?? 1
-  return (isCompositeGroup.value ? model.rate_multiplier : undefined) ?? effectiveRate.value
+  return (isCompositeGroup.value ? props.group.channel_rate_multipliers?.[model.platform] : undefined) ?? effectiveRate.value
 }
 
 /** 高峰窗口描述(含倍率与服务器时区标注);分组未启用高峰为空串。 */

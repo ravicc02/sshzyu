@@ -10,9 +10,9 @@ export interface GroupModelPriceEntry {
   model: string
   /** Composite group provider inferred from the model name, e.g. deepseek/zhipu/kimi. */
   provider?: string
-  /** 是否已配独立倍率（等价于 rate_multiplier != null） */
+  /** 是否已配置模型级倍率（等价于 rate_multiplier != null） */
   custom_rate: boolean
-  /** 实际覆盖倍率；未配置为 null（页面回落展示分组默认倍率） */
+  /** 模型级覆盖倍率；未配置为 null（页面回落展示渠道倍率） */
   rate_multiplier: number | null
 }
 
@@ -21,8 +21,10 @@ export interface GroupModelPriceGroup {
   id: number
   name: string
   platform: string
-  /** 分组默认计费倍率（页面在分组名旁展示） */
+  /** 独立分组的渠道倍率（页面在分组名旁展示） */
   rate_multiplier: number
+  /** 聚合分组按供应商配置的渠道倍率 */
+  channel_rate_multipliers?: Record<string, number>
   models: GroupModelPriceEntry[]
 }
 
@@ -48,7 +50,7 @@ export async function listAllGroupModelPrices(): Promise<GroupModelPriceGroup[]>
 }
 
 /**
- * 设置某模型的独立计费倍率（隐式配置，替代分组默认，仅对该模型生效）
+ * 设置某模型的独立倍率（仅对该模型生效，不改变渠道倍率）
  * @param groupId - 分组 ID
  * @param model - 计费模型名
  * @param rateMultiplier - 倍率（> 0）
@@ -65,7 +67,7 @@ export async function setModelRateMultiplier(
 }
 
 /**
- * 清除某模型的独立倍率（回落分组默认）
+ * 清除某模型的独立倍率（回落渠道倍率）
  * @param groupId - 分组 ID
  * @param model - 计费模型名
  */

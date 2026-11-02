@@ -71,9 +71,6 @@ type modelPlazaModel struct {
 	RouteTarget     string                     `json:"route_target,omitempty"`
 	Pricing         *userSupportedModelPricing `json:"pricing"`
 	OfficialPricing *modelPlazaOfficialPricing `json:"official_pricing"`
-	// RateMultiplier is an explicit model/provider billing override. When absent,
-	// clients use the group or user-specific multiplier.
-	RateMultiplier *float64 `json:"rate_multiplier,omitempty"`
 	// LongContextBasis 多档时的计价基准："whole_request"（整单按档）| "marginal"（仅超出部分）。
 	LongContextBasis string `json:"long_context_basis,omitempty"`
 	// TimePricing 分时倍率时段，落在时段内的请求整单乘倍率；无分时省略。
@@ -89,11 +86,14 @@ type modelPlazaGroup struct {
 	SubscriptionType   string   `json:"subscription_type"`
 	RateMultiplier     float64  `json:"rate_multiplier"`
 	UserRateMultiplier *float64 `json:"user_rate_multiplier,omitempty"`
-	PeakRateEnabled    bool     `json:"peak_rate_enabled"`
-	PeakStart          string   `json:"peak_start"`
-	PeakEnd            string   `json:"peak_end"`
-	PeakRateMultiplier float64  `json:"peak_rate_multiplier"`
-	IsExclusive        bool     `json:"is_exclusive"`
+	// ChannelRateMultipliers 仅聚合分组返回。键为供应商平台，值为渠道倍率；
+	// 模型级倍率不会进入广场。
+	ChannelRateMultipliers map[string]float64 `json:"channel_rate_multipliers,omitempty"`
+	PeakRateEnabled        bool               `json:"peak_rate_enabled"`
+	PeakStart              string             `json:"peak_start"`
+	PeakEnd                string             `json:"peak_end"`
+	PeakRateMultiplier     float64            `json:"peak_rate_multiplier"`
+	IsExclusive            bool               `json:"is_exclusive"`
 	// 生图独立倍率：为 true 时图片计费模型的实付倍率取 ImageRateMultiplier，
 	// 不取分组/用户专属倍率。
 	ImageRateIndependent bool    `json:"image_rate_independent"`
@@ -214,7 +214,6 @@ func toModelPlazaGroupDTO(g *service.PlazaGroup, userRates map[int64]float64) mo
 			RouteTarget:      m.RouteTarget,
 			Pricing:          toUserPricing(m.Pricing),
 			OfficialPricing:  toModelPlazaOfficialPricing(m.OfficialPricing),
-			RateMultiplier:   m.RateMultiplier,
 			LongContextBasis: string(m.LongContextBasis),
 			TimePricing:      toModelPlazaTimePricing(m.TimePricing),
 		})
@@ -226,6 +225,7 @@ func toModelPlazaGroupDTO(g *service.PlazaGroup, userRates map[int64]float64) mo
 		Platform:                  g.Platform,
 		SubscriptionType:          g.SubscriptionType,
 		RateMultiplier:            g.RateMultiplier,
+		ChannelRateMultipliers:    g.ChannelRateMultipliers,
 		PeakRateEnabled:           g.PeakRateEnabled,
 		PeakStart:                 g.PeakStart,
 		PeakEnd:                   g.PeakEnd,

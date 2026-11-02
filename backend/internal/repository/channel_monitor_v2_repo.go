@@ -605,7 +605,8 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 			if info, ok := groupInfo[groupID]; ok {
 				row.GroupPlatform = info.platform
 				rateMultiplier := info.rateMultiplier
-				if info.platform == service.PlatformComposite && key.platform != service.PlatformComposite {
+				if info.platform == service.PlatformComposite {
+					row.ProviderRates = cloneChannelMonitorV2ProviderRates(info.providerRateByID)
 					if providerRate, exists := info.providerRateByID[key.platform]; exists {
 						rateMultiplier = providerRate
 					}
@@ -795,9 +796,45 @@ func seedChannelMonitorV2MatrixAccumulators(filter service.ChannelMonitorV2Filte
 					buckets:   make(map[string]*metricAccumulator),
 				}
 			}
+			for provider, rate := range info.providerRateByID {
+				if rate <= 0 || !channelMonitorV2PlatformSelected(platforms, provider) {
+					continue
+				}
+				providerKey := channelMonitorV2MatrixKey{platform: provider, groupID: groupID}
+				if accs[providerKey] == nil {
+					accs[providerKey] = &channelMonitorV2MatrixAccumulator{
+						groupName: info.name,
+						total:     newMetricAccumulator(),
+						buckets:   make(map[string]*metricAccumulator),
+					}
+				}
+			}
 		}
 	}
 	return accs
+}
+
+func channelMonitorV2PlatformSelected(platforms []string, platform string) bool {
+	if len(platforms) == 0 {
+		return true
+	}
+	for _, value := range platforms {
+		if value == platform {
+			return true
+		}
+	}
+	return false
+}
+
+func cloneChannelMonitorV2ProviderRates(input map[string]float64) map[string]float64 {
+	if len(input) == 0 {
+		return nil
+	}
+	out := make(map[string]float64, len(input))
+	for platform, rate := range input {
+		out[platform] = rate
+	}
+	return out
 }
 
 func configuredChannelMonitorV2Models(cfg service.ChannelMonitorV2Config, platform string, filter service.ChannelMonitorV2Filter) []string {
@@ -918,7 +955,7 @@ func (r *channelMonitorV2Repository) loadChannelMonitorV2GroupInfo(ctx context.C
 			_ = json.Unmarshal(modelPricingRaw, &modelPricing)
 		}
 		providerRateByID := make(map[string]float64)
-		for _, rate := range service.GroupProviderRates(&service.Group{
+		for _, rate := range service.GroupChannelRates(&service.Group{
 			Platform:       platform,
 			RateMultiplier: rateMultiplier,
 			ModelPricing:   modelPricing,

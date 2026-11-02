@@ -146,8 +146,8 @@ type Group struct {
 	RateLimitedAccountCount int64
 }
 
-// GroupProviderRate is a provider-wide multiplier for a composite group.
-// It is derived from provider wildcard/exact entries in ModelPricing.
+// GroupProviderRate is a provider-wide channel multiplier for a composite
+// group. Exact model overrides are represented separately.
 type GroupProviderRate struct {
 	Platform       string  `json:"platform"`
 	RateMultiplier float64 `json:"rate_multiplier"`

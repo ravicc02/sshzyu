@@ -73,6 +73,7 @@
                     <!-- 分组默认倍率：置于分组名左侧 -->
                     <span
                       class="shrink-0 rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-xs font-semibold text-gray-700 dark:bg-dark-900 dark:text-dark-200"
+                      :title="g.platform === 'composite' ? t('admin.modelPrice.groupDefaultRateTitle') : t('admin.modelPrice.channelRateTitle')"
                     >
                       {{ formatRate(g.rate_multiplier) }}
                     </span>
@@ -109,7 +110,13 @@
                         <strong class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ providerLabel(provider.provider) }}</strong>
                         <span class="text-xs text-gray-400 dark:text-dark-500">{{ t('admin.modelPrice.providerModelCount', { count: provider.models.length }) }}</span>
                         <span class="inline-flex shrink-0 rounded-full px-2 py-0.5 font-mono text-xs font-medium" :class="provider.custom ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-dark-900 dark:text-dark-300'">
-                          {{ provider.mixed ? t('admin.modelPrice.mixedRate') : formatRate(provider.rate) }}
+                          {{ t('admin.modelPrice.providerRateBadge', { rate: formatRate(provider.rate) }) }}
+                        </span>
+                        <span
+                          v-if="provider.modelOverrideCount > 0"
+                          class="inline-flex shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                        >
+                          {{ t('admin.modelPrice.modelOverrideCount', { count: provider.modelOverrideCount }) }}
                         </span>
                       </div>
                       <div class="flex shrink-0 items-center gap-2">
@@ -134,14 +141,41 @@
                         </button>
                       </div>
                     </div>
-                    <div class="mt-2 flex flex-wrap gap-1.5 pl-9">
-                      <span
+                    <div class="mt-3 grid gap-2 pl-9">
+                      <div
                         v-for="model in provider.models"
                         :key="model.model"
-                        class="rounded-md bg-gray-50 px-2 py-1 font-mono text-xs text-gray-600 dark:bg-dark-900 dark:text-dark-300"
+                        class="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50/70 px-2.5 py-2 dark:border-dark-700 dark:bg-dark-900/40"
                       >
-                        {{ model.model }}
-                      </span>
+                        <div class="flex min-w-0 items-center gap-2">
+                          <span class="truncate font-mono text-xs text-gray-700 dark:text-dark-200">{{ model.model }}</span>
+                          <span
+                            class="shrink-0 rounded-full px-2 py-0.5 font-mono text-xs font-medium"
+                            :class="model.custom_rate ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-white text-gray-500 dark:bg-dark-900 dark:text-dark-400'"
+                          >
+                            {{ formatRate(effectiveModelRate(provider.rate, model)) }}
+                          </span>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-1.5">
+                          <button
+                            type="button"
+                            :disabled="saving"
+                            class="rounded-md border border-gray-300 px-2 py-1 text-[11px] text-gray-700 hover:bg-white dark:border-dark-600 dark:text-dark-200 dark:hover:bg-dark-900"
+                            @click="openDialog(g.id, model)"
+                          >
+                            {{ t('admin.modelPrice.adjustModel') }}
+                          </button>
+                          <button
+                            v-if="model.custom_rate"
+                            type="button"
+                            :disabled="saving"
+                            class="rounded-md border border-gray-300 px-2 py-1 text-[11px] text-gray-700 hover:bg-white dark:border-dark-600 dark:text-dark-200 dark:hover:bg-dark-900"
+                            @click="clearRate(g.id, model)"
+                          >
+                            {{ t('admin.modelPrice.reset') }}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -443,7 +477,7 @@ function openProviderDialog(group: GroupModelPriceGroup, provider: ProviderPrice
     batch: false,
     provider: provider.provider,
     error: '',
-    value: provider.mixed ? undefined : provider.rate
+    value: provider.rate
   })
 }
 
@@ -468,13 +502,13 @@ async function saveRate() {
     if (dialog.provider) {
       await setProviderRateMultiplier(dialog.groupId, dialog.provider, value)
       const group = groups.value.find(group => group.id === dialog.groupId)
-      for (const entry of group?.models ?? []) {
-        if (entry.model && models.includes(entry.model)) {
-          entry.rate_multiplier = value
-          entry.custom_rate = true
+      if (group) {
+        group.channel_rate_multipliers = {
+          ...(group.channel_rate_multipliers ?? {}),
+          [dialog.provider]: value
         }
       }
-      feedback.value = t('admin.modelPrice.savedCount', { count: models.length })
+      feedback.value = t('admin.modelPrice.savedChannelRate', { provider: providerLabel(dialog.provider) })
       dialog.visible = false
       return
     }
@@ -507,11 +541,10 @@ async function clearProviderRate(groupId: number, provider: ProviderPriceGroup) 
   try {
     await clearProviderRateMultiplier(groupId, provider.provider)
     const group = groups.value.find(group => group.id === groupId)
-    for (const entry of group?.models ?? []) {
-      if (entry.provider === provider.provider) {
-        entry.rate_multiplier = null
-        entry.custom_rate = false
-      }
+    if (group?.channel_rate_multipliers) {
+      const next = { ...group.channel_rate_multipliers }
+      delete next[provider.provider]
+      group.channel_rate_multipliers = next
     }
     feedback.value = ''
   } catch {

@@ -327,6 +327,8 @@ const props = defineProps<{
   rateMultiplier: number
   /** 用户专属倍率;与默认不同,实付价按此计算并划线展示原倍率。 */
   userRateMultiplier?: number | null
+  /** 聚合分组:供应商平台 -> 渠道倍率。模型级倍率不会传入广场。 */
+  channelRateMultipliers?: Record<string, number>
   /** 生图独立倍率:true 时图片计费模型的实付倍率取 imageRateMultiplier,不取分组/专属倍率。 */
   imageRateIndependent?: boolean
   imageRateMultiplier?: number | null
@@ -370,13 +372,14 @@ const sortedModels = computed(() => {
 const effectiveRate = computed(() => props.userRateMultiplier ?? props.rateMultiplier)
 const isCompositeGroup = computed(() => props.platform === 'composite')
 
-/** 分组/用户默认倍率之上的模型或供应商倍率优先。 */
+/** 渠道倍率优先于分组/用户倍率；不存在时回落到生效分组倍率。 */
 function modelRate(m: PlazaModel): number {
-  return (isCompositeGroup.value ? m.rate_multiplier : undefined) ?? effectiveRate.value
+  return (isCompositeGroup.value ? props.channelRateMultipliers?.[m.platform] : undefined) ?? effectiveRate.value
 }
 
 function baseRate(m: PlazaModel): number {
-  return m.rate_multiplier != null ? effectiveRate.value : props.rateMultiplier
+  const hasChannelRate = isCompositeGroup.value && props.channelRateMultipliers?.[m.platform] != null
+  return hasChannelRate ? effectiveRate.value : props.rateMultiplier
 }
 
 function hasCustomRate(m: PlazaModel): boolean {

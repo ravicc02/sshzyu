@@ -47,64 +47,48 @@ func providerFromGroupRateEntry(model string) (string, bool) {
 	return provider, ok
 }
 
-// GroupProviderRates derives provider-wide rates from a composite group's
-// model pricing entries. Wildcard/provider entries take precedence over exact
-// legacy entries for the same provider.
+// GroupProviderRates derives provider-wide channel rates from a composite
+// group. Exact model entries are intentionally excluded: they are model-level
+// overrides and must not be presented as the channel's rate.
 func GroupProviderRates(group *Group) []GroupProviderRate {
+	return GroupChannelRates(group)
+}
+
+// GroupChannelRates returns only channel-wide overrides. The provider marker is
+// authoritative; a model wildcard such as deepseek-* is accepted as a legacy
+// channel-wide entry. Exact model overrides are excluded.
+func GroupChannelRates(group *Group) []GroupProviderRate {
 	if group == nil || group.Platform != PlatformComposite {
 		return nil
 	}
-	exact := make(map[string]float64)
 	providerEntries := make(map[string]float64)
 	wildcard := make(map[string]float64)
-	providersSeen := make(map[string]struct{})
 	for i := range group.ModelPricing {
 		entry := &group.ModelPricing[i]
 		for _, pattern := range entry.Models {
 			if provider, ok := providerFromGroupRateEntry(pattern); ok {
-				providersSeen[provider] = struct{}{}
 				if entry.RateMultiplier != nil && *entry.RateMultiplier > 0 {
 					providerEntries[provider] = *entry.RateMultiplier
 				}
 				continue
 			}
 			provider := modelProviderPlatform(pattern)
-			if provider == "" {
+			if provider == "" || !strings.HasSuffix(strings.TrimSpace(pattern), "*") {
 				continue
 			}
-			providersSeen[provider] = struct{}{}
 			if entry.RateMultiplier == nil || *entry.RateMultiplier <= 0 {
 				continue
 			}
-			if strings.HasSuffix(strings.TrimSpace(pattern), "*") {
-				wildcard[provider] = *entry.RateMultiplier
-			} else if _, exists := exact[provider]; !exists {
-				exact[provider] = *entry.RateMultiplier
-			}
+			wildcard[provider] = *entry.RateMultiplier
 		}
 	}
-	out := make([]GroupProviderRate, 0, len(wildcard)+len(exact))
+	out := make([]GroupProviderRate, 0, len(providerEntries)+len(wildcard))
 	for provider, rate := range providerEntries {
 		out = append(out, GroupProviderRate{Platform: provider, RateMultiplier: rate})
 		delete(wildcard, provider)
-		delete(exact, provider)
 	}
 	for provider, rate := range wildcard {
 		out = append(out, GroupProviderRate{Platform: provider, RateMultiplier: rate})
-		delete(exact, provider)
-	}
-	for provider, rate := range exact {
-		out = append(out, GroupProviderRate{Platform: provider, RateMultiplier: rate})
-	}
-	seenOut := make(map[string]struct{}, len(out))
-	for _, item := range out {
-		seenOut[item.Platform] = struct{}{}
-	}
-	for provider := range providersSeen {
-		if _, exists := seenOut[provider]; exists {
-			continue
-		}
-		out = append(out, GroupProviderRate{Platform: provider, RateMultiplier: group.RateMultiplier})
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		oi, ij := groupProviderSortOrder[out[i].Platform], groupProviderSortOrder[out[j].Platform]
@@ -114,4 +98,34 @@ func GroupProviderRates(group *Group) []GroupProviderRate {
 		return out[i].Platform < out[j].Platform
 	})
 	return out
+}
+
+// GroupModelRateOverride returns a model-specific rate override only. Channel
+// rates and wildcard provider entries are deliberately ignored so the admin UI
+// can distinguish "channel rate" from "model rate".
+func GroupModelRateOverride(group *Group, model string) *float64 {
+	if group == nil {
+		return nil
+	}
+	model = normalizeChannelPricingModelName(model)
+	for i := range group.ModelPricing {
+		entry := &group.ModelPricing[i]
+		if entry.RateMultiplier == nil || *entry.RateMultiplier <= 0 {
+			continue
+		}
+		for _, pattern := range entry.Models {
+			if _, channelEntry := providerFromGroupRateEntry(pattern); channelEntry {
+				continue
+			}
+			normalized := normalizeChannelPricingModelName(pattern)
+			if strings.HasSuffix(normalized, "*") {
+				continue
+			}
+			if normalized == model {
+				rate := *entry.RateMultiplier
+				return &rate
+			}
+		}
+	}
+	return nil
 }

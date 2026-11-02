@@ -27,9 +27,6 @@ type PlazaModel struct {
 	Platform        string
 	Pricing         *ChannelModelPricing
 	OfficialPricing *PlazaOfficialPricing
-	// RateMultiplier is the model/provider billing override configured in group
-	// model pricing. Nil means the group/user rate remains effective.
-	RateMultiplier *float64
 	// RouteTarget 是渠道显式跨模型映射的目标；同名或隐式映射为空。
 	RouteTarget string
 	// LongContextBasis 多档时的计价基准（整单 / 仅超出部分），单档为空。
@@ -65,7 +62,10 @@ type PlazaGroup struct {
 	VideoRateMultiplier  float64
 	// LongContextPricingEnabled 分组是否按上下文长度应用阶梯价；关闭时模型展示的是最低档。
 	LongContextPricingEnabled bool
-	Models                    []PlazaModel
+	// ChannelRateMultipliers 是聚合分组按供应商设置的渠道倍率。模型级倍率
+	// 不进入广场；未命中的渠道回落到 RateMultiplier / 用户专属倍率。
+	ChannelRateMultipliers map[string]float64
+	Models                 []PlazaModel
 }
 
 // ModelPlazaService 聚合模型广场数据。
@@ -145,6 +145,10 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 	order := make([]int64, 0, len(groups))
 	for i := range groups {
 		g := &groups[i]
+		channelRates := make(map[string]float64)
+		for _, rate := range GroupChannelRates(g) {
+			channelRates[rate.Platform] = rate.RateMultiplier
+		}
 		byGroup[g.ID] = &PlazaGroup{
 			ID:                        g.ID,
 			Name:                      g.Name,
@@ -163,6 +167,7 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 			VideoRateIndependent:      g.VideoRateIndependent,
 			VideoRateMultiplier:       g.VideoRateMultiplier,
 			LongContextPricingEnabled: g.LongContextPricingEnabled,
+			ChannelRateMultipliers:    channelRates,
 		}
 		groupEnt[g.ID] = g
 		order = append(order, g.ID)
@@ -329,7 +334,6 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 		g := groupEnt[gid]
 		for j := range pg.Models {
 			s.fillDisplayPricing(ctx, &pg.Models[j], g)
-			pg.Models[j].RateMultiplier = plazaModelRateMultiplier(g, pg.Models[j].Name)
 			pg.Models[j].OfficialPricing = s.resolveOfficialPricing(ctx, &pg.Models[j], officialMemo)
 		}
 		out = append(out, *pg)
@@ -342,18 +346,6 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 		return out[i].Name < out[j].Name
 	})
 	return out, nil
-}
-
-func plazaModelRateMultiplier(group *Group, modelName string) *float64 {
-	if group == nil || group.Platform != PlatformComposite {
-		return nil
-	}
-	pricing := matchGroupModelPricing(group, modelName)
-	if pricing == nil || pricing.RateMultiplier == nil || *pricing.RateMultiplier <= 0 {
-		return nil
-	}
-	rate := *pricing.RateMultiplier
-	return &rate
 }
 
 // fillDisplayPricing 把模型的展示定价换成实收口径：

@@ -1334,7 +1334,7 @@ func (s *adminServiceImpl) BatchSetGroupRateMultipliers(ctx context.Context, gro
 }
 
 // GroupModelPriceEntry 是「模型价格」页的单个模型条目。
-// CustomRate 表示该模型是否已配置独立倍率；界面不展示具体数值（隐式配置）。
+// CustomRate 只表示该模型自身配置了独立倍率；渠道倍率不会折算成模型倍率。
 type GroupModelPriceEntry struct {
 	Model    string `json:"model"`
 	Provider string `json:"provider,omitempty"`
@@ -1348,8 +1348,9 @@ type GroupModelPriceEntry struct {
 // GetGroupModelPrices 返回分组下可用于配置独立倍率的模型清单及其配置状态。
 // 模型清单来源：该分组可调度账号的 model_mapping（账号级模型列表）并集，
 // 即分组实际配置的模型；不含平台默认模型兜底——分组没配的模型不出现在「模型价格」页。
-// 每个模型返回是否已配独立倍率（CustomRate）与实际覆盖倍率（RateMultiplier，未配置为 nil），
-// 供管理端「模型价格」页直接展示配置值。
+// 每个模型返回是否已配模型倍率（CustomRate）与实际覆盖倍率
+// （RateMultiplier，未配置为 nil）。渠道倍率单独通过
+// GroupModelPriceGroup.ChannelRateMultipliers 返回。
 func (s *adminServiceImpl) GetGroupModelPrices(ctx context.Context, groupID int64) ([]GroupModelPriceEntry, error) {
 	group, err := s.groupRepo.GetByID(ctx, groupID)
 	if err != nil {
@@ -1408,16 +1409,14 @@ func (s *adminServiceImpl) groupModelPriceEntries(ctx context.Context, group *Gr
 	}
 	entries := make([]GroupModelPriceEntry, 0, len(models))
 	for _, m := range models {
-		entry := matchGroupModelPricing(group, m)
 		provider := strings.TrimSpace(group.Platform)
 		if group.Platform == PlatformComposite {
 			provider = modelProviderPlatform(m)
 		}
 		item := GroupModelPriceEntry{Model: m, Provider: provider}
-		if entry != nil && entry.RateMultiplier != nil && *entry.RateMultiplier > 0 {
-			rate := *entry.RateMultiplier
+		if rate := GroupModelRateOverride(group, m); rate != nil {
 			item.CustomRate = true
-			item.RateMultiplier = &rate
+			item.RateMultiplier = rate
 		}
 		entries = append(entries, item)
 	}
@@ -1425,13 +1424,15 @@ func (s *adminServiceImpl) groupModelPriceEntries(ctx context.Context, group *Gr
 }
 
 // GroupModelPriceGroup 是「模型价格」页的单个分组条目：分组信息 + 该分组下可配置的模型清单。
-// RateMultiplier 是分组默认计费倍率，供页面在分组名旁展示。
+// RateMultiplier 是独立分组的渠道默认倍率；ChannelRateMultipliers 是聚合分组
+// 按供应商配置的渠道倍率。模型级覆盖只存在于 Models[].RateMultiplier。
 type GroupModelPriceGroup struct {
-	ID             int64                  `json:"id"`
-	Name           string                 `json:"name"`
-	Platform       string                 `json:"platform"`
-	RateMultiplier float64                `json:"rate_multiplier"`
-	Models         []GroupModelPriceEntry `json:"models"`
+	ID                     int64                  `json:"id"`
+	Name                   string                 `json:"name"`
+	Platform               string                 `json:"platform"`
+	RateMultiplier         float64                `json:"rate_multiplier"`
+	ChannelRateMultipliers map[string]float64     `json:"channel_rate_multipliers,omitempty"`
+	Models                 []GroupModelPriceEntry `json:"models"`
 }
 
 // ListAllGroupModelPrices 返回所有活跃分组及其可配置模型清单与配置状态，
@@ -1448,12 +1449,17 @@ func (s *adminServiceImpl) ListAllGroupModelPrices(ctx context.Context) ([]Group
 		if err != nil {
 			return nil, err
 		}
+		channelRates := make(map[string]float64)
+		for _, rate := range GroupChannelRates(g) {
+			channelRates[rate.Platform] = rate.RateMultiplier
+		}
 		out = append(out, GroupModelPriceGroup{
-			ID:             g.ID,
-			Name:           g.Name,
-			Platform:       g.Platform,
-			RateMultiplier: g.RateMultiplier,
-			Models:         entries,
+			ID:                     g.ID,
+			Name:                   g.Name,
+			Platform:               g.Platform,
+			RateMultiplier:         g.RateMultiplier,
+			ChannelRateMultipliers: channelRates,
+			Models:                 entries,
 		})
 	}
 	return out, nil

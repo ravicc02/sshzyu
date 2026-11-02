@@ -10,8 +10,8 @@ export interface ProviderPriceGroup {
   provider: string
   models: GroupModelPriceEntry[]
   rate: number
-  mixed: boolean
   custom: boolean
+  modelOverrideCount: number
 }
 
 const PROVIDER_ORDER = ['deepseek', 'zhipu', 'kimi', 'minimax']
@@ -32,14 +32,13 @@ export function buildProviderPriceGroups(group: GroupModelPriceGroup): ProviderP
   return [...buckets.entries()]
     .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
     .map(([provider, models]) => {
-      const rates = models.map((model) => effectiveModelRate(group.rate_multiplier, model))
-      const first = rates[0] ?? group.rate_multiplier
+      const channelRate = group.channel_rate_multipliers?.[provider] ?? group.rate_multiplier
       return {
         provider,
         models,
-        rate: first,
-        mixed: rates.some((rate) => Math.abs(rate - first) > 1e-9),
-        custom: models.some((model) => model.custom_rate),
+        rate: channelRate,
+        custom: group.channel_rate_multipliers?.[provider] != null,
+        modelOverrideCount: models.filter((model) => model.custom_rate).length
       }
     })
 }
@@ -80,7 +79,7 @@ export function buildPlatformSections(
 }
 
 /**
- * 分组默认倍率的展示文本：去掉浮点长尾并统一带 x 后缀。
+ * 渠道倍率的展示文本：去掉浮点长尾并统一带 x 后缀。
  * 非法值（NaN / Infinity / <= 0）回退为 `1x`，避免页面出现 "NaNx" 之类的脏文本。
  */
 export function formatRate(value: number): string {
@@ -89,7 +88,7 @@ export function formatRate(value: number): string {
 }
 
 /**
- * 模型行展示的实际生效倍率：已配独立倍率时取覆盖值，否则回落分组默认倍率。
+ * 模型行展示的实际生效倍率：已配模型倍率时取覆盖值，否则回落渠道倍率。
  * 页面据此直接显示数值（不再用「已自定义 / 默认」这类状态标记）。
  */
 export function effectiveModelRate(
