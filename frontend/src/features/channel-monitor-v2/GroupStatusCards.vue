@@ -58,7 +58,7 @@
                     </div>
                     <div class="mt-1.5 grid grid-cols-2 gap-1 text-[9px] text-gray-400">
                       <span>{{ t('channelMonitorV2.groupCards.availability') }}</span>
-                      <span>{{ t('channelMonitorV2.groupCards.groupMultiplier') }}</span>
+                      <span>{{ t('channelMonitorV2.groupCards.channelMultiplier') }}</span>
                       <strong class="truncate" :class="probeStateTextClass(provider.health)">{{ provider.availability }}</strong>
                       <strong class="truncate tabular-nums text-teal-700 dark:text-teal-300">{{ provider.multiplier }}</strong>
                     </div>

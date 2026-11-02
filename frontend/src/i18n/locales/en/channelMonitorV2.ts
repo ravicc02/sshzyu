@@ -40,7 +40,7 @@ export default {
       intelligenceAccountErrors: 'Account request errors {count}',
       multiplier: 'Group multiplier {value}',
       providerBreakdown: 'Provider breakdown', providerCount: '{count} providers', providerNoData: 'No provider traffic',
-      provider: 'Provider', groupMultiplier: 'Group multiplier', noLatencySample: 'No latency',
+      provider: 'Provider', channelMultiplier: 'Channel multiplier', noLatencySample: 'No latency',
       providerModels: 'Probe models: {models}', providerModelsEmpty: 'No probe models',
       probeModelsLabel: 'Probe models', primaryProbeModelLabel: 'Primary model',
       showAllProviders: 'Show all {count} providers', hideAllProviders: 'Hide providers',

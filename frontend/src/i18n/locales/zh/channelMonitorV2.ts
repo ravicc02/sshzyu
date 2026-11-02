@@ -40,7 +40,7 @@ export default {
       intelligenceAccountErrors: '账号请求错误 {count}',
       multiplier: '分组倍率 {value}',
       providerBreakdown: '供应商明细', providerCount: '{count} 个供应商', providerNoData: '暂无供应商流量',
-      provider: '供应商', groupMultiplier: '分组倍率', noLatencySample: '暂无延迟',
+      provider: '供应商', channelMultiplier: '渠道倍率', noLatencySample: '暂无延迟',
       providerModels: '探测模型：{models}', providerModelsEmpty: '暂无探测模型',
       probeModelsLabel: '探测模型', primaryProbeModelLabel: '主模型',
       showAllProviders: '展开全部 {count} 个供应商', hideAllProviders: '收起供应商',
