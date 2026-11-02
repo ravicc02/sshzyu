@@ -47,41 +47,48 @@ type CreateAPIKeyRequest struct {
 }
 
 type CreateAPIKeyBatchRequest struct {
-	Name    string  `json:"name" binding:"max=100"`
-	GroupID int64   `json:"group_id" binding:"required,gt=0"`
-	Count   int     `json:"count" binding:"required,min=1,max=50"`
-	Quota   float64 `json:"quota" binding:"required,gt=0"`
+	Name        string  `json:"name" binding:"max=100"`
+	GroupID     int64   `json:"group_id" binding:"required,gt=0"`
+	Count       int     `json:"count" binding:"required,min=1,max=50"`
+	Quota       float64 `json:"quota" binding:"gte=0"`
+	QuotaTokens int64   `json:"quota_tokens" binding:"gte=0"`
 }
 
 type apiKeyBatchSummaryResponse struct {
-	BatchID        string     `json:"batch_id"`
-	BatchName      string     `json:"batch_name"`
-	GroupID        *int64     `json:"group_id"`
-	GroupName      string     `json:"group_name"`
-	GroupPlatform  string     `json:"group_platform"`
-	KeyCount       int64      `json:"key_count"`
-	ActiveKeyCount int64      `json:"active_key_count"`
-	QuotaPerKey    float64    `json:"quota_per_key"`
-	QuotaTotal     float64    `json:"quota_total"`
-	QuotaUsedTotal float64    `json:"quota_used_total"`
-	CreatedAt      time.Time  `json:"created_at"`
-	LastUsedAt     *time.Time `json:"last_used_at"`
+	BatchID              string     `json:"batch_id"`
+	BatchName            string     `json:"batch_name"`
+	GroupID              *int64     `json:"group_id"`
+	GroupName            string     `json:"group_name"`
+	GroupPlatform        string     `json:"group_platform"`
+	KeyCount             int64      `json:"key_count"`
+	ActiveKeyCount       int64      `json:"active_key_count"`
+	QuotaPerKey          float64    `json:"quota_per_key"`
+	QuotaTotal           float64    `json:"quota_total"`
+	QuotaUsedTotal       float64    `json:"quota_used_total"`
+	QuotaTokensPerKey    int64      `json:"quota_tokens_per_key"`
+	QuotaTokensTotal     int64      `json:"quota_tokens_total"`
+	QuotaTokensUsedTotal int64      `json:"quota_tokens_used_total"`
+	CreatedAt            time.Time  `json:"created_at"`
+	LastUsedAt           *time.Time `json:"last_used_at"`
 }
 
 func apiKeyBatchSummaryToResponse(item service.APIKeyBatchSummary) apiKeyBatchSummaryResponse {
 	return apiKeyBatchSummaryResponse{
-		BatchID:        item.BatchID,
-		BatchName:      item.BatchName,
-		GroupID:        item.GroupID,
-		GroupName:      item.GroupName,
-		GroupPlatform:  item.GroupPlatform,
-		KeyCount:       item.KeyCount,
-		ActiveKeyCount: item.ActiveKeyCount,
-		QuotaPerKey:    item.QuotaPerKey,
-		QuotaTotal:     item.QuotaTotal,
-		QuotaUsedTotal: item.QuotaUsedTotal,
-		CreatedAt:      item.CreatedAt,
-		LastUsedAt:     item.LastUsedAt,
+		BatchID:              item.BatchID,
+		BatchName:            item.BatchName,
+		GroupID:              item.GroupID,
+		GroupName:            item.GroupName,
+		GroupPlatform:        item.GroupPlatform,
+		KeyCount:             item.KeyCount,
+		ActiveKeyCount:       item.ActiveKeyCount,
+		QuotaPerKey:          item.QuotaPerKey,
+		QuotaTotal:           item.QuotaTotal,
+		QuotaUsedTotal:       item.QuotaUsedTotal,
+		QuotaTokensPerKey:    item.QuotaTokensPerKey,
+		QuotaTokensTotal:     item.QuotaTokensTotal,
+		QuotaTokensUsedTotal: item.QuotaTokensUsedTotal,
+		CreatedAt:            item.CreatedAt,
+		LastUsedAt:           item.LastUsedAt,
 	}
 }
 
@@ -298,13 +305,13 @@ func (h *APIKeyHandler) CreateBatch(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if !validAPIKeyLimit(req.Quota) || req.Quota <= 0 {
-		response.BadRequest(c, "Invalid request: quota must be finite and greater than zero")
+	if !validAPIKeyLimit(req.Quota) || (req.Quota <= 0 && req.QuotaTokens <= 0) {
+		response.BadRequest(c, "Invalid request: quota or token quota must be greater than zero")
 		return
 	}
 	executeUserIdempotentJSON(c, "user.api_key_batches.create", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
 		keys, err := h.apiKeyService.CreateBatch(ctx, subject.UserID, service.CreateAPIKeyBatchRequest{
-			Name: req.Name, GroupID: req.GroupID, Count: req.Count, Quota: req.Quota,
+			Name: req.Name, GroupID: req.GroupID, Count: req.Count, Quota: req.Quota, QuotaTokens: req.QuotaTokens,
 		})
 		if err != nil {
 			return nil, err

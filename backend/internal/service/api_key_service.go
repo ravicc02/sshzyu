@@ -274,10 +274,11 @@ type CreateAPIKeyRequest struct {
 const MaxBatchAPIKeys = 50
 
 type CreateAPIKeyBatchRequest struct {
-	Name    string
-	GroupID int64
-	Count   int
-	Quota   float64
+	Name        string
+	GroupID     int64
+	Count       int
+	Quota       float64
+	QuotaTokens int64
 }
 
 // UpdateAPIKeyRequest 更新API Key请求
@@ -681,8 +682,11 @@ func (s *APIKeyService) CreateBatch(ctx context.Context, userID int64, req Creat
 	if err := validateAPIKeyLimit(req.Quota); err != nil {
 		return nil, err
 	}
-	if req.Quota <= 0 {
-		return nil, infraerrors.BadRequest("BATCH_QUOTA_REQUIRED", "batch key quota must be greater than zero")
+	if req.QuotaTokens < 0 {
+		return nil, infraerrors.BadRequest("BATCH_TOKEN_QUOTA_INVALID", "batch key token quota must be non-negative")
+	}
+	if req.Quota <= 0 && req.QuotaTokens <= 0 {
+		return nil, infraerrors.BadRequest("BATCH_QUOTA_REQUIRED", "batch key quota or token quota must be greater than zero")
 	}
 	if s.cfg != nil && s.cfg.APIKeyCreate.MaxActivePerUser > 0 {
 		count, err := s.apiKeyRepo.CountByUserID(ctx, userID)
@@ -704,11 +708,12 @@ func (s *APIKeyService) CreateBatch(ctx context.Context, userID int64, req Creat
 	created := make([]APIKey, 0, req.Count)
 	for i := 1; i <= req.Count; i++ {
 		key, err := s.Create(ctx, userID, CreateAPIKeyRequest{
-			Name:      batchAPIKeyName(baseName, i, req.Count),
-			GroupID:   &groupID,
-			BatchID:   &batchID,
-			BatchName: baseName,
-			Quota:     req.Quota,
+			Name:        batchAPIKeyName(baseName, i, req.Count),
+			GroupID:     &groupID,
+			BatchID:     &batchID,
+			BatchName:   baseName,
+			Quota:       req.Quota,
+			QuotaTokens: req.QuotaTokens,
 		})
 		if err != nil {
 			for j := range created {

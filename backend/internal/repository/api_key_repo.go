@@ -545,6 +545,9 @@ func (r *apiKeyRepository) ListBatchesByUserID(ctx context.Context, userID int64
 			COALESCE(MAX(k.quota), 0),
 			COALESCE(SUM(k.quota), 0),
 			COALESCE(SUM(k.quota_used), 0),
+			COALESCE(MAX(k.quota_tokens), 0),
+			COALESCE(SUM(k.quota_tokens), 0),
+			COALESCE(SUM(k.quota_tokens_used), 0),
 			MIN(k.created_at),
 			MAX(k.last_used_at)
 		FROM api_keys AS k
@@ -575,6 +578,9 @@ func (r *apiKeyRepository) ListBatchesByUserID(ctx context.Context, userID int64
 			&item.QuotaPerKey,
 			&item.QuotaTotal,
 			&item.QuotaUsedTotal,
+			&item.QuotaTokensPerKey,
+			&item.QuotaTokensTotal,
+			&item.QuotaTokensUsedTotal,
 			&item.CreatedAt,
 			&lastUsedAt,
 		); err != nil {

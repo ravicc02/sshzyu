@@ -187,16 +187,19 @@ type APIKeyListFilters struct {
 
 // APIKeyBatchSummary is the aggregate view of one batch-generated key set.
 type APIKeyBatchSummary struct {
-	BatchID        string
-	BatchName      string
-	GroupID        *int64
-	GroupName      string
-	GroupPlatform  string
-	KeyCount       int64
-	ActiveKeyCount int64
-	QuotaPerKey    float64
-	QuotaTotal     float64
-	QuotaUsedTotal float64
-	CreatedAt      time.Time
-	LastUsedAt     *time.Time
+	BatchID              string
+	BatchName            string
+	GroupID              *int64
+	GroupName            string
+	GroupPlatform        string
+	KeyCount             int64
+	ActiveKeyCount       int64
+	QuotaPerKey          float64
+	QuotaTotal           float64
+	QuotaUsedTotal       float64
+	QuotaTokensPerKey    int64
+	QuotaTokensTotal     int64
+	QuotaTokensUsedTotal int64
+	CreatedAt            time.Time
+	LastUsedAt           *time.Time
 }

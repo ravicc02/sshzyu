@@ -64,6 +64,12 @@
             <div class="mt-4 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-dark-700">
               <div class="h-full rounded-full bg-primary-500" :style="{ width: `${batchUsagePercent(batch)}%` }" />
             </div>
+            <div v-if="batch.quota_tokens_total > 0" class="mt-3 flex items-center justify-between gap-2 text-xs">
+              <span class="text-gray-500 dark:text-gray-400">{{ t('batchKeys.tokenQuotaUsed') }}</span>
+              <strong class="tabular-nums text-gray-900 dark:text-white">
+                {{ formatTokenQuota(batch.quota_tokens_used_total) }} / {{ formatTokenQuota(batch.quota_tokens_total) }}
+              </strong>
+            </div>
           </button>
         </div>
       </section>
@@ -77,6 +83,12 @@
                 used: formatMoney(selectedBatch.quota_used_total),
                 total: formatMoney(selectedBatch.quota_total),
               }) }}
+              <template v-if="selectedBatch.quota_tokens_total > 0">
+                · {{ t('batchKeys.tokenQuotaSummary', {
+                  used: formatTokenQuota(selectedBatch.quota_tokens_used_total),
+                  total: formatTokenQuota(selectedBatch.quota_tokens_total),
+                }) }}
+              </template>
             </p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
@@ -145,6 +157,17 @@
                     <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-dark-700">
                       <div class="h-full rounded-full" :class="quotaPercent(key) >= 100 ? 'bg-rose-500' : quotaPercent(key) >= 80 ? 'bg-amber-400' : 'bg-emerald-500'" :style="{ width: `${quotaPercent(key)}%` }" />
                     </div>
+                    <div v-if="key.quota_tokens > 0" class="mt-2.5">
+                      <div class="flex items-center justify-between gap-2 text-xs">
+                        <span class="font-medium tabular-nums text-gray-900 dark:text-white">
+                          {{ formatTokenQuota(key.quota_tokens_used) }} / {{ formatTokenQuota(key.quota_tokens) }} Token
+                        </span>
+                        <span class="tabular-nums text-gray-400">{{ tokenQuotaPercent(key) }}%</span>
+                      </div>
+                      <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-dark-700">
+                        <div class="h-full rounded-full" :class="tokenQuotaPercent(key) >= 100 ? 'bg-rose-500' : tokenQuotaPercent(key) >= 80 ? 'bg-amber-400' : 'bg-sky-500'" :style="{ width: `${tokenQuotaPercent(key)}%` }" />
+                      </div>
+                    </div>
                   </td>
                   <td class="px-4 py-3">
                     <span class="badge" :class="key.status === 'active' ? 'badge-success' : key.status === 'quota_exhausted' ? 'badge-warning' : 'badge-gray'">
@@ -178,13 +201,23 @@
             <p class="input-hint">{{ t('batchKeys.countHint') }}</p>
           </div>
           <div>
-            <label class="input-label">{{ t('batchKeys.quotaPerKey') }} <span class="text-red-500">*</span></label>
+            <label class="input-label">{{ t('batchKeys.balanceQuota') }}</label>
             <div class="relative">
               <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-              <input v-model.number="createForm.quota" type="number" min="0.01" step="0.01" required class="input pl-7" />
+              <input v-model.number="createForm.quota" type="number" min="0" step="0.01" class="input pl-7" />
             </div>
-            <p class="input-hint">{{ t('batchKeys.quotaHint') }}</p>
           </div>
+        </div>
+        <div>
+          <label class="input-label">{{ t('batchKeys.tokenQuotaPerKey') }}</label>
+          <div class="flex gap-2">
+            <input v-model.number="createForm.quota_token_amount" type="number" min="0" step="0.01" class="input" placeholder="0" />
+            <select v-model="createForm.quota_token_unit" class="input w-24">
+              <option value="M">M</option>
+              <option value="B">B</option>
+            </select>
+          </div>
+          <p class="input-hint">{{ t('batchKeys.quotaHint') }}</p>
         </div>
         <div>
           <label class="input-label">{{ t('keys.groupLabel') }} <span class="text-red-500">*</span></label>
@@ -194,6 +227,10 @@
           <div class="flex items-center justify-between gap-3 text-sm">
             <span class="text-gray-600 dark:text-gray-300">{{ t('batchKeys.estimatedTotal') }}</span>
             <strong class="tabular-nums text-primary-700 dark:text-primary-300">{{ formatMoney(estimatedTotal) }}</strong>
+          </div>
+          <div v-if="estimatedTokenTotal > 0" class="mt-2 flex items-center justify-between gap-3 border-t border-primary-100 pt-2 text-sm dark:border-primary-500/20">
+            <span class="text-gray-600 dark:text-gray-300">{{ t('batchKeys.estimatedTokenTotal') }}</span>
+            <strong class="tabular-nums text-primary-700 dark:text-primary-300">{{ formatTokenQuota(estimatedTokenTotal) }}</strong>
           </div>
         </div>
       </form>
@@ -236,6 +273,7 @@ import { useClipboard } from '@/composables/useClipboard'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { formatDateTime } from '@/utils/format'
 import { maskApiKey } from '@/utils/maskApiKey'
+import { formatTokenQuota, tokenAmountToBase, type TokenQuotaUnit } from '@/utils/tokenQuota'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -258,12 +296,16 @@ const createForm = reactive({
   name: '',
   count: 10,
   quota: 1,
+  quota_token_amount: 0,
+  quota_token_unit: 'M' as TokenQuotaUnit,
   group_id: null as number | null,
 })
 
 const selectedBatch = computed(() => batches.value.find(batch => batch.batch_id === selectedBatchId.value) || null)
 const groupOptions = computed(() => groups.value.map(group => ({ value: group.id, label: group.name })))
 const estimatedTotal = computed(() => Math.max(0, Number(createForm.count) || 0) * Math.max(0, Number(createForm.quota) || 0))
+const quotaTokens = computed(() => tokenAmountToBase(createForm.quota_token_amount, createForm.quota_token_unit))
+const estimatedTokenTotal = computed(() => Math.max(0, Number(createForm.count) || 0) * quotaTokens.value)
 const allSelected = computed(() => batchKeys.value.length > 0 && batchKeys.value.every(key => selectedIds.value.has(key.id)))
 
 function setSelectedIds(ids: number[]) {
@@ -331,6 +373,8 @@ function openCreate() {
   createForm.name = ''
   createForm.count = 10
   createForm.quota = 1
+  createForm.quota_token_amount = 0
+  createForm.quota_token_unit = 'M'
   createForm.group_id = groups.value[0]?.id ?? null
   showCreateDialog.value = true
 }
@@ -340,7 +384,11 @@ async function submitCreate() {
     appStore.showError(t('keys.groupRequired'))
     return
   }
-  if (createForm.count < 1 || createForm.count > 50 || createForm.quota <= 0) {
+  if (
+    createForm.count < 1 ||
+    createForm.count > 50 ||
+    (Number(createForm.quota) <= 0 && quotaTokens.value <= 0)
+  ) {
     appStore.showError(t('batchKeys.invalidCreate'))
     return
   }
@@ -350,7 +398,8 @@ async function submitCreate() {
       name: createForm.name.trim() || undefined,
       group_id: createForm.group_id,
       count: Number(createForm.count),
-      quota: Number(createForm.quota),
+      quota: Math.max(0, Number(createForm.quota) || 0),
+      quota_tokens: quotaTokens.value,
     }
     const response = await batchKeysAPI.createBatch(payload)
     const createdBatchID = response.items[0]?.batch_id || ''
@@ -441,12 +490,22 @@ function quotaPercent(key: ApiKey) {
 }
 
 function batchUsagePercent(batch: APIKeyBatchSummary) {
-  if (!batch.quota_total || batch.quota_total <= 0) return 0
-  return Math.max(0, Math.min(100, Math.round((batch.quota_used_total / batch.quota_total) * 100)))
+  if (batch.quota_total > 0) {
+    return Math.max(0, Math.min(100, Math.round((batch.quota_used_total / batch.quota_total) * 100)))
+  }
+  if (batch.quota_tokens_total > 0) {
+    return Math.max(0, Math.min(100, Math.round((batch.quota_tokens_used_total / batch.quota_tokens_total) * 100)))
+  }
+  return 0
 }
 
 function formatMoney(value: number) {
   return `$${Number(value || 0).toFixed(2)}`
+}
+
+function tokenQuotaPercent(key: ApiKey) {
+  if (!key.quota_tokens || key.quota_tokens <= 0) return 0
+  return Math.max(0, Math.min(100, Math.round((key.quota_tokens_used / key.quota_tokens) * 100)))
 }
 
 watch(selectedBatchId, batchId => {

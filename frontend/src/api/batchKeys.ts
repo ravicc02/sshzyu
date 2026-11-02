@@ -12,6 +12,9 @@ export interface APIKeyBatchSummary {
   quota_per_key: number
   quota_total: number
   quota_used_total: number
+  quota_tokens_per_key: number
+  quota_tokens_total: number
+  quota_tokens_used_total: number
   created_at: string
   last_used_at: string | null
 }
@@ -21,6 +24,7 @@ export interface CreateAPIKeyBatchRequest {
   group_id: number
   count: number
   quota: number
+  quota_tokens: number
 }
 
 export async function listBatches(options?: { signal?: AbortSignal }): Promise<{ items: APIKeyBatchSummary[] }> {
