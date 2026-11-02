@@ -657,11 +657,13 @@ function intelligenceSummary(row: MonitorMatrixRow) {
 }
 
 function intelligenceProbeStale(probe: UserMonitorView): boolean {
-  const checkedAt = probe.intelligence_timeline?.[0]?.checked_at
-  if (!checkedAt) return false
-  const timestamp = Date.parse(checkedAt)
+  const latestTimestamp = (probe.intelligence_timeline || [])
+    .map(point => Date.parse(point.checked_at))
+    .filter(Number.isFinite)
+    .sort((a, b) => b - a)[0]
+  if (!latestTimestamp) return false
   const interval = Math.max(30, probe.intelligence_interval_seconds || probe.interval_seconds || 60)
-  return !Number.isFinite(timestamp) || Date.now() - timestamp > interval * 1000 * 2
+  return Date.now() - latestTimestamp > interval * 1000 * 2
 }
 
 function intelligenceSummaryClass(row: MonitorMatrixRow) {

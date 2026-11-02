@@ -800,7 +800,7 @@ func buildIntelligenceTimeline(rounds []GroupDegradationRound) []UserMonitorTime
 		}
 		out = append(out, UserMonitorTimelinePoint{
 			Status:    status,
-			CheckedAt: round.BucketStart,
+			CheckedAt: round.LatestAt,
 		})
 	}
 	return out

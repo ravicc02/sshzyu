@@ -456,6 +456,7 @@ func (r *channelMonitorRepository) ListGroupDegradationRounds(
 				group_id,
 				round_no,
 				MIN(checked_at) AS bucket_start,
+				MAX(checked_at) AS latest_at,
 				COUNT(*) FILTER (WHERE account_rank = 1 AND status = 'pass') AS pass_count,
 				COUNT(*) FILTER (WHERE account_rank = 1 AND status = 'degraded') AS degraded_count,
 				COUNT(*) FILTER (WHERE account_rank = 1 AND status = 'error') AS error_count
@@ -469,7 +470,7 @@ func (r *channelMonitorRepository) ListGroupDegradationRounds(
 				) AS round_rank
 			FROM rounds
 		)
-		SELECT group_id, bucket_start, pass_count, degraded_count, error_count
+		SELECT group_id, bucket_start, latest_at, pass_count, degraded_count, error_count
 		FROM recent
 		WHERE round_rank <= $3
 		ORDER BY group_id, bucket_start DESC
@@ -486,6 +487,7 @@ func (r *channelMonitorRepository) ListGroupDegradationRounds(
 		if err := rows.Scan(
 			&round.GroupID,
 			&round.BucketStart,
+			&round.LatestAt,
 			&round.PassCount,
 			&round.DegradedCount,
 			&round.ErrorCount,
