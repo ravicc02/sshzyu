@@ -31,6 +31,23 @@ export function parseOAuthCallbackInput(value: string): OAuthCallbackInput {
     }
   }
 
+  // Users often copy from the value after `code=`, producing:
+  // AUTHORIZATION_CODE&scope=...&state=...
+  // Recover the leading raw code and state instead of treating the whole
+  // fragment as the code.
+  const raw = trimmed.replace(/^\?/, '')
+  const separator = raw.indexOf('&')
+  if (separator > 0) {
+    const leading = raw.slice(0, separator)
+    if (leading && !leading.includes('=')) {
+      const params = new URLSearchParams(raw.slice(separator + 1))
+      return {
+        code: safeDecode(leading).trim(),
+        state: (params.get('state') || '').trim()
+      }
+    }
+  }
+
   return { code: safeDecode(trimmed).trim(), state: '' }
 }
 

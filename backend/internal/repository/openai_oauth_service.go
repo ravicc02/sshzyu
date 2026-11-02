@@ -45,15 +45,37 @@ func (s *openaiOAuthService) ExchangeCode(ctx context.Context, code, codeVerifie
 	formData.Set("code_verifier", codeVerifier)
 
 	var tokenResp openai.TokenResponse
-
 	authUA, authOriginator := service.CodexCanonicalAuthIdentity()
-	resp, err := client.R().
-		SetContext(ctx).
-		SetHeader("User-Agent", authUA).
-		SetHeader("originator", authOriginator).
-		SetFormDataFromValues(formData).
-		SetSuccessResult(&tokenResp).
-		Post(s.tokenURL)
+	postToken := func(proxy string) (*req.Response, error) {
+		tokenResp = openai.TokenResponse{}
+		requestClient := client
+		if proxy != proxyURL {
+			var clientErr error
+			requestClient, clientErr = createOpenAIReqClient(proxy)
+			if clientErr != nil {
+				return nil, clientErr
+			}
+		}
+		return requestClient.R().
+			SetContext(ctx).
+			SetHeader("User-Agent", authUA).
+			SetHeader("originator", authOriginator).
+			SetFormDataFromValues(formData).
+			SetSuccessResult(&tokenResp).
+			Post(s.tokenURL)
+	}
+	resp, err := postToken(proxyURL)
+	if err != nil && strings.TrimSpace(proxyURL) != "" && (ctx == nil || ctx.Err() == nil) {
+		proxyErr := err
+		resp, err = postToken("")
+		if err != nil {
+			return nil, infraerrors.New(
+				http.StatusBadGateway,
+				"OPENAI_OAUTH_PROXY_AND_DIRECT_FAILED",
+				"OpenAI OAuth could not reach the token endpoint through the selected proxy or a direct retry. Select Direct or another proxy, regenerate the authorization URL, and retry.",
+			).WithCause(errors.Join(proxyErr, err))
+		}
+	}
 
 	if err != nil {
 		if shouldReturnOpenAINoProxyHint(ctx, proxyURL, err) {

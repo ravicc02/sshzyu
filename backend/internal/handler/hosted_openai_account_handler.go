@@ -293,24 +293,61 @@ func hostedPathID(c *gin.Context) (int64, bool) {
 }
 
 func hostedOAuthCodeAndState(code, state, callbackURL string) (string, string) {
-	code = strings.TrimSpace(code)
+	code = normalizeHostedOAuthCode(code)
 	state = strings.TrimSpace(state)
 	callbackURL = strings.TrimSpace(callbackURL)
 	if callbackURL == "" {
 		return code, state
 	}
-	parsed, err := url.Parse(callbackURL)
-	if err != nil {
-		return code, state
+
+	query := hostedOAuthCallbackValues(callbackURL)
+	if callbackCode := normalizeHostedOAuthCode(query.Get("code")); callbackCode != "" {
+		code = callbackCode
 	}
-	query := parsed.Query()
-	if code == "" {
-		code = strings.TrimSpace(query.Get("code"))
-	}
-	if state == "" {
-		state = strings.TrimSpace(query.Get("state"))
+	if callbackState := strings.TrimSpace(query.Get("state")); callbackState != "" {
+		state = callbackState
 	}
 	return code, state
+}
+
+func hostedOAuthCallbackValues(callbackURL string) url.Values {
+	callbackURL = strings.TrimSpace(callbackURL)
+	if callbackURL == "" {
+		return nil
+	}
+	if parsed, err := url.Parse(callbackURL); err == nil && parsed.Query().Get("code") != "" {
+		return parsed.Query()
+	}
+
+	raw := strings.TrimPrefix(callbackURL, "?")
+	if strings.Contains(raw, "code=") {
+		values, _ := url.ParseQuery(raw)
+		return values
+	}
+	parts := strings.SplitN(raw, "&", 2)
+	if len(parts) == 2 && parts[0] != "" && !strings.Contains(parts[0], "=") {
+		values, _ := url.ParseQuery(parts[1])
+		values.Set("code", parts[0])
+		return values
+	}
+	return nil
+}
+
+func normalizeHostedOAuthCode(code string) string {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return ""
+	}
+	if strings.HasPrefix(strings.ToLower(code), "code=") {
+		code = code[len("code="):]
+	}
+	if separator := strings.Index(code, "&"); separator > 0 {
+		leading := strings.TrimSpace(code[:separator])
+		if leading != "" && !strings.Contains(leading, "=") {
+			return leading
+		}
+	}
+	return code
 }
 
 func hostedModelsFromRequest(models []string, legacyModel string) []string {
