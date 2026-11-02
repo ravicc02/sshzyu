@@ -479,37 +479,17 @@ function probeStatusToHealth(status: MonitorTimelinePoint['status']): HealthStat
 }
 
 function timelineSlots(row: MonitorMatrixRow) {
-  if (!hasTraffic(row)) return activeSlots(row)
-  const result = realSlots(row)
-  const coverage = props.coverage
-  if (!coverage || !hasProbe(row)) return result
-  const start = Date.parse(coverage.requested_start)
-  const end = Date.parse(coverage.requested_end || coverage.data_through)
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return result
-  const width = (end - start) / 20
-  const points = probesForRow(row)
-    .flatMap(probe => probe.timeline || [])
-    .filter(point => Number.isFinite(Date.parse(point.checked_at)))
-  for (const point of points) {
-    const stamp = Date.parse(point.checked_at)
-    if (stamp < start || stamp >= end) continue
-    const index = Math.min(19, Math.floor((stamp - start) / width))
-    if (result[index]) continue
-    result[index] = probeTimelineSlot(point)
-  }
-  return result
+  return hasProbe(row) ? activeSlots(row) : realSlots(row)
 }
 
 function timelineAria(row: MonitorMatrixRow) {
-  return hasTraffic(row) || hasProbe(row)
-    ? t('channelMonitorV2.groupCards.combined')
-    : t('channelMonitorV2.groupCards.noData')
+  if (hasProbe(row)) return t('channelMonitorV2.groupCards.availabilityProbe')
+  return hasTraffic(row) ? t('channelMonitorV2.groupCards.combined') : t('channelMonitorV2.groupCards.noData')
 }
 
 function timelineWindowLabel(row: MonitorMatrixRow) {
-  return hasTraffic(row) || hasProbe(row)
-    ? t('channelMonitorV2.groupCards.combinedWindow')
-    : t('channelMonitorV2.groupCards.noData')
+  if (hasProbe(row)) return t('channelMonitorV2.groupCards.availabilityProbeWindow')
+  return hasTraffic(row) ? t('channelMonitorV2.groupCards.combinedWindow') : t('channelMonitorV2.groupCards.noData')
 }
 
 function slotTitle(slot: TimelineSlot | null) {
@@ -570,13 +550,15 @@ function latencyValue(row: MonitorMatrixRow) {
 }
 
 function lastUpdatedAt(row: MonitorMatrixRow): string | null {
-  if (hasTraffic(row)) return props.coverage?.data_through || null
-  const timestamps = probesForRow(row)
-    .flatMap(probe => probe.timeline || [])
-    .map(point => point.checked_at)
-    .filter(value => Number.isFinite(Date.parse(value)))
-    .sort((a, b) => Date.parse(b) - Date.parse(a))
-  return timestamps[0] || null
+  if (hasProbe(row)) {
+    const timestamps = probesForRow(row)
+      .flatMap(probe => probe.timeline || [])
+      .map(point => point.checked_at)
+      .filter(value => Number.isFinite(Date.parse(value)))
+      .sort((a, b) => Date.parse(b) - Date.parse(a))
+    return timestamps[0] || null
+  }
+  return hasTraffic(row) ? props.coverage?.data_through || null : null
 }
 
 function intelligenceProbe(row: MonitorMatrixRow): UserMonitorView | null {

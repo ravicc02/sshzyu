@@ -27,7 +27,7 @@ export default {
     ranges: { '90m': '90m', '24h': '24h', '7d': '7d', '30d': '30d' },
     groupCards: {
       title: 'Group status', openStatus: 'Open full monitor', empty: 'No groups to display',
-      availability: 'Availability', realRequests: 'Real requests', activeProbe: 'On-demand probe', activeLatency: 'Probe latency', combined: 'Combined monitoring', combinedWindow: 'Combined monitoring · last 90 minutes', latency: 'Latency', availabilityValue: 'Availability {value}',
+      availability: 'Availability', realRequests: 'Real requests', activeProbe: 'On-demand probe', availabilityProbe: 'Availability probe', availabilityProbeWindow: 'Availability probe · latest 20 runs', activeLatency: 'Probe latency', combined: 'Combined monitoring', combinedWindow: 'Combined monitoring · last 90 minutes', latency: 'Latency', availabilityValue: 'Availability {value}',
       buckets: '20 intervals', recentChecks: 'Latest 20 active probes',
       noData: 'No data', stale: 'Stale data', intelligencePending: 'Reasoning check not enabled',
       cacheRateFallback: 'Current window has too few samples; showing the latest cache value that met the sample threshold',

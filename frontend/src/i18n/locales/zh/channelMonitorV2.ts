@@ -27,7 +27,7 @@ export default {
     ranges: { '90m': '90m', '24h': '24h', '7d': '7d', '30d': '30d' },
     groupCards: {
       title: '分组状态', openStatus: '查看完整监控', empty: '暂无可显示的分组',
-      availability: '可用率', realRequests: '真实请求', activeProbe: '按需探测', activeLatency: '探测延迟', combined: '综合监控', combinedWindow: '综合监控 · 最近 90 分钟', latency: '延迟', availabilityValue: '可用率 {value}',
+      availability: '可用率', realRequests: '真实请求', activeProbe: '按需探测', availabilityProbe: '可用性探测', availabilityProbeWindow: '可用性探测 · 最近 20 次', activeLatency: '探测延迟', combined: '综合监控', combinedWindow: '综合监控 · 最近 90 分钟', latency: '延迟', availabilityValue: '可用率 {value}',
       buckets: '20 个时间段', recentChecks: '最近 20 次主动探测',
       noData: '暂无数据', stale: '数据过期', intelligencePending: '测智尚未启用',
       cacheRateFallback: '当前窗口样本不足，显示最近一次达到最小样本的历史缓存值',
