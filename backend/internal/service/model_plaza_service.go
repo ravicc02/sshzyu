@@ -345,6 +345,9 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 }
 
 func plazaModelRateMultiplier(group *Group, modelName string) *float64 {
+	if group == nil || group.Platform != PlatformComposite {
+		return nil
+	}
 	pricing := matchGroupModelPricing(group, modelName)
 	if pricing == nil || pricing.RateMultiplier == nil || *pricing.RateMultiplier <= 0 {
 		return nil

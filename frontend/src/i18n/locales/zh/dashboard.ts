@@ -735,6 +735,8 @@ export default {
     },
     card: {
       modelCount: '{count} 个可用模型',
+      providerModelCount: '{count} 个模型',
+      providerRate: '渠道倍率 ×{rate}',
       showPricing: '查看价格',
       hidePricing: '收起价格',
         basePrice: '倍率前',

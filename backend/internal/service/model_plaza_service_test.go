@@ -756,4 +756,7 @@ func TestPlazaModelRateMultiplier_UsesProviderOverride(t *testing.T) {
 	require.NotNil(t, kimiRate)
 	require.InDelta(t, 0.8, *kimiRate, 1e-12)
 	require.Nil(t, plazaModelRateMultiplier(group, "glm-5.3-flash"))
+
+	group.Platform = PlatformOpenAI
+	require.Nil(t, plazaModelRateMultiplier(group, "kimi-k3.1-pro"))
 }

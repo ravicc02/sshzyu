@@ -114,6 +114,33 @@ describe('PlazaGroupSection 模型卡片', () => {
     expect(wrapper.text()).toContain('¥24.00')
   })
 
+  it('ignores model rate overrides for non-composite groups', () => {
+    const model = ladderModel(1)
+    model.rate_multiplier = 0.8
+    const wrapper = mountSection(group({ platform: 'openai', rate_multiplier: 0.5, models: [model] }))
+
+    expect(wrapper.text()).toContain('$2.50')
+    expect(wrapper.text()).not.toContain('$4.00')
+  })
+
+  it('groups composite models by provider with their channel rates', () => {
+    const deepseek = ladderModel(1)
+    deepseek.name = 'deepseek-v4.1-flash'
+    deepseek.platform = 'deepseek'
+    deepseek.rate_multiplier = 0.4
+    const kimi = ladderModel(1)
+    kimi.name = 'kimi-k3.1-pro'
+    kimi.platform = 'kimi'
+    kimi.rate_multiplier = 0.8
+    const wrapper = mountSection(group({ platform: 'composite', models: [deepseek, kimi] }))
+
+    const text = wrapper.text()
+    expect(text).toContain('DeepSeek')
+    expect(text).toContain('Kimi')
+    expect(text).toContain('modelPlaza.card.providerRate')
+    expect(text.indexOf('DeepSeek')).toBeLessThan(text.indexOf('Kimi'))
+  })
+
   it('uses the API route target to show an explicit mapping arrow', () => {
     const model = ladderModel(1)
     model.name = 'gpt-6-luna'

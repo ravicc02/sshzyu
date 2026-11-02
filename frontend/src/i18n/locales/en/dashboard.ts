@@ -730,6 +730,8 @@ export default {
     },
     card: {
       modelCount: '{count} available models',
+      providerModelCount: '{count} models',
+      providerRate: 'Channel rate ×{rate}',
       showPricing: 'View pricing',
       hidePricing: 'Hide pricing',
       basePrice: 'Base',

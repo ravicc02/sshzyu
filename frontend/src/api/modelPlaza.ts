@@ -47,7 +47,8 @@ export interface PlazaModel {
   name: string
   platform: string
   /**
-   * 模型或供应商的独立计费倍率；存在时替代用户/分组倍率。
+   * 聚合分组的模型或供应商独立计费倍率；存在时替代用户/分组倍率。
+   * 普通分组不会返回该字段。
    * 图片、视频独立倍率在展示时仍按分组配置优先。
    */
   rate_multiplier?: number

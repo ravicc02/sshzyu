@@ -368,10 +368,11 @@ const sortedModels = computed(() => {
 })
 
 const effectiveRate = computed(() => props.userRateMultiplier ?? props.rateMultiplier)
+const isCompositeGroup = computed(() => props.platform === 'composite')
 
 /** 分组/用户默认倍率之上的模型或供应商倍率优先。 */
 function modelRate(m: PlazaModel): number {
-  return m.rate_multiplier ?? effectiveRate.value
+  return (isCompositeGroup.value ? m.rate_multiplier : undefined) ?? effectiveRate.value
 }
 
 function baseRate(m: PlazaModel): number {

@@ -64,36 +64,59 @@
         </div>
 
         <!-- 始终先展示模型清单；按需展开逐项定价。 -->
-        <div class="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          <span
-            v-for="model in group.models"
-            :key="`${model.platform}:${model.name}`"
-            class="min-w-0 rounded-xl border border-gray-200 bg-gray-50/70 p-3 transition-colors group-hover/header:border-gray-300 group-hover/header:bg-white dark:border-dark-700 dark:bg-dark-900/50 dark:group-hover/header:border-dark-600 dark:group-hover/header:bg-dark-900"
+        <div class="mt-5 space-y-4">
+          <section
+            v-for="(bucket, bucketIndex) in modelBuckets"
+            :key="bucket.key"
+            :class="bucket.isProvider && bucketIndex > 0 ? 'border-t border-gray-100 pt-4 dark:border-dark-700/60' : ''"
           >
-            <span class="flex min-w-0 items-center justify-between gap-2 font-mono text-xs font-medium text-gray-700 dark:text-dark-200">
-              <span class="flex min-w-0 items-center gap-1.5">
-                <PlatformIcon :platform="model.platform as GroupPlatform" size="xs" />
-                <span class="truncate">{{ model.name }}</span>
+            <div v-if="bucket.isProvider" class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span class="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
+                <PlatformIcon :platform="bucket.platform as GroupPlatform" size="sm" />
+                {{ platformLabel(bucket.platform) }}
+              </span>
+              <span class="text-xs text-gray-400 dark:text-dark-500">
+                {{ t('modelPlaza.card.providerModelCount', { count: bucket.models.length }) }}
               </span>
               <span
-                v-if="model.route_target && model.route_target !== model.name"
-                class="inline-flex min-w-0 shrink-0 items-center gap-1 rounded-md bg-primary-50 px-1.5 py-0.5 text-[10px] font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
-                :aria-label="t('modelPlaza.card.routesTo', { target: model.route_target })"
+                v-if="bucket.rate != null"
+                class="rounded-md bg-primary-50 px-2 py-0.5 font-mono text-xs font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
               >
-                <Icon name="arrowRight" size="xs" class="h-3 w-3 shrink-0" />
-                <span class="max-w-32 truncate">{{ model.route_target }}</span>
+                {{ t('modelPlaza.card.providerRate', { rate: bucket.rate }) }}
               </span>
-            </span>
-            <span v-if="previewPrice(model)" class="mt-2 grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1 pl-5">
-              <span class="text-[10px] text-gray-400 dark:text-dark-500">{{ t('modelPlaza.card.basePrice') }}</span>
-              <span class="truncate font-mono text-[11px] text-gray-400 dark:text-dark-500" :class="previewRate(model) === 1 ? '' : 'line-through'">{{ previewPrice(model)!.standard }}</span>
-              <span class="text-[10px] font-semibold text-gray-500 dark:text-dark-400">{{ t('modelPlaza.card.paidPrice') }}</span>
-              <span class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-                <strong class="font-mono text-sm font-bold" :class="previewRate(model) < 1 ? 'text-emerald-600 dark:text-emerald-400' : previewRate(model) > 1 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-dark-200'">{{ previewPrice(model)!.paid }}</strong>
-                <span v-if="previewRate(model) !== 1" class="rounded-md px-1.5 py-0.5 text-[10px] font-semibold" :class="previewRate(model) < 1 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'">{{ discountFor(model) }}</span>
+            </div>
+            <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              <span
+                v-for="model in bucket.models"
+                :key="`${model.platform}:${model.name}`"
+                class="min-w-0 rounded-xl border border-gray-200 bg-gray-50/70 p-3 transition-colors group-hover/header:border-gray-300 group-hover/header:bg-white dark:border-dark-700 dark:bg-dark-900/50 dark:group-hover/header:border-dark-600 dark:group-hover/header:bg-dark-900"
+              >
+                <span class="flex min-w-0 items-center justify-between gap-2 font-mono text-xs font-medium text-gray-700 dark:text-dark-200">
+                  <span class="flex min-w-0 items-center gap-1.5">
+                    <PlatformIcon :platform="model.platform as GroupPlatform" size="xs" />
+                    <span class="truncate">{{ model.name }}</span>
+                  </span>
+                  <span
+                    v-if="model.route_target && model.route_target !== model.name"
+                    class="inline-flex min-w-0 shrink-0 items-center gap-1 rounded-md bg-primary-50 px-1.5 py-0.5 text-[10px] font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
+                    :aria-label="t('modelPlaza.card.routesTo', { target: model.route_target })"
+                  >
+                    <Icon name="arrowRight" size="xs" class="h-3 w-3 shrink-0" />
+                    <span class="max-w-32 truncate">{{ model.route_target }}</span>
+                  </span>
+                </span>
+                <span v-if="previewPrice(model)" class="mt-2 grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1 pl-5">
+                  <span class="text-[10px] text-gray-400 dark:text-dark-500">{{ t('modelPlaza.card.basePrice') }}</span>
+                  <span class="truncate font-mono text-[11px] text-gray-400 dark:text-dark-500" :class="previewRate(model) === 1 ? '' : 'line-through'">{{ previewPrice(model)!.standard }}</span>
+                  <span class="text-[10px] font-semibold text-gray-500 dark:text-dark-400">{{ t('modelPlaza.card.paidPrice') }}</span>
+                  <span class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <strong class="font-mono text-sm font-bold" :class="previewRate(model) < 1 ? 'text-emerald-600 dark:text-emerald-400' : previewRate(model) > 1 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-dark-200'">{{ previewPrice(model)!.paid }}</strong>
+                    <span v-if="previewRate(model) !== 1" class="rounded-md px-1.5 py-0.5 text-[10px] font-semibold" :class="previewRate(model) < 1 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'">{{ discountFor(model) }}</span>
+                  </span>
+                </span>
               </span>
-            </span>
-          </span>
+            </div>
+          </section>
         </div>
     </header>
 
@@ -146,7 +169,7 @@ import type { GroupPlatform, SubscriptionType } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { formatScaled } from '@/utils/pricing'
 import { BILLING_MODE_IMAGE, BILLING_MODE_TOKEN, BILLING_MODE_VIDEO, type BillingMode } from '@/constants/channel'
-import { platformAccentBarClass, platformBorderStrongClass } from '@/utils/platformColors'
+import { platformAccentBarClass, platformBorderStrongClass, platformLabel } from '@/utils/platformColors'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import { useAppStore } from '@/stores/app'
 
@@ -158,10 +181,42 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const expanded = ref(false)
 
+const isCompositeGroup = computed(() => props.group.platform === 'composite')
 const effectiveRate = computed(() => props.group.user_rate_multiplier ?? props.group.rate_multiplier)
 const hasModelRateOverrides = computed(() =>
+  isCompositeGroup.value &&
   props.group.models.some((model) => model.rate_multiplier != null && model.rate_multiplier > 0)
 )
+
+interface ModelBucket {
+  key: string
+  platform: string
+  models: ModelPlazaGroup['models']
+  rate: number | null
+  isProvider: boolean
+}
+
+const modelBuckets = computed<ModelBucket[]>(() => {
+  if (!isCompositeGroup.value) {
+    return [{ key: 'all', platform: props.group.platform, models: props.group.models, rate: null, isProvider: false }]
+  }
+  const byProvider = new Map<string, ModelPlazaGroup['models']>()
+  for (const model of props.group.models) {
+    const bucket = byProvider.get(model.platform)
+    if (bucket) bucket.push(model)
+    else byProvider.set(model.platform, [model])
+  }
+  return [...byProvider.entries()].map(([platform, models]) => {
+    const rates = new Set(models.map((model) => model.rate_multiplier ?? effectiveRate.value))
+    return {
+      key: platform,
+      platform,
+      models,
+      rate: rates.size === 1 ? [...rates][0] : null,
+      isProvider: true,
+    }
+  })
+})
 
 interface PreviewPrice {
   standard: string
@@ -247,7 +302,7 @@ function modelRate(model: ModelPlazaGroup['models'][number]): number {
   const mode = billingMode(model)
   if (mode === BILLING_MODE_IMAGE && props.group.image_rate_independent) return props.group.image_rate_multiplier ?? 1
   if (mode === BILLING_MODE_VIDEO && props.group.video_rate_independent) return props.group.video_rate_multiplier ?? 1
-  return model.rate_multiplier ?? effectiveRate.value
+  return (isCompositeGroup.value ? model.rate_multiplier : undefined) ?? effectiveRate.value
 }
 
 /** 高峰窗口描述(含倍率与服务器时区标注);分组未启用高峰为空串。 */
