@@ -27,20 +27,24 @@ type hostedOpenAIAuthURLRequest struct {
 }
 
 type hostedOpenAIAccountConfigRequest struct {
-	Model            string `json:"model"`
-	ProxyID          *int64 `json:"proxy_id"`
-	SupportsMessages *bool  `json:"supports_messages"`
+	AccountName      string   `json:"account_name"`
+	Model            string   `json:"model"`
+	Models           []string `json:"models"`
+	ProxyID          *int64   `json:"proxy_id"`
+	SupportsMessages *bool    `json:"supports_messages"`
 }
 
 type hostedOpenAICreateRequest struct {
-	SessionID        string `json:"session_id"`
-	Code             string `json:"code"`
-	State            string `json:"state"`
-	CallbackURL      string `json:"callback_url"`
-	RedirectURI      string `json:"redirect_uri"`
-	Model            string `json:"model"`
-	ProxyID          *int64 `json:"proxy_id"`
-	SupportsMessages bool   `json:"supports_messages"`
+	SessionID        string   `json:"session_id"`
+	Code             string   `json:"code"`
+	State            string   `json:"state"`
+	CallbackURL      string   `json:"callback_url"`
+	RedirectURI      string   `json:"redirect_uri"`
+	AccountName      string   `json:"account_name"`
+	Model            string   `json:"model"`
+	Models           []string `json:"models"`
+	ProxyID          *int64   `json:"proxy_id"`
+	SupportsMessages bool     `json:"supports_messages"`
 }
 
 type hostedOpenAIReauthorizeRequest struct {
@@ -119,7 +123,8 @@ func (h *HostedOpenAIAccountHandler) Create(c *gin.Context) {
 		Code:             code,
 		State:            state,
 		RedirectURI:      strings.TrimSpace(req.RedirectURI),
-		Model:            strings.TrimSpace(req.Model),
+		AccountName:      strings.TrimSpace(req.AccountName),
+		Models:           hostedModelsFromRequest(req.Models, req.Model),
 		ProxyID:          req.ProxyID,
 		SupportsMessages: req.SupportsMessages,
 	})
@@ -145,7 +150,8 @@ func (h *HostedOpenAIAccountHandler) Update(c *gin.Context) {
 		return
 	}
 	item, err := h.service.UpdateForUser(c.Request.Context(), userID, id, service.UpdateHostedOpenAIAccountInput{
-		Model:            req.Model,
+		AccountName:      req.AccountName,
+		Models:           hostedModelsFromRequest(req.Models, req.Model),
 		ProxyID:          req.ProxyID,
 		SupportsMessages: req.SupportsMessages,
 	})
@@ -225,7 +231,8 @@ func (h *HostedOpenAIAccountHandler) AdminUpdate(c *gin.Context) {
 		return
 	}
 	item, err := h.service.UpdateForAdmin(c.Request.Context(), id, service.UpdateHostedOpenAIAccountInput{
-		Model:            req.Model,
+		AccountName:      req.AccountName,
+		Models:           hostedModelsFromRequest(req.Models, req.Model),
 		ProxyID:          req.ProxyID,
 		SupportsMessages: req.SupportsMessages,
 	})
@@ -304,4 +311,14 @@ func hostedOAuthCodeAndState(code, state, callbackURL string) (string, string) {
 		state = strings.TrimSpace(query.Get("state"))
 	}
 	return code, state
+}
+
+func hostedModelsFromRequest(models []string, legacyModel string) []string {
+	if len(models) > 0 {
+		return models
+	}
+	if model := strings.TrimSpace(legacyModel); model != "" {
+		return []string{model}
+	}
+	return nil
 }

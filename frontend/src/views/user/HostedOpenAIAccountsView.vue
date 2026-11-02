@@ -38,10 +38,10 @@
               <div class="account-avatar">{{ initials(account) }}</div>
               <div class="identity-copy">
                 <div class="title-line">
-                  <h2>{{ account.account_email || account.user_name }}</h2>
+                  <h2>{{ account.account_name || account.account_email || account.user_name }}</h2>
                   <span class="status-chip" :class="statusClass(account)">{{ statusLabel(account) }}</span>
                 </div>
-                <p>{{ account.quota.account_type }}</p>
+                <p>{{ account.account_email }} · {{ account.quota.account_type }}</p>
               </div>
             </div>
             <button type="button" class="icon-button" title="刷新额度" :disabled="refreshingID === account.id" @click="refreshQuota(account)">
@@ -52,7 +52,7 @@
           <dl class="account-meta">
             <div>
               <dt>模型</dt>
-              <dd>{{ account.model }}</dd>
+              <dd :title="account.models.join(', ')">{{ account.models.join(' · ') }}</dd>
             </div>
             <div>
               <dt>分组</dt>
@@ -104,11 +104,17 @@
 
         <div class="modal-body hosted-form">
           <label class="field">
-            <span>模型</span>
-            <input v-model.trim="createForm.model" list="hosted-model-options" class="input" placeholder="gpt-5.2-codex" />
-            <datalist id="hosted-model-options">
-              <option v-for="model in options.suggested_models" :key="model" :value="model" />
-            </datalist>
+            <span>账号名称</span>
+            <input v-model.trim="createForm.account_name" class="input" placeholder="例如 主账号" />
+          </label>
+
+          <label class="field">
+            <span>模型白名单</span>
+            <ModelWhitelistSelector
+              v-model="createForm.models"
+              platform="openai"
+              :show-sync-button="false"
+            />
           </label>
 
           <label class="field">
@@ -128,7 +134,7 @@
           </label>
 
           <div class="auth-step">
-            <button type="button" class="btn btn-secondary" :disabled="authLoading || !createForm.model" @click="generateAuth">
+            <button type="button" class="btn btn-secondary" :disabled="authLoading || !canCreateConfig" @click="generateAuth">
               <Icon name="externalLink" size="sm" />
               {{ authURL ? '重新生成登录链接' : '生成登录链接' }}
             </button>
@@ -166,8 +172,16 @@
         </header>
         <div class="modal-body hosted-form">
           <label class="field">
-            <span>模型</span>
-            <input v-model.trim="editForm.model" list="hosted-model-options" class="input" />
+            <span>账号名称</span>
+            <input v-model.trim="editForm.account_name" class="input" />
+          </label>
+          <label class="field">
+            <span>模型白名单</span>
+            <ModelWhitelistSelector
+              v-model="editForm.models"
+              platform="openai"
+              :show-sync-button="false"
+            />
           </label>
           <label class="field">
             <span>代理</span>
@@ -183,7 +197,7 @@
         </div>
         <footer class="modal-foot">
           <button type="button" class="btn btn-secondary" @click="editAccount = null">取消</button>
-          <button type="button" class="btn btn-primary" :disabled="savingEdit || !editForm.model" @click="saveEdit">
+          <button type="button" class="btn btn-primary" :disabled="savingEdit || !editForm.account_name || editForm.models.length === 0" @click="saveEdit">
             {{ savingEdit ? '保存中' : '保存' }}
           </button>
         </footer>
@@ -243,6 +257,7 @@ import {
   type HostedOpenAIOptions
 } from '@/api/hostedOpenAIAccounts'
 import QuotaBar from '@/components/hosted/QuotaBar.vue'
+import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import { extractApiErrorMessage } from '@/utils/apiError'
 
 const appStore = useAppStore()
@@ -257,7 +272,8 @@ const authLoading = ref(false)
 const authURL = ref('')
 const sessionID = ref('')
 const createForm = reactive({
-  model: '',
+  account_name: '',
+  models: [] as string[],
   proxy_id: null as number | null,
   supports_messages: false,
   callback_url: ''
@@ -266,7 +282,8 @@ const createForm = reactive({
 const editAccount = ref<HostedOpenAIAccount | null>(null)
 const savingEdit = ref(false)
 const editForm = reactive({
-  model: '',
+  account_name: '',
+  models: [] as string[],
   proxy_id: null as number | null,
   supports_messages: false
 })
@@ -278,7 +295,8 @@ const reauthCallback = ref('')
 const reauthing = ref(false)
 
 const activeCount = computed(() => accounts.value.filter((item) => item.status === 'active').length)
-const canCreate = computed(() => Boolean(sessionID.value && createForm.callback_url && createForm.model))
+const canCreateConfig = computed(() => Boolean(createForm.account_name && createForm.models.length > 0))
+const canCreate = computed(() => Boolean(sessionID.value && createForm.callback_url && canCreateConfig.value))
 
 async function load() {
   loading.value = true
@@ -295,7 +313,8 @@ async function load() {
 
 function openCreate() {
   createOpen.value = true
-  createForm.model = options.value.suggested_models[0] || ''
+  createForm.account_name = ''
+  createForm.models = []
   createForm.proxy_id = null
   createForm.supports_messages = false
   createForm.callback_url = ''
@@ -327,7 +346,8 @@ async function createAccount() {
     const created = await createHostedOpenAIAccount({
       session_id: sessionID.value,
       callback_url: createForm.callback_url,
-      model: createForm.model,
+      account_name: createForm.account_name,
+      models: createForm.models,
       proxy_id: createForm.proxy_id,
       supports_messages: createForm.supports_messages
     })
@@ -343,7 +363,8 @@ async function createAccount() {
 
 function openEdit(account: HostedOpenAIAccount) {
   editAccount.value = account
-  editForm.model = account.model
+  editForm.account_name = account.account_name || account.account_email
+  editForm.models = [...(account.models?.length ? account.models : [account.model])]
   editForm.proxy_id = account.proxy_id ?? null
   editForm.supports_messages = account.supports_messages
 }
@@ -353,7 +374,8 @@ async function saveEdit() {
   savingEdit.value = true
   try {
     const updated = await updateHostedOpenAIAccount(editAccount.value.id, {
-      model: editForm.model,
+      account_name: editForm.account_name,
+      models: editForm.models,
       proxy_id: editForm.proxy_id,
       supports_messages: editForm.supports_messages
     })
@@ -429,7 +451,7 @@ function replaceAccount(updated: HostedOpenAIAccount) {
 }
 
 function initials(account: HostedOpenAIAccount) {
-  const text = account.account_email || account.user_name || 'O'
+  const text = account.account_name || account.account_email || account.user_name || 'O'
   return text.slice(0, 1).toUpperCase()
 }
 

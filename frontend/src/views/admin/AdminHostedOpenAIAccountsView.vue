@@ -54,6 +54,7 @@
                   <div class="avatar">{{ initials(account) }}</div>
                   <div>
                     <strong>{{ account.user_name }}</strong>
+                    <span>{{ account.account_name || account.account_email || account.user_email }}</span>
                     <span>{{ account.account_email || account.user_email }}</span>
                     <small>#{{ account.user_id }} · {{ account.quota.account_type }}</small>
                   </div>
@@ -62,7 +63,7 @@
               <td>
                 <div class="stack-cell">
                   <strong :title="account.group_name">{{ account.group_name }}</strong>
-                  <code>{{ account.model }}</code>
+                  <code :title="account.models.join(', ')">{{ account.models.join(' · ') }}</code>
                   <span>{{ account.supports_messages ? '/v1/messages' : 'Messages 关闭' }}</span>
                 </div>
               </td>
@@ -133,8 +134,16 @@
         </header>
         <div class="modal-body form-grid">
           <label class="field">
-            <span>模型</span>
-            <input v-model.trim="editForm.model" class="input" />
+            <span>账号名称</span>
+            <input v-model.trim="editForm.account_name" class="input" />
+          </label>
+          <label class="field">
+            <span>模型白名单</span>
+            <ModelWhitelistSelector
+              v-model="editForm.models"
+              platform="openai"
+              :show-sync-button="false"
+            />
           </label>
           <label class="field">
             <span>代理</span>
@@ -150,7 +159,7 @@
         </div>
         <footer class="modal-foot">
           <button type="button" class="btn btn-secondary" @click="editing = null">取消</button>
-          <button type="button" class="btn btn-primary" :disabled="saving || !editForm.model" @click="saveEdit">
+          <button type="button" class="btn btn-primary" :disabled="saving || !editForm.account_name || editForm.models.length === 0" @click="saveEdit">
             {{ saving ? '保存中' : '保存' }}
           </button>
         </footer>
@@ -164,6 +173,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import QuotaBar from '@/components/hosted/QuotaBar.vue'
+import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import {
@@ -186,7 +196,8 @@ const busyID = ref<number | null>(null)
 const editing = ref<HostedOpenAIAccount | null>(null)
 const saving = ref(false)
 const editForm = reactive({
-  model: '',
+  account_name: '',
+  models: [] as string[],
   proxy_id: null as number | null,
   supports_messages: false
 })
@@ -196,7 +207,14 @@ const filteredAccounts = computed(() => {
   return accounts.value.filter((account) => {
     if (statusFilter.value && account.status !== statusFilter.value) return false
     if (!query) return true
-    return [account.user_name, account.user_email, account.account_email, account.group_name, account.model]
+    return [
+      account.user_name,
+      account.user_email,
+      account.account_email,
+      account.account_name,
+      account.group_name,
+      ...(account.models || [account.model])
+    ]
       .join(' ')
       .toLowerCase()
       .includes(query)
@@ -218,7 +236,8 @@ async function load() {
 
 function openEdit(account: HostedOpenAIAccount) {
   editing.value = account
-  editForm.model = account.model
+  editForm.account_name = account.account_name || account.account_email
+  editForm.models = [...(account.models?.length ? account.models : [account.model])]
   editForm.proxy_id = account.proxy_id ?? null
   editForm.supports_messages = account.supports_messages
 }
@@ -229,7 +248,8 @@ async function saveEdit() {
   try {
     replaceAccount(
       await updateAdminHostedOpenAIAccount(editing.value.id, {
-        model: editForm.model,
+        account_name: editForm.account_name,
+        models: editForm.models,
         proxy_id: editForm.proxy_id,
         supports_messages: editForm.supports_messages
       })

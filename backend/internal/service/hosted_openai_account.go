@@ -15,24 +15,26 @@ import (
 var ErrHostedOpenAIAccountNotFound = infraerrors.NotFound("HOSTED_OPENAI_ACCOUNT_NOT_FOUND", "hosted OpenAI account not found")
 
 type HostedOpenAIAccountRecord struct {
-	ID                   int64
-	UserID               int64
-	AccountID            int64
-	GroupID              int64
-	SubscriptionID       *int64
-	ProxyID              *int64
-	Model                string
-	SupportsMessages     bool
-	Status               string
-	AccountEmail         string
-	PlanType             string
-	LastQuotaRefreshedAt *time.Time
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
-	UserName             string
-	UserEmail            string
-	GroupName            string
-	ProxyName            string
+	ID                   int64      `json:"id"`
+	UserID               int64      `json:"user_id"`
+	AccountID            int64      `json:"account_id"`
+	GroupID              int64      `json:"group_id"`
+	SubscriptionID       *int64     `json:"subscription_id,omitempty"`
+	ProxyID              *int64     `json:"proxy_id,omitempty"`
+	AccountName          string     `json:"account_name"`
+	Model                string     `json:"model"`
+	Models               []string   `json:"models"`
+	SupportsMessages     bool       `json:"supports_messages"`
+	Status               string     `json:"status"`
+	AccountEmail         string     `json:"account_email"`
+	PlanType             string     `json:"plan_type"`
+	LastQuotaRefreshedAt *time.Time `json:"last_quota_refreshed_at,omitempty"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
+	UserName             string     `json:"user_name"`
+	UserEmail            string     `json:"user_email"`
+	GroupName            string     `json:"group_name"`
+	ProxyName            string     `json:"proxy_name"`
 }
 
 type HostedOpenAIAccountRepository interface {
@@ -41,7 +43,7 @@ type HostedOpenAIAccountRepository interface {
 	GetByIDForUser(ctx context.Context, id, userID int64) (*HostedOpenAIAccountRecord, error)
 	ListByUser(ctx context.Context, userID int64) ([]HostedOpenAIAccountRecord, error)
 	List(ctx context.Context, search, status string) ([]HostedOpenAIAccountRecord, error)
-	UpdateConfig(ctx context.Context, id int64, proxyID *int64, model string, supportsMessages bool) error
+	UpdateConfig(ctx context.Context, id int64, proxyID *int64, accountName string, models []string, supportsMessages bool) error
 	UpdateStatus(ctx context.Context, id int64, status string) error
 	UpdateQuotaMeta(ctx context.Context, id int64, planType string, refreshedAt time.Time) error
 	UpdateIdentity(ctx context.Context, id int64, email, planType string) error
@@ -84,13 +86,15 @@ type CreateHostedOpenAIAccountInput struct {
 	Code             string
 	State            string
 	RedirectURI      string
-	Model            string
+	AccountName      string
+	Models           []string
 	ProxyID          *int64
 	SupportsMessages bool
 }
 
 type UpdateHostedOpenAIAccountInput struct {
-	Model            string
+	AccountName      string
+	Models           []string
 	ProxyID          *int64
 	SupportsMessages *bool
 }
@@ -206,9 +210,13 @@ func (s *HostedOpenAIAccountService) Create(
 	userID int64,
 	input CreateHostedOpenAIAccountInput,
 ) (*HostedOpenAIAccountView, error) {
-	model := strings.TrimSpace(input.Model)
-	if model == "" {
-		return nil, infraerrors.BadRequest("HOSTED_OPENAI_MODEL_REQUIRED", "please choose a model")
+	models, err := normalizeHostedModels(input.Models)
+	if err != nil {
+		return nil, err
+	}
+	accountName := strings.TrimSpace(input.AccountName)
+	if accountName == "" {
+		return nil, infraerrors.BadRequest("HOSTED_OPENAI_ACCOUNT_NAME_REQUIRED", "please enter an account name")
 	}
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
@@ -249,10 +257,10 @@ func (s *HostedOpenAIAccountService) Create(
 		SubscriptionType:      SubscriptionTypeSubscription,
 		AllowMessagesDispatch: input.SupportsMessages,
 		RequireOAuthOnly:      true,
-		DefaultMappedModel:    model,
+		DefaultMappedModel:    models[0],
 		ModelAllowlist: GroupModelAllowlist{
 			Enabled: true,
-			Models:  []string{model},
+			Models:  models,
 		},
 	})
 	if err != nil {
@@ -260,7 +268,7 @@ func (s *HostedOpenAIAccountService) Create(
 	}
 
 	account, err := s.adminService.CreateAccount(ctx, &CreateAccountInput{
-		Name:        hostedFirstNonEmpty(email, label, "Hosted OpenAI Account"),
+		Name:        accountName,
 		Platform:    PlatformOpenAI,
 		Type:        AccountTypeOAuth,
 		Credentials: credentials,
@@ -302,7 +310,9 @@ func (s *HostedOpenAIAccountService) Create(
 		GroupID:          group.ID,
 		SubscriptionID:   &sub.ID,
 		ProxyID:          input.ProxyID,
-		Model:            model,
+		AccountName:      accountName,
+		Model:            models[0],
+		Models:           models,
 		SupportsMessages: input.SupportsMessages,
 		Status:           "active",
 		AccountEmail:     email,
@@ -377,9 +387,20 @@ func (s *HostedOpenAIAccountService) update(
 	if record.Status == "archived" {
 		return nil, infraerrors.Conflict("HOSTED_OPENAI_ACCOUNT_ARCHIVED", "hosted account is archived")
 	}
-	model := strings.TrimSpace(input.Model)
-	if model == "" {
-		model = record.Model
+	models := input.Models
+	if len(models) == 0 {
+		models = record.Models
+		if len(models) == 0 && strings.TrimSpace(record.Model) != "" {
+			models = []string{record.Model}
+		}
+	}
+	models, err := normalizeHostedModels(models)
+	if err != nil {
+		return nil, err
+	}
+	accountName := strings.TrimSpace(input.AccountName)
+	if accountName == "" {
+		accountName = hostedFirstNonEmpty(record.AccountName, record.AccountEmail)
 	}
 	supportsMessages := record.SupportsMessages
 	if input.SupportsMessages != nil {
@@ -397,10 +418,10 @@ func (s *HostedOpenAIAccountService) update(
 	_, err = s.adminService.UpdateGroup(ctx, record.GroupID, &UpdateGroupInput{
 		Platform:              group.Platform,
 		AllowMessagesDispatch: &supportsMessages,
-		DefaultMappedModel:    &model,
+		DefaultMappedModel:    &models[0],
 		ModelAllowlist: &GroupModelAllowlist{
 			Enabled: true,
-			Models:  []string{model},
+			Models:  models,
 		},
 	})
 	if err != nil {
@@ -410,10 +431,13 @@ func (s *HostedOpenAIAccountService) update(
 	if input.ProxyID != nil {
 		accountProxyID = *input.ProxyID
 	}
-	if _, err := s.adminService.UpdateAccount(ctx, record.AccountID, &UpdateAccountInput{ProxyID: &accountProxyID}); err != nil {
-		return nil, fmt.Errorf("update hosted account proxy: %w", err)
+	if _, err := s.adminService.UpdateAccount(ctx, record.AccountID, &UpdateAccountInput{
+		Name:    accountName,
+		ProxyID: &accountProxyID,
+	}); err != nil {
+		return nil, fmt.Errorf("update hosted account: %w", err)
 	}
-	if err := s.repo.UpdateConfig(ctx, record.ID, input.ProxyID, model, supportsMessages); err != nil {
+	if err := s.repo.UpdateConfig(ctx, record.ID, input.ProxyID, accountName, models, supportsMessages); err != nil {
 		return nil, err
 	}
 	updated, err := s.repo.GetByID(ctx, record.ID)
@@ -784,6 +808,32 @@ func hostedFirstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func normalizeHostedModels(models []string) ([]string, error) {
+	seen := make(map[string]struct{}, len(models))
+	normalized := make([]string, 0, len(models))
+	for _, model := range models {
+		model = strings.TrimSpace(model)
+		if model == "" {
+			continue
+		}
+		if len(model) > 120 {
+			return nil, infraerrors.BadRequest("HOSTED_OPENAI_MODEL_INVALID", "model name is too long")
+		}
+		if _, exists := seen[model]; exists {
+			continue
+		}
+		seen[model] = struct{}{}
+		normalized = append(normalized, model)
+	}
+	if len(normalized) == 0 {
+		return nil, infraerrors.BadRequest("HOSTED_OPENAI_MODEL_REQUIRED", "please choose at least one model")
+	}
+	if len(normalized) > 50 {
+		return nil, infraerrors.BadRequest("HOSTED_OPENAI_MODEL_LIMIT", "at most 50 models can be selected")
+	}
+	return normalized, nil
 }
 
 func truncateRunes(value string, max int) string {

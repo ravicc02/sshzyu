@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -27,7 +28,9 @@ const hostedOpenAIAccountSelect = `
 		h.group_id,
 		h.subscription_id,
 		h.proxy_id,
+		h.account_name,
 		h.model,
+		h.models,
 		h.supports_messages,
 		h.status,
 		h.account_email,
@@ -55,6 +58,7 @@ func scanHostedOpenAIAccount(scanner hostedOpenAIAccountScanner) (*service.Hoste
 		subscriptionID   sql.NullInt64
 		proxyID          sql.NullInt64
 		lastQuotaRefresh sql.NullTime
+		modelsRaw        []byte
 	)
 	if err := scanner.Scan(
 		&record.ID,
@@ -63,7 +67,9 @@ func scanHostedOpenAIAccount(scanner hostedOpenAIAccountScanner) (*service.Hoste
 		&record.GroupID,
 		&subscriptionID,
 		&proxyID,
+		&record.AccountName,
 		&record.Model,
+		&modelsRaw,
 		&record.SupportsMessages,
 		&record.Status,
 		&record.AccountEmail,
@@ -87,6 +93,14 @@ func scanHostedOpenAIAccount(scanner hostedOpenAIAccountScanner) (*service.Hoste
 	if lastQuotaRefresh.Valid {
 		record.LastQuotaRefreshedAt = &lastQuotaRefresh.Time
 	}
+	if len(modelsRaw) > 0 {
+		if err := json.Unmarshal(modelsRaw, &record.Models); err != nil {
+			return nil, fmt.Errorf("decode hosted models: %w", err)
+		}
+	}
+	if len(record.Models) == 0 && strings.TrimSpace(record.Model) != "" {
+		record.Models = []string{record.Model}
+	}
 	return &record, nil
 }
 
@@ -94,15 +108,19 @@ func (r *hostedOpenAIAccountRepository) Create(ctx context.Context, record *serv
 	if record == nil {
 		return errors.New("hosted account record is nil")
 	}
+	modelsJSON, err := json.Marshal(record.Models)
+	if err != nil {
+		return fmt.Errorf("encode hosted models: %w", err)
+	}
 	query := `
 		INSERT INTO hosted_openai_accounts (
-			user_id, account_id, group_id, subscription_id, proxy_id, model,
-			supports_messages, status, account_email, plan_type, created_at, updated_at
+			user_id, account_id, group_id, subscription_id, proxy_id, account_name,
+			model, models, supports_messages, status, account_email, plan_type, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
 		RETURNING id, created_at, updated_at
 	`
-	err := r.db.QueryRowContext(
+	err = r.db.QueryRowContext(
 		ctx,
 		query,
 		record.UserID,
@@ -110,7 +128,9 @@ func (r *hostedOpenAIAccountRepository) Create(ctx context.Context, record *serv
 		record.GroupID,
 		record.SubscriptionID,
 		record.ProxyID,
+		record.AccountName,
 		record.Model,
+		modelsJSON,
 		record.SupportsMessages,
 		record.Status,
 		record.AccountEmail,
@@ -193,14 +213,20 @@ func (r *hostedOpenAIAccountRepository) UpdateConfig(
 	ctx context.Context,
 	id int64,
 	proxyID *int64,
-	model string,
+	accountName string,
+	models []string,
 	supportsMessages bool,
 ) error {
+	modelsJSON, err := json.Marshal(models)
+	if err != nil {
+		return fmt.Errorf("encode hosted models: %w", err)
+	}
 	result, err := r.db.ExecContext(ctx, `
 		UPDATE hosted_openai_accounts
-		SET proxy_id = $2, model = $3, supports_messages = $4, updated_at = NOW()
+		SET proxy_id = $2, account_name = $3, model = $4, models = $5,
+		    supports_messages = $6, updated_at = NOW()
 		WHERE id = $1
-	`, id, proxyID, model, supportsMessages)
+	`, id, proxyID, accountName, models[0], modelsJSON, supportsMessages)
 	if err != nil {
 		return fmt.Errorf("update hosted account config: %w", err)
 	}

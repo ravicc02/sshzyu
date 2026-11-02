@@ -22,7 +22,9 @@ export interface HostedOpenAIAccount {
   group_id: number
   subscription_id?: number | null
   proxy_id?: number | null
+  account_name: string
   model: string
+  models: string[]
   supports_messages: boolean
   status: 'active' | 'suspended' | 'archived'
   account_email: string
@@ -59,12 +61,16 @@ export interface HostedCreatePayload {
   code?: string
   state?: string
   redirect_uri?: string
-  model: string
+  account_name: string
+  models: string[]
+  model?: string
   proxy_id?: number | null
   supports_messages: boolean
 }
 
 export interface HostedConfigPayload {
+  account_name?: string
+  models?: string[]
   model?: string
   proxy_id?: number | null
   supports_messages?: boolean

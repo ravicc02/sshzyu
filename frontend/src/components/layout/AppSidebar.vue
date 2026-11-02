@@ -994,7 +994,7 @@ function groupNavigation(
 
 const managementSections = computed(() => groupNavigation(adminNavItems.value, [
   { id: 'overview', label: dockText.value.overview, paths: ['/admin/dashboard', '/admin/ops', '/admin/usage'] },
-  { id: 'resources', label: dockText.value.resources, paths: ['/admin/users', '/admin/groups', '/admin/model-prices', '/admin/accounts', '/admin/account-scheduler', '/admin/upstream-monitor', '/admin/channels', '/keys'] },
+  { id: 'resources', label: dockText.value.resources, paths: ['/admin/users', '/admin/groups', '/admin/model-prices', '/admin/accounts', '/admin/hosted-accounts', '/admin/account-scheduler', '/admin/upstream-monitor', '/admin/channels', '/keys'] },
   { id: 'operations', label: dockText.value.operations, paths: ['/admin/subscriptions', '/admin/orders', '/admin/redeem', '/admin/promo-codes', '/admin/lottery', '/admin/affiliates'] },
   { id: 'system', label: dockText.value.system, paths: ['/admin/announcements', '/admin/proxies', '/admin/plugins', '/admin/risk-control', '/admin/audit-logs', '/admin/settings'] }
 ], 'admin'))
@@ -1003,7 +1003,7 @@ const personalSections = computed(() => groupNavigation(isAdmin.value ? personal
   { id: 'overview', label: dockText.value.overview, paths: ['/dashboard'] },
   { id: 'work', label: dockText.value.work, paths: ['/model-plaza', '/agent', '/keys', '/usage', '/available-channels', '/monitor'] },
   { id: 'image', label: dockText.value.image, paths: ['/image-playground', '/image-studio', '/batch-image'] },
-  { id: 'account', label: dockText.value.account, paths: ['/purchase', '/subscriptions', '/orders', '/redeem', '/lottery', '/affiliate', '/profile'] }
+  { id: 'account', label: dockText.value.account, paths: ['/hosted-accounts', '/purchase', '/subscriptions', '/orders', '/redeem', '/lottery', '/affiliate', '/profile'] }
 ], 'personal'))
 
 const visibleNavSections = computed((): NavigationSection[] => {
