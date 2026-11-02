@@ -325,6 +325,23 @@ func (s *HostedOpenAIAccountService) Create(
 		AccountStatus:             account.Status,
 		Quota:                     buildHostedQuotaFromAccount(account),
 	}
+	if s.quotaService != nil {
+		if usage, quotaErr := s.quotaService.QueryUsage(ctx, account.ID); quotaErr == nil && usage != nil {
+			if cacheErr := s.quotaService.CachePostResetSnapshot(ctx, account.ID, usage); cacheErr != nil {
+				slog.Warn("hosted_openai_initial_quota_cache_failed", "account_id", account.ID, "error", cacheErr)
+			}
+			planType := hostedFirstNonEmpty(strings.TrimSpace(usage.PlanType), view.PlanType)
+			refreshedAt := time.Unix(usage.FetchedAt, 0).UTC()
+			if metaErr := s.repo.UpdateQuotaMeta(ctx, record.ID, planType, refreshedAt); metaErr == nil {
+				view.PlanType = planType
+				view.LastQuotaRefreshedAt = &refreshedAt
+			}
+			view.Quota = buildHostedQuotaFromUsage(usage)
+		} else if quotaErr != nil {
+			view.Quota.Error = "额度暂未读取，请手动刷新"
+			slog.Warn("hosted_openai_initial_quota_query_failed", "account_id", account.ID, "error", quotaErr)
+		}
+	}
 	return &view, nil
 }
 
