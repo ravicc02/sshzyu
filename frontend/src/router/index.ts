@@ -216,6 +216,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/hosted-accounts',
+    name: 'HostedOpenAIAccounts',
+    component: () => import('@/views/user/HostedOpenAIAccountsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Hosted Accounts',
+      titleKey: 'nav.hostedAccounts',
+      descriptionKey: 'nav.hostedAccounts'
+    }
+  },
+  {
     path: '/batch-keys',
     name: 'BatchKeys',
     component: () => import('@/views/user/BatchKeysView.vue'),
@@ -600,6 +612,18 @@ const routes: RouteRecordRaw[] = [
       title: 'Account Management',
       titleKey: 'admin.accounts.title',
       descriptionKey: 'admin.accounts.description'
+    }
+  },
+  {
+    path: '/admin/hosted-accounts',
+    name: 'AdminHostedOpenAIAccounts',
+    component: () => import('@/views/admin/AdminHostedOpenAIAccountsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Hosted Account Management',
+      titleKey: 'nav.hostedAccountManagement',
+      descriptionKey: 'nav.hostedAccountManagement'
     }
   },
   {

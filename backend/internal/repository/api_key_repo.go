@@ -54,10 +54,18 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		SetNillableLastUsedAt(key.LastUsedAt).
 		SetQuota(key.Quota).
 		SetQuotaUsed(key.QuotaUsed).
+		SetQuotaTokens(key.QuotaTokens).
+		SetQuotaTokensUsed(key.QuotaTokensUsed).
 		SetNillableExpiresAt(key.ExpiresAt).
 		SetRateLimit5h(key.RateLimit5h).
 		SetRateLimit1d(key.RateLimit1d).
-		SetRateLimit7d(key.RateLimit7d)
+		SetRateLimit7d(key.RateLimit7d).
+		SetRateLimit5hTokens(key.RateLimit5hTokens).
+		SetRateLimit1dTokens(key.RateLimit1dTokens).
+		SetRateLimit7dTokens(key.RateLimit7dTokens).
+		SetUsage5hTokens(key.Usage5hTokens).
+		SetUsage1dTokens(key.Usage1dTokens).
+		SetUsage7dTokens(key.Usage7dTokens)
 
 	if len(key.IPWhitelist) > 0 {
 		builder.SetIPWhitelist(key.IPWhitelist)
@@ -183,6 +191,9 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				group.FieldDailyLimitUsd,
 				group.FieldWeeklyLimitUsd,
 				group.FieldMonthlyLimitUsd,
+				group.FieldDailyTokenLimit,
+				group.FieldWeeklyTokenLimit,
+				group.FieldMonthlyTokenLimit,
 				group.FieldAllowImageGeneration,
 				group.FieldAllowBatchImageGeneration,
 				group.FieldImageCountBilling,
@@ -270,20 +281,32 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 	if fields.Quota {
 		builder.SetQuota(key.Quota)
 	}
+	if fields.QuotaTokens {
+		builder.SetQuotaTokens(key.QuotaTokens)
+	}
 	if fields.QuotaUsed {
 		builder.SetQuotaUsed(key.QuotaUsed)
+	}
+	if fields.QuotaTokensUsed {
+		builder.SetQuotaTokensUsed(key.QuotaTokensUsed)
 	}
 	if fields.RateLimits {
 		builder.
 			SetRateLimit5h(key.RateLimit5h).
 			SetRateLimit1d(key.RateLimit1d).
-			SetRateLimit7d(key.RateLimit7d)
+			SetRateLimit7d(key.RateLimit7d).
+			SetRateLimit5hTokens(key.RateLimit5hTokens).
+			SetRateLimit1dTokens(key.RateLimit1dTokens).
+			SetRateLimit7dTokens(key.RateLimit7dTokens)
 	}
 	if fields.RateLimitUsage {
 		builder.
 			SetUsage5h(key.Usage5h).
 			SetUsage1d(key.Usage1d).
-			SetUsage7d(key.Usage7d)
+			SetUsage7d(key.Usage7d).
+			SetUsage5hTokens(key.Usage5hTokens).
+			SetUsage1dTokens(key.Usage1dTokens).
+			SetUsage7dTokens(key.Usage7dTokens)
 
 		// Rate limit window start times
 		if key.Window5hStart != nil {
@@ -889,6 +912,50 @@ func (r *apiKeyRepository) IncrementQuotaUsedAndGetState(ctx context.Context, id
 	return state, nil
 }
 
+// IncrementTokenUsageAndGetState atomically records actual token usage against
+// the lifetime token quota and all rolling token windows. The SQL is shared by
+// every gateway path and keeps the key status and window starts authoritative.
+func (r *apiKeyRepository) IncrementTokenUsageAndGetState(ctx context.Context, id int64, tokens int64) (*service.APIKeyQuotaUsageState, error) {
+	query := `
+		UPDATE api_keys
+		SET
+			quota_tokens_used = quota_tokens_used + $1,
+			usage_5h_tokens = CASE WHEN window_5h_start IS NOT NULL AND window_5h_start + INTERVAL '5 hours' <= NOW() THEN $1 ELSE usage_5h_tokens + $1 END,
+			usage_1d_tokens = CASE WHEN window_1d_start IS NOT NULL AND window_1d_start + INTERVAL '24 hours' <= NOW() THEN $1 ELSE usage_1d_tokens + $1 END,
+			usage_7d_tokens = CASE WHEN window_7d_start IS NOT NULL AND window_7d_start + INTERVAL '7 days' <= NOW() THEN $1 ELSE usage_7d_tokens + $1 END,
+			window_5h_start = CASE WHEN window_5h_start IS NULL OR window_5h_start + INTERVAL '5 hours' <= NOW() THEN NOW() ELSE window_5h_start END,
+			window_1d_start = CASE WHEN window_1d_start IS NULL OR window_1d_start + INTERVAL '24 hours' <= NOW() THEN date_trunc('day', NOW()) ELSE window_1d_start END,
+			window_7d_start = CASE WHEN window_7d_start IS NULL OR window_7d_start + INTERVAL '7 days' <= NOW() THEN date_trunc('day', NOW()) ELSE window_7d_start END,
+			status = CASE
+				WHEN (quota_tokens > 0 AND quota_tokens_used + $1 >= quota_tokens)
+					OR (quota > 0 AND quota_used >= quota) THEN $2
+				ELSE status
+			END,
+			updated_at = NOW()
+		WHERE id = $3 AND deleted_at IS NULL
+		RETURNING quota_tokens_used, quota_tokens, quota_used, quota, key, status
+	`
+	state := &service.APIKeyQuotaUsageState{}
+	if err := scanSingleRow(
+		ctx,
+		r.sql,
+		query,
+		[]any{tokens, service.StatusAPIKeyQuotaExhausted, id},
+		&state.QuotaTokensUsed,
+		&state.QuotaTokens,
+		&state.QuotaUsed,
+		&state.Quota,
+		&state.Key,
+		&state.Status,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, service.ErrAPIKeyNotFound
+		}
+		return nil, err
+	}
+	return state, nil
+}
+
 func (r *apiKeyRepository) UpdateLastUsed(ctx context.Context, id int64, usedAt time.Time) error {
 	affected, err := r.client.APIKey.Update().
 		Where(apikey.IDEQ(id), apikey.DeletedAtIsNil()).
@@ -926,10 +993,13 @@ func (r *apiKeyRepository) ResetRateLimitWindows(ctx context.Context, id int64) 
 	_, err := r.sql.ExecContext(ctx, `
 		UPDATE api_keys SET
 			usage_5h = CASE WHEN window_5h_start IS NOT NULL AND window_5h_start + INTERVAL '5 hours' <= NOW() THEN 0 ELSE usage_5h END,
+			usage_5h_tokens = CASE WHEN window_5h_start IS NOT NULL AND window_5h_start + INTERVAL '5 hours' <= NOW() THEN 0 ELSE usage_5h_tokens END,
 			window_5h_start = CASE WHEN window_5h_start IS NOT NULL AND window_5h_start + INTERVAL '5 hours' <= NOW() THEN NOW() ELSE window_5h_start END,
 			usage_1d = CASE WHEN window_1d_start IS NOT NULL AND window_1d_start + INTERVAL '24 hours' <= NOW() THEN 0 ELSE usage_1d END,
+			usage_1d_tokens = CASE WHEN window_1d_start IS NOT NULL AND window_1d_start + INTERVAL '24 hours' <= NOW() THEN 0 ELSE usage_1d_tokens END,
 			window_1d_start = CASE WHEN window_1d_start IS NOT NULL AND window_1d_start + INTERVAL '24 hours' <= NOW() THEN date_trunc('day', NOW()) ELSE window_1d_start END,
 			usage_7d = CASE WHEN window_7d_start IS NOT NULL AND window_7d_start + INTERVAL '7 days' <= NOW() THEN 0 ELSE usage_7d END,
+			usage_7d_tokens = CASE WHEN window_7d_start IS NOT NULL AND window_7d_start + INTERVAL '7 days' <= NOW() THEN 0 ELSE usage_7d_tokens END,
 			window_7d_start = CASE WHEN window_7d_start IS NOT NULL AND window_7d_start + INTERVAL '7 days' <= NOW() THEN date_trunc('day', NOW()) ELSE window_7d_start END,
 			updated_at = NOW()
 		WHERE id = $1 AND deleted_at IS NULL`,
@@ -940,7 +1010,9 @@ func (r *apiKeyRepository) ResetRateLimitWindows(ctx context.Context, id int64) 
 // GetRateLimitData returns the current rate limit usage and window start times for an API key.
 func (r *apiKeyRepository) GetRateLimitData(ctx context.Context, id int64) (result *service.APIKeyRateLimitData, err error) {
 	rows, err := r.sql.QueryContext(ctx, `
-		SELECT quota_used, usage_5h, usage_1d, usage_7d, window_5h_start, window_1d_start, window_7d_start
+		SELECT quota_used, quota_tokens_used, usage_5h, usage_1d, usage_7d,
+		       usage_5h_tokens, usage_1d_tokens, usage_7d_tokens,
+		       window_5h_start, window_1d_start, window_7d_start
 		FROM api_keys
 		WHERE id = $1 AND deleted_at IS NULL`,
 		id)
@@ -956,7 +1028,19 @@ func (r *apiKeyRepository) GetRateLimitData(ctx context.Context, id int64) (resu
 		return nil, service.ErrAPIKeyNotFound
 	}
 	data := &service.APIKeyRateLimitData{}
-	if err := rows.Scan(&data.QuotaUsed, &data.Usage5h, &data.Usage1d, &data.Usage7d, &data.Window5hStart, &data.Window1dStart, &data.Window7dStart); err != nil {
+	if err := rows.Scan(
+		&data.QuotaUsed,
+		&data.QuotaTokensUsed,
+		&data.Usage5h,
+		&data.Usage1d,
+		&data.Usage7d,
+		&data.Usage5hTokens,
+		&data.Usage1dTokens,
+		&data.Usage7dTokens,
+		&data.Window5hStart,
+		&data.Window1dStart,
+		&data.Window7dStart,
+	); err != nil {
 		return nil, err
 	}
 	return data, rows.Err()
@@ -967,31 +1051,39 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		return nil
 	}
 	out := &service.APIKey{
-		ID:            m.ID,
-		UserID:        m.UserID,
-		Key:           m.Key,
-		Name:          m.Name,
-		BatchID:       m.BatchID,
-		BatchName:     m.BatchName,
-		Status:        m.Status,
-		IPWhitelist:   m.IPWhitelist,
-		IPBlacklist:   m.IPBlacklist,
-		LastUsedAt:    m.LastUsedAt,
-		CreatedAt:     m.CreatedAt,
-		UpdatedAt:     m.UpdatedAt,
-		GroupID:       m.GroupID,
-		Quota:         m.Quota,
-		QuotaUsed:     m.QuotaUsed,
-		ExpiresAt:     m.ExpiresAt,
-		RateLimit5h:   m.RateLimit5h,
-		RateLimit1d:   m.RateLimit1d,
-		RateLimit7d:   m.RateLimit7d,
-		Usage5h:       m.Usage5h,
-		Usage1d:       m.Usage1d,
-		Usage7d:       m.Usage7d,
-		Window5hStart: m.Window5hStart,
-		Window1dStart: m.Window1dStart,
-		Window7dStart: m.Window7dStart,
+		ID:                m.ID,
+		UserID:            m.UserID,
+		Key:               m.Key,
+		Name:              m.Name,
+		BatchID:           m.BatchID,
+		BatchName:         m.BatchName,
+		Status:            m.Status,
+		IPWhitelist:       m.IPWhitelist,
+		IPBlacklist:       m.IPBlacklist,
+		LastUsedAt:        m.LastUsedAt,
+		CreatedAt:         m.CreatedAt,
+		UpdatedAt:         m.UpdatedAt,
+		GroupID:           m.GroupID,
+		Quota:             m.Quota,
+		QuotaUsed:         m.QuotaUsed,
+		QuotaTokens:       m.QuotaTokens,
+		QuotaTokensUsed:   m.QuotaTokensUsed,
+		ExpiresAt:         m.ExpiresAt,
+		RateLimit5h:       m.RateLimit5h,
+		RateLimit1d:       m.RateLimit1d,
+		RateLimit7d:       m.RateLimit7d,
+		Usage5h:           m.Usage5h,
+		Usage1d:           m.Usage1d,
+		Usage7d:           m.Usage7d,
+		RateLimit5hTokens: m.RateLimit5hTokens,
+		RateLimit1dTokens: m.RateLimit1dTokens,
+		RateLimit7dTokens: m.RateLimit7dTokens,
+		Usage5hTokens:     m.Usage5hTokens,
+		Usage1dTokens:     m.Usage1dTokens,
+		Usage7dTokens:     m.Usage7dTokens,
+		Window5hStart:     m.Window5hStart,
+		Window1dStart:     m.Window1dStart,
+		Window7dStart:     m.Window7dStart,
 	}
 	if m.Edges.User != nil {
 		out.User = userEntityToService(m.Edges.User)
@@ -1075,6 +1167,9 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		DailyLimitUSD:                   g.DailyLimitUsd,
 		WeeklyLimitUSD:                  g.WeeklyLimitUsd,
 		MonthlyLimitUSD:                 g.MonthlyLimitUsd,
+		DailyTokenLimit:                 g.DailyTokenLimit,
+		WeeklyTokenLimit:                g.WeeklyTokenLimit,
+		MonthlyTokenLimit:               g.MonthlyTokenLimit,
 		AllowImageGeneration:            g.AllowImageGeneration,
 		AllowBatchImageGeneration:       g.AllowBatchImageGeneration,
 		ImageCountBilling:               g.ImageCountBilling,

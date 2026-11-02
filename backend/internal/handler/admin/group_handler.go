@@ -46,6 +46,51 @@ type optionalLimitField struct {
 	value *float64
 }
 
+type optionalTokenLimitField struct {
+	set   bool
+	value *int64
+}
+
+func (f *optionalTokenLimitField) UnmarshalJSON(data []byte) error {
+	f.set = true
+	trimmed := bytes.TrimSpace(data)
+	if bytes.Equal(trimmed, []byte("null")) {
+		f.value = nil
+		return nil
+	}
+	var number int64
+	if err := json.Unmarshal(trimmed, &number); err == nil {
+		f.value = &number
+		return nil
+	}
+	var text string
+	if err := json.Unmarshal(trimmed, &text); err == nil {
+		text = strings.TrimSpace(text)
+		if text == "" {
+			f.value = nil
+			return nil
+		}
+		number, err = strconv.ParseInt(text, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid token limit value %q: %w", text, err)
+		}
+		f.value = &number
+		return nil
+	}
+	return fmt.Errorf("invalid token limit value: %s", string(trimmed))
+}
+
+func (f optionalTokenLimitField) ToServiceInput() *int64 {
+	if !f.set {
+		return nil
+	}
+	if f.value != nil {
+		return f.value
+	}
+	unlimited := int64(-1)
+	return &unlimited
+}
+
 func (f *optionalLimitField) UnmarshalJSON(data []byte) error {
 	f.set = true
 
@@ -195,6 +240,9 @@ type CreateGroupRequest struct {
 	DailyLimitUSD             optionalLimitField            `json:"daily_limit_usd"`
 	WeeklyLimitUSD            optionalLimitField            `json:"weekly_limit_usd"`
 	MonthlyLimitUSD           optionalLimitField            `json:"monthly_limit_usd"`
+	DailyTokenLimit           optionalTokenLimitField       `json:"daily_token_limit"`
+	WeeklyTokenLimit          optionalTokenLimitField       `json:"weekly_token_limit"`
+	MonthlyTokenLimit         optionalTokenLimitField       `json:"monthly_token_limit"`
 	LongContextPricingEnabled bool                          `json:"long_context_pricing_enabled"`
 	ModelPricing              []service.ChannelModelPricing `json:"model_pricing"`
 	// 图片生成计费配置（antigravity 和 gemini 平台使用，负数表示清除配置）
@@ -272,6 +320,9 @@ type UpdateGroupRequest struct {
 	DailyLimitUSD             optionalLimitField             `json:"daily_limit_usd"`
 	WeeklyLimitUSD            optionalLimitField             `json:"weekly_limit_usd"`
 	MonthlyLimitUSD           optionalLimitField             `json:"monthly_limit_usd"`
+	DailyTokenLimit           optionalTokenLimitField        `json:"daily_token_limit"`
+	WeeklyTokenLimit          optionalTokenLimitField        `json:"weekly_token_limit"`
+	MonthlyTokenLimit         optionalTokenLimitField        `json:"monthly_token_limit"`
 	LongContextPricingEnabled *bool                          `json:"long_context_pricing_enabled"`
 	ModelPricing              *[]service.ChannelModelPricing `json:"model_pricing"`
 	// 图片生成计费配置（antigravity 和 gemini 平台使用，负数表示清除配置）
@@ -679,6 +730,9 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		DailyLimitUSD:                   req.DailyLimitUSD.ToServiceInput(),
 		WeeklyLimitUSD:                  req.WeeklyLimitUSD.ToServiceInput(),
 		MonthlyLimitUSD:                 req.MonthlyLimitUSD.ToServiceInput(),
+		DailyTokenLimit:                 req.DailyTokenLimit.ToServiceInput(),
+		WeeklyTokenLimit:                req.WeeklyTokenLimit.ToServiceInput(),
+		MonthlyTokenLimit:               req.MonthlyTokenLimit.ToServiceInput(),
 		LongContextPricingEnabled:       req.LongContextPricingEnabled,
 		ModelPricing:                    req.ModelPricing,
 		AllowImageGeneration:            req.AllowImageGeneration,
@@ -827,6 +881,9 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		DailyLimitUSD:                   req.DailyLimitUSD.ToServiceInput(),
 		WeeklyLimitUSD:                  req.WeeklyLimitUSD.ToServiceInput(),
 		MonthlyLimitUSD:                 req.MonthlyLimitUSD.ToServiceInput(),
+		DailyTokenLimit:                 req.DailyTokenLimit.ToServiceInput(),
+		WeeklyTokenLimit:                req.WeeklyTokenLimit.ToServiceInput(),
+		MonthlyTokenLimit:               req.MonthlyTokenLimit.ToServiceInput(),
 		LongContextPricingEnabled:       req.LongContextPricingEnabled,
 		ModelPricing:                    req.ModelPricing,
 		AllowImageGeneration:            req.AllowImageGeneration,

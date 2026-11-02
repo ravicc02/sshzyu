@@ -16,16 +16,21 @@ type APIKeyAuthSnapshot struct {
 	Group       *APIKeyAuthGroupSnapshot `json:"group,omitempty"`
 
 	// Quota fields for API Key independent quota feature
-	Quota     float64 `json:"quota"`      // Quota limit in USD (0 = unlimited)
-	QuotaUsed float64 `json:"quota_used"` // Used quota amount
+	Quota           float64 `json:"quota"`      // Quota limit in USD (0 = unlimited)
+	QuotaUsed       float64 `json:"quota_used"` // Used quota amount
+	QuotaTokens     int64   `json:"quota_tokens"`
+	QuotaTokensUsed int64   `json:"quota_tokens_used"`
 
 	// Expiration field for API Key expiration feature
 	ExpiresAt *time.Time `json:"expires_at,omitempty"` // Expiration time (nil = never expires)
 
 	// Rate limit configuration (only limits, not usage - usage read from Redis at check time)
-	RateLimit5h float64 `json:"rate_limit_5h"`
-	RateLimit1d float64 `json:"rate_limit_1d"`
-	RateLimit7d float64 `json:"rate_limit_7d"`
+	RateLimit5h       float64 `json:"rate_limit_5h"`
+	RateLimit1d       float64 `json:"rate_limit_1d"`
+	RateLimit7d       float64 `json:"rate_limit_7d"`
+	RateLimit5hTokens int64   `json:"rate_limit_5h_tokens"`
+	RateLimit1dTokens int64   `json:"rate_limit_1d_tokens"`
+	RateLimit7dTokens int64   `json:"rate_limit_7d_tokens"`
 }
 
 // APIKeyAuthUserSnapshot 用户快照
@@ -67,6 +72,9 @@ type APIKeyAuthGroupSnapshot struct {
 	DailyLimitUSD                   *float64                      `json:"daily_limit_usd,omitempty"`
 	WeeklyLimitUSD                  *float64                      `json:"weekly_limit_usd,omitempty"`
 	MonthlyLimitUSD                 *float64                      `json:"monthly_limit_usd,omitempty"`
+	DailyTokenLimit                 *int64                        `json:"daily_token_limit,omitempty"`
+	WeeklyTokenLimit                *int64                        `json:"weekly_token_limit,omitempty"`
+	MonthlyTokenLimit               *int64                        `json:"monthly_token_limit,omitempty"`
 	AllowImageGeneration            bool                          `json:"allow_image_generation"`
 	AllowBatchImageGeneration       bool                          `json:"allow_batch_image_generation"`
 	ImageCountBilling               bool                          `json:"image_count_billing"`

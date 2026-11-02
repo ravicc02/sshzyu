@@ -266,6 +266,48 @@ func (_u *APIKeyUpdate) AddQuotaUsed(v float64) *APIKeyUpdate {
 	return _u
 }
 
+// SetQuotaTokens sets the "quota_tokens" field.
+func (_u *APIKeyUpdate) SetQuotaTokens(v int64) *APIKeyUpdate {
+	_u.mutation.ResetQuotaTokens()
+	_u.mutation.SetQuotaTokens(v)
+	return _u
+}
+
+// SetNillableQuotaTokens sets the "quota_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableQuotaTokens(v *int64) *APIKeyUpdate {
+	if v != nil {
+		_u.SetQuotaTokens(*v)
+	}
+	return _u
+}
+
+// AddQuotaTokens adds value to the "quota_tokens" field.
+func (_u *APIKeyUpdate) AddQuotaTokens(v int64) *APIKeyUpdate {
+	_u.mutation.AddQuotaTokens(v)
+	return _u
+}
+
+// SetQuotaTokensUsed sets the "quota_tokens_used" field.
+func (_u *APIKeyUpdate) SetQuotaTokensUsed(v int64) *APIKeyUpdate {
+	_u.mutation.ResetQuotaTokensUsed()
+	_u.mutation.SetQuotaTokensUsed(v)
+	return _u
+}
+
+// SetNillableQuotaTokensUsed sets the "quota_tokens_used" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableQuotaTokensUsed(v *int64) *APIKeyUpdate {
+	if v != nil {
+		_u.SetQuotaTokensUsed(*v)
+	}
+	return _u
+}
+
+// AddQuotaTokensUsed adds value to the "quota_tokens_used" field.
+func (_u *APIKeyUpdate) AddQuotaTokensUsed(v int64) *APIKeyUpdate {
+	_u.mutation.AddQuotaTokensUsed(v)
+	return _u
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_u *APIKeyUpdate) SetExpiresAt(v time.Time) *APIKeyUpdate {
 	_u.mutation.SetExpiresAt(v)
@@ -409,6 +451,132 @@ func (_u *APIKeyUpdate) SetNillableUsage7d(v *float64) *APIKeyUpdate {
 // AddUsage7d adds value to the "usage_7d" field.
 func (_u *APIKeyUpdate) AddUsage7d(v float64) *APIKeyUpdate {
 	_u.mutation.AddUsage7d(v)
+	return _u
+}
+
+// SetRateLimit5hTokens sets the "rate_limit_5h_tokens" field.
+func (_u *APIKeyUpdate) SetRateLimit5hTokens(v int64) *APIKeyUpdate {
+	_u.mutation.ResetRateLimit5hTokens()
+	_u.mutation.SetRateLimit5hTokens(v)
+	return _u
+}
+
+// SetNillableRateLimit5hTokens sets the "rate_limit_5h_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableRateLimit5hTokens(v *int64) *APIKeyUpdate {
+	if v != nil {
+		_u.SetRateLimit5hTokens(*v)
+	}
+	return _u
+}
+
+// AddRateLimit5hTokens adds value to the "rate_limit_5h_tokens" field.
+func (_u *APIKeyUpdate) AddRateLimit5hTokens(v int64) *APIKeyUpdate {
+	_u.mutation.AddRateLimit5hTokens(v)
+	return _u
+}
+
+// SetRateLimit1dTokens sets the "rate_limit_1d_tokens" field.
+func (_u *APIKeyUpdate) SetRateLimit1dTokens(v int64) *APIKeyUpdate {
+	_u.mutation.ResetRateLimit1dTokens()
+	_u.mutation.SetRateLimit1dTokens(v)
+	return _u
+}
+
+// SetNillableRateLimit1dTokens sets the "rate_limit_1d_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableRateLimit1dTokens(v *int64) *APIKeyUpdate {
+	if v != nil {
+		_u.SetRateLimit1dTokens(*v)
+	}
+	return _u
+}
+
+// AddRateLimit1dTokens adds value to the "rate_limit_1d_tokens" field.
+func (_u *APIKeyUpdate) AddRateLimit1dTokens(v int64) *APIKeyUpdate {
+	_u.mutation.AddRateLimit1dTokens(v)
+	return _u
+}
+
+// SetRateLimit7dTokens sets the "rate_limit_7d_tokens" field.
+func (_u *APIKeyUpdate) SetRateLimit7dTokens(v int64) *APIKeyUpdate {
+	_u.mutation.ResetRateLimit7dTokens()
+	_u.mutation.SetRateLimit7dTokens(v)
+	return _u
+}
+
+// SetNillableRateLimit7dTokens sets the "rate_limit_7d_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableRateLimit7dTokens(v *int64) *APIKeyUpdate {
+	if v != nil {
+		_u.SetRateLimit7dTokens(*v)
+	}
+	return _u
+}
+
+// AddRateLimit7dTokens adds value to the "rate_limit_7d_tokens" field.
+func (_u *APIKeyUpdate) AddRateLimit7dTokens(v int64) *APIKeyUpdate {
+	_u.mutation.AddRateLimit7dTokens(v)
+	return _u
+}
+
+// SetUsage5hTokens sets the "usage_5h_tokens" field.
+func (_u *APIKeyUpdate) SetUsage5hTokens(v int64) *APIKeyUpdate {
+	_u.mutation.ResetUsage5hTokens()
+	_u.mutation.SetUsage5hTokens(v)
+	return _u
+}
+
+// SetNillableUsage5hTokens sets the "usage_5h_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableUsage5hTokens(v *int64) *APIKeyUpdate {
+	if v != nil {
+		_u.SetUsage5hTokens(*v)
+	}
+	return _u
+}
+
+// AddUsage5hTokens adds value to the "usage_5h_tokens" field.
+func (_u *APIKeyUpdate) AddUsage5hTokens(v int64) *APIKeyUpdate {
+	_u.mutation.AddUsage5hTokens(v)
+	return _u
+}
+
+// SetUsage1dTokens sets the "usage_1d_tokens" field.
+func (_u *APIKeyUpdate) SetUsage1dTokens(v int64) *APIKeyUpdate {
+	_u.mutation.ResetUsage1dTokens()
+	_u.mutation.SetUsage1dTokens(v)
+	return _u
+}
+
+// SetNillableUsage1dTokens sets the "usage_1d_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableUsage1dTokens(v *int64) *APIKeyUpdate {
+	if v != nil {
+		_u.SetUsage1dTokens(*v)
+	}
+	return _u
+}
+
+// AddUsage1dTokens adds value to the "usage_1d_tokens" field.
+func (_u *APIKeyUpdate) AddUsage1dTokens(v int64) *APIKeyUpdate {
+	_u.mutation.AddUsage1dTokens(v)
+	return _u
+}
+
+// SetUsage7dTokens sets the "usage_7d_tokens" field.
+func (_u *APIKeyUpdate) SetUsage7dTokens(v int64) *APIKeyUpdate {
+	_u.mutation.ResetUsage7dTokens()
+	_u.mutation.SetUsage7dTokens(v)
+	return _u
+}
+
+// SetNillableUsage7dTokens sets the "usage_7d_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableUsage7dTokens(v *int64) *APIKeyUpdate {
+	if v != nil {
+		_u.SetUsage7dTokens(*v)
+	}
+	return _u
+}
+
+// AddUsage7dTokens adds value to the "usage_7d_tokens" field.
+func (_u *APIKeyUpdate) AddUsage7dTokens(v int64) *APIKeyUpdate {
+	_u.mutation.AddUsage7dTokens(v)
 	return _u
 }
 
@@ -689,6 +857,18 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.AddedQuotaUsed(); ok {
 		_spec.AddField(apikey.FieldQuotaUsed, field.TypeFloat64, value)
 	}
+	if value, ok := _u.mutation.QuotaTokens(); ok {
+		_spec.SetField(apikey.FieldQuotaTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedQuotaTokens(); ok {
+		_spec.AddField(apikey.FieldQuotaTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.QuotaTokensUsed(); ok {
+		_spec.SetField(apikey.FieldQuotaTokensUsed, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedQuotaTokensUsed(); ok {
+		_spec.AddField(apikey.FieldQuotaTokensUsed, field.TypeInt64, value)
+	}
 	if value, ok := _u.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)
 	}
@@ -730,6 +910,42 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedUsage7d(); ok {
 		_spec.AddField(apikey.FieldUsage7d, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.RateLimit5hTokens(); ok {
+		_spec.SetField(apikey.FieldRateLimit5hTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedRateLimit5hTokens(); ok {
+		_spec.AddField(apikey.FieldRateLimit5hTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.RateLimit1dTokens(); ok {
+		_spec.SetField(apikey.FieldRateLimit1dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedRateLimit1dTokens(); ok {
+		_spec.AddField(apikey.FieldRateLimit1dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.RateLimit7dTokens(); ok {
+		_spec.SetField(apikey.FieldRateLimit7dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedRateLimit7dTokens(); ok {
+		_spec.AddField(apikey.FieldRateLimit7dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.Usage5hTokens(); ok {
+		_spec.SetField(apikey.FieldUsage5hTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedUsage5hTokens(); ok {
+		_spec.AddField(apikey.FieldUsage5hTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.Usage1dTokens(); ok {
+		_spec.SetField(apikey.FieldUsage1dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedUsage1dTokens(); ok {
+		_spec.AddField(apikey.FieldUsage1dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.Usage7dTokens(); ok {
+		_spec.SetField(apikey.FieldUsage7dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedUsage7dTokens(); ok {
+		_spec.AddField(apikey.FieldUsage7dTokens, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.Window5hStart(); ok {
 		_spec.SetField(apikey.FieldWindow5hStart, field.TypeTime, value)
@@ -1106,6 +1322,48 @@ func (_u *APIKeyUpdateOne) AddQuotaUsed(v float64) *APIKeyUpdateOne {
 	return _u
 }
 
+// SetQuotaTokens sets the "quota_tokens" field.
+func (_u *APIKeyUpdateOne) SetQuotaTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.ResetQuotaTokens()
+	_u.mutation.SetQuotaTokens(v)
+	return _u
+}
+
+// SetNillableQuotaTokens sets the "quota_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableQuotaTokens(v *int64) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetQuotaTokens(*v)
+	}
+	return _u
+}
+
+// AddQuotaTokens adds value to the "quota_tokens" field.
+func (_u *APIKeyUpdateOne) AddQuotaTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.AddQuotaTokens(v)
+	return _u
+}
+
+// SetQuotaTokensUsed sets the "quota_tokens_used" field.
+func (_u *APIKeyUpdateOne) SetQuotaTokensUsed(v int64) *APIKeyUpdateOne {
+	_u.mutation.ResetQuotaTokensUsed()
+	_u.mutation.SetQuotaTokensUsed(v)
+	return _u
+}
+
+// SetNillableQuotaTokensUsed sets the "quota_tokens_used" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableQuotaTokensUsed(v *int64) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetQuotaTokensUsed(*v)
+	}
+	return _u
+}
+
+// AddQuotaTokensUsed adds value to the "quota_tokens_used" field.
+func (_u *APIKeyUpdateOne) AddQuotaTokensUsed(v int64) *APIKeyUpdateOne {
+	_u.mutation.AddQuotaTokensUsed(v)
+	return _u
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_u *APIKeyUpdateOne) SetExpiresAt(v time.Time) *APIKeyUpdateOne {
 	_u.mutation.SetExpiresAt(v)
@@ -1249,6 +1507,132 @@ func (_u *APIKeyUpdateOne) SetNillableUsage7d(v *float64) *APIKeyUpdateOne {
 // AddUsage7d adds value to the "usage_7d" field.
 func (_u *APIKeyUpdateOne) AddUsage7d(v float64) *APIKeyUpdateOne {
 	_u.mutation.AddUsage7d(v)
+	return _u
+}
+
+// SetRateLimit5hTokens sets the "rate_limit_5h_tokens" field.
+func (_u *APIKeyUpdateOne) SetRateLimit5hTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.ResetRateLimit5hTokens()
+	_u.mutation.SetRateLimit5hTokens(v)
+	return _u
+}
+
+// SetNillableRateLimit5hTokens sets the "rate_limit_5h_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableRateLimit5hTokens(v *int64) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetRateLimit5hTokens(*v)
+	}
+	return _u
+}
+
+// AddRateLimit5hTokens adds value to the "rate_limit_5h_tokens" field.
+func (_u *APIKeyUpdateOne) AddRateLimit5hTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.AddRateLimit5hTokens(v)
+	return _u
+}
+
+// SetRateLimit1dTokens sets the "rate_limit_1d_tokens" field.
+func (_u *APIKeyUpdateOne) SetRateLimit1dTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.ResetRateLimit1dTokens()
+	_u.mutation.SetRateLimit1dTokens(v)
+	return _u
+}
+
+// SetNillableRateLimit1dTokens sets the "rate_limit_1d_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableRateLimit1dTokens(v *int64) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetRateLimit1dTokens(*v)
+	}
+	return _u
+}
+
+// AddRateLimit1dTokens adds value to the "rate_limit_1d_tokens" field.
+func (_u *APIKeyUpdateOne) AddRateLimit1dTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.AddRateLimit1dTokens(v)
+	return _u
+}
+
+// SetRateLimit7dTokens sets the "rate_limit_7d_tokens" field.
+func (_u *APIKeyUpdateOne) SetRateLimit7dTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.ResetRateLimit7dTokens()
+	_u.mutation.SetRateLimit7dTokens(v)
+	return _u
+}
+
+// SetNillableRateLimit7dTokens sets the "rate_limit_7d_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableRateLimit7dTokens(v *int64) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetRateLimit7dTokens(*v)
+	}
+	return _u
+}
+
+// AddRateLimit7dTokens adds value to the "rate_limit_7d_tokens" field.
+func (_u *APIKeyUpdateOne) AddRateLimit7dTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.AddRateLimit7dTokens(v)
+	return _u
+}
+
+// SetUsage5hTokens sets the "usage_5h_tokens" field.
+func (_u *APIKeyUpdateOne) SetUsage5hTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.ResetUsage5hTokens()
+	_u.mutation.SetUsage5hTokens(v)
+	return _u
+}
+
+// SetNillableUsage5hTokens sets the "usage_5h_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableUsage5hTokens(v *int64) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetUsage5hTokens(*v)
+	}
+	return _u
+}
+
+// AddUsage5hTokens adds value to the "usage_5h_tokens" field.
+func (_u *APIKeyUpdateOne) AddUsage5hTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.AddUsage5hTokens(v)
+	return _u
+}
+
+// SetUsage1dTokens sets the "usage_1d_tokens" field.
+func (_u *APIKeyUpdateOne) SetUsage1dTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.ResetUsage1dTokens()
+	_u.mutation.SetUsage1dTokens(v)
+	return _u
+}
+
+// SetNillableUsage1dTokens sets the "usage_1d_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableUsage1dTokens(v *int64) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetUsage1dTokens(*v)
+	}
+	return _u
+}
+
+// AddUsage1dTokens adds value to the "usage_1d_tokens" field.
+func (_u *APIKeyUpdateOne) AddUsage1dTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.AddUsage1dTokens(v)
+	return _u
+}
+
+// SetUsage7dTokens sets the "usage_7d_tokens" field.
+func (_u *APIKeyUpdateOne) SetUsage7dTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.ResetUsage7dTokens()
+	_u.mutation.SetUsage7dTokens(v)
+	return _u
+}
+
+// SetNillableUsage7dTokens sets the "usage_7d_tokens" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableUsage7dTokens(v *int64) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetUsage7dTokens(*v)
+	}
+	return _u
+}
+
+// AddUsage7dTokens adds value to the "usage_7d_tokens" field.
+func (_u *APIKeyUpdateOne) AddUsage7dTokens(v int64) *APIKeyUpdateOne {
+	_u.mutation.AddUsage7dTokens(v)
 	return _u
 }
 
@@ -1559,6 +1943,18 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	if value, ok := _u.mutation.AddedQuotaUsed(); ok {
 		_spec.AddField(apikey.FieldQuotaUsed, field.TypeFloat64, value)
 	}
+	if value, ok := _u.mutation.QuotaTokens(); ok {
+		_spec.SetField(apikey.FieldQuotaTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedQuotaTokens(); ok {
+		_spec.AddField(apikey.FieldQuotaTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.QuotaTokensUsed(); ok {
+		_spec.SetField(apikey.FieldQuotaTokensUsed, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedQuotaTokensUsed(); ok {
+		_spec.AddField(apikey.FieldQuotaTokensUsed, field.TypeInt64, value)
+	}
 	if value, ok := _u.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)
 	}
@@ -1600,6 +1996,42 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if value, ok := _u.mutation.AddedUsage7d(); ok {
 		_spec.AddField(apikey.FieldUsage7d, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.RateLimit5hTokens(); ok {
+		_spec.SetField(apikey.FieldRateLimit5hTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedRateLimit5hTokens(); ok {
+		_spec.AddField(apikey.FieldRateLimit5hTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.RateLimit1dTokens(); ok {
+		_spec.SetField(apikey.FieldRateLimit1dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedRateLimit1dTokens(); ok {
+		_spec.AddField(apikey.FieldRateLimit1dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.RateLimit7dTokens(); ok {
+		_spec.SetField(apikey.FieldRateLimit7dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedRateLimit7dTokens(); ok {
+		_spec.AddField(apikey.FieldRateLimit7dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.Usage5hTokens(); ok {
+		_spec.SetField(apikey.FieldUsage5hTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedUsage5hTokens(); ok {
+		_spec.AddField(apikey.FieldUsage5hTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.Usage1dTokens(); ok {
+		_spec.SetField(apikey.FieldUsage1dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedUsage1dTokens(); ok {
+		_spec.AddField(apikey.FieldUsage1dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.Usage7dTokens(); ok {
+		_spec.SetField(apikey.FieldUsage7dTokens, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedUsage7dTokens(); ok {
+		_spec.AddField(apikey.FieldUsage7dTokens, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.Window5hStart(); ok {
 		_spec.SetField(apikey.FieldWindow5hStart, field.TypeTime, value)

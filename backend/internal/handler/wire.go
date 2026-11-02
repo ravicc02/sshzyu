@@ -53,6 +53,7 @@ func ProvideAdminHandlers(
 	ollamaCloudUsage *service.OllamaCloudUsageService,
 	opencodeGoUsage *service.OpenCodeGoUsageService,
 	claudeResetCredits *service.ClaudeResetCreditService,
+	hostedOpenAIAccounts *HostedOpenAIAccountHandler,
 ) *AdminHandlers {
 	accountHandler.SetUpstreamBillingProbeService(upstreamBillingProbe)
 	accountHandler.SetOllamaCloudUsageService(ollamaCloudUsage)
@@ -97,6 +98,7 @@ func ProvideAdminHandlers(
 		Affiliate:              affiliateHandler,
 		Compliance:             complianceHandler,
 		AuditLog:               auditLogHandler,
+		HostedOpenAIAccounts:   hostedOpenAIAccounts,
 	}
 }
 
@@ -211,31 +213,33 @@ func ProvideHandlers(
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
 	_ *service.OpenAIQuotaAutoResetService,
+	hostedOpenAIAccounts *HostedOpenAIAccountHandler,
 ) *Handlers {
 	return &Handlers{
-		Agent:            agentHandler,
-		Auth:             authHandler,
-		User:             userHandler,
-		APIKey:           apiKeyHandler,
-		Usage:            usageHandler,
-		Redeem:           redeemHandler,
-		Lottery:          lotteryHandler,
-		Subscription:     subscriptionHandler,
-		Announcement:     announcementHandler,
-		ChannelMonitor:   channelMonitorUserHandler,
-		ChannelMonitorV2: channelMonitorV2Handler,
-		Admin:            adminHandlers,
-		Gateway:          gatewayHandler,
-		OpenAIGateway:    openaiGatewayHandler,
-		Setting:          settingHandler,
-		Totp:             totpHandler,
-		Passkey:          passkeyHandler,
-		Payment:          paymentHandler,
-		PaymentWebhook:   paymentWebhookHandler,
-		AvailableChannel: availableChannelHandler,
-		ModelPlaza:       modelPlazaHandler,
-		AsyncImage:       asyncImageHandler,
-		BatchImage:       batchImageHandler,
+		Agent:                agentHandler,
+		Auth:                 authHandler,
+		User:                 userHandler,
+		APIKey:               apiKeyHandler,
+		Usage:                usageHandler,
+		Redeem:               redeemHandler,
+		Lottery:              lotteryHandler,
+		Subscription:         subscriptionHandler,
+		Announcement:         announcementHandler,
+		ChannelMonitor:       channelMonitorUserHandler,
+		ChannelMonitorV2:     channelMonitorV2Handler,
+		Admin:                adminHandlers,
+		Gateway:              gatewayHandler,
+		OpenAIGateway:        openaiGatewayHandler,
+		Setting:              settingHandler,
+		Totp:                 totpHandler,
+		Passkey:              passkeyHandler,
+		Payment:              paymentHandler,
+		PaymentWebhook:       paymentWebhookHandler,
+		AvailableChannel:     availableChannelHandler,
+		ModelPlaza:           modelPlazaHandler,
+		AsyncImage:           asyncImageHandler,
+		BatchImage:           batchImageHandler,
+		HostedOpenAIAccounts: hostedOpenAIAccounts,
 	}
 }
 
@@ -264,6 +268,7 @@ var ProviderSet = wire.NewSet(
 	NewAsyncImageHandler,
 	NewAgentHandler,
 	ProvideBatchImageHandler,
+	NewHostedOpenAIAccountHandler,
 
 	// Admin handlers
 	admin.NewDashboardHandler,

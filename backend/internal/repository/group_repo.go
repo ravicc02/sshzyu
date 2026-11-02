@@ -106,6 +106,9 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 		SetNillableDailyLimitUsd(groupIn.DailyLimitUSD).
 		SetNillableWeeklyLimitUsd(groupIn.WeeklyLimitUSD).
 		SetNillableMonthlyLimitUsd(groupIn.MonthlyLimitUSD).
+		SetNillableDailyTokenLimit(groupIn.DailyTokenLimit).
+		SetNillableWeeklyTokenLimit(groupIn.WeeklyTokenLimit).
+		SetNillableMonthlyTokenLimit(groupIn.MonthlyTokenLimit).
 		SetAllowImageGeneration(groupIn.AllowImageGeneration).
 		SetAllowBatchImageGeneration(groupIn.AllowBatchImageGeneration).
 		SetImageCountBilling(groupIn.ImageCountBilling).
@@ -298,6 +301,9 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		SetNillableDailyLimitUsd(groupIn.DailyLimitUSD).
 		SetNillableWeeklyLimitUsd(groupIn.WeeklyLimitUSD).
 		SetNillableMonthlyLimitUsd(groupIn.MonthlyLimitUSD).
+		SetNillableDailyTokenLimit(groupIn.DailyTokenLimit).
+		SetNillableWeeklyTokenLimit(groupIn.WeeklyTokenLimit).
+		SetNillableMonthlyTokenLimit(groupIn.MonthlyTokenLimit).
 		SetAllowImageGeneration(groupIn.AllowImageGeneration).
 		SetAllowBatchImageGeneration(groupIn.AllowBatchImageGeneration).
 		SetImageCountBilling(groupIn.ImageCountBilling).
@@ -357,6 +363,21 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		builder = builder.SetMonthlyLimitUsd(*groupIn.MonthlyLimitUSD)
 	} else {
 		builder = builder.ClearMonthlyLimitUsd()
+	}
+	if groupIn.DailyTokenLimit != nil {
+		builder = builder.SetDailyTokenLimit(*groupIn.DailyTokenLimit)
+	} else {
+		builder = builder.ClearDailyTokenLimit()
+	}
+	if groupIn.WeeklyTokenLimit != nil {
+		builder = builder.SetWeeklyTokenLimit(*groupIn.WeeklyTokenLimit)
+	} else {
+		builder = builder.ClearWeeklyTokenLimit()
+	}
+	if groupIn.MonthlyTokenLimit != nil {
+		builder = builder.SetMonthlyTokenLimit(*groupIn.MonthlyTokenLimit)
+	} else {
+		builder = builder.ClearMonthlyTokenLimit()
 	}
 	if groupIn.ImagePrice1K != nil {
 		builder = builder.SetImagePrice1k(*groupIn.ImagePrice1K)

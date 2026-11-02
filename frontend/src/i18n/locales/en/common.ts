@@ -189,6 +189,8 @@ export default {
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
     accountScheduler: 'Account Scheduler',
+    hostedAccounts: 'Hosted Accounts',
+    hostedAccountManagement: 'Hosted Management',
     upstreamMonitor: 'Upstream Monitor',
     plugins: 'Plugins',
     proxies: 'Proxies',

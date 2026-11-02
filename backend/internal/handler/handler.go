@@ -45,33 +45,35 @@ type AdminHandlers struct {
 	Affiliate              *admin.AffiliateHandler
 	Compliance             *admin.ComplianceHandler
 	AuditLog               *admin.AuditLogHandler
+	HostedOpenAIAccounts   *HostedOpenAIAccountHandler
 }
 
 // Handlers contains all HTTP handlers
 type Handlers struct {
-	Agent            *AgentHandler
-	Auth             *AuthHandler
-	User             *UserHandler
-	APIKey           *APIKeyHandler
-	Usage            *UsageHandler
-	Redeem           *RedeemHandler
-	Lottery          *LotteryHandler
-	Subscription     *SubscriptionHandler
-	Announcement     *AnnouncementHandler
-	ChannelMonitor   *ChannelMonitorUserHandler
-	ChannelMonitorV2 *ChannelMonitorV2Handler
-	Admin            *AdminHandlers
-	Gateway          *GatewayHandler
-	OpenAIGateway    *OpenAIGatewayHandler
-	Setting          *SettingHandler
-	Totp             *TotpHandler
-	Passkey          *PasskeyHandler
-	Payment          *PaymentHandler
-	PaymentWebhook   *PaymentWebhookHandler
-	AvailableChannel *AvailableChannelHandler
-	ModelPlaza       *ModelPlazaHandler
-	AsyncImage       *AsyncImageHandler
-	BatchImage       *BatchImageHandler
+	Agent                *AgentHandler
+	Auth                 *AuthHandler
+	User                 *UserHandler
+	APIKey               *APIKeyHandler
+	Usage                *UsageHandler
+	Redeem               *RedeemHandler
+	Lottery              *LotteryHandler
+	Subscription         *SubscriptionHandler
+	Announcement         *AnnouncementHandler
+	ChannelMonitor       *ChannelMonitorUserHandler
+	ChannelMonitorV2     *ChannelMonitorV2Handler
+	Admin                *AdminHandlers
+	Gateway              *GatewayHandler
+	OpenAIGateway        *OpenAIGatewayHandler
+	Setting              *SettingHandler
+	Totp                 *TotpHandler
+	Passkey              *PasskeyHandler
+	Payment              *PaymentHandler
+	PaymentWebhook       *PaymentWebhookHandler
+	AvailableChannel     *AvailableChannelHandler
+	ModelPlaza           *ModelPlazaHandler
+	AsyncImage           *AsyncImageHandler
+	BatchImage           *BatchImageHandler
+	HostedOpenAIAccounts *HostedOpenAIAccountHandler
 }
 
 // BuildInfo contains build-time information

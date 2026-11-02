@@ -48,6 +48,7 @@ func RegisterAdminRoutes(
 		// 账号管理
 		registerAccountRoutes(admin, h, stepUpAuth)
 		registerUpstreamBalanceRoutes(admin, h)
+		registerHostedOpenAIRoutes(admin, h)
 
 		// 公告管理
 		registerAnnouncementRoutes(admin, h)
@@ -651,6 +652,17 @@ func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpA
 		adminSettings.PUT("/web-search-emulation", h.Admin.Setting.UpdateWebSearchEmulationConfig)
 		adminSettings.POST("/web-search-emulation/test", h.Admin.Setting.TestWebSearchEmulation)
 		adminSettings.POST("/web-search-emulation/reset-usage", h.Admin.Setting.ResetWebSearchUsage)
+	}
+
+}
+
+func registerHostedOpenAIRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	hosted := admin.Group("/hosted-openai-accounts")
+	{
+		hosted.GET("", h.Admin.HostedOpenAIAccounts.AdminList)
+		hosted.PUT("/:id", h.Admin.HostedOpenAIAccounts.AdminUpdate)
+		hosted.POST("/:id/refresh-quota", h.Admin.HostedOpenAIAccounts.AdminRefreshQuota)
+		hosted.POST("/:id/status", h.Admin.HostedOpenAIAccounts.AdminSetStatus)
 	}
 }
 

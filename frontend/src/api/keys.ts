@@ -65,7 +65,15 @@ export async function create(
   ipBlacklist?: string[],
   quota?: number,
   expiresInDays?: number,
-  rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number }
+  rateLimitData?: {
+    rate_limit_5h?: number
+    rate_limit_1d?: number
+    rate_limit_7d?: number
+    rate_limit_5h_tokens?: number
+    rate_limit_1d_tokens?: number
+    rate_limit_7d_tokens?: number
+  },
+  quotaTokens?: number
 ): Promise<ApiKey> {
   const payload: CreateApiKeyRequest = { name }
   if (groupId !== undefined) {
@@ -83,6 +91,9 @@ export async function create(
   if (quota !== undefined && quota > 0) {
     payload.quota = quota
   }
+  if (quotaTokens !== undefined && quotaTokens > 0) {
+    payload.quota_tokens = quotaTokens
+  }
   if (expiresInDays !== undefined && expiresInDays > 0) {
     payload.expires_in_days = expiresInDays
   }
@@ -94,6 +105,15 @@ export async function create(
   }
   if (rateLimitData?.rate_limit_7d && rateLimitData.rate_limit_7d > 0) {
     payload.rate_limit_7d = rateLimitData.rate_limit_7d
+  }
+  if (rateLimitData?.rate_limit_5h_tokens && rateLimitData.rate_limit_5h_tokens > 0) {
+    payload.rate_limit_5h_tokens = rateLimitData.rate_limit_5h_tokens
+  }
+  if (rateLimitData?.rate_limit_1d_tokens && rateLimitData.rate_limit_1d_tokens > 0) {
+    payload.rate_limit_1d_tokens = rateLimitData.rate_limit_1d_tokens
+  }
+  if (rateLimitData?.rate_limit_7d_tokens && rateLimitData.rate_limit_7d_tokens > 0) {
+    payload.rate_limit_7d_tokens = rateLimitData.rate_limit_7d_tokens
   }
 
   const { data } = await apiClient.post<ApiKey>('/keys', payload)

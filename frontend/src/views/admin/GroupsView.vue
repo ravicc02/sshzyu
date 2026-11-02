@@ -738,6 +738,10 @@
                 class="input"
                 :placeholder="t('admin.groups.subscription.noLimit')"
               />
+              <div class="mt-2 flex gap-2">
+                <input v-model.number="createForm.daily_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
+                <Select v-model="createForm.daily_token_unit" :options="tokenUnitOptions" class="w-24" />
+              </div>
             </div>
             <div>
               <label class="input-label">{{
@@ -751,6 +755,10 @@
                 class="input"
                 :placeholder="t('admin.groups.subscription.noLimit')"
               />
+              <div class="mt-2 flex gap-2">
+                <input v-model.number="createForm.weekly_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
+                <Select v-model="createForm.weekly_token_unit" :options="tokenUnitOptions" class="w-24" />
+              </div>
             </div>
             <div>
               <label class="input-label">{{
@@ -764,6 +772,10 @@
                 class="input"
                 :placeholder="t('admin.groups.subscription.noLimit')"
               />
+              <div class="mt-2 flex gap-2">
+                <input v-model.number="createForm.monthly_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
+                <Select v-model="createForm.monthly_token_unit" :options="tokenUnitOptions" class="w-24" />
+              </div>
             </div>
           </div>
         </div>
@@ -2398,6 +2410,10 @@
                 class="input"
                 :placeholder="t('admin.groups.subscription.noLimit')"
               />
+              <div class="mt-2 flex gap-2">
+                <input v-model.number="editForm.daily_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
+                <Select v-model="editForm.daily_token_unit" :options="tokenUnitOptions" class="w-24" />
+              </div>
             </div>
             <div>
               <label class="input-label">{{
@@ -2411,6 +2427,10 @@
                 class="input"
                 :placeholder="t('admin.groups.subscription.noLimit')"
               />
+              <div class="mt-2 flex gap-2">
+                <input v-model.number="editForm.weekly_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
+                <Select v-model="editForm.weekly_token_unit" :options="tokenUnitOptions" class="w-24" />
+              </div>
             </div>
             <div>
               <label class="input-label">{{
@@ -2424,6 +2444,10 @@
                 class="input"
                 :placeholder="t('admin.groups.subscription.noLimit')"
               />
+              <div class="mt-2 flex gap-2">
+                <input v-model.number="editForm.monthly_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
+                <Select v-model="editForm.monthly_token_unit" :options="tokenUnitOptions" class="w-24" />
+              </div>
             </div>
           </div>
         </div>
@@ -4362,6 +4386,12 @@ import type { ChannelModelPricing } from "@/api/admin/channels";
 import { VueDraggable } from "vue-draggable-plus";
 import { createStableObjectKeyResolver } from "@/utils/stableObjectKey";
 import { extractApiErrorMessage } from "@/utils/apiError";
+import {
+  inferTokenQuotaUnit,
+  tokenAmountToBase,
+  tokenBaseToAmount,
+  type TokenQuotaUnit,
+} from "@/utils/tokenQuota";
 import { useKeyedDebouncedSearch } from "@/composables/useKeyedDebouncedSearch";
 import { getPersistedPageSize } from "@/composables/usePersistedPageSize";
 import {
@@ -4711,6 +4741,11 @@ const subscriptionTypeOptions = computed(() => [
   { value: "subscription", label: t("admin.groups.subscription.subscription") },
 ]);
 
+const tokenUnitOptions = [
+  { value: "M", label: "M" },
+  { value: "B", label: "B" },
+];
+
 // 降级分组选项（创建时）- 仅包含 anthropic 平台且未启用 claude_code_only 的分组
 const fallbackGroupOptions = computed(() => {
   const options: { value: number | null; label: string }[] = [
@@ -4992,6 +5027,12 @@ const createForm = reactive({
   daily_limit_usd: null as number | null,
   weekly_limit_usd: null as number | null,
   monthly_limit_usd: null as number | null,
+  daily_token_amount: null as number | null,
+  weekly_token_amount: null as number | null,
+  monthly_token_amount: null as number | null,
+  daily_token_unit: "M" as TokenQuotaUnit,
+  weekly_token_unit: "M" as TokenQuotaUnit,
+  monthly_token_unit: "M" as TokenQuotaUnit,
   long_context_pricing_enabled: true,
   force_openai_fast: false,
   free_openai_fast: false,
@@ -5362,6 +5403,12 @@ const editForm = reactive({
   daily_limit_usd: null as number | null,
   weekly_limit_usd: null as number | null,
   monthly_limit_usd: null as number | null,
+  daily_token_amount: null as number | null,
+  weekly_token_amount: null as number | null,
+  monthly_token_amount: null as number | null,
+  daily_token_unit: "M" as TokenQuotaUnit,
+  weekly_token_unit: "M" as TokenQuotaUnit,
+  monthly_token_unit: "M" as TokenQuotaUnit,
   long_context_pricing_enabled: true,
   force_openai_fast: false,
   free_openai_fast: false,
@@ -5844,6 +5891,12 @@ const closeCreateModal = () => {
   createForm.daily_limit_usd = null;
   createForm.weekly_limit_usd = null;
   createForm.monthly_limit_usd = null;
+  createForm.daily_token_amount = null;
+  createForm.weekly_token_amount = null;
+  createForm.monthly_token_amount = null;
+  createForm.daily_token_unit = "M";
+  createForm.weekly_token_unit = "M";
+  createForm.monthly_token_unit = "M";
   createForm.allow_image_generation = false;
   createForm.allow_batch_image_generation = false;
   createForm.image_count_billing = false;
@@ -5914,6 +5967,14 @@ const normalizeOptionalLimit = (
   return Number.isFinite(value) && value > 0 ? value : null;
 };
 
+const normalizeOptionalTokenLimit = (
+  value: number | string | null | undefined,
+  unit: TokenQuotaUnit,
+): number | null => {
+  const tokens = tokenAmountToBase(value, unit);
+  return tokens > 0 ? tokens : null;
+};
+
 const normalizeRateMultiplier = (
   value: number | string | null | undefined,
 ): number => {
@@ -5976,6 +6037,12 @@ const handleCreateGroup = async () => {
   try {
     const {
       video_model_prices: _createFormVideoModelPrices,
+      daily_token_amount: _dailyTokenAmount,
+      weekly_token_amount: _weeklyTokenAmount,
+      monthly_token_amount: _monthlyTokenAmount,
+      daily_token_unit: _dailyTokenUnit,
+      weekly_token_unit: _weeklyTokenUnit,
+      monthly_token_unit: _monthlyTokenUnit,
       ...createGroupForm
     } = createForm;
     const videoModelPrices = serializeVideoModelPrices(
@@ -6004,6 +6071,18 @@ const handleCreateGroup = async () => {
       ),
       monthly_limit_usd: normalizeOptionalLimit(
         createForm.monthly_limit_usd as number | string | null,
+      ),
+      daily_token_limit: normalizeOptionalTokenLimit(
+        createForm.daily_token_amount,
+        createForm.daily_token_unit,
+      ),
+      weekly_token_limit: normalizeOptionalTokenLimit(
+        createForm.weekly_token_amount,
+        createForm.weekly_token_unit,
+      ),
+      monthly_token_limit: normalizeOptionalTokenLimit(
+        createForm.monthly_token_amount,
+        createForm.monthly_token_unit,
       ),
       ...(Object.keys(videoModelPrices).length > 0
         ? { video_model_prices: videoModelPrices }
@@ -6134,6 +6213,12 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.daily_limit_usd = group.daily_limit_usd;
   editForm.weekly_limit_usd = group.weekly_limit_usd;
   editForm.monthly_limit_usd = group.monthly_limit_usd;
+  editForm.daily_token_unit = inferTokenQuotaUnit(group.daily_token_limit);
+  editForm.weekly_token_unit = inferTokenQuotaUnit(group.weekly_token_limit);
+  editForm.monthly_token_unit = inferTokenQuotaUnit(group.monthly_token_limit);
+  editForm.daily_token_amount = tokenBaseToAmount(group.daily_token_limit, editForm.daily_token_unit);
+  editForm.weekly_token_amount = tokenBaseToAmount(group.weekly_token_limit, editForm.weekly_token_unit);
+  editForm.monthly_token_amount = tokenBaseToAmount(group.monthly_token_limit, editForm.monthly_token_unit);
   editForm.long_context_pricing_enabled =
     group.long_context_pricing_enabled ?? true;
   editForm.force_openai_fast = group.force_openai_fast ?? false;
@@ -6348,6 +6433,18 @@ const handleUpdateGroup = async () => {
       ),
       monthly_limit_usd: normalizeOptionalLimit(
         editForm.monthly_limit_usd as number | string | null,
+      ),
+      daily_token_limit: normalizeOptionalTokenLimit(
+        editForm.daily_token_amount,
+        editForm.daily_token_unit,
+      ),
+      weekly_token_limit: normalizeOptionalTokenLimit(
+        editForm.weekly_token_amount,
+        editForm.weekly_token_unit,
+      ),
+      monthly_token_limit: normalizeOptionalTokenLimit(
+        editForm.monthly_token_amount,
+        editForm.monthly_token_unit,
       ),
       video_model_prices: serializeVideoModelPrices(
         editForm.video_model_prices,

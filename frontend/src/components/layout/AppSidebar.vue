@@ -828,6 +828,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   }
   items.push(
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
+    { path: '/hosted-accounts', label: t('nav.hostedAccounts'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/model-plaza', query: { embedded: '1' }, label: t('nav.modelPlaza'), icon: ModelPlazaIcon, featureFlag: flagModelPlaza },
     // A canvas is useful before a user has an eligible key: they can organize
     // prompts and references, then create or enable a key when ready to run it.
@@ -901,6 +902,7 @@ const adminNavItems = computed((): NavItem[] => {
     },
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
+    { path: '/admin/hosted-accounts', label: t('nav.hostedAccountManagement'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/account-scheduler', label: t('nav.accountScheduler'), icon: ChartIcon },
     { path: '/admin/upstream-monitor', label: t('nav.upstreamMonitor'), icon: SignalIcon },
     { path: '/admin/plugins', label: t('nav.plugins'), icon: PluginIcon, featureFlag: flagPluginManagement },

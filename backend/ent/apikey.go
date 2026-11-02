@@ -50,6 +50,10 @@ type APIKey struct {
 	Quota float64 `json:"quota,omitempty"`
 	// Used quota amount in USD
 	QuotaUsed float64 `json:"quota_used,omitempty"`
+	// Lifetime token quota for this API key (0 = unlimited)
+	QuotaTokens int64 `json:"quota_tokens,omitempty"`
+	// Used lifetime token quota
+	QuotaTokensUsed int64 `json:"quota_tokens_used,omitempty"`
 	// Expiration time for this API key (null = never expires)
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	// Rate limit in USD per 5 hours (0 = unlimited)
@@ -64,6 +68,18 @@ type APIKey struct {
 	Usage1d float64 `json:"usage_1d,omitempty"`
 	// Used amount in USD for the current 7d window
 	Usage7d float64 `json:"usage_7d,omitempty"`
+	// Token limit per 5 hours (0 = unlimited)
+	RateLimit5hTokens int64 `json:"rate_limit_5h_tokens,omitempty"`
+	// Token limit per day (0 = unlimited)
+	RateLimit1dTokens int64 `json:"rate_limit_1d_tokens,omitempty"`
+	// Token limit per 7 days (0 = unlimited)
+	RateLimit7dTokens int64 `json:"rate_limit_7d_tokens,omitempty"`
+	// Used tokens in the current 5h window
+	Usage5hTokens int64 `json:"usage_5h_tokens,omitempty"`
+	// Used tokens in the current 1d window
+	Usage1dTokens int64 `json:"usage_1d_tokens,omitempty"`
+	// Used tokens in the current 7d window
+	Usage7dTokens int64 `json:"usage_7d_tokens,omitempty"`
 	// Start time of the current 5h rate limit window
 	Window5hStart *time.Time `json:"window_5h_start,omitempty"`
 	// Start time of the current 1d rate limit window
@@ -129,7 +145,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case apikey.FieldQuota, apikey.FieldQuotaUsed, apikey.FieldRateLimit5h, apikey.FieldRateLimit1d, apikey.FieldRateLimit7d, apikey.FieldUsage5h, apikey.FieldUsage1d, apikey.FieldUsage7d:
 			values[i] = new(sql.NullFloat64)
-		case apikey.FieldID, apikey.FieldUserID, apikey.FieldGroupID:
+		case apikey.FieldID, apikey.FieldUserID, apikey.FieldGroupID, apikey.FieldQuotaTokens, apikey.FieldQuotaTokensUsed, apikey.FieldRateLimit5hTokens, apikey.FieldRateLimit1dTokens, apikey.FieldRateLimit7dTokens, apikey.FieldUsage5hTokens, apikey.FieldUsage1dTokens, apikey.FieldUsage7dTokens:
 			values[i] = new(sql.NullInt64)
 		case apikey.FieldKey, apikey.FieldName, apikey.FieldBatchID, apikey.FieldBatchName, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -254,6 +270,18 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.QuotaUsed = value.Float64
 			}
+		case apikey.FieldQuotaTokens:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field quota_tokens", values[i])
+			} else if value.Valid {
+				_m.QuotaTokens = value.Int64
+			}
+		case apikey.FieldQuotaTokensUsed:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field quota_tokens_used", values[i])
+			} else if value.Valid {
+				_m.QuotaTokensUsed = value.Int64
+			}
 		case apikey.FieldExpiresAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field expires_at", values[i])
@@ -296,6 +324,42 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field usage_7d", values[i])
 			} else if value.Valid {
 				_m.Usage7d = value.Float64
+			}
+		case apikey.FieldRateLimit5hTokens:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_limit_5h_tokens", values[i])
+			} else if value.Valid {
+				_m.RateLimit5hTokens = value.Int64
+			}
+		case apikey.FieldRateLimit1dTokens:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_limit_1d_tokens", values[i])
+			} else if value.Valid {
+				_m.RateLimit1dTokens = value.Int64
+			}
+		case apikey.FieldRateLimit7dTokens:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_limit_7d_tokens", values[i])
+			} else if value.Valid {
+				_m.RateLimit7dTokens = value.Int64
+			}
+		case apikey.FieldUsage5hTokens:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_5h_tokens", values[i])
+			} else if value.Valid {
+				_m.Usage5hTokens = value.Int64
+			}
+		case apikey.FieldUsage1dTokens:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_1d_tokens", values[i])
+			} else if value.Valid {
+				_m.Usage1dTokens = value.Int64
+			}
+		case apikey.FieldUsage7dTokens:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_7d_tokens", values[i])
+			} else if value.Valid {
+				_m.Usage7dTokens = value.Int64
 			}
 		case apikey.FieldWindow5hStart:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -422,6 +486,12 @@ func (_m *APIKey) String() string {
 	builder.WriteString("quota_used=")
 	builder.WriteString(fmt.Sprintf("%v", _m.QuotaUsed))
 	builder.WriteString(", ")
+	builder.WriteString("quota_tokens=")
+	builder.WriteString(fmt.Sprintf("%v", _m.QuotaTokens))
+	builder.WriteString(", ")
+	builder.WriteString("quota_tokens_used=")
+	builder.WriteString(fmt.Sprintf("%v", _m.QuotaTokensUsed))
+	builder.WriteString(", ")
 	if v := _m.ExpiresAt; v != nil {
 		builder.WriteString("expires_at=")
 		builder.WriteString(v.Format(time.ANSIC))
@@ -444,6 +514,24 @@ func (_m *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("usage_7d=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Usage7d))
+	builder.WriteString(", ")
+	builder.WriteString("rate_limit_5h_tokens=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RateLimit5hTokens))
+	builder.WriteString(", ")
+	builder.WriteString("rate_limit_1d_tokens=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RateLimit1dTokens))
+	builder.WriteString(", ")
+	builder.WriteString("rate_limit_7d_tokens=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RateLimit7dTokens))
+	builder.WriteString(", ")
+	builder.WriteString("usage_5h_tokens=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Usage5hTokens))
+	builder.WriteString(", ")
+	builder.WriteString("usage_1d_tokens=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Usage1dTokens))
+	builder.WriteString(", ")
+	builder.WriteString("usage_7d_tokens=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Usage7dTokens))
 	builder.WriteString(", ")
 	if v := _m.Window5hStart; v != nil {
 		builder.WriteString("window_5h_start=")

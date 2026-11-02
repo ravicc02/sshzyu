@@ -393,6 +393,9 @@ func renewedSubscriptionTerm(existingSub *UserSubscription, notes string, starts
 	renewed.DailyUsageUSD = 0
 	renewed.WeeklyUsageUSD = 0
 	renewed.MonthlyUsageUSD = 0
+	renewed.DailyUsageTokens = 0
+	renewed.WeeklyUsageTokens = 0
+	renewed.MonthlyUsageTokens = 0
 	renewed.Notes = appendSubscriptionNotes(existingSub.Notes, notes)
 	return &renewed
 }
@@ -837,16 +840,19 @@ func normalizeExpiredWindowsAt(subs []UserSubscription, now time.Time) {
 		if sub.canAutomaticallyResetDailyAt(now) {
 			sub.DailyWindowStart = nil
 			sub.DailyUsageUSD = 0
+			sub.DailyUsageTokens = 0
 		}
 		// 周窗口过期：清零展示数据
 		if sub.canAutomaticallyResetWeeklyAt(now) {
 			sub.WeeklyWindowStart = nil
 			sub.WeeklyUsageUSD = 0
+			sub.WeeklyUsageTokens = 0
 		}
 		// 月窗口过期：清零展示数据
 		if sub.canAutomaticallyResetMonthlyAt(now) {
 			sub.MonthlyWindowStart = nil
 			sub.MonthlyUsageUSD = 0
+			sub.MonthlyUsageTokens = 0
 		}
 	}
 }
@@ -922,6 +928,7 @@ func (s *SubscriptionService) CheckAndResetWindows(ctx context.Context, sub *Use
 		}
 		sub.DailyWindowStart = &windowStart
 		sub.DailyUsageUSD = 0
+		sub.DailyUsageTokens = 0
 		needsInvalidateCache = true
 	}
 
@@ -933,6 +940,7 @@ func (s *SubscriptionService) CheckAndResetWindows(ctx context.Context, sub *Use
 		}
 		sub.WeeklyWindowStart = &windowStart
 		sub.WeeklyUsageUSD = 0
+		sub.WeeklyUsageTokens = 0
 		needsInvalidateCache = true
 	}
 
@@ -944,6 +952,7 @@ func (s *SubscriptionService) CheckAndResetWindows(ctx context.Context, sub *Use
 		}
 		sub.MonthlyWindowStart = &windowStart
 		sub.MonthlyUsageUSD = 0
+		sub.MonthlyUsageTokens = 0
 		needsInvalidateCache = true
 	}
 
@@ -996,6 +1005,15 @@ func (s *SubscriptionService) CheckUsageLimits(ctx context.Context, sub *UserSub
 	if !sub.CheckMonthlyLimit(group, additionalCost) {
 		return ErrMonthlyLimitExceeded
 	}
+	if !sub.CheckDailyTokenLimit(group, 0) {
+		return ErrDailyLimitExceeded
+	}
+	if !sub.CheckWeeklyTokenLimit(group, 0) {
+		return ErrWeeklyLimitExceeded
+	}
+	if !sub.CheckMonthlyTokenLimit(group, 0) {
+		return ErrMonthlyLimitExceeded
+	}
 	return nil
 }
 
@@ -1019,14 +1037,20 @@ func (s *SubscriptionService) ValidateAndCheckLimits(sub *UserSubscription, grou
 	//    调用方随后同步推进 DB 窗口，并用回读快照重新校验。
 	if sub.canAutomaticallyResetDailyAt(now) {
 		sub.DailyUsageUSD = 0
+		sub.DailyUsageTokens = 0
+		sub.DailyUsageTokens = 0
 		needsMaintenance = true
 	}
 	if sub.canAutomaticallyResetWeeklyAt(now) {
 		sub.WeeklyUsageUSD = 0
+		sub.WeeklyUsageTokens = 0
+		sub.WeeklyUsageTokens = 0
 		needsMaintenance = true
 	}
 	if sub.canAutomaticallyResetMonthlyAt(now) {
 		sub.MonthlyUsageUSD = 0
+		sub.MonthlyUsageTokens = 0
+		sub.MonthlyUsageTokens = 0
 		needsMaintenance = true
 	}
 	if !sub.IsWindowActivated() {
@@ -1041,6 +1065,15 @@ func (s *SubscriptionService) ValidateAndCheckLimits(sub *UserSubscription, grou
 		return needsMaintenance, ErrWeeklyLimitExceeded
 	}
 	if !sub.CheckMonthlyLimit(group, 0) {
+		return needsMaintenance, ErrMonthlyLimitExceeded
+	}
+	if !sub.CheckDailyTokenLimit(group, 0) {
+		return needsMaintenance, ErrDailyLimitExceeded
+	}
+	if !sub.CheckWeeklyTokenLimit(group, 0) {
+		return needsMaintenance, ErrWeeklyLimitExceeded
+	}
+	if !sub.CheckMonthlyTokenLimit(group, 0) {
 		return needsMaintenance, ErrMonthlyLimitExceeded
 	}
 

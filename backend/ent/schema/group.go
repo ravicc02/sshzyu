@@ -99,6 +99,18 @@ func (Group) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Int64("daily_token_limit").
+			Optional().
+			Nillable().
+			Comment("Daily token limit for subscription groups; nil = unlimited"),
+		field.Int64("weekly_token_limit").
+			Optional().
+			Nillable().
+			Comment("Weekly token limit for subscription groups; nil = unlimited"),
+		field.Int64("monthly_token_limit").
+			Optional().
+			Nillable().
+			Comment("Monthly token limit for subscription groups; nil = unlimited"),
 		field.Int("default_validity_days").
 			Default(30),
 

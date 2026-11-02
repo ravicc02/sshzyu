@@ -50,20 +50,28 @@ type APIKey struct {
 	CurrentConcurrency  int
 
 	// Quota fields
-	Quota     float64    // Quota limit in USD (0 = unlimited)
-	QuotaUsed float64    // Used quota amount
-	ExpiresAt *time.Time // Expiration time (nil = never expires)
+	Quota           float64 // Quota limit in USD (0 = unlimited)
+	QuotaUsed       float64 // Used quota amount
+	QuotaTokens     int64   // Lifetime token limit (0 = unlimited)
+	QuotaTokensUsed int64
+	ExpiresAt       *time.Time // Expiration time (nil = never expires)
 
 	// Rate limit fields
-	RateLimit5h   float64    // Rate limit in USD per 5h (0 = unlimited)
-	RateLimit1d   float64    // Rate limit in USD per 1d (0 = unlimited)
-	RateLimit7d   float64    // Rate limit in USD per 7d (0 = unlimited)
-	Usage5h       float64    // Used amount in current 5h window
-	Usage1d       float64    // Used amount in current 1d window
-	Usage7d       float64    // Used amount in current 7d window
-	Window5hStart *time.Time // Start of current 5h window
-	Window1dStart *time.Time // Start of current 1d window
-	Window7dStart *time.Time // Start of current 7d window
+	RateLimit5h       float64 // Rate limit in USD per 5h (0 = unlimited)
+	RateLimit1d       float64 // Rate limit in USD per 1d (0 = unlimited)
+	RateLimit7d       float64 // Rate limit in USD per 7d (0 = unlimited)
+	Usage5h           float64 // Used amount in current 5h window
+	Usage1d           float64 // Used amount in current 1d window
+	Usage7d           float64 // Used amount in current 7d window
+	RateLimit5hTokens int64
+	RateLimit1dTokens int64
+	RateLimit7dTokens int64
+	Usage5hTokens     int64
+	Usage1dTokens     int64
+	Usage7dTokens     int64
+	Window5hStart     *time.Time // Start of current 5h window
+	Window1dStart     *time.Time // Start of current 1d window
+	Window7dStart     *time.Time // Start of current 7d window
 }
 
 func (k *APIKey) IsActive() bool {
@@ -73,6 +81,18 @@ func (k *APIKey) IsActive() bool {
 // HasRateLimits returns true if any rate limit window is configured
 func (k *APIKey) HasRateLimits() bool {
 	return k.RateLimit5h > 0 || k.RateLimit1d > 0 || k.RateLimit7d > 0
+}
+
+func (k *APIKey) HasTokenQuota() bool {
+	return k != nil && k.QuotaTokens > 0
+}
+
+func (k *APIKey) HasTokenRateLimits() bool {
+	return k != nil && (k.RateLimit5hTokens > 0 || k.RateLimit1dTokens > 0 || k.RateLimit7dTokens > 0)
+}
+
+func (k *APIKey) HasAnyTokenLimits() bool {
+	return k != nil && (k.HasTokenQuota() || k.HasTokenRateLimits())
 }
 
 // IsExpired checks if the API key has expired
@@ -85,10 +105,8 @@ func (k *APIKey) IsExpired() bool {
 
 // IsQuotaExhausted checks if the API key quota is exhausted
 func (k *APIKey) IsQuotaExhausted() bool {
-	if k.Quota <= 0 {
-		return false // unlimited
-	}
-	return k.QuotaUsed >= k.Quota
+	return (k.Quota > 0 && k.QuotaUsed >= k.Quota) ||
+		(k.QuotaTokens > 0 && k.QuotaTokensUsed >= k.QuotaTokens)
 }
 
 // GetQuotaRemaining returns remaining quota (-1 for unlimited)
@@ -137,6 +155,27 @@ func (k *APIKey) EffectiveUsage7d() float64 {
 		return 0
 	}
 	return k.Usage7d
+}
+
+func (k *APIKey) EffectiveUsage5hTokens() int64 {
+	if IsWindowExpired(k.Window5hStart, RateLimitWindow5h) {
+		return 0
+	}
+	return k.Usage5hTokens
+}
+
+func (k *APIKey) EffectiveUsage1dTokens() int64 {
+	if IsWindowExpired(k.Window1dStart, RateLimitWindow1d) {
+		return 0
+	}
+	return k.Usage1dTokens
+}
+
+func (k *APIKey) EffectiveUsage7dTokens() int64 {
+	if IsWindowExpired(k.Window7dStart, RateLimitWindow7d) {
+		return 0
+	}
+	return k.Usage7dTokens
 }
 
 // APIKeyListFilters holds optional filtering parameters for listing API keys.

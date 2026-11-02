@@ -45,6 +45,10 @@ const (
 	FieldQuota = "quota"
 	// FieldQuotaUsed holds the string denoting the quota_used field in the database.
 	FieldQuotaUsed = "quota_used"
+	// FieldQuotaTokens holds the string denoting the quota_tokens field in the database.
+	FieldQuotaTokens = "quota_tokens"
+	// FieldQuotaTokensUsed holds the string denoting the quota_tokens_used field in the database.
+	FieldQuotaTokensUsed = "quota_tokens_used"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
 	FieldExpiresAt = "expires_at"
 	// FieldRateLimit5h holds the string denoting the rate_limit_5h field in the database.
@@ -59,6 +63,18 @@ const (
 	FieldUsage1d = "usage_1d"
 	// FieldUsage7d holds the string denoting the usage_7d field in the database.
 	FieldUsage7d = "usage_7d"
+	// FieldRateLimit5hTokens holds the string denoting the rate_limit_5h_tokens field in the database.
+	FieldRateLimit5hTokens = "rate_limit_5h_tokens"
+	// FieldRateLimit1dTokens holds the string denoting the rate_limit_1d_tokens field in the database.
+	FieldRateLimit1dTokens = "rate_limit_1d_tokens"
+	// FieldRateLimit7dTokens holds the string denoting the rate_limit_7d_tokens field in the database.
+	FieldRateLimit7dTokens = "rate_limit_7d_tokens"
+	// FieldUsage5hTokens holds the string denoting the usage_5h_tokens field in the database.
+	FieldUsage5hTokens = "usage_5h_tokens"
+	// FieldUsage1dTokens holds the string denoting the usage_1d_tokens field in the database.
+	FieldUsage1dTokens = "usage_1d_tokens"
+	// FieldUsage7dTokens holds the string denoting the usage_7d_tokens field in the database.
+	FieldUsage7dTokens = "usage_7d_tokens"
 	// FieldWindow5hStart holds the string denoting the window_5h_start field in the database.
 	FieldWindow5hStart = "window_5h_start"
 	// FieldWindow1dStart holds the string denoting the window_1d_start field in the database.
@@ -114,6 +130,8 @@ var Columns = []string{
 	FieldIPBlacklist,
 	FieldQuota,
 	FieldQuotaUsed,
+	FieldQuotaTokens,
+	FieldQuotaTokensUsed,
 	FieldExpiresAt,
 	FieldRateLimit5h,
 	FieldRateLimit1d,
@@ -121,6 +139,12 @@ var Columns = []string{
 	FieldUsage5h,
 	FieldUsage1d,
 	FieldUsage7d,
+	FieldRateLimit5hTokens,
+	FieldRateLimit1dTokens,
+	FieldRateLimit7dTokens,
+	FieldUsage5hTokens,
+	FieldUsage1dTokens,
+	FieldUsage7dTokens,
 	FieldWindow5hStart,
 	FieldWindow1dStart,
 	FieldWindow7dStart,
@@ -168,6 +192,10 @@ var (
 	DefaultQuota float64
 	// DefaultQuotaUsed holds the default value on creation for the "quota_used" field.
 	DefaultQuotaUsed float64
+	// DefaultQuotaTokens holds the default value on creation for the "quota_tokens" field.
+	DefaultQuotaTokens int64
+	// DefaultQuotaTokensUsed holds the default value on creation for the "quota_tokens_used" field.
+	DefaultQuotaTokensUsed int64
 	// DefaultRateLimit5h holds the default value on creation for the "rate_limit_5h" field.
 	DefaultRateLimit5h float64
 	// DefaultRateLimit1d holds the default value on creation for the "rate_limit_1d" field.
@@ -180,6 +208,18 @@ var (
 	DefaultUsage1d float64
 	// DefaultUsage7d holds the default value on creation for the "usage_7d" field.
 	DefaultUsage7d float64
+	// DefaultRateLimit5hTokens holds the default value on creation for the "rate_limit_5h_tokens" field.
+	DefaultRateLimit5hTokens int64
+	// DefaultRateLimit1dTokens holds the default value on creation for the "rate_limit_1d_tokens" field.
+	DefaultRateLimit1dTokens int64
+	// DefaultRateLimit7dTokens holds the default value on creation for the "rate_limit_7d_tokens" field.
+	DefaultRateLimit7dTokens int64
+	// DefaultUsage5hTokens holds the default value on creation for the "usage_5h_tokens" field.
+	DefaultUsage5hTokens int64
+	// DefaultUsage1dTokens holds the default value on creation for the "usage_1d_tokens" field.
+	DefaultUsage1dTokens int64
+	// DefaultUsage7dTokens holds the default value on creation for the "usage_7d_tokens" field.
+	DefaultUsage7dTokens int64
 )
 
 // OrderOption defines the ordering options for the APIKey queries.
@@ -255,6 +295,16 @@ func ByQuotaUsed(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldQuotaUsed, opts...).ToFunc()
 }
 
+// ByQuotaTokens orders the results by the quota_tokens field.
+func ByQuotaTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldQuotaTokens, opts...).ToFunc()
+}
+
+// ByQuotaTokensUsed orders the results by the quota_tokens_used field.
+func ByQuotaTokensUsed(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldQuotaTokensUsed, opts...).ToFunc()
+}
+
 // ByExpiresAt orders the results by the expires_at field.
 func ByExpiresAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldExpiresAt, opts...).ToFunc()
@@ -288,6 +338,36 @@ func ByUsage1d(opts ...sql.OrderTermOption) OrderOption {
 // ByUsage7d orders the results by the usage_7d field.
 func ByUsage7d(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUsage7d, opts...).ToFunc()
+}
+
+// ByRateLimit5hTokens orders the results by the rate_limit_5h_tokens field.
+func ByRateLimit5hTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateLimit5hTokens, opts...).ToFunc()
+}
+
+// ByRateLimit1dTokens orders the results by the rate_limit_1d_tokens field.
+func ByRateLimit1dTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateLimit1dTokens, opts...).ToFunc()
+}
+
+// ByRateLimit7dTokens orders the results by the rate_limit_7d_tokens field.
+func ByRateLimit7dTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateLimit7dTokens, opts...).ToFunc()
+}
+
+// ByUsage5hTokens orders the results by the usage_5h_tokens field.
+func ByUsage5hTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUsage5hTokens, opts...).ToFunc()
+}
+
+// ByUsage1dTokens orders the results by the usage_1d_tokens field.
+func ByUsage1dTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUsage1dTokens, opts...).ToFunc()
+}
+
+// ByUsage7dTokens orders the results by the usage_7d_tokens field.
+func ByUsage7dTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUsage7dTokens, opts...).ToFunc()
 }
 
 // ByWindow5hStart orders the results by the window_5h_start field.

@@ -126,6 +126,17 @@ func RegisterUserRoutes(
 			groups.GET("/rates", h.APIKey.GetUserGroupRates)
 		}
 
+		hosted := authenticated.Group("/hosted-openai-accounts")
+		{
+			hosted.GET("", h.HostedOpenAIAccounts.List)
+			hosted.GET("/options", h.HostedOpenAIAccounts.Options)
+			hosted.POST("/auth-url", h.HostedOpenAIAccounts.GenerateAuthURL)
+			hosted.POST("", h.HostedOpenAIAccounts.Create)
+			hosted.PUT("/:id", h.HostedOpenAIAccounts.Update)
+			hosted.POST("/:id/refresh-quota", h.HostedOpenAIAccounts.RefreshQuota)
+			hosted.POST("/:id/reauthorize", h.HostedOpenAIAccounts.Reauthorize)
+		}
+
 		// 用户可用渠道（非管理员接口）
 		channels := authenticated.Group("/channels")
 		{

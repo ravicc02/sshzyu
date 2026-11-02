@@ -195,6 +195,34 @@ func (_c *APIKeyCreate) SetNillableQuotaUsed(v *float64) *APIKeyCreate {
 	return _c
 }
 
+// SetQuotaTokens sets the "quota_tokens" field.
+func (_c *APIKeyCreate) SetQuotaTokens(v int64) *APIKeyCreate {
+	_c.mutation.SetQuotaTokens(v)
+	return _c
+}
+
+// SetNillableQuotaTokens sets the "quota_tokens" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableQuotaTokens(v *int64) *APIKeyCreate {
+	if v != nil {
+		_c.SetQuotaTokens(*v)
+	}
+	return _c
+}
+
+// SetQuotaTokensUsed sets the "quota_tokens_used" field.
+func (_c *APIKeyCreate) SetQuotaTokensUsed(v int64) *APIKeyCreate {
+	_c.mutation.SetQuotaTokensUsed(v)
+	return _c
+}
+
+// SetNillableQuotaTokensUsed sets the "quota_tokens_used" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableQuotaTokensUsed(v *int64) *APIKeyCreate {
+	if v != nil {
+		_c.SetQuotaTokensUsed(*v)
+	}
+	return _c
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_c *APIKeyCreate) SetExpiresAt(v time.Time) *APIKeyCreate {
 	_c.mutation.SetExpiresAt(v)
@@ -289,6 +317,90 @@ func (_c *APIKeyCreate) SetUsage7d(v float64) *APIKeyCreate {
 func (_c *APIKeyCreate) SetNillableUsage7d(v *float64) *APIKeyCreate {
 	if v != nil {
 		_c.SetUsage7d(*v)
+	}
+	return _c
+}
+
+// SetRateLimit5hTokens sets the "rate_limit_5h_tokens" field.
+func (_c *APIKeyCreate) SetRateLimit5hTokens(v int64) *APIKeyCreate {
+	_c.mutation.SetRateLimit5hTokens(v)
+	return _c
+}
+
+// SetNillableRateLimit5hTokens sets the "rate_limit_5h_tokens" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableRateLimit5hTokens(v *int64) *APIKeyCreate {
+	if v != nil {
+		_c.SetRateLimit5hTokens(*v)
+	}
+	return _c
+}
+
+// SetRateLimit1dTokens sets the "rate_limit_1d_tokens" field.
+func (_c *APIKeyCreate) SetRateLimit1dTokens(v int64) *APIKeyCreate {
+	_c.mutation.SetRateLimit1dTokens(v)
+	return _c
+}
+
+// SetNillableRateLimit1dTokens sets the "rate_limit_1d_tokens" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableRateLimit1dTokens(v *int64) *APIKeyCreate {
+	if v != nil {
+		_c.SetRateLimit1dTokens(*v)
+	}
+	return _c
+}
+
+// SetRateLimit7dTokens sets the "rate_limit_7d_tokens" field.
+func (_c *APIKeyCreate) SetRateLimit7dTokens(v int64) *APIKeyCreate {
+	_c.mutation.SetRateLimit7dTokens(v)
+	return _c
+}
+
+// SetNillableRateLimit7dTokens sets the "rate_limit_7d_tokens" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableRateLimit7dTokens(v *int64) *APIKeyCreate {
+	if v != nil {
+		_c.SetRateLimit7dTokens(*v)
+	}
+	return _c
+}
+
+// SetUsage5hTokens sets the "usage_5h_tokens" field.
+func (_c *APIKeyCreate) SetUsage5hTokens(v int64) *APIKeyCreate {
+	_c.mutation.SetUsage5hTokens(v)
+	return _c
+}
+
+// SetNillableUsage5hTokens sets the "usage_5h_tokens" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableUsage5hTokens(v *int64) *APIKeyCreate {
+	if v != nil {
+		_c.SetUsage5hTokens(*v)
+	}
+	return _c
+}
+
+// SetUsage1dTokens sets the "usage_1d_tokens" field.
+func (_c *APIKeyCreate) SetUsage1dTokens(v int64) *APIKeyCreate {
+	_c.mutation.SetUsage1dTokens(v)
+	return _c
+}
+
+// SetNillableUsage1dTokens sets the "usage_1d_tokens" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableUsage1dTokens(v *int64) *APIKeyCreate {
+	if v != nil {
+		_c.SetUsage1dTokens(*v)
+	}
+	return _c
+}
+
+// SetUsage7dTokens sets the "usage_7d_tokens" field.
+func (_c *APIKeyCreate) SetUsage7dTokens(v int64) *APIKeyCreate {
+	_c.mutation.SetUsage7dTokens(v)
+	return _c
+}
+
+// SetNillableUsage7dTokens sets the "usage_7d_tokens" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableUsage7dTokens(v *int64) *APIKeyCreate {
+	if v != nil {
+		_c.SetUsage7dTokens(*v)
 	}
 	return _c
 }
@@ -427,6 +539,14 @@ func (_c *APIKeyCreate) defaults() error {
 		v := apikey.DefaultQuotaUsed
 		_c.mutation.SetQuotaUsed(v)
 	}
+	if _, ok := _c.mutation.QuotaTokens(); !ok {
+		v := apikey.DefaultQuotaTokens
+		_c.mutation.SetQuotaTokens(v)
+	}
+	if _, ok := _c.mutation.QuotaTokensUsed(); !ok {
+		v := apikey.DefaultQuotaTokensUsed
+		_c.mutation.SetQuotaTokensUsed(v)
+	}
 	if _, ok := _c.mutation.RateLimit5h(); !ok {
 		v := apikey.DefaultRateLimit5h
 		_c.mutation.SetRateLimit5h(v)
@@ -450,6 +570,30 @@ func (_c *APIKeyCreate) defaults() error {
 	if _, ok := _c.mutation.Usage7d(); !ok {
 		v := apikey.DefaultUsage7d
 		_c.mutation.SetUsage7d(v)
+	}
+	if _, ok := _c.mutation.RateLimit5hTokens(); !ok {
+		v := apikey.DefaultRateLimit5hTokens
+		_c.mutation.SetRateLimit5hTokens(v)
+	}
+	if _, ok := _c.mutation.RateLimit1dTokens(); !ok {
+		v := apikey.DefaultRateLimit1dTokens
+		_c.mutation.SetRateLimit1dTokens(v)
+	}
+	if _, ok := _c.mutation.RateLimit7dTokens(); !ok {
+		v := apikey.DefaultRateLimit7dTokens
+		_c.mutation.SetRateLimit7dTokens(v)
+	}
+	if _, ok := _c.mutation.Usage5hTokens(); !ok {
+		v := apikey.DefaultUsage5hTokens
+		_c.mutation.SetUsage5hTokens(v)
+	}
+	if _, ok := _c.mutation.Usage1dTokens(); !ok {
+		v := apikey.DefaultUsage1dTokens
+		_c.mutation.SetUsage1dTokens(v)
+	}
+	if _, ok := _c.mutation.Usage7dTokens(); !ok {
+		v := apikey.DefaultUsage7dTokens
+		_c.mutation.SetUsage7dTokens(v)
 	}
 	return nil
 }
@@ -508,6 +652,12 @@ func (_c *APIKeyCreate) check() error {
 	if _, ok := _c.mutation.QuotaUsed(); !ok {
 		return &ValidationError{Name: "quota_used", err: errors.New(`ent: missing required field "APIKey.quota_used"`)}
 	}
+	if _, ok := _c.mutation.QuotaTokens(); !ok {
+		return &ValidationError{Name: "quota_tokens", err: errors.New(`ent: missing required field "APIKey.quota_tokens"`)}
+	}
+	if _, ok := _c.mutation.QuotaTokensUsed(); !ok {
+		return &ValidationError{Name: "quota_tokens_used", err: errors.New(`ent: missing required field "APIKey.quota_tokens_used"`)}
+	}
 	if _, ok := _c.mutation.RateLimit5h(); !ok {
 		return &ValidationError{Name: "rate_limit_5h", err: errors.New(`ent: missing required field "APIKey.rate_limit_5h"`)}
 	}
@@ -525,6 +675,24 @@ func (_c *APIKeyCreate) check() error {
 	}
 	if _, ok := _c.mutation.Usage7d(); !ok {
 		return &ValidationError{Name: "usage_7d", err: errors.New(`ent: missing required field "APIKey.usage_7d"`)}
+	}
+	if _, ok := _c.mutation.RateLimit5hTokens(); !ok {
+		return &ValidationError{Name: "rate_limit_5h_tokens", err: errors.New(`ent: missing required field "APIKey.rate_limit_5h_tokens"`)}
+	}
+	if _, ok := _c.mutation.RateLimit1dTokens(); !ok {
+		return &ValidationError{Name: "rate_limit_1d_tokens", err: errors.New(`ent: missing required field "APIKey.rate_limit_1d_tokens"`)}
+	}
+	if _, ok := _c.mutation.RateLimit7dTokens(); !ok {
+		return &ValidationError{Name: "rate_limit_7d_tokens", err: errors.New(`ent: missing required field "APIKey.rate_limit_7d_tokens"`)}
+	}
+	if _, ok := _c.mutation.Usage5hTokens(); !ok {
+		return &ValidationError{Name: "usage_5h_tokens", err: errors.New(`ent: missing required field "APIKey.usage_5h_tokens"`)}
+	}
+	if _, ok := _c.mutation.Usage1dTokens(); !ok {
+		return &ValidationError{Name: "usage_1d_tokens", err: errors.New(`ent: missing required field "APIKey.usage_1d_tokens"`)}
+	}
+	if _, ok := _c.mutation.Usage7dTokens(); !ok {
+		return &ValidationError{Name: "usage_7d_tokens", err: errors.New(`ent: missing required field "APIKey.usage_7d_tokens"`)}
 	}
 	if len(_c.mutation.UserIDs()) == 0 {
 		return &ValidationError{Name: "user", err: errors.New(`ent: missing required edge "APIKey.user"`)}
@@ -608,6 +776,14 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 		_spec.SetField(apikey.FieldQuotaUsed, field.TypeFloat64, value)
 		_node.QuotaUsed = value
 	}
+	if value, ok := _c.mutation.QuotaTokens(); ok {
+		_spec.SetField(apikey.FieldQuotaTokens, field.TypeInt64, value)
+		_node.QuotaTokens = value
+	}
+	if value, ok := _c.mutation.QuotaTokensUsed(); ok {
+		_spec.SetField(apikey.FieldQuotaTokensUsed, field.TypeInt64, value)
+		_node.QuotaTokensUsed = value
+	}
 	if value, ok := _c.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)
 		_node.ExpiresAt = &value
@@ -635,6 +811,30 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Usage7d(); ok {
 		_spec.SetField(apikey.FieldUsage7d, field.TypeFloat64, value)
 		_node.Usage7d = value
+	}
+	if value, ok := _c.mutation.RateLimit5hTokens(); ok {
+		_spec.SetField(apikey.FieldRateLimit5hTokens, field.TypeInt64, value)
+		_node.RateLimit5hTokens = value
+	}
+	if value, ok := _c.mutation.RateLimit1dTokens(); ok {
+		_spec.SetField(apikey.FieldRateLimit1dTokens, field.TypeInt64, value)
+		_node.RateLimit1dTokens = value
+	}
+	if value, ok := _c.mutation.RateLimit7dTokens(); ok {
+		_spec.SetField(apikey.FieldRateLimit7dTokens, field.TypeInt64, value)
+		_node.RateLimit7dTokens = value
+	}
+	if value, ok := _c.mutation.Usage5hTokens(); ok {
+		_spec.SetField(apikey.FieldUsage5hTokens, field.TypeInt64, value)
+		_node.Usage5hTokens = value
+	}
+	if value, ok := _c.mutation.Usage1dTokens(); ok {
+		_spec.SetField(apikey.FieldUsage1dTokens, field.TypeInt64, value)
+		_node.Usage1dTokens = value
+	}
+	if value, ok := _c.mutation.Usage7dTokens(); ok {
+		_spec.SetField(apikey.FieldUsage7dTokens, field.TypeInt64, value)
+		_node.Usage7dTokens = value
 	}
 	if value, ok := _c.mutation.Window5hStart(); ok {
 		_spec.SetField(apikey.FieldWindow5hStart, field.TypeTime, value)
@@ -966,6 +1166,42 @@ func (u *APIKeyUpsert) AddQuotaUsed(v float64) *APIKeyUpsert {
 	return u
 }
 
+// SetQuotaTokens sets the "quota_tokens" field.
+func (u *APIKeyUpsert) SetQuotaTokens(v int64) *APIKeyUpsert {
+	u.Set(apikey.FieldQuotaTokens, v)
+	return u
+}
+
+// UpdateQuotaTokens sets the "quota_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateQuotaTokens() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldQuotaTokens)
+	return u
+}
+
+// AddQuotaTokens adds v to the "quota_tokens" field.
+func (u *APIKeyUpsert) AddQuotaTokens(v int64) *APIKeyUpsert {
+	u.Add(apikey.FieldQuotaTokens, v)
+	return u
+}
+
+// SetQuotaTokensUsed sets the "quota_tokens_used" field.
+func (u *APIKeyUpsert) SetQuotaTokensUsed(v int64) *APIKeyUpsert {
+	u.Set(apikey.FieldQuotaTokensUsed, v)
+	return u
+}
+
+// UpdateQuotaTokensUsed sets the "quota_tokens_used" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateQuotaTokensUsed() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldQuotaTokensUsed)
+	return u
+}
+
+// AddQuotaTokensUsed adds v to the "quota_tokens_used" field.
+func (u *APIKeyUpsert) AddQuotaTokensUsed(v int64) *APIKeyUpsert {
+	u.Add(apikey.FieldQuotaTokensUsed, v)
+	return u
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (u *APIKeyUpsert) SetExpiresAt(v time.Time) *APIKeyUpsert {
 	u.Set(apikey.FieldExpiresAt, v)
@@ -1089,6 +1325,114 @@ func (u *APIKeyUpsert) UpdateUsage7d() *APIKeyUpsert {
 // AddUsage7d adds v to the "usage_7d" field.
 func (u *APIKeyUpsert) AddUsage7d(v float64) *APIKeyUpsert {
 	u.Add(apikey.FieldUsage7d, v)
+	return u
+}
+
+// SetRateLimit5hTokens sets the "rate_limit_5h_tokens" field.
+func (u *APIKeyUpsert) SetRateLimit5hTokens(v int64) *APIKeyUpsert {
+	u.Set(apikey.FieldRateLimit5hTokens, v)
+	return u
+}
+
+// UpdateRateLimit5hTokens sets the "rate_limit_5h_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateRateLimit5hTokens() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldRateLimit5hTokens)
+	return u
+}
+
+// AddRateLimit5hTokens adds v to the "rate_limit_5h_tokens" field.
+func (u *APIKeyUpsert) AddRateLimit5hTokens(v int64) *APIKeyUpsert {
+	u.Add(apikey.FieldRateLimit5hTokens, v)
+	return u
+}
+
+// SetRateLimit1dTokens sets the "rate_limit_1d_tokens" field.
+func (u *APIKeyUpsert) SetRateLimit1dTokens(v int64) *APIKeyUpsert {
+	u.Set(apikey.FieldRateLimit1dTokens, v)
+	return u
+}
+
+// UpdateRateLimit1dTokens sets the "rate_limit_1d_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateRateLimit1dTokens() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldRateLimit1dTokens)
+	return u
+}
+
+// AddRateLimit1dTokens adds v to the "rate_limit_1d_tokens" field.
+func (u *APIKeyUpsert) AddRateLimit1dTokens(v int64) *APIKeyUpsert {
+	u.Add(apikey.FieldRateLimit1dTokens, v)
+	return u
+}
+
+// SetRateLimit7dTokens sets the "rate_limit_7d_tokens" field.
+func (u *APIKeyUpsert) SetRateLimit7dTokens(v int64) *APIKeyUpsert {
+	u.Set(apikey.FieldRateLimit7dTokens, v)
+	return u
+}
+
+// UpdateRateLimit7dTokens sets the "rate_limit_7d_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateRateLimit7dTokens() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldRateLimit7dTokens)
+	return u
+}
+
+// AddRateLimit7dTokens adds v to the "rate_limit_7d_tokens" field.
+func (u *APIKeyUpsert) AddRateLimit7dTokens(v int64) *APIKeyUpsert {
+	u.Add(apikey.FieldRateLimit7dTokens, v)
+	return u
+}
+
+// SetUsage5hTokens sets the "usage_5h_tokens" field.
+func (u *APIKeyUpsert) SetUsage5hTokens(v int64) *APIKeyUpsert {
+	u.Set(apikey.FieldUsage5hTokens, v)
+	return u
+}
+
+// UpdateUsage5hTokens sets the "usage_5h_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateUsage5hTokens() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldUsage5hTokens)
+	return u
+}
+
+// AddUsage5hTokens adds v to the "usage_5h_tokens" field.
+func (u *APIKeyUpsert) AddUsage5hTokens(v int64) *APIKeyUpsert {
+	u.Add(apikey.FieldUsage5hTokens, v)
+	return u
+}
+
+// SetUsage1dTokens sets the "usage_1d_tokens" field.
+func (u *APIKeyUpsert) SetUsage1dTokens(v int64) *APIKeyUpsert {
+	u.Set(apikey.FieldUsage1dTokens, v)
+	return u
+}
+
+// UpdateUsage1dTokens sets the "usage_1d_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateUsage1dTokens() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldUsage1dTokens)
+	return u
+}
+
+// AddUsage1dTokens adds v to the "usage_1d_tokens" field.
+func (u *APIKeyUpsert) AddUsage1dTokens(v int64) *APIKeyUpsert {
+	u.Add(apikey.FieldUsage1dTokens, v)
+	return u
+}
+
+// SetUsage7dTokens sets the "usage_7d_tokens" field.
+func (u *APIKeyUpsert) SetUsage7dTokens(v int64) *APIKeyUpsert {
+	u.Set(apikey.FieldUsage7dTokens, v)
+	return u
+}
+
+// UpdateUsage7dTokens sets the "usage_7d_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateUsage7dTokens() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldUsage7dTokens)
+	return u
+}
+
+// AddUsage7dTokens adds v to the "usage_7d_tokens" field.
+func (u *APIKeyUpsert) AddUsage7dTokens(v int64) *APIKeyUpsert {
+	u.Add(apikey.FieldUsage7dTokens, v)
 	return u
 }
 
@@ -1443,6 +1787,48 @@ func (u *APIKeyUpsertOne) UpdateQuotaUsed() *APIKeyUpsertOne {
 	})
 }
 
+// SetQuotaTokens sets the "quota_tokens" field.
+func (u *APIKeyUpsertOne) SetQuotaTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetQuotaTokens(v)
+	})
+}
+
+// AddQuotaTokens adds v to the "quota_tokens" field.
+func (u *APIKeyUpsertOne) AddQuotaTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddQuotaTokens(v)
+	})
+}
+
+// UpdateQuotaTokens sets the "quota_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateQuotaTokens() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateQuotaTokens()
+	})
+}
+
+// SetQuotaTokensUsed sets the "quota_tokens_used" field.
+func (u *APIKeyUpsertOne) SetQuotaTokensUsed(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetQuotaTokensUsed(v)
+	})
+}
+
+// AddQuotaTokensUsed adds v to the "quota_tokens_used" field.
+func (u *APIKeyUpsertOne) AddQuotaTokensUsed(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddQuotaTokensUsed(v)
+	})
+}
+
+// UpdateQuotaTokensUsed sets the "quota_tokens_used" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateQuotaTokensUsed() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateQuotaTokensUsed()
+	})
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (u *APIKeyUpsertOne) SetExpiresAt(v time.Time) *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
@@ -1587,6 +1973,132 @@ func (u *APIKeyUpsertOne) AddUsage7d(v float64) *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) UpdateUsage7d() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateUsage7d()
+	})
+}
+
+// SetRateLimit5hTokens sets the "rate_limit_5h_tokens" field.
+func (u *APIKeyUpsertOne) SetRateLimit5hTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetRateLimit5hTokens(v)
+	})
+}
+
+// AddRateLimit5hTokens adds v to the "rate_limit_5h_tokens" field.
+func (u *APIKeyUpsertOne) AddRateLimit5hTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddRateLimit5hTokens(v)
+	})
+}
+
+// UpdateRateLimit5hTokens sets the "rate_limit_5h_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateRateLimit5hTokens() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateRateLimit5hTokens()
+	})
+}
+
+// SetRateLimit1dTokens sets the "rate_limit_1d_tokens" field.
+func (u *APIKeyUpsertOne) SetRateLimit1dTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetRateLimit1dTokens(v)
+	})
+}
+
+// AddRateLimit1dTokens adds v to the "rate_limit_1d_tokens" field.
+func (u *APIKeyUpsertOne) AddRateLimit1dTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddRateLimit1dTokens(v)
+	})
+}
+
+// UpdateRateLimit1dTokens sets the "rate_limit_1d_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateRateLimit1dTokens() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateRateLimit1dTokens()
+	})
+}
+
+// SetRateLimit7dTokens sets the "rate_limit_7d_tokens" field.
+func (u *APIKeyUpsertOne) SetRateLimit7dTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetRateLimit7dTokens(v)
+	})
+}
+
+// AddRateLimit7dTokens adds v to the "rate_limit_7d_tokens" field.
+func (u *APIKeyUpsertOne) AddRateLimit7dTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddRateLimit7dTokens(v)
+	})
+}
+
+// UpdateRateLimit7dTokens sets the "rate_limit_7d_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateRateLimit7dTokens() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateRateLimit7dTokens()
+	})
+}
+
+// SetUsage5hTokens sets the "usage_5h_tokens" field.
+func (u *APIKeyUpsertOne) SetUsage5hTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsage5hTokens(v)
+	})
+}
+
+// AddUsage5hTokens adds v to the "usage_5h_tokens" field.
+func (u *APIKeyUpsertOne) AddUsage5hTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddUsage5hTokens(v)
+	})
+}
+
+// UpdateUsage5hTokens sets the "usage_5h_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateUsage5hTokens() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsage5hTokens()
+	})
+}
+
+// SetUsage1dTokens sets the "usage_1d_tokens" field.
+func (u *APIKeyUpsertOne) SetUsage1dTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsage1dTokens(v)
+	})
+}
+
+// AddUsage1dTokens adds v to the "usage_1d_tokens" field.
+func (u *APIKeyUpsertOne) AddUsage1dTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddUsage1dTokens(v)
+	})
+}
+
+// UpdateUsage1dTokens sets the "usage_1d_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateUsage1dTokens() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsage1dTokens()
+	})
+}
+
+// SetUsage7dTokens sets the "usage_7d_tokens" field.
+func (u *APIKeyUpsertOne) SetUsage7dTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsage7dTokens(v)
+	})
+}
+
+// AddUsage7dTokens adds v to the "usage_7d_tokens" field.
+func (u *APIKeyUpsertOne) AddUsage7dTokens(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddUsage7dTokens(v)
+	})
+}
+
+// UpdateUsage7dTokens sets the "usage_7d_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateUsage7dTokens() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsage7dTokens()
 	})
 }
 
@@ -2116,6 +2628,48 @@ func (u *APIKeyUpsertBulk) UpdateQuotaUsed() *APIKeyUpsertBulk {
 	})
 }
 
+// SetQuotaTokens sets the "quota_tokens" field.
+func (u *APIKeyUpsertBulk) SetQuotaTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetQuotaTokens(v)
+	})
+}
+
+// AddQuotaTokens adds v to the "quota_tokens" field.
+func (u *APIKeyUpsertBulk) AddQuotaTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddQuotaTokens(v)
+	})
+}
+
+// UpdateQuotaTokens sets the "quota_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateQuotaTokens() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateQuotaTokens()
+	})
+}
+
+// SetQuotaTokensUsed sets the "quota_tokens_used" field.
+func (u *APIKeyUpsertBulk) SetQuotaTokensUsed(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetQuotaTokensUsed(v)
+	})
+}
+
+// AddQuotaTokensUsed adds v to the "quota_tokens_used" field.
+func (u *APIKeyUpsertBulk) AddQuotaTokensUsed(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddQuotaTokensUsed(v)
+	})
+}
+
+// UpdateQuotaTokensUsed sets the "quota_tokens_used" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateQuotaTokensUsed() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateQuotaTokensUsed()
+	})
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (u *APIKeyUpsertBulk) SetExpiresAt(v time.Time) *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
@@ -2260,6 +2814,132 @@ func (u *APIKeyUpsertBulk) AddUsage7d(v float64) *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) UpdateUsage7d() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateUsage7d()
+	})
+}
+
+// SetRateLimit5hTokens sets the "rate_limit_5h_tokens" field.
+func (u *APIKeyUpsertBulk) SetRateLimit5hTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetRateLimit5hTokens(v)
+	})
+}
+
+// AddRateLimit5hTokens adds v to the "rate_limit_5h_tokens" field.
+func (u *APIKeyUpsertBulk) AddRateLimit5hTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddRateLimit5hTokens(v)
+	})
+}
+
+// UpdateRateLimit5hTokens sets the "rate_limit_5h_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateRateLimit5hTokens() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateRateLimit5hTokens()
+	})
+}
+
+// SetRateLimit1dTokens sets the "rate_limit_1d_tokens" field.
+func (u *APIKeyUpsertBulk) SetRateLimit1dTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetRateLimit1dTokens(v)
+	})
+}
+
+// AddRateLimit1dTokens adds v to the "rate_limit_1d_tokens" field.
+func (u *APIKeyUpsertBulk) AddRateLimit1dTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddRateLimit1dTokens(v)
+	})
+}
+
+// UpdateRateLimit1dTokens sets the "rate_limit_1d_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateRateLimit1dTokens() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateRateLimit1dTokens()
+	})
+}
+
+// SetRateLimit7dTokens sets the "rate_limit_7d_tokens" field.
+func (u *APIKeyUpsertBulk) SetRateLimit7dTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetRateLimit7dTokens(v)
+	})
+}
+
+// AddRateLimit7dTokens adds v to the "rate_limit_7d_tokens" field.
+func (u *APIKeyUpsertBulk) AddRateLimit7dTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddRateLimit7dTokens(v)
+	})
+}
+
+// UpdateRateLimit7dTokens sets the "rate_limit_7d_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateRateLimit7dTokens() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateRateLimit7dTokens()
+	})
+}
+
+// SetUsage5hTokens sets the "usage_5h_tokens" field.
+func (u *APIKeyUpsertBulk) SetUsage5hTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsage5hTokens(v)
+	})
+}
+
+// AddUsage5hTokens adds v to the "usage_5h_tokens" field.
+func (u *APIKeyUpsertBulk) AddUsage5hTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddUsage5hTokens(v)
+	})
+}
+
+// UpdateUsage5hTokens sets the "usage_5h_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateUsage5hTokens() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsage5hTokens()
+	})
+}
+
+// SetUsage1dTokens sets the "usage_1d_tokens" field.
+func (u *APIKeyUpsertBulk) SetUsage1dTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsage1dTokens(v)
+	})
+}
+
+// AddUsage1dTokens adds v to the "usage_1d_tokens" field.
+func (u *APIKeyUpsertBulk) AddUsage1dTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddUsage1dTokens(v)
+	})
+}
+
+// UpdateUsage1dTokens sets the "usage_1d_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateUsage1dTokens() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsage1dTokens()
+	})
+}
+
+// SetUsage7dTokens sets the "usage_7d_tokens" field.
+func (u *APIKeyUpsertBulk) SetUsage7dTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsage7dTokens(v)
+	})
+}
+
+// AddUsage7dTokens adds v to the "usage_7d_tokens" field.
+func (u *APIKeyUpsertBulk) AddUsage7dTokens(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddUsage7dTokens(v)
+	})
+}
+
+// UpdateUsage7dTokens sets the "usage_7d_tokens" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateUsage7dTokens() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsage7dTokens()
 	})
 }
 

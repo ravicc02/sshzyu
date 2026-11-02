@@ -189,6 +189,8 @@ export default {
     subscriptions: '订阅管理',
     accounts: '账号管理',
     accountScheduler: '账号调度',
+    hostedAccounts: '托管账号',
+    hostedAccountManagement: '托管管理',
     upstreamMonitor: '上游监控',
     plugins: '插件管理',
     proxies: 'IP管理',

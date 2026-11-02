@@ -78,6 +78,12 @@ func (APIKey) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
 			Default(0).
 			Comment("Used quota amount in USD"),
+		field.Int64("quota_tokens").
+			Default(0).
+			Comment("Lifetime token quota for this API key (0 = unlimited)"),
+		field.Int64("quota_tokens_used").
+			Default(0).
+			Comment("Used lifetime token quota"),
 		// Expiration time (nil = never expires)
 		field.Time("expires_at").
 			Optional().
@@ -111,6 +117,24 @@ func (APIKey) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
 			Default(0).
 			Comment("Used amount in USD for the current 7d window"),
+		field.Int64("rate_limit_5h_tokens").
+			Default(0).
+			Comment("Token limit per 5 hours (0 = unlimited)"),
+		field.Int64("rate_limit_1d_tokens").
+			Default(0).
+			Comment("Token limit per day (0 = unlimited)"),
+		field.Int64("rate_limit_7d_tokens").
+			Default(0).
+			Comment("Token limit per 7 days (0 = unlimited)"),
+		field.Int64("usage_5h_tokens").
+			Default(0).
+			Comment("Used tokens in the current 5h window"),
+		field.Int64("usage_1d_tokens").
+			Default(0).
+			Comment("Used tokens in the current 1d window"),
+		field.Int64("usage_7d_tokens").
+			Default(0).
+			Comment("Used tokens in the current 7d window"),
 		// Window start times
 		field.Time("window_5h_start").
 			Optional().

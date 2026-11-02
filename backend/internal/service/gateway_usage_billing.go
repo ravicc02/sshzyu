@@ -93,7 +93,8 @@ type postUsageBillingParams struct {
 var ErrSimpleModeKeyRateLimitBillingUnavailable = errors.New("simple mode api key rate-limit billing unavailable")
 
 func simpleModeKeyRateLimitBillingEnabled(cfg *config.Config, apiKey *APIKey) bool {
-	return cfg != nil && cfg.RunMode == config.RunModeSimple && cfg.SimpleModeKeyRateLimitEnabled && apiKey != nil && apiKey.HasRateLimits()
+	return cfg != nil && cfg.RunMode == config.RunModeSimple && cfg.SimpleModeKeyRateLimitEnabled &&
+		apiKey != nil && (apiKey.HasRateLimits() || apiKey.HasTokenRateLimits())
 }
 
 // PlatformFromAPIKey 从 APIKey 关联的 Group 推导 platform 名称。
@@ -134,7 +135,7 @@ func (p *postUsageBillingParams) shouldDeductAPIKeyQuota() bool {
 }
 
 func (p *postUsageBillingParams) shouldUpdateRateLimits() bool {
-	return p.Cost.ActualCost > 0 && p.APIKey.HasRateLimits() && p.APIKeyService != nil
+	return p.Cost.ActualCost > 0 && (p.APIKey.HasRateLimits() || p.APIKey.HasTokenRateLimits()) && p.APIKeyService != nil
 }
 
 func (p *postUsageBillingParams) shouldUpdateAccountQuota() bool {
@@ -323,7 +324,7 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	}
 
 	if p.SimpleModeKeyRateLimitOnly {
-		if p.Cost.ActualCost > 0 && p.APIKey.HasRateLimits() {
+		if p.Cost.ActualCost > 0 && (p.APIKey.HasRateLimits() || p.APIKey.HasTokenRateLimits()) {
 			cmd.APIKeyRateLimitCost = p.Cost.ActualCost
 		}
 		cmd.Normalize()
@@ -370,6 +371,7 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 		// The legacy path is only a fallback for standard billing. Simple mode
 		// must retain request-id deduplication and never bill other balances.
 		postUsageBilling(ctx, p, deps)
+		applyTokenQuotaUsage(ctx, usageLog, p, deps)
 		return true, nil
 	}
 
@@ -386,6 +388,8 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 		return false, nil
 	}
 
+	applyTokenQuotaUsage(billingCtx, usageLog, p, deps)
+
 	if result.APIKeyQuotaExhausted {
 		if invalidator, ok := p.APIKeyService.(apiKeyAuthCacheInvalidator); ok && p.APIKey != nil && p.APIKey.Key != "" {
 			invalidator.InvalidateAuthCacheByKey(billingCtx, p.APIKey.Key)
@@ -394,6 +398,39 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 
 	finalizePostUsageBilling(billingCtx, p, deps, result)
 	return true, nil
+}
+
+func applyTokenQuotaUsage(ctx context.Context, usageLog *UsageLog, p *postUsageBillingParams, deps *billingDeps) {
+	if usageLog == nil || p == nil || deps == nil {
+		return
+	}
+	tokens := int64(usageLog.TotalTokens())
+	if tokens <= 0 {
+		return
+	}
+	if p.APIKey != nil && p.APIKey.HasAnyTokenLimits() {
+		if updater, ok := p.APIKeyService.(interface {
+			UpdateTokenUsage(context.Context, int64, int64) error
+		}); ok {
+			if err := updater.UpdateTokenUsage(ctx, p.APIKey.ID, tokens); err != nil {
+				slog.Error("update api key token usage failed", "api_key_id", p.APIKey.ID, "tokens", tokens, "error", err)
+			}
+		}
+	}
+	if p.IsSubscriptionBill && p.Subscription != nil && p.APIKey != nil && p.APIKey.Group != nil && p.APIKey.Group.HasAnyTokenLimit() {
+		if updater, ok := deps.userSubRepo.(interface {
+			IncrementTokenUsage(context.Context, int64, int64) error
+		}); ok {
+			if err := updater.IncrementTokenUsage(ctx, p.Subscription.ID, tokens); err != nil {
+				slog.Error("increment subscription token usage failed", "subscription_id", p.Subscription.ID, "tokens", tokens, "error", err)
+			} else if deps.billingCacheService != nil {
+				if err := deps.billingCacheService.InvalidateSubscription(ctx, p.Subscription.UserID, p.Subscription.GroupID); err != nil {
+					slog.Warn("invalidate subscription token usage cache failed",
+						"subscription_id", p.Subscription.ID, "error", err)
+				}
+			}
+		}
+	}
 }
 
 func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *billingDeps, result *UsageBillingApplyResult) {

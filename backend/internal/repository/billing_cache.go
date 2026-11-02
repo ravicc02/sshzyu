@@ -50,12 +50,15 @@ func billingSubKey(userID, groupID int64) string {
 }
 
 const (
-	subFieldStatus       = "status"
-	subFieldExpiresAt    = "expires_at"
-	subFieldDailyUsage   = "daily_usage"
-	subFieldWeeklyUsage  = "weekly_usage"
-	subFieldMonthlyUsage = "monthly_usage"
-	subFieldVersion      = "version"
+	subFieldStatus             = "status"
+	subFieldExpiresAt          = "expires_at"
+	subFieldDailyUsage         = "daily_usage"
+	subFieldWeeklyUsage        = "weekly_usage"
+	subFieldMonthlyUsage       = "monthly_usage"
+	subFieldDailyUsageTokens   = "daily_usage_tokens"
+	subFieldWeeklyUsageTokens  = "weekly_usage_tokens"
+	subFieldMonthlyUsageTokens = "monthly_usage_tokens"
+	subFieldVersion            = "version"
 )
 
 // billingRateLimitKey generates the Redis key for API key rate limit cache.
@@ -211,6 +214,15 @@ func (c *billingCache) parseSubscriptionCache(data map[string]string) (*service.
 	if monthlyStr, ok := data[subFieldMonthlyUsage]; ok {
 		result.MonthlyUsage, _ = strconv.ParseFloat(monthlyStr, 64)
 	}
+	if dailyStr, ok := data[subFieldDailyUsageTokens]; ok {
+		result.DailyUsageTokens, _ = strconv.ParseInt(dailyStr, 10, 64)
+	}
+	if weeklyStr, ok := data[subFieldWeeklyUsageTokens]; ok {
+		result.WeeklyUsageTokens, _ = strconv.ParseInt(weeklyStr, 10, 64)
+	}
+	if monthlyStr, ok := data[subFieldMonthlyUsageTokens]; ok {
+		result.MonthlyUsageTokens, _ = strconv.ParseInt(monthlyStr, 10, 64)
+	}
 
 	if versionStr, ok := data[subFieldVersion]; ok {
 		result.Version, _ = strconv.ParseInt(versionStr, 10, 64)
@@ -227,12 +239,15 @@ func (c *billingCache) SetSubscriptionCache(ctx context.Context, userID, groupID
 	key := billingSubKey(userID, groupID)
 
 	fields := map[string]any{
-		subFieldStatus:       data.Status,
-		subFieldExpiresAt:    data.ExpiresAt.Unix(),
-		subFieldDailyUsage:   data.DailyUsage,
-		subFieldWeeklyUsage:  data.WeeklyUsage,
-		subFieldMonthlyUsage: data.MonthlyUsage,
-		subFieldVersion:      data.Version,
+		subFieldStatus:             data.Status,
+		subFieldExpiresAt:          data.ExpiresAt.Unix(),
+		subFieldDailyUsage:         data.DailyUsage,
+		subFieldWeeklyUsage:        data.WeeklyUsage,
+		subFieldMonthlyUsage:       data.MonthlyUsage,
+		subFieldDailyUsageTokens:   data.DailyUsageTokens,
+		subFieldWeeklyUsageTokens:  data.WeeklyUsageTokens,
+		subFieldMonthlyUsageTokens: data.MonthlyUsageTokens,
+		subFieldVersion:            data.Version,
 	}
 
 	pipe := c.rdb.Pipeline()

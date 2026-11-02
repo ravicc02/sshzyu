@@ -41,12 +41,15 @@ var (
 
 // subscriptionCacheData 订阅缓存数据结构（内部使用）
 type subscriptionCacheData struct {
-	Status       string
-	ExpiresAt    time.Time
-	DailyUsage   float64
-	WeeklyUsage  float64
-	MonthlyUsage float64
-	Version      int64
+	Status             string
+	ExpiresAt          time.Time
+	DailyUsage         float64
+	WeeklyUsage        float64
+	MonthlyUsage       float64
+	DailyUsageTokens   int64
+	WeeklyUsageTokens  int64
+	MonthlyUsageTokens int64
+	Version            int64
 }
 
 // 缓存写入任务类型
@@ -443,23 +446,29 @@ func (s *BillingCacheService) GetSubscriptionStatus(ctx context.Context, userID,
 
 func (s *BillingCacheService) convertFromPortsData(data *SubscriptionCacheData) *subscriptionCacheData {
 	return &subscriptionCacheData{
-		Status:       data.Status,
-		ExpiresAt:    data.ExpiresAt,
-		DailyUsage:   data.DailyUsage,
-		WeeklyUsage:  data.WeeklyUsage,
-		MonthlyUsage: data.MonthlyUsage,
-		Version:      data.Version,
+		Status:             data.Status,
+		ExpiresAt:          data.ExpiresAt,
+		DailyUsage:         data.DailyUsage,
+		WeeklyUsage:        data.WeeklyUsage,
+		MonthlyUsage:       data.MonthlyUsage,
+		DailyUsageTokens:   data.DailyUsageTokens,
+		WeeklyUsageTokens:  data.WeeklyUsageTokens,
+		MonthlyUsageTokens: data.MonthlyUsageTokens,
+		Version:            data.Version,
 	}
 }
 
 func (s *BillingCacheService) convertToPortsData(data *subscriptionCacheData) *SubscriptionCacheData {
 	return &SubscriptionCacheData{
-		Status:       data.Status,
-		ExpiresAt:    data.ExpiresAt,
-		DailyUsage:   data.DailyUsage,
-		WeeklyUsage:  data.WeeklyUsage,
-		MonthlyUsage: data.MonthlyUsage,
-		Version:      data.Version,
+		Status:             data.Status,
+		ExpiresAt:          data.ExpiresAt,
+		DailyUsage:         data.DailyUsage,
+		WeeklyUsage:        data.WeeklyUsage,
+		MonthlyUsage:       data.MonthlyUsage,
+		DailyUsageTokens:   data.DailyUsageTokens,
+		WeeklyUsageTokens:  data.WeeklyUsageTokens,
+		MonthlyUsageTokens: data.MonthlyUsageTokens,
+		Version:            data.Version,
 	}
 }
 
@@ -471,12 +480,15 @@ func (s *BillingCacheService) getSubscriptionFromDB(ctx context.Context, userID,
 	}
 
 	return &subscriptionCacheData{
-		Status:       sub.Status,
-		ExpiresAt:    sub.ExpiresAt,
-		DailyUsage:   sub.DailyUsageUSD,
-		WeeklyUsage:  sub.WeeklyUsageUSD,
-		MonthlyUsage: sub.MonthlyUsageUSD,
-		Version:      sub.UpdatedAt.Unix(),
+		Status:             sub.Status,
+		ExpiresAt:          sub.ExpiresAt,
+		DailyUsage:         sub.DailyUsageUSD,
+		WeeklyUsage:        sub.WeeklyUsageUSD,
+		MonthlyUsage:       sub.MonthlyUsageUSD,
+		DailyUsageTokens:   sub.DailyUsageTokens,
+		WeeklyUsageTokens:  sub.WeeklyUsageTokens,
+		MonthlyUsageTokens: sub.MonthlyUsageTokens,
+		Version:            sub.UpdatedAt.Unix(),
 	}, nil
 }
 
@@ -579,6 +591,20 @@ func (s *BillingCacheService) checkAPIKeyRateLimits(ctx context.Context, apiKey 
 
 // checkAPIKeyRateLimitsWithPending 在窗口用量上叠加 pending（即将扣除的金额）后检查限速窗口。
 func (s *BillingCacheService) checkAPIKeyRateLimitsWithPending(ctx context.Context, apiKey *APIKey, pending float64) error {
+	if apiKey.HasTokenRateLimits() {
+		if s.apiKeyRateLimitLoader == nil {
+			return nil
+		}
+		data, err := s.apiKeyRateLimitLoader.GetRateLimitData(ctx, apiKey.ID)
+		if err != nil || data == nil {
+			return nil
+		}
+		if err := s.evaluateRateLimits(ctx, apiKey, data.Usage5h, data.Usage1d, data.Usage7d,
+			data.Window5hStart, data.Window1dStart, data.Window7dStart, pending); err != nil {
+			return err
+		}
+		return checkAPIKeyTokenRateLimits(apiKey, data)
+	}
 	if s.cache == nil {
 		// No cache: fall back to reading from DB directly
 		if s.apiKeyRateLimitLoader == nil {
@@ -857,6 +883,15 @@ func (s *BillingCacheService) checkFixedChargeSubscription(ctx context.Context, 
 	if group.HasMonthlyLimit() && subData.MonthlyUsage+pending > *group.MonthlyLimitUSD {
 		return ErrMonthlyLimitExceeded
 	}
+	if group.HasDailyTokenLimit() && subData.DailyUsageTokens > *group.DailyTokenLimit {
+		return ErrDailyLimitExceeded
+	}
+	if group.HasWeeklyTokenLimit() && subData.WeeklyUsageTokens > *group.WeeklyTokenLimit {
+		return ErrWeeklyLimitExceeded
+	}
+	if group.HasMonthlyTokenLimit() && subData.MonthlyUsageTokens > *group.MonthlyTokenLimit {
+		return ErrMonthlyLimitExceeded
+	}
 	return nil
 }
 
@@ -884,6 +919,8 @@ func (s *BillingCacheService) checkFixedChargeAPIKey(ctx context.Context, apiKey
 	switch {
 	case exceeds(data.QuotaUsed, apiKey.Quota):
 		return ErrAPIKeyQuotaExhausted
+	case apiKey.QuotaTokens > 0 && data.QuotaTokensUsed >= apiKey.QuotaTokens:
+		return ErrAPIKeyQuotaExhausted
 	case exceeds(data.EffectiveUsage5h(), apiKey.RateLimit5h):
 		return ErrAPIKeyRateLimit5hExceeded
 	case exceeds(data.EffectiveUsage1d(), apiKey.RateLimit1d):
@@ -891,7 +928,7 @@ func (s *BillingCacheService) checkFixedChargeAPIKey(ctx context.Context, apiKey
 	case exceeds(data.EffectiveUsage7d(), apiKey.RateLimit7d):
 		return ErrAPIKeyRateLimit7dExceeded
 	}
-	return nil
+	return checkAPIKeyTokenRateLimits(apiKey, data)
 }
 
 // checkSimpleModeAPIKeyRateLimits is deliberately DB-authoritative. Redis
@@ -917,6 +954,22 @@ func (s *BillingCacheService) checkSimpleModeAPIKeyRateLimits(ctx context.Contex
 		return ErrAPIKeyRateLimit1dExceeded
 	}
 	if apiKey.RateLimit7d > 0 && data.EffectiveUsage7d() >= apiKey.RateLimit7d {
+		return ErrAPIKeyRateLimit7dExceeded
+	}
+	return checkAPIKeyTokenRateLimits(apiKey, data)
+}
+
+func checkAPIKeyTokenRateLimits(apiKey *APIKey, data *APIKeyRateLimitData) error {
+	if apiKey == nil || data == nil {
+		return nil
+	}
+	if apiKey.RateLimit5hTokens > 0 && data.EffectiveUsage5hTokens() >= apiKey.RateLimit5hTokens {
+		return ErrAPIKeyRateLimit5hExceeded
+	}
+	if apiKey.RateLimit1dTokens > 0 && data.EffectiveUsage1dTokens() >= apiKey.RateLimit1dTokens {
+		return ErrAPIKeyRateLimit1dExceeded
+	}
+	if apiKey.RateLimit7dTokens > 0 && data.EffectiveUsage7dTokens() >= apiKey.RateLimit7dTokens {
 		return ErrAPIKeyRateLimit7dExceeded
 	}
 	return nil
@@ -1077,6 +1130,15 @@ func (s *BillingCacheService) checkSubscriptionEligibility(ctx context.Context, 
 	}
 
 	if group.HasMonthlyLimit() && subData.MonthlyUsage >= *group.MonthlyLimitUSD {
+		return ErrMonthlyLimitExceeded
+	}
+	if group.HasDailyTokenLimit() && subData.DailyUsageTokens >= *group.DailyTokenLimit {
+		return ErrDailyLimitExceeded
+	}
+	if group.HasWeeklyTokenLimit() && subData.WeeklyUsageTokens >= *group.WeeklyTokenLimit {
+		return ErrWeeklyLimitExceeded
+	}
+	if group.HasMonthlyTokenLimit() && subData.MonthlyUsageTokens >= *group.MonthlyTokenLimit {
 		return ErrMonthlyLimitExceeded
 	}
 

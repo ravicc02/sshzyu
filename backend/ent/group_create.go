@@ -280,6 +280,48 @@ func (_c *GroupCreate) SetNillableMonthlyLimitUsd(v *float64) *GroupCreate {
 	return _c
 }
 
+// SetDailyTokenLimit sets the "daily_token_limit" field.
+func (_c *GroupCreate) SetDailyTokenLimit(v int64) *GroupCreate {
+	_c.mutation.SetDailyTokenLimit(v)
+	return _c
+}
+
+// SetNillableDailyTokenLimit sets the "daily_token_limit" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableDailyTokenLimit(v *int64) *GroupCreate {
+	if v != nil {
+		_c.SetDailyTokenLimit(*v)
+	}
+	return _c
+}
+
+// SetWeeklyTokenLimit sets the "weekly_token_limit" field.
+func (_c *GroupCreate) SetWeeklyTokenLimit(v int64) *GroupCreate {
+	_c.mutation.SetWeeklyTokenLimit(v)
+	return _c
+}
+
+// SetNillableWeeklyTokenLimit sets the "weekly_token_limit" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableWeeklyTokenLimit(v *int64) *GroupCreate {
+	if v != nil {
+		_c.SetWeeklyTokenLimit(*v)
+	}
+	return _c
+}
+
+// SetMonthlyTokenLimit sets the "monthly_token_limit" field.
+func (_c *GroupCreate) SetMonthlyTokenLimit(v int64) *GroupCreate {
+	_c.mutation.SetMonthlyTokenLimit(v)
+	return _c
+}
+
+// SetNillableMonthlyTokenLimit sets the "monthly_token_limit" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableMonthlyTokenLimit(v *int64) *GroupCreate {
+	if v != nil {
+		_c.SetMonthlyTokenLimit(*v)
+	}
+	return _c
+}
+
 // SetDefaultValidityDays sets the "default_validity_days" field.
 func (_c *GroupCreate) SetDefaultValidityDays(v int) *GroupCreate {
 	_c.mutation.SetDefaultValidityDays(v)
@@ -1555,6 +1597,18 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 		_spec.SetField(group.FieldMonthlyLimitUsd, field.TypeFloat64, value)
 		_node.MonthlyLimitUsd = &value
 	}
+	if value, ok := _c.mutation.DailyTokenLimit(); ok {
+		_spec.SetField(group.FieldDailyTokenLimit, field.TypeInt64, value)
+		_node.DailyTokenLimit = &value
+	}
+	if value, ok := _c.mutation.WeeklyTokenLimit(); ok {
+		_spec.SetField(group.FieldWeeklyTokenLimit, field.TypeInt64, value)
+		_node.WeeklyTokenLimit = &value
+	}
+	if value, ok := _c.mutation.MonthlyTokenLimit(); ok {
+		_spec.SetField(group.FieldMonthlyTokenLimit, field.TypeInt64, value)
+		_node.MonthlyTokenLimit = &value
+	}
 	if value, ok := _c.mutation.DefaultValidityDays(); ok {
 		_spec.SetField(group.FieldDefaultValidityDays, field.TypeInt, value)
 		_node.DefaultValidityDays = value
@@ -2168,6 +2222,78 @@ func (u *GroupUpsert) AddMonthlyLimitUsd(v float64) *GroupUpsert {
 // ClearMonthlyLimitUsd clears the value of the "monthly_limit_usd" field.
 func (u *GroupUpsert) ClearMonthlyLimitUsd() *GroupUpsert {
 	u.SetNull(group.FieldMonthlyLimitUsd)
+	return u
+}
+
+// SetDailyTokenLimit sets the "daily_token_limit" field.
+func (u *GroupUpsert) SetDailyTokenLimit(v int64) *GroupUpsert {
+	u.Set(group.FieldDailyTokenLimit, v)
+	return u
+}
+
+// UpdateDailyTokenLimit sets the "daily_token_limit" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateDailyTokenLimit() *GroupUpsert {
+	u.SetExcluded(group.FieldDailyTokenLimit)
+	return u
+}
+
+// AddDailyTokenLimit adds v to the "daily_token_limit" field.
+func (u *GroupUpsert) AddDailyTokenLimit(v int64) *GroupUpsert {
+	u.Add(group.FieldDailyTokenLimit, v)
+	return u
+}
+
+// ClearDailyTokenLimit clears the value of the "daily_token_limit" field.
+func (u *GroupUpsert) ClearDailyTokenLimit() *GroupUpsert {
+	u.SetNull(group.FieldDailyTokenLimit)
+	return u
+}
+
+// SetWeeklyTokenLimit sets the "weekly_token_limit" field.
+func (u *GroupUpsert) SetWeeklyTokenLimit(v int64) *GroupUpsert {
+	u.Set(group.FieldWeeklyTokenLimit, v)
+	return u
+}
+
+// UpdateWeeklyTokenLimit sets the "weekly_token_limit" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateWeeklyTokenLimit() *GroupUpsert {
+	u.SetExcluded(group.FieldWeeklyTokenLimit)
+	return u
+}
+
+// AddWeeklyTokenLimit adds v to the "weekly_token_limit" field.
+func (u *GroupUpsert) AddWeeklyTokenLimit(v int64) *GroupUpsert {
+	u.Add(group.FieldWeeklyTokenLimit, v)
+	return u
+}
+
+// ClearWeeklyTokenLimit clears the value of the "weekly_token_limit" field.
+func (u *GroupUpsert) ClearWeeklyTokenLimit() *GroupUpsert {
+	u.SetNull(group.FieldWeeklyTokenLimit)
+	return u
+}
+
+// SetMonthlyTokenLimit sets the "monthly_token_limit" field.
+func (u *GroupUpsert) SetMonthlyTokenLimit(v int64) *GroupUpsert {
+	u.Set(group.FieldMonthlyTokenLimit, v)
+	return u
+}
+
+// UpdateMonthlyTokenLimit sets the "monthly_token_limit" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateMonthlyTokenLimit() *GroupUpsert {
+	u.SetExcluded(group.FieldMonthlyTokenLimit)
+	return u
+}
+
+// AddMonthlyTokenLimit adds v to the "monthly_token_limit" field.
+func (u *GroupUpsert) AddMonthlyTokenLimit(v int64) *GroupUpsert {
+	u.Add(group.FieldMonthlyTokenLimit, v)
+	return u
+}
+
+// ClearMonthlyTokenLimit clears the value of the "monthly_token_limit" field.
+func (u *GroupUpsert) ClearMonthlyTokenLimit() *GroupUpsert {
+	u.SetNull(group.FieldMonthlyTokenLimit)
 	return u
 }
 
@@ -3340,6 +3466,90 @@ func (u *GroupUpsertOne) UpdateMonthlyLimitUsd() *GroupUpsertOne {
 func (u *GroupUpsertOne) ClearMonthlyLimitUsd() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.ClearMonthlyLimitUsd()
+	})
+}
+
+// SetDailyTokenLimit sets the "daily_token_limit" field.
+func (u *GroupUpsertOne) SetDailyTokenLimit(v int64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetDailyTokenLimit(v)
+	})
+}
+
+// AddDailyTokenLimit adds v to the "daily_token_limit" field.
+func (u *GroupUpsertOne) AddDailyTokenLimit(v int64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddDailyTokenLimit(v)
+	})
+}
+
+// UpdateDailyTokenLimit sets the "daily_token_limit" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateDailyTokenLimit() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateDailyTokenLimit()
+	})
+}
+
+// ClearDailyTokenLimit clears the value of the "daily_token_limit" field.
+func (u *GroupUpsertOne) ClearDailyTokenLimit() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearDailyTokenLimit()
+	})
+}
+
+// SetWeeklyTokenLimit sets the "weekly_token_limit" field.
+func (u *GroupUpsertOne) SetWeeklyTokenLimit(v int64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetWeeklyTokenLimit(v)
+	})
+}
+
+// AddWeeklyTokenLimit adds v to the "weekly_token_limit" field.
+func (u *GroupUpsertOne) AddWeeklyTokenLimit(v int64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddWeeklyTokenLimit(v)
+	})
+}
+
+// UpdateWeeklyTokenLimit sets the "weekly_token_limit" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateWeeklyTokenLimit() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateWeeklyTokenLimit()
+	})
+}
+
+// ClearWeeklyTokenLimit clears the value of the "weekly_token_limit" field.
+func (u *GroupUpsertOne) ClearWeeklyTokenLimit() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearWeeklyTokenLimit()
+	})
+}
+
+// SetMonthlyTokenLimit sets the "monthly_token_limit" field.
+func (u *GroupUpsertOne) SetMonthlyTokenLimit(v int64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetMonthlyTokenLimit(v)
+	})
+}
+
+// AddMonthlyTokenLimit adds v to the "monthly_token_limit" field.
+func (u *GroupUpsertOne) AddMonthlyTokenLimit(v int64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddMonthlyTokenLimit(v)
+	})
+}
+
+// UpdateMonthlyTokenLimit sets the "monthly_token_limit" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateMonthlyTokenLimit() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateMonthlyTokenLimit()
+	})
+}
+
+// ClearMonthlyTokenLimit clears the value of the "monthly_token_limit" field.
+func (u *GroupUpsertOne) ClearMonthlyTokenLimit() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearMonthlyTokenLimit()
 	})
 }
 
@@ -4814,6 +5024,90 @@ func (u *GroupUpsertBulk) UpdateMonthlyLimitUsd() *GroupUpsertBulk {
 func (u *GroupUpsertBulk) ClearMonthlyLimitUsd() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.ClearMonthlyLimitUsd()
+	})
+}
+
+// SetDailyTokenLimit sets the "daily_token_limit" field.
+func (u *GroupUpsertBulk) SetDailyTokenLimit(v int64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetDailyTokenLimit(v)
+	})
+}
+
+// AddDailyTokenLimit adds v to the "daily_token_limit" field.
+func (u *GroupUpsertBulk) AddDailyTokenLimit(v int64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddDailyTokenLimit(v)
+	})
+}
+
+// UpdateDailyTokenLimit sets the "daily_token_limit" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateDailyTokenLimit() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateDailyTokenLimit()
+	})
+}
+
+// ClearDailyTokenLimit clears the value of the "daily_token_limit" field.
+func (u *GroupUpsertBulk) ClearDailyTokenLimit() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearDailyTokenLimit()
+	})
+}
+
+// SetWeeklyTokenLimit sets the "weekly_token_limit" field.
+func (u *GroupUpsertBulk) SetWeeklyTokenLimit(v int64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetWeeklyTokenLimit(v)
+	})
+}
+
+// AddWeeklyTokenLimit adds v to the "weekly_token_limit" field.
+func (u *GroupUpsertBulk) AddWeeklyTokenLimit(v int64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddWeeklyTokenLimit(v)
+	})
+}
+
+// UpdateWeeklyTokenLimit sets the "weekly_token_limit" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateWeeklyTokenLimit() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateWeeklyTokenLimit()
+	})
+}
+
+// ClearWeeklyTokenLimit clears the value of the "weekly_token_limit" field.
+func (u *GroupUpsertBulk) ClearWeeklyTokenLimit() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearWeeklyTokenLimit()
+	})
+}
+
+// SetMonthlyTokenLimit sets the "monthly_token_limit" field.
+func (u *GroupUpsertBulk) SetMonthlyTokenLimit(v int64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetMonthlyTokenLimit(v)
+	})
+}
+
+// AddMonthlyTokenLimit adds v to the "monthly_token_limit" field.
+func (u *GroupUpsertBulk) AddMonthlyTokenLimit(v int64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddMonthlyTokenLimit(v)
+	})
+}
+
+// UpdateMonthlyTokenLimit sets the "monthly_token_limit" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateMonthlyTokenLimit() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateMonthlyTokenLimit()
+	})
+}
+
+// ClearMonthlyTokenLimit clears the value of the "monthly_token_limit" field.
+func (u *GroupUpsertBulk) ClearMonthlyTokenLimit() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearMonthlyTokenLimit()
 	})
 }
 

@@ -65,13 +65,15 @@ const (
 // 若编辑 Key 时无条件整行回写，并发累计的配额与限流计数就会被旧快照覆盖。
 // 因此调用方必须显式声明要改的列。
 type APIKeyUpdateFields struct {
-	Name      bool
-	Status    bool
-	Quota     bool
-	GroupID   bool
-	ExpiresAt bool
+	Name        bool
+	Status      bool
+	Quota       bool
+	QuotaTokens bool
+	GroupID     bool
+	ExpiresAt   bool
 	// QuotaUsed 仅供"重置配额用量"路径声明；常规计费走 IncrementQuotaUsed。
-	QuotaUsed bool
+	QuotaUsed       bool
+	QuotaTokensUsed bool
 	// RateLimits 覆盖 rate_limit_5h / _1d / _7d 三个阈值。
 	RateLimits bool
 	// RateLimitUsage 覆盖 usage_5h/_1d/_7d 与三个窗口起点，
@@ -137,13 +139,17 @@ type apiKeyBatchRepository interface {
 // APIKeyRateLimitData holds rate limit usage and window state for an API key.
 type APIKeyRateLimitData struct {
 	// QuotaUsed 是总额度已用量（quota_used）。
-	QuotaUsed     float64
-	Usage5h       float64
-	Usage1d       float64
-	Usage7d       float64
-	Window5hStart *time.Time
-	Window1dStart *time.Time
-	Window7dStart *time.Time
+	QuotaUsed       float64
+	QuotaTokensUsed int64
+	Usage5h         float64
+	Usage5hTokens   int64
+	Usage1d         float64
+	Usage1dTokens   int64
+	Usage7d         float64
+	Usage7dTokens   int64
+	Window5hStart   *time.Time
+	Window1dStart   *time.Time
+	Window7dStart   *time.Time
 }
 
 // EffectiveUsage5h returns the 5h window usage, or 0 if the window has expired.
@@ -154,12 +160,26 @@ func (d *APIKeyRateLimitData) EffectiveUsage5h() float64 {
 	return d.Usage5h
 }
 
+func (d *APIKeyRateLimitData) EffectiveUsage5hTokens() int64 {
+	if IsWindowExpired(d.Window5hStart, RateLimitWindow5h) {
+		return 0
+	}
+	return d.Usage5hTokens
+}
+
 // EffectiveUsage1d returns the 1d window usage, or 0 if the window has expired.
 func (d *APIKeyRateLimitData) EffectiveUsage1d() float64 {
 	if IsWindowExpired(d.Window1dStart, RateLimitWindow1d) {
 		return 0
 	}
 	return d.Usage1d
+}
+
+func (d *APIKeyRateLimitData) EffectiveUsage1dTokens() int64 {
+	if IsWindowExpired(d.Window1dStart, RateLimitWindow1d) {
+		return 0
+	}
+	return d.Usage1dTokens
 }
 
 // EffectiveUsage7d returns the 7d window usage, or 0 if the window has expired.
@@ -170,13 +190,22 @@ func (d *APIKeyRateLimitData) EffectiveUsage7d() float64 {
 	return d.Usage7d
 }
 
+func (d *APIKeyRateLimitData) EffectiveUsage7dTokens() int64 {
+	if IsWindowExpired(d.Window7dStart, RateLimitWindow7d) {
+		return 0
+	}
+	return d.Usage7dTokens
+}
+
 // APIKeyQuotaUsageState captures the latest quota fields after an atomic quota update.
 // It is intentionally small so repositories can return it from a single SQL statement.
 type APIKeyQuotaUsageState struct {
-	QuotaUsed float64
-	Quota     float64
-	Key       string
-	Status    string
+	QuotaUsed       float64
+	Quota           float64
+	QuotaTokensUsed int64
+	QuotaTokens     int64
+	Key             string
+	Status          string
 }
 
 // APIKeyCache defines cache operations for API key service
@@ -229,13 +258,17 @@ type CreateAPIKeyRequest struct {
 	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单
 
 	// Quota fields
-	Quota         float64 `json:"quota"`           // Quota limit in USD (0 = unlimited)
+	Quota         float64 `json:"quota"` // Quota limit in USD (0 = unlimited)
+	QuotaTokens   int64   `json:"quota_tokens"`
 	ExpiresInDays *int    `json:"expires_in_days"` // Days until expiry (nil = never expires)
 
 	// Rate limit fields (0 = unlimited)
-	RateLimit5h float64 `json:"rate_limit_5h"`
-	RateLimit1d float64 `json:"rate_limit_1d"`
-	RateLimit7d float64 `json:"rate_limit_7d"`
+	RateLimit5h       float64 `json:"rate_limit_5h"`
+	RateLimit1d       float64 `json:"rate_limit_1d"`
+	RateLimit7d       float64 `json:"rate_limit_7d"`
+	RateLimit5hTokens int64   `json:"rate_limit_5h_tokens"`
+	RateLimit1dTokens int64   `json:"rate_limit_1d_tokens"`
+	RateLimit7dTokens int64   `json:"rate_limit_7d_tokens"`
 }
 
 const MaxBatchAPIKeys = 50
@@ -256,7 +289,8 @@ type UpdateAPIKeyRequest struct {
 	IPBlacklist *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
 
 	// Quota fields
-	Quota           *float64   `json:"quota"`       // Quota limit in USD (nil = no change, 0 = unlimited)
+	Quota           *float64   `json:"quota"` // Quota limit in USD (nil = no change, 0 = unlimited)
+	QuotaTokens     *int64     `json:"quota_tokens"`
 	ExpiresAt       *time.Time `json:"expires_at"`  // Expiration time (nil = no change)
 	ClearExpiration bool       `json:"-"`           // Clear expiration (internal use)
 	ResetQuota      *bool      `json:"reset_quota"` // Reset quota_used to 0
@@ -265,6 +299,9 @@ type UpdateAPIKeyRequest struct {
 	RateLimit5h         *float64 `json:"rate_limit_5h"`
 	RateLimit1d         *float64 `json:"rate_limit_1d"`
 	RateLimit7d         *float64 `json:"rate_limit_7d"`
+	RateLimit5hTokens   *int64   `json:"rate_limit_5h_tokens"`
+	RateLimit1dTokens   *int64   `json:"rate_limit_1d_tokens"`
+	RateLimit7dTokens   *int64   `json:"rate_limit_7d_tokens"`
 	ResetRateLimitUsage *bool    `json:"reset_rate_limit_usage"` // Reset all usage counters to 0
 }
 
@@ -281,6 +318,11 @@ func validateCreateAPIKeyRequest(req CreateAPIKeyRequest) error {
 			return err
 		}
 	}
+	for _, v := range []int64{req.QuotaTokens, req.RateLimit5hTokens, req.RateLimit1dTokens, req.RateLimit7dTokens} {
+		if v < 0 {
+			return infraerrors.BadRequest("API_KEY_TOKEN_LIMIT_INVALID", "api key token limits must be non-negative")
+		}
+	}
 	if req.ExpiresInDays != nil && *req.ExpiresInDays <= 0 {
 		return infraerrors.BadRequest("API_KEY_EXPIRY_INVALID", "expires_in_days must be greater than zero")
 	}
@@ -293,6 +335,11 @@ func validateUpdateAPIKeyRequest(req UpdateAPIKeyRequest) error {
 			if err := validateAPIKeyLimit(*v); err != nil {
 				return err
 			}
+		}
+	}
+	for _, v := range []*int64{req.QuotaTokens, req.RateLimit5hTokens, req.RateLimit1dTokens, req.RateLimit7dTokens} {
+		if v != nil && *v < 0 {
+			return infraerrors.BadRequest("API_KEY_TOKEN_LIMIT_INVALID", "api key token limits must be non-negative")
 		}
 	}
 	return nil
@@ -586,20 +633,24 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 
 	// 创建API Key记录
 	apiKey := &APIKey{
-		UserID:      userID,
-		Key:         key,
-		Name:        html.EscapeString(req.Name),
-		BatchID:     req.BatchID,
-		BatchName:   html.EscapeString(req.BatchName),
-		GroupID:     req.GroupID,
-		Status:      StatusActive,
-		IPWhitelist: req.IPWhitelist,
-		IPBlacklist: req.IPBlacklist,
-		Quota:       req.Quota,
-		QuotaUsed:   0,
-		RateLimit5h: req.RateLimit5h,
-		RateLimit1d: req.RateLimit1d,
-		RateLimit7d: req.RateLimit7d,
+		UserID:            userID,
+		Key:               key,
+		Name:              html.EscapeString(req.Name),
+		BatchID:           req.BatchID,
+		BatchName:         html.EscapeString(req.BatchName),
+		GroupID:           req.GroupID,
+		Status:            StatusActive,
+		IPWhitelist:       req.IPWhitelist,
+		IPBlacklist:       req.IPBlacklist,
+		Quota:             req.Quota,
+		QuotaUsed:         0,
+		QuotaTokens:       req.QuotaTokens,
+		RateLimit5h:       req.RateLimit5h,
+		RateLimit1d:       req.RateLimit1d,
+		RateLimit7d:       req.RateLimit7d,
+		RateLimit5hTokens: req.RateLimit5hTokens,
+		RateLimit1dTokens: req.RateLimit1dTokens,
+		RateLimit7dTokens: req.RateLimit7dTokens,
 	}
 
 	// Set expiration time if specified
@@ -978,9 +1029,20 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			apiKey.Status = StatusActive
 		}
 	}
+	if req.QuotaTokens != nil {
+		apiKey.QuotaTokens = *req.QuotaTokens
+		fields.QuotaTokens = true
+		if apiKey.Status == StatusAPIKeyQuotaExhausted &&
+			(*req.QuotaTokens <= 0 || *req.QuotaTokens > apiKey.QuotaTokensUsed) &&
+			(apiKey.Quota <= 0 || apiKey.Quota > apiKey.QuotaUsed) {
+			apiKey.Status = StatusActive
+		}
+	}
 	if req.ResetQuota != nil && *req.ResetQuota {
 		apiKey.QuotaUsed = 0
+		apiKey.QuotaTokensUsed = 0
 		fields.QuotaUsed = true
+		fields.QuotaTokensUsed = true
 		// If resetting quota and status was quota_exhausted, reactivate
 		if apiKey.Status == StatusAPIKeyQuotaExhausted {
 			apiKey.Status = StatusActive
@@ -1025,11 +1087,26 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		apiKey.RateLimit7d = *req.RateLimit7d
 		fields.RateLimits = true
 	}
+	if req.RateLimit5hTokens != nil {
+		apiKey.RateLimit5hTokens = *req.RateLimit5hTokens
+		fields.RateLimits = true
+	}
+	if req.RateLimit1dTokens != nil {
+		apiKey.RateLimit1dTokens = *req.RateLimit1dTokens
+		fields.RateLimits = true
+	}
+	if req.RateLimit7dTokens != nil {
+		apiKey.RateLimit7dTokens = *req.RateLimit7dTokens
+		fields.RateLimits = true
+	}
 	resetRateLimit := req.ResetRateLimitUsage != nil && *req.ResetRateLimitUsage
 	if resetRateLimit {
 		apiKey.Usage5h = 0
 		apiKey.Usage1d = 0
 		apiKey.Usage7d = 0
+		apiKey.Usage5hTokens = 0
+		apiKey.Usage1dTokens = 0
+		apiKey.Usage7dTokens = 0
 		apiKey.Window5hStart = nil
 		apiKey.Window1dStart = nil
 		apiKey.Window7dStart = nil
@@ -1311,6 +1388,36 @@ func (s *APIKeyService) UpdateQuotaUsed(ctx context.Context, apiKeyID int64, cos
 		s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
 	}
 
+	return nil
+}
+
+// UpdateTokenUsage records actual request tokens against the key's lifetime
+// token quota and the 5h/1d/7d token windows in one atomic database update.
+// Amount and token quotas intentionally coexist; exhausting either one marks
+// the key exhausted.
+func (s *APIKeyService) UpdateTokenUsage(ctx context.Context, apiKeyID int64, tokens int64) error {
+	if tokens <= 0 {
+		return nil
+	}
+	type tokenUsageStateReader interface {
+		IncrementTokenUsageAndGetState(ctx context.Context, id int64, tokens int64) (*APIKeyQuotaUsageState, error)
+	}
+	repo, ok := s.apiKeyRepo.(tokenUsageStateReader)
+	if !ok {
+		return nil
+	}
+	state, err := repo.IncrementTokenUsageAndGetState(ctx, apiKeyID, tokens)
+	if err != nil {
+		return fmt.Errorf("increment api key token usage: %w", err)
+	}
+	if state != nil && strings.TrimSpace(state.Key) != "" {
+		if state.Status == StatusAPIKeyQuotaExhausted {
+			s.InvalidateAuthCacheByKey(ctx, state.Key)
+		}
+		if s.rateLimitCacheInvalid != nil {
+			_ = s.rateLimitCacheInvalid.InvalidateAPIKeyRateLimit(ctx, apiKeyID)
+		}
+	}
 	return nil
 }
 

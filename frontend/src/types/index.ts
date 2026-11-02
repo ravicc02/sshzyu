@@ -591,6 +591,9 @@ export interface Group {
   daily_limit_usd: number | null
   weekly_limit_usd: number | null
   monthly_limit_usd: number | null
+  daily_token_limit: number | null
+  weekly_token_limit: number | null
+  monthly_token_limit: number | null
   long_context_pricing_enabled: boolean
   // 图片生成计费配置
   allow_image_generation: boolean
@@ -759,6 +762,8 @@ export interface ApiKey {
   last_used_ip: string | null
   quota: number // Quota limit in USD (0 = unlimited)
   quota_used: number // Used quota amount in USD
+  quota_tokens: number
+  quota_tokens_used: number
   expires_at: string | null // Expiration time (null = never expires)
   created_at: string
   updated_at: string
@@ -767,9 +772,15 @@ export interface ApiKey {
   rate_limit_5h: number
   rate_limit_1d: number
   rate_limit_7d: number
+  rate_limit_5h_tokens: number
+  rate_limit_1d_tokens: number
+  rate_limit_7d_tokens: number
   usage_5h: number
   usage_1d: number
   usage_7d: number
+  usage_5h_tokens: number
+  usage_1d_tokens: number
+  usage_7d_tokens: number
   window_5h_start: string | null
   window_1d_start: string | null
   window_7d_start: string | null
@@ -785,10 +796,14 @@ export interface CreateApiKeyRequest {
   ip_whitelist?: string[]
   ip_blacklist?: string[]
   quota?: number // Quota limit in USD (0 = unlimited)
+  quota_tokens?: number
   expires_in_days?: number // Days until expiry (null = never expires)
   rate_limit_5h?: number
   rate_limit_1d?: number
   rate_limit_7d?: number
+  rate_limit_5h_tokens?: number
+  rate_limit_1d_tokens?: number
+  rate_limit_7d_tokens?: number
 }
 
 export interface UpdateApiKeyRequest {
@@ -798,11 +813,15 @@ export interface UpdateApiKeyRequest {
   ip_whitelist?: string[]
   ip_blacklist?: string[]
   quota?: number // Quota limit in USD (null = no change, 0 = unlimited)
+  quota_tokens?: number
   expires_at?: string | null // Expiration time (null = no change)
   reset_quota?: boolean // Reset quota_used to 0
   rate_limit_5h?: number
   rate_limit_1d?: number
   rate_limit_7d?: number
+  rate_limit_5h_tokens?: number
+  rate_limit_1d_tokens?: number
+  rate_limit_7d_tokens?: number
   reset_rate_limit_usage?: boolean
 }
 
@@ -817,6 +836,9 @@ export interface CreateGroupRequest {
   daily_limit_usd?: number | null
   weekly_limit_usd?: number | null
   monthly_limit_usd?: number | null
+  daily_token_limit?: number | null
+  weekly_token_limit?: number | null
+  monthly_token_limit?: number | null
   long_context_pricing_enabled?: boolean
   force_openai_fast?: boolean
   free_openai_fast?: boolean
@@ -885,6 +907,9 @@ export interface UpdateGroupRequest {
   daily_limit_usd?: number | null
   weekly_limit_usd?: number | null
   monthly_limit_usd?: number | null
+  daily_token_limit?: number | null
+  weekly_token_limit?: number | null
+  monthly_token_limit?: number | null
   long_context_pricing_enabled?: boolean
   force_openai_fast?: boolean
   free_openai_fast?: boolean
@@ -2182,6 +2207,9 @@ export interface UserSubscription {
   daily_usage_usd: number
   weekly_usage_usd: number
   monthly_usage_usd: number
+  daily_usage_tokens: number
+  weekly_usage_tokens: number
+  monthly_usage_tokens: number
   daily_window_start: string | null
   weekly_window_start: string | null
   monthly_window_start: string | null

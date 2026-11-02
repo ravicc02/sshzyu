@@ -54,39 +54,47 @@ type AdminUser struct {
 }
 
 type APIKey struct {
-	ID          int64      `json:"id"`
-	UserID      int64      `json:"user_id"`
-	Key         string     `json:"key"`
-	Name        string     `json:"name"`
-	BatchID     *string    `json:"batch_id,omitempty"`
-	BatchName   string     `json:"batch_name,omitempty"`
-	GroupID     *int64     `json:"group_id"`
-	Status      string     `json:"status"`
-	IPWhitelist []string   `json:"ip_whitelist"`
-	IPBlacklist []string   `json:"ip_blacklist"`
-	LastUsedAt  *time.Time `json:"last_used_at"`
-	LastUsedIP  *string    `json:"last_used_ip"`
-	Quota       float64    `json:"quota"`      // Quota limit in USD (0 = unlimited)
-	QuotaUsed   float64    `json:"quota_used"` // Used quota amount in USD
-	ExpiresAt   *time.Time `json:"expires_at"` // Expiration time (nil = never expires)
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID              int64      `json:"id"`
+	UserID          int64      `json:"user_id"`
+	Key             string     `json:"key"`
+	Name            string     `json:"name"`
+	BatchID         *string    `json:"batch_id,omitempty"`
+	BatchName       string     `json:"batch_name,omitempty"`
+	GroupID         *int64     `json:"group_id"`
+	Status          string     `json:"status"`
+	IPWhitelist     []string   `json:"ip_whitelist"`
+	IPBlacklist     []string   `json:"ip_blacklist"`
+	LastUsedAt      *time.Time `json:"last_used_at"`
+	LastUsedIP      *string    `json:"last_used_ip"`
+	Quota           float64    `json:"quota"`      // Quota limit in USD (0 = unlimited)
+	QuotaUsed       float64    `json:"quota_used"` // Used quota amount in USD
+	QuotaTokens     int64      `json:"quota_tokens"`
+	QuotaTokensUsed int64      `json:"quota_tokens_used"`
+	ExpiresAt       *time.Time `json:"expires_at"` // Expiration time (nil = never expires)
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 	// CurrentConcurrency is the real-time active request count for this API key.
 	CurrentConcurrency int `json:"current_concurrency"`
 
 	// Rate limit fields
-	RateLimit5h   float64    `json:"rate_limit_5h"`
-	RateLimit1d   float64    `json:"rate_limit_1d"`
-	RateLimit7d   float64    `json:"rate_limit_7d"`
-	Usage5h       float64    `json:"usage_5h"`
-	Usage1d       float64    `json:"usage_1d"`
-	Usage7d       float64    `json:"usage_7d"`
-	Window5hStart *time.Time `json:"window_5h_start"`
-	Window1dStart *time.Time `json:"window_1d_start"`
-	Window7dStart *time.Time `json:"window_7d_start"`
-	Reset5hAt     *time.Time `json:"reset_5h_at,omitempty"`
-	Reset1dAt     *time.Time `json:"reset_1d_at,omitempty"`
-	Reset7dAt     *time.Time `json:"reset_7d_at,omitempty"`
+	RateLimit5h       float64    `json:"rate_limit_5h"`
+	RateLimit1d       float64    `json:"rate_limit_1d"`
+	RateLimit7d       float64    `json:"rate_limit_7d"`
+	Usage5h           float64    `json:"usage_5h"`
+	Usage1d           float64    `json:"usage_1d"`
+	Usage7d           float64    `json:"usage_7d"`
+	RateLimit5hTokens int64      `json:"rate_limit_5h_tokens"`
+	RateLimit1dTokens int64      `json:"rate_limit_1d_tokens"`
+	RateLimit7dTokens int64      `json:"rate_limit_7d_tokens"`
+	Usage5hTokens     int64      `json:"usage_5h_tokens"`
+	Usage1dTokens     int64      `json:"usage_1d_tokens"`
+	Usage7dTokens     int64      `json:"usage_7d_tokens"`
+	Window5hStart     *time.Time `json:"window_5h_start"`
+	Window1dStart     *time.Time `json:"window_1d_start"`
+	Window7dStart     *time.Time `json:"window_7d_start"`
+	Reset5hAt         *time.Time `json:"reset_5h_at,omitempty"`
+	Reset1dAt         *time.Time `json:"reset_1d_at,omitempty"`
+	Reset7dAt         *time.Time `json:"reset_7d_at,omitempty"`
 
 	User  *User  `json:"user,omitempty"`
 	Group *Group `json:"group,omitempty"`
@@ -110,6 +118,9 @@ type Group struct {
 	DailyLimitUSD             *float64 `json:"daily_limit_usd"`
 	WeeklyLimitUSD            *float64 `json:"weekly_limit_usd"`
 	MonthlyLimitUSD           *float64 `json:"monthly_limit_usd"`
+	DailyTokenLimit           *int64   `json:"daily_token_limit"`
+	WeeklyTokenLimit          *int64   `json:"weekly_token_limit"`
+	MonthlyTokenLimit         *int64   `json:"monthly_token_limit"`
 	LongContextPricingEnabled bool     `json:"long_context_pricing_enabled"`
 
 	// 图片生成计费配置（仅 antigravity 平台使用）
@@ -777,9 +788,12 @@ type UserSubscription struct {
 	WeeklyWindowStart  *time.Time `json:"weekly_window_start"`
 	MonthlyWindowStart *time.Time `json:"monthly_window_start"`
 
-	DailyUsageUSD   float64 `json:"daily_usage_usd"`
-	WeeklyUsageUSD  float64 `json:"weekly_usage_usd"`
-	MonthlyUsageUSD float64 `json:"monthly_usage_usd"`
+	DailyUsageUSD      float64 `json:"daily_usage_usd"`
+	WeeklyUsageUSD     float64 `json:"weekly_usage_usd"`
+	MonthlyUsageUSD    float64 `json:"monthly_usage_usd"`
+	DailyUsageTokens   int64   `json:"daily_usage_tokens"`
+	WeeklyUsageTokens  int64   `json:"weekly_usage_tokens"`
+	MonthlyUsageTokens int64   `json:"monthly_usage_tokens"`
 
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`

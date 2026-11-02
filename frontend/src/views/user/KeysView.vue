@@ -230,11 +230,28 @@
                   />
                 </div>
               </div>
+              <div v-if="row.quota_tokens > 0" class="mt-1.5">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-gray-500 dark:text-gray-400">Token:</span>
+                  <span class="font-medium text-gray-900 dark:text-white">
+                    {{ formatTokenQuota(row.quota_tokens_used) }} / {{ formatTokenQuota(row.quota_tokens) }}
+                  </span>
+                </div>
+                <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+                  <div
+                    class="h-full rounded-full bg-primary-500 transition-all"
+                    :style="{ width: Math.min((row.quota_tokens_used / row.quota_tokens) * 100, 100) + '%' }"
+                  />
+                </div>
+              </div>
             </div>
           </template>
 
           <template #cell-rate_limit="{ row }">
-            <div v-if="row.rate_limit_5h > 0 || row.rate_limit_1d > 0 || row.rate_limit_7d > 0" class="space-y-1.5 min-w-[140px]">
+            <div
+              v-if="row.rate_limit_5h > 0 || row.rate_limit_1d > 0 || row.rate_limit_7d > 0 || row.rate_limit_5h_tokens > 0 || row.rate_limit_1d_tokens > 0 || row.rate_limit_7d_tokens > 0"
+              class="space-y-1.5 min-w-[140px]"
+            >
               <!-- 5h window -->
               <div v-if="row.rate_limit_5h > 0">
                 <div class="flex items-center justify-between text-xs">
@@ -318,6 +335,15 @@
                 <div v-if="row.reset_7d_at && formatResetTime(row.reset_7d_at)" class="text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
                   ⟳ {{ formatResetTime(row.reset_7d_at) }}
                 </div>
+              </div>
+              <div v-if="row.rate_limit_5h_tokens > 0" class="text-[10px] text-gray-500 dark:text-gray-400">
+                5h Token {{ formatTokenQuota(row.usage_5h_tokens) }}/{{ formatTokenQuota(row.rate_limit_5h_tokens) }}
+              </div>
+              <div v-if="row.rate_limit_1d_tokens > 0" class="text-[10px] text-gray-500 dark:text-gray-400">
+                1d Token {{ formatTokenQuota(row.usage_1d_tokens) }}/{{ formatTokenQuota(row.rate_limit_1d_tokens) }}
+              </div>
+              <div v-if="row.rate_limit_7d_tokens > 0" class="text-[10px] text-gray-500 dark:text-gray-400">
+                7d Token {{ formatTokenQuota(row.usage_7d_tokens) }}/{{ formatTokenQuota(row.rate_limit_7d_tokens) }}
               </div>
               <!-- Reset button -->
               <button
@@ -706,6 +732,24 @@
               <p class="input-hint">{{ t('keys.quotaAmountHint') }}</p>
             </div>
 
+            <div>
+              <label class="input-label">Token 配额</label>
+              <div class="flex gap-2">
+                <input
+                  v-model.number="formData.quota_token_amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input"
+                  placeholder="0"
+                />
+                <select v-model="formData.quota_token_unit" class="input w-24">
+                  <option value="M">M</option>
+                  <option value="B">B</option>
+                </select>
+              </div>
+            </div>
+
             <!-- Quota used display (only in edit mode) -->
             <div v-if="showEditModal && selectedKey && selectedKey.quota > 0">
               <label class="input-label">{{ t('keys.quotaUsed') }}</label>
@@ -769,6 +813,13 @@
                   :placeholder="'0'"
                 />
               </div>
+              <div class="mt-2 flex gap-2">
+                <input v-model.number="formData.rate_limit_5h_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
+                <select v-model="formData.rate_limit_5h_token_unit" class="input w-24">
+                  <option value="M">M</option>
+                  <option value="B">B</option>
+                </select>
+              </div>
               <!-- Usage info (edit mode only) -->
               <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_5h > 0" class="mt-2">
                 <div class="flex items-center gap-2">
@@ -815,6 +866,13 @@
                   :placeholder="'0'"
                 />
               </div>
+              <div class="mt-2 flex gap-2">
+                <input v-model.number="formData.rate_limit_1d_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
+                <select v-model="formData.rate_limit_1d_token_unit" class="input w-24">
+                  <option value="M">M</option>
+                  <option value="B">B</option>
+                </select>
+              </div>
               <!-- Usage info (edit mode only) -->
               <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_1d > 0" class="mt-2">
                 <div class="flex items-center gap-2">
@@ -860,6 +918,13 @@
                   class="input pl-7"
                   :placeholder="'0'"
                 />
+              </div>
+              <div class="mt-2 flex gap-2">
+                <input v-model.number="formData.rate_limit_7d_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
+                <select v-model="formData.rate_limit_7d_token_unit" class="input w-24">
+                  <option value="M">M</option>
+                  <option value="B">B</option>
+                </select>
               </div>
               <!-- Usage info (edit mode only) -->
               <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_7d > 0" class="mt-2">
@@ -1228,6 +1293,13 @@ import {
   buildCcSwitchImportDeeplink,
   type CcSwitchClientType
 } from '@/utils/ccswitchImport'
+import {
+  formatTokenQuota,
+  inferTokenQuotaUnit,
+  tokenAmountToBase,
+  tokenBaseToAmount,
+  type TokenQuotaUnit
+} from '@/utils/tokenQuota'
 
 // Helper to format date for datetime-local input
 const formatDateTimeLocal = (isoDate: string): string => {
@@ -1423,11 +1495,19 @@ const formData = ref({
   // Quota settings (empty = unlimited)
   enable_quota: false,
   quota: null as number | null,
+  quota_token_amount: null as number | null,
+  quota_token_unit: 'M' as TokenQuotaUnit,
   // Rate limit settings
   enable_rate_limit: false,
   rate_limit_5h: null as number | null,
   rate_limit_1d: null as number | null,
   rate_limit_7d: null as number | null,
+  rate_limit_5h_token_amount: null as number | null,
+  rate_limit_1d_token_amount: null as number | null,
+  rate_limit_7d_token_amount: null as number | null,
+  rate_limit_5h_token_unit: 'M' as TokenQuotaUnit,
+  rate_limit_1d_token_unit: 'M' as TokenQuotaUnit,
+  rate_limit_7d_token_unit: 'M' as TokenQuotaUnit,
   enable_expiration: false,
   expiration_preset: '30' as '7' | '30' | '90' | 'custom',
   expiration_date: ''
@@ -1686,10 +1766,24 @@ const editKey = (key: ApiKey) => {
     ip_blacklist: (key.ip_blacklist || []).join('\n'),
     enable_quota: key.quota > 0,
     quota: key.quota > 0 ? key.quota : null,
-    enable_rate_limit: (key.rate_limit_5h > 0) || (key.rate_limit_1d > 0) || (key.rate_limit_7d > 0),
+    quota_token_amount: tokenBaseToAmount(key.quota_tokens, inferTokenQuotaUnit(key.quota_tokens)),
+    quota_token_unit: inferTokenQuotaUnit(key.quota_tokens),
+    enable_rate_limit:
+      key.rate_limit_5h > 0 ||
+      key.rate_limit_1d > 0 ||
+      key.rate_limit_7d > 0 ||
+      key.rate_limit_5h_tokens > 0 ||
+      key.rate_limit_1d_tokens > 0 ||
+      key.rate_limit_7d_tokens > 0,
     rate_limit_5h: key.rate_limit_5h || null,
     rate_limit_1d: key.rate_limit_1d || null,
     rate_limit_7d: key.rate_limit_7d || null,
+    rate_limit_5h_token_amount: tokenBaseToAmount(key.rate_limit_5h_tokens, inferTokenQuotaUnit(key.rate_limit_5h_tokens)),
+    rate_limit_1d_token_amount: tokenBaseToAmount(key.rate_limit_1d_tokens, inferTokenQuotaUnit(key.rate_limit_1d_tokens)),
+    rate_limit_7d_token_amount: tokenBaseToAmount(key.rate_limit_7d_tokens, inferTokenQuotaUnit(key.rate_limit_7d_tokens)),
+    rate_limit_5h_token_unit: inferTokenQuotaUnit(key.rate_limit_5h_tokens),
+    rate_limit_1d_token_unit: inferTokenQuotaUnit(key.rate_limit_1d_tokens),
+    rate_limit_7d_token_unit: inferTokenQuotaUnit(key.rate_limit_7d_tokens),
     enable_expiration: hasExpiration,
     expiration_preset: 'custom',
     expiration_date: key.expires_at ? formatDateTimeLocal(key.expires_at) : ''
@@ -1802,6 +1896,7 @@ const handleSubmit = async () => {
 
   // Calculate quota value (null/empty/0 = unlimited, stored as 0)
   const quota = formData.value.quota && formData.value.quota > 0 ? formData.value.quota : 0
+  const quotaTokens = tokenAmountToBase(formData.value.quota_token_amount, formData.value.quota_token_unit)
 
   // Calculate expiration
   let expiresInDays: number | undefined
@@ -1827,7 +1922,17 @@ const handleSubmit = async () => {
     rate_limit_5h: formData.value.rate_limit_5h && formData.value.rate_limit_5h > 0 ? formData.value.rate_limit_5h : 0,
     rate_limit_1d: formData.value.rate_limit_1d && formData.value.rate_limit_1d > 0 ? formData.value.rate_limit_1d : 0,
     rate_limit_7d: formData.value.rate_limit_7d && formData.value.rate_limit_7d > 0 ? formData.value.rate_limit_7d : 0,
-  } : { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }
+    rate_limit_5h_tokens: tokenAmountToBase(formData.value.rate_limit_5h_token_amount, formData.value.rate_limit_5h_token_unit),
+    rate_limit_1d_tokens: tokenAmountToBase(formData.value.rate_limit_1d_token_amount, formData.value.rate_limit_1d_token_unit),
+    rate_limit_7d_tokens: tokenAmountToBase(formData.value.rate_limit_7d_token_amount, formData.value.rate_limit_7d_token_unit)
+  } : {
+    rate_limit_5h: 0,
+    rate_limit_1d: 0,
+    rate_limit_7d: 0,
+    rate_limit_5h_tokens: 0,
+    rate_limit_1d_tokens: 0,
+    rate_limit_7d_tokens: 0
+  }
 
   submitting.value = true
   try {
@@ -1838,10 +1943,14 @@ const handleSubmit = async () => {
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
         quota: quota,
+        quota_tokens: quotaTokens,
         expires_at: expiresAt,
         rate_limit_5h: rateLimitData.rate_limit_5h,
         rate_limit_1d: rateLimitData.rate_limit_1d,
         rate_limit_7d: rateLimitData.rate_limit_7d,
+        rate_limit_5h_tokens: rateLimitData.rate_limit_5h_tokens,
+        rate_limit_1d_tokens: rateLimitData.rate_limit_1d_tokens,
+        rate_limit_7d_tokens: rateLimitData.rate_limit_7d_tokens
       }
       if (shouldSubmitEditStatus(selectedKey.value, formData.value.status)) {
         updates.status = formData.value.status
@@ -1858,7 +1967,8 @@ const handleSubmit = async () => {
         ipBlacklist,
         quota,
         expiresInDays,
-        rateLimitData
+        rateLimitData,
+        quotaTokens
       )
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
       // Only advance tour if active, on submit step, and creation succeeded
@@ -1912,10 +2022,18 @@ const closeModals = () => {
     ip_blacklist: '',
     enable_quota: false,
     quota: null,
+    quota_token_amount: null,
+    quota_token_unit: 'M',
     enable_rate_limit: false,
     rate_limit_5h: null,
     rate_limit_1d: null,
     rate_limit_7d: null,
+    rate_limit_5h_token_amount: null,
+    rate_limit_1d_token_amount: null,
+    rate_limit_7d_token_amount: null,
+    rate_limit_5h_token_unit: 'M',
+    rate_limit_1d_token_unit: 'M',
+    rate_limit_7d_token_unit: 'M',
     enable_expiration: false,
     expiration_preset: '30',
     expiration_date: ''
