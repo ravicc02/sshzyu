@@ -647,17 +647,14 @@ function intelligenceSummary(row: MonitorMatrixRow) {
     const states = intelligenceSlots(row)
       .map(slot => slot?.state)
       .filter((state): state is HealthState => state != null && state !== 'unknown')
-    if (states.length > 0) {
-      const passed = states.filter(state => state === 'healthy').length
+    const decisiveStates = states.filter(state => state === 'healthy' || state === 'critical')
+    if (decisiveStates.length > 0) {
+      const passed = decisiveStates.filter(state => state === 'healthy').length
       return t('channelMonitorV2.groupCards.intelligencePassRate', {
-        value: formatMonitorPercent(passed / states.length),
+        value: formatMonitorPercent(passed / decisiveStates.length),
       })
     }
-    if ((probe.intelligence_errors || 0) > 0) {
-      return t('channelMonitorV2.groupCards.intelligenceAccountErrors', {
-        count: probe.intelligence_errors,
-      })
-    }
+    if (states.includes('warning')) return t('channelMonitorV2.groupCards.intelligenceError')
   }
   const latest = probe.intelligence_timeline?.[0]
   if (!latest) return t('channelMonitorV2.groupCards.intelligenceWaiting')
@@ -684,8 +681,8 @@ function intelligenceSummaryClass(row: MonitorMatrixRow) {
       .map(slot => slot?.state)
       .filter((state): state is HealthState => state != null && state !== 'unknown')
     if (states.includes('critical')) return 'font-semibold text-rose-700 dark:text-rose-300'
+    if (states.includes('healthy')) return 'font-semibold text-emerald-700 dark:text-emerald-300'
     if (states.includes('warning')) return 'font-semibold text-amber-700 dark:text-amber-300'
-    if (states.length > 0) return 'font-semibold text-emerald-700 dark:text-emerald-300'
     return 'font-semibold text-amber-700 dark:text-amber-300'
   }
   const latest = probe?.intelligence_timeline?.[0]
