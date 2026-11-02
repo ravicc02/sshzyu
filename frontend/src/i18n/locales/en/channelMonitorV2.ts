@@ -33,7 +33,7 @@ export default {
       cacheRateFallback: 'Current window has too few samples; showing the latest cache value that met the sample threshold',
       cacheRateAwaitingSamples: 'Collecting cache samples; shown after {count} requests',
       intelligenceActive: 'Active reasoning checks', intelligenceNotConfigured: 'OpenAI reasoning check not configured',
-      intelligenceWaiting: 'Waiting for first result', intelligenceNotDegraded: 'Passed', intelligenceDegraded: 'Not passed', intelligenceError: 'Request error',
+      intelligenceWaiting: 'Waiting for first result', intelligenceNotDegraded: 'Not degraded', intelligenceDegraded: 'Degraded', intelligenceError: 'Flapping',
       intelligenceAccountRate: 'Account aggregate {passed}/{samples} · {rate}%',
       intelligencePassRate: 'Pass rate {value}',
       intelligenceAccountVote: 'Not degraded {passed}/{samples}',

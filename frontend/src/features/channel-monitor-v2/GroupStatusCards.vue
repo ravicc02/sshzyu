@@ -583,7 +583,7 @@ function intelligenceSlots(row: MonitorMatrixRow): Array<TimelineSlot | null> {
   if (points.length >= 2) {
     const result: Array<TimelineSlot | null> = Array(Math.max(0, 20 - points.length)).fill(null)
     result.push(...points.map(point => ({
-      state: probeStatusToHealth(point.status),
+      state: intelligenceStatusToHealth(point.status),
       timestamp: point.checked_at,
       detail: point.status === 'operational'
         ? t('channelMonitorV2.groupCards.intelligenceNotDegraded')
@@ -598,6 +598,13 @@ function intelligenceSlots(row: MonitorMatrixRow): Array<TimelineSlot | null> {
   return Array(20).fill(null)
 }
 
+function intelligenceStatusToHealth(status: MonitorTimelinePoint['status']): HealthState {
+  if (status === 'operational') return 'healthy'
+  if (status === 'degraded') return 'critical'
+  if (status === 'failed' || status === 'error') return 'warning'
+  return 'unknown'
+}
+
 function aggregateIntelligenceSlots(probe: UserMonitorView): Array<TimelineSlot | null> {
   const passed = Math.max(0, probe.intelligence_passed || 0)
   const failed = Math.max(0, probe.intelligence_failed || 0)
@@ -608,12 +615,12 @@ function aggregateIntelligenceSlots(probe: UserMonitorView): Array<TimelineSlot 
   const states: HealthState[] = []
   if (total <= 20) {
     states.push(...Array<HealthState>(passed).fill('healthy'))
-    states.push(...Array<HealthState>(failed).fill('warning'))
-    states.push(...Array<HealthState>(errors).fill('critical'))
+    states.push(...Array<HealthState>(failed).fill('critical'))
+    states.push(...Array<HealthState>(errors).fill('warning'))
   } else {
     for (let index = 0; index < 20; index += 1) {
       const position = ((index + 0.5) / 20) * total
-      states.push(position < passed ? 'healthy' : position < passed + failed ? 'warning' : 'critical')
+      states.push(position < passed ? 'healthy' : position < passed + failed ? 'critical' : 'warning')
     }
   }
 
@@ -637,11 +644,14 @@ function intelligenceSummary(row: MonitorMatrixRow) {
   if (!probe) return t('channelMonitorV2.groupCards.intelligenceNotConfigured')
   if (probe.intelligence_source === 'account_aggregate') {
     if (intelligenceProbeStale(probe)) return t('channelStatus.intelligenceStale')
-    const passed = probe.intelligence_passed || 0
-    const failed = probe.intelligence_failed || 0
-    const samples = passed + failed
-    if (samples > 0) {
-      return t('channelMonitorV2.groupCards.intelligencePassRate', { value: formatMonitorPercent(passed / samples) })
+    const states = intelligenceSlots(row)
+      .map(slot => slot?.state)
+      .filter((state): state is HealthState => state != null && state !== 'unknown')
+    if (states.length > 0) {
+      const passed = states.filter(state => state === 'healthy').length
+      return t('channelMonitorV2.groupCards.intelligencePassRate', {
+        value: formatMonitorPercent(passed / states.length),
+      })
     }
     if ((probe.intelligence_errors || 0) > 0) {
       return t('channelMonitorV2.groupCards.intelligenceAccountErrors', {
@@ -669,14 +679,16 @@ function intelligenceProbeStale(probe: UserMonitorView): boolean {
 function intelligenceSummaryClass(row: MonitorMatrixRow) {
   if (!props.hybrid || !intelligenceProbe(row)) return 'text-gray-500 dark:text-gray-400'
   const probe = intelligenceProbe(row)
-  const status = probe?.intelligence_status || probe?.intelligence_timeline?.[0]?.status
-  const latest = probe?.intelligence_timeline?.[0]
-  if (probe?.intelligence_source === 'account_aggregate' && status) {
-    if (status === 'operational') return 'font-semibold text-emerald-700 dark:text-emerald-300'
-    if (status === 'degraded') return 'font-semibold text-amber-700 dark:text-amber-300'
-    if (status === 'failed') return 'font-semibold text-rose-700 dark:text-rose-300'
+  if (probe?.intelligence_source === 'account_aggregate') {
+    const states = intelligenceSlots(row)
+      .map(slot => slot?.state)
+      .filter((state): state is HealthState => state != null && state !== 'unknown')
+    if (states.includes('critical')) return 'font-semibold text-rose-700 dark:text-rose-300'
+    if (states.includes('warning')) return 'font-semibold text-amber-700 dark:text-amber-300'
+    if (states.length > 0) return 'font-semibold text-emerald-700 dark:text-emerald-300'
     return 'font-semibold text-amber-700 dark:text-amber-300'
   }
+  const latest = probe?.intelligence_timeline?.[0]
   if (!latest) return 'text-gray-500 dark:text-gray-400'
   if (latest.status === 'operational') return 'font-semibold text-emerald-700 dark:text-emerald-300'
   if (latest.status === 'failed') return 'font-semibold text-rose-700 dark:text-rose-300'

@@ -33,7 +33,7 @@ export default {
       cacheRateFallback: '当前窗口样本不足，显示最近一次达到最小样本的历史缓存值',
       cacheRateAwaitingSamples: '缓存样本积累中，达到 {count} 次请求后显示',
       intelligenceActive: '主动测智', intelligenceNotConfigured: '未配置 OpenAI 主动测智',
-      intelligenceWaiting: '等待首次测智结果', intelligenceNotDegraded: '通过', intelligenceDegraded: '未通过', intelligenceError: '请求错误',
+      intelligenceWaiting: '等待首次测智结果', intelligenceNotDegraded: '不降智', intelligenceDegraded: '降智', intelligenceError: '波动',
       intelligenceAccountRate: '账号聚合 {passed}/{samples} · {rate}%',
       intelligencePassRate: '不降智率 {value}',
       intelligenceAccountVote: '不降 {passed}/{samples}',
