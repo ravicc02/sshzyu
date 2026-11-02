@@ -113,7 +113,7 @@ describe('channel monitor Grok provider', () => {
 
     expect(PROVIDERS).toContain(PROVIDER_GROK)
     const providerButtons = wrapper.findAll('[data-testid^="monitor-provider-"]')
-    expect(providerButtons).toHaveLength(8)
+    expect(providerButtons).toHaveLength(9)
     expect(providerButtons[0].element.parentElement?.className).toContain('grid-cols-2')
     expect(providerButtons[0].element.parentElement?.className).toContain('sm:grid-cols-4')
 
@@ -186,9 +186,15 @@ describe('channel monitor Grok provider', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="monitor-composite-routing"]').exists()).toBe(true)
-    expect(wrapper.findAll('[data-testid^="monitor-provider-"]')).toHaveLength(0)
+    expect(wrapper.find('[data-testid="monitor-provider-deepseek"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="monitor-provider-zhipu"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="monitor-provider-kimi"]').exists()).toBe(false)
     expect((wrapper.get('[data-testid="monitor-endpoint"]').element as HTMLInputElement).value).toBe(window.location.origin)
-    expect((wrapper.get('[data-testid="monitor-primary-model"]').element as HTMLInputElement).value).toBe('deepseek-v4.1-flash')
+    expect(wrapper.find('[data-testid="monitor-primary-model"]').exists()).toBe(false)
+    expect((wrapper.get('[data-testid="monitor-provider-model-deepseek"]').element as HTMLInputElement).value).toBe('deepseek-v4.1-flash')
+    expect((wrapper.get('[data-testid="monitor-provider-model-zhipu"]').element as HTMLInputElement).value).toBe('glm-5.3-flash')
+    expect((wrapper.get('[data-testid="monitor-provider-model-kimi"]').element as HTMLInputElement).value).toBe('kimi-k3.1-pro')
+    expect((wrapper.get('[data-testid="monitor-provider-model-minimax"]').element as HTMLInputElement).value).toBe('')
     expect(wrapper.text()).toContain('admin.channelMonitor.form.compositeRoutingTitle')
     expect(wrapper.text()).toContain('monitorCommon.providers.deepseek')
     expect(wrapper.text()).toContain('monitorCommon.providers.zhipu')

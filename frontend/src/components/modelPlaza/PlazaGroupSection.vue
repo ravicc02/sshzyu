@@ -167,7 +167,7 @@ import PlazaModelPricingTable from './PlazaModelPricingTable.vue'
 import type { ModelPlazaGroup } from '@/api/modelPlaza'
 import type { GroupPlatform, SubscriptionType } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
-import { formatScaled } from '@/utils/pricing'
+import { formatScaled, type PriceCurrency } from '@/utils/pricing'
 import { BILLING_MODE_IMAGE, BILLING_MODE_TOKEN, BILLING_MODE_VIDEO, type BillingMode } from '@/constants/channel'
 import { platformAccentBarClass, platformBorderStrongClass, platformLabel } from '@/utils/platformColors'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
@@ -242,8 +242,8 @@ function previewPrice(model: ModelPlazaGroup['models'][number]): PreviewPrice | 
       [t('modelPlaza.table.outputShort'), pricing.output_price]
     ] as const
     return {
-      standard: values.filter(([, price]) => price != null).map(([label, price]) => `${label} ${formatPrice(price ?? 0, scale)}`).join(' · ') + ` ${unit}`,
-      paid: values.filter(([, price]) => price != null).map(([label, price]) => `${label} ${formatPrice((price ?? 0) * rate, scale)}`).join(' · ') + ` ${unit}`
+      standard: values.filter(([, price]) => price != null).map(([label, price]) => `${label} ${formatPrice(price ?? 0, scale, model)}`).join(' · ') + ` ${unit}`,
+      paid: values.filter(([, price]) => price != null).map(([label, price]) => `${label} ${formatPrice((price ?? 0) * rate, scale, model)}`).join(' · ') + ` ${unit}`
     }
   }
 
@@ -251,8 +251,8 @@ function previewPrice(model: ModelPlazaGroup['models'][number]): PreviewPrice | 
   const raw = pricing.intervals?.find((interval) => interval.per_request_price != null)?.per_request_price ?? pricing.per_request_price
   if (raw == null) return null
   return {
-    standard: `${formatPrice(raw, scale)} ${unit}`,
-    paid: `${formatPrice(raw * rate, scale)} ${unit}`
+    standard: `${formatPrice(raw, scale, model)} ${unit}`,
+    paid: `${formatPrice(raw * rate, scale, model)} ${unit}`
   }
 }
 
@@ -277,8 +277,14 @@ function discountFor(model: ModelPlazaGroup['models'][number]): string {
     : t('modelPlaza.card.surcharge', { percent })
 }
 
-function formatPrice(value: number, scale: number): string {
-  return formatScaled(value, scale, 2)
+const CN_PROVIDER_PLATFORMS = new Set(['deepseek', 'zhipu', 'kimi', 'minimax'])
+
+function currencyFor(model: ModelPlazaGroup['models'][number]): PriceCurrency {
+  return CN_PROVIDER_PLATFORMS.has(model.platform.toLowerCase()) ? 'cny' : 'usd'
+}
+
+function formatPrice(value: number, scale: number, model: ModelPlazaGroup['models'][number]): string {
+  return formatScaled(value, scale, 2, currencyFor(model))
 }
 
 const discountLabel = computed(() => {

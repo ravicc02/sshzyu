@@ -194,7 +194,7 @@ func TestChannelMonitorV2GroupInfoLoadsRealMultiplier(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 	mock.ExpectQuery(`SELECT id, COALESCE\(name, ''\), lower\(COALESCE`).WithArgs(pq.Array([]int64{4})).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "platform", "rate_multiplier"}).AddRow(4, "ChatGPT Plus", "openai", 0.045))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "platform", "rate_multiplier", "model_pricing"}).AddRow(4, "ChatGPT Plus", "openai", 0.045, []byte("[]")))
 	info, err := (&channelMonitorV2Repository{db: db}).loadChannelMonitorV2GroupInfo(context.Background(), []int64{4})
 	require.NoError(t, err)
 	require.Equal(t, 0.045, info[4].rateMultiplier)

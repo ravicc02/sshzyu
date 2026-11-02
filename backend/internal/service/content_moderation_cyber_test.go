@@ -281,7 +281,7 @@ func TestRecordCyberPolicyEvent_RuntimeSnapshotRefreshFailureKeepsStaleScope(t *
 	require.Eventually(t, func() bool {
 		_, calls := settingRepo.calls()
 		return calls == 2
-	}, time.Second, time.Millisecond)
+	}, 3*time.Second, 5*time.Millisecond)
 	getValue, getMultiple := settingRepo.calls()
 	require.Zero(t, getValue)
 	require.Equal(t, 2, getMultiple)

@@ -211,7 +211,7 @@ describe('AppSidebar Dock navigation', () => {
     expect(navigationPaths(wrapper)).toEqual([
       '/admin/dashboard', '/admin/ops', '/admin/users', '/admin/groups', '/admin/model-prices',
       '/admin/channels/pricing', '/admin/channels/monitor', '/admin/subscriptions',
-      '/admin/accounts', '/admin/account-scheduler', '/admin/upstream-monitor', '/admin/plugins', '/admin/announcements', '/admin/proxies',
+      '/admin/accounts', '/admin/account-scheduler', '/admin/hosted-accounts', '/admin/upstream-monitor', '/admin/plugins', '/admin/announcements', '/admin/proxies',
       '/admin/risk-control', '/admin/redeem', '/admin/promo-codes', '/admin/lottery',
       '/admin/affiliates/invites', '/admin/affiliates/rebates', '/admin/affiliates/transfers',
       '/admin/orders/dashboard', '/admin/orders', '/admin/orders/plans',
@@ -229,7 +229,7 @@ describe('AppSidebar Dock navigation', () => {
     await wrapper.get('button[aria-label="个人空间"]').trigger('click')
     expect(router.currentRoute.value.path).toBe('/admin/dashboard')
     expect(navigationPaths(wrapper)).toEqual([
-      '/keys', '/model-plaza?embedded=1', '/agent', '/image-playground', '/image-studio', '/batch-image', '/usage', '/available-channels', '/monitor', '/subscriptions',
+      '/keys', '/model-plaza?embedded=1', '/agent', '/image-playground', '/image-studio', '/batch-image', '/usage', '/available-channels', '/monitor', '/hosted-accounts', '/subscriptions',
       '/purchase', '/orders', '/redeem', '/lottery', '/affiliate', '/profile', '/custom/user-help'
     ].sort())
     expect(wrapper.get('button[aria-label="个人空间"]').attributes('aria-pressed')).toBe('true')

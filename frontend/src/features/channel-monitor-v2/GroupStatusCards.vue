@@ -483,13 +483,15 @@ function timelineSlots(row: MonitorMatrixRow) {
 }
 
 function timelineAria(row: MonitorMatrixRow) {
-  if (hasProbe(row)) return t('channelMonitorV2.groupCards.availabilityProbe')
-  return hasTraffic(row) ? t('channelMonitorV2.groupCards.combined') : t('channelMonitorV2.groupCards.noData')
+  return hasTraffic(row) || hasProbe(row)
+    ? t('channelMonitorV2.groupCards.combined')
+    : t('channelMonitorV2.groupCards.noData')
 }
 
 function timelineWindowLabel(row: MonitorMatrixRow) {
-  if (hasProbe(row)) return t('channelMonitorV2.groupCards.availabilityProbeWindow')
-  return hasTraffic(row) ? t('channelMonitorV2.groupCards.combinedWindow') : t('channelMonitorV2.groupCards.noData')
+  return hasTraffic(row) || hasProbe(row)
+    ? t('channelMonitorV2.groupCards.combinedWindow')
+    : t('channelMonitorV2.groupCards.noData')
 }
 
 function slotTitle(slot: TimelineSlot | null) {

@@ -173,6 +173,7 @@
             </span>
             <input
               v-model.trim="form.provider_models[item.value]"
+              :data-testid="`monitor-provider-model-${item.value}`"
               type="text"
               class="input font-medium"
               :class="getPlatformTextClass(item.value)"

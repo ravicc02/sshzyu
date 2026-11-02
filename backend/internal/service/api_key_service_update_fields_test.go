@@ -105,7 +105,7 @@ func TestAPIKeyUpdate_DeclaresUsageColumnsOnExplicitReset(t *testing.T) {
 		ResetRateLimitUsage: &reset,
 	})
 	require.NoError(t, err)
-	require.Equal(t, []APIKeyUpdateFields{{QuotaUsed: true, RateLimitUsage: true}}, repo.updateFields)
+	require.Equal(t, []APIKeyUpdateFields{{QuotaUsed: true, QuotaTokensUsed: true, RateLimitUsage: true}}, repo.updateFields)
 }
 
 // 配额扩容会顺带把 quota_exhausted 复活为 active，此时必须声明 status。
