@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"sort"
 	"strings"
 	"time"
@@ -158,7 +159,10 @@ func (s *HostedOpenAIAccountService) Options(ctx context.Context) (*HostedOpenAI
 	}
 	proxyOptions := make([]HostedProxyOption, 0, len(proxies))
 	for _, proxy := range proxies {
-		proxyOptions = append(proxyOptions, HostedProxyOption{ID: proxy.ID, Name: proxy.Name})
+		proxyOptions = append(proxyOptions, HostedProxyOption{
+			ID:   proxy.ID,
+			Name: hostedProxyDisplayName(proxy.Name, proxy.ID),
+		})
 	}
 	sort.Slice(proxyOptions, func(i, j int) bool { return proxyOptions[i].Name < proxyOptions[j].Name })
 
@@ -327,7 +331,7 @@ func (s *HostedOpenAIAccountService) Create(
 	record.GroupName = group.Name
 	if input.ProxyID != nil {
 		if proxy, proxyErr := s.proxyRepo.GetByID(ctx, *input.ProxyID); proxyErr == nil && proxy != nil {
-			record.ProxyName = proxy.Name
+			record.ProxyName = hostedProxyDisplayName(proxy.Name, proxy.ID)
 		}
 	}
 	view := HostedOpenAIAccountView{
@@ -579,6 +583,9 @@ func (s *HostedOpenAIAccountService) views(ctx context.Context, records []Hosted
 	}
 	views := make([]HostedOpenAIAccountView, 0, len(records))
 	for _, record := range records {
+		if record.ProxyID != nil && record.ProxyName != "" {
+			record.ProxyName = hostedProxyDisplayName(record.ProxyName, *record.ProxyID)
+		}
 		account := accountByID[record.AccountID]
 		quota := HostedOpenAIQuota{AccountType: hostedAccountType(record.PlanType)}
 		if account == nil {
@@ -808,6 +815,28 @@ func hostedFirstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func hostedProxyDisplayName(name string, proxyID int64) string {
+	name = strings.TrimSpace(name)
+	fallback := fmt.Sprintf("代理 #%d", proxyID)
+	if name == "" {
+		return fallback
+	}
+	if strings.Contains(name, "://") {
+		return fallback
+	}
+	ipCandidate := strings.Trim(name, "[]")
+	if net.ParseIP(ipCandidate) != nil {
+		return fallback
+	}
+	if host, _, err := net.SplitHostPort(name); err == nil {
+		host = strings.Trim(host, "[]")
+		if net.ParseIP(host) != nil || strings.Contains(host, ".") {
+			return fallback
+		}
+	}
+	return name
 }
 
 func normalizeHostedModels(models []string) ([]string, error) {
