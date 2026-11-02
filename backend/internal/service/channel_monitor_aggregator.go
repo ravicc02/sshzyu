@@ -130,7 +130,13 @@ func collectMonitorIndexes(monitors []*ChannelMonitor) ([]int64, map[int64]strin
 	for _, m := range monitors {
 		ids = append(ids, m.ID)
 		primaryByID[m.ID] = m.PrimaryModel
-		extrasByID[m.ID] = m.ExtraModels
+		extras := make([]string, 0, len(m.ProviderModels))
+		for _, model := range monitorProbeModels(m) {
+			if model != m.PrimaryModel {
+				extras = append(extras, model)
+			}
+		}
+		extrasByID[m.ID] = extras
 		if m.GroupID != nil {
 			groupByID[m.ID] = *m.GroupID
 		}
@@ -349,7 +355,7 @@ func mergeModelDetails(
 	latest []*ChannelMonitorLatest,
 	availMap map[int]map[string]*ChannelMonitorAvailability,
 ) []ModelDetail {
-	all := append([]string{m.PrimaryModel}, m.ExtraModels...)
+	all := monitorProbeModels(m)
 	latestByModel := indexLatestByModel(latest)
 	out := make([]ModelDetail, 0, len(all))
 	for _, model := range all {

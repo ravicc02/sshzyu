@@ -604,7 +604,13 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 			row.GroupID = &groupID
 			if info, ok := groupInfo[groupID]; ok {
 				row.GroupPlatform = info.platform
-				row.RateMultiplier = &info.rateMultiplier
+				rateMultiplier := info.rateMultiplier
+				if info.platform == service.PlatformComposite && key.platform != service.PlatformComposite {
+					if providerRate, exists := info.providerRateByID[key.platform]; exists {
+						rateMultiplier = providerRate
+					}
+				}
+				row.RateMultiplier = &rateMultiplier
 			}
 		}
 		bucketKeys := make([]string, 0, len(acc.buckets))
@@ -866,9 +872,10 @@ func channelMonitorV2RestrictedGroupScopeEmpty(filter service.ChannelMonitorV2Fi
 }
 
 type channelMonitorV2GroupInfo struct {
-	name           string
-	platform       string
-	rateMultiplier float64
+	name             string
+	platform         string
+	rateMultiplier   float64
+	providerRateByID map[string]float64
 }
 
 func (r *channelMonitorV2Repository) listActiveGroupIDs(ctx context.Context) ([]int64, error) {
@@ -893,7 +900,7 @@ func (r *channelMonitorV2Repository) loadChannelMonitorV2GroupInfo(ctx context.C
 	if len(groupIDs) == 0 {
 		return out, nil
 	}
-	rows, err := r.db.QueryContext(ctx, `SELECT id, COALESCE(name, ''), lower(COALESCE(NULLIF(TRIM(platform), ''), 'unknown')), rate_multiplier FROM groups WHERE id = ANY($1) AND deleted_at IS NULL AND status = 'active'`, pq.Array(groupIDs))
+	rows, err := r.db.QueryContext(ctx, `SELECT id, COALESCE(name, ''), lower(COALESCE(NULLIF(TRIM(platform), ''), 'unknown')), rate_multiplier, COALESCE(model_pricing, '[]'::jsonb) FROM groups WHERE id = ANY($1) AND deleted_at IS NULL AND status = 'active'`, pq.Array(groupIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -902,10 +909,28 @@ func (r *channelMonitorV2Repository) loadChannelMonitorV2GroupInfo(ctx context.C
 		var id int64
 		var name, platform string
 		var rateMultiplier float64
-		if err := rows.Scan(&id, &name, &platform, &rateMultiplier); err != nil {
+		var modelPricingRaw []byte
+		if err := rows.Scan(&id, &name, &platform, &rateMultiplier, &modelPricingRaw); err != nil {
 			return nil, err
 		}
-		out[id] = channelMonitorV2GroupInfo{name: name, platform: platform, rateMultiplier: rateMultiplier}
+		var modelPricing []service.ChannelModelPricing
+		if len(modelPricingRaw) > 0 {
+			_ = json.Unmarshal(modelPricingRaw, &modelPricing)
+		}
+		providerRateByID := make(map[string]float64)
+		for _, rate := range service.GroupProviderRates(&service.Group{
+			Platform:       platform,
+			RateMultiplier: rateMultiplier,
+			ModelPricing:   modelPricing,
+		}) {
+			providerRateByID[rate.Platform] = rate.RateMultiplier
+		}
+		out[id] = channelMonitorV2GroupInfo{
+			name:             name,
+			platform:         platform,
+			rateMultiplier:   rateMultiplier,
+			providerRateByID: providerRateByID,
+		}
 	}
 	return out, rows.Err()
 }

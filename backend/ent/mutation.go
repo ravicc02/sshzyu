@@ -15450,6 +15450,7 @@ type ChannelMonitorMutation struct {
 	primary_model           *string
 	extra_models            *[]string
 	appendextra_models      []string
+	provider_models         *map[string]string
 	group_name              *string
 	group_id                *int64
 	addgroup_id             *int64
@@ -16021,6 +16022,42 @@ func (m *ChannelMonitorMutation) AppendedExtraModels() ([]string, bool) {
 func (m *ChannelMonitorMutation) ResetExtraModels() {
 	m.extra_models = nil
 	m.appendextra_models = nil
+}
+
+// SetProviderModels sets the "provider_models" field.
+func (m *ChannelMonitorMutation) SetProviderModels(value map[string]string) {
+	m.provider_models = &value
+}
+
+// ProviderModels returns the value of the "provider_models" field in the mutation.
+func (m *ChannelMonitorMutation) ProviderModels() (r map[string]string, exists bool) {
+	v := m.provider_models
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProviderModels returns the old "provider_models" field's value of the ChannelMonitor entity.
+// If the ChannelMonitor object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelMonitorMutation) OldProviderModels(ctx context.Context) (v map[string]string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProviderModels is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProviderModels requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProviderModels: %w", err)
+	}
+	return oldValue.ProviderModels, nil
+}
+
+// ResetProviderModels resets all changes to the "provider_models" field.
+func (m *ChannelMonitorMutation) ResetProviderModels() {
+	m.provider_models = nil
 }
 
 // SetGroupName sets the "group_name" field.
@@ -16819,7 +16856,7 @@ func (m *ChannelMonitorMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ChannelMonitorMutation) Fields() []string {
-	fields := make([]string, 0, 24)
+	fields := make([]string, 0, 25)
 	if m.created_at != nil {
 		fields = append(fields, channelmonitor.FieldCreatedAt)
 	}
@@ -16852,6 +16889,9 @@ func (m *ChannelMonitorMutation) Fields() []string {
 	}
 	if m.extra_models != nil {
 		fields = append(fields, channelmonitor.FieldExtraModels)
+	}
+	if m.provider_models != nil {
+		fields = append(fields, channelmonitor.FieldProviderModels)
 	}
 	if m.group_name != nil {
 		fields = append(fields, channelmonitor.FieldGroupName)
@@ -16922,6 +16962,8 @@ func (m *ChannelMonitorMutation) Field(name string) (ent.Value, bool) {
 		return m.PrimaryModel()
 	case channelmonitor.FieldExtraModels:
 		return m.ExtraModels()
+	case channelmonitor.FieldProviderModels:
+		return m.ProviderModels()
 	case channelmonitor.FieldGroupName:
 		return m.GroupName()
 	case channelmonitor.FieldGroupID:
@@ -16979,6 +17021,8 @@ func (m *ChannelMonitorMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldPrimaryModel(ctx)
 	case channelmonitor.FieldExtraModels:
 		return m.OldExtraModels(ctx)
+	case channelmonitor.FieldProviderModels:
+		return m.OldProviderModels(ctx)
 	case channelmonitor.FieldGroupName:
 		return m.OldGroupName(ctx)
 	case channelmonitor.FieldGroupID:
@@ -17090,6 +17134,13 @@ func (m *ChannelMonitorMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetExtraModels(v)
+		return nil
+	case channelmonitor.FieldProviderModels:
+		v, ok := value.(map[string]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProviderModels(v)
 		return nil
 	case channelmonitor.FieldGroupName:
 		v, ok := value.(string)
@@ -17365,6 +17416,9 @@ func (m *ChannelMonitorMutation) ResetField(name string) error {
 		return nil
 	case channelmonitor.FieldExtraModels:
 		m.ResetExtraModels()
+		return nil
+	case channelmonitor.FieldProviderModels:
+		m.ResetProviderModels()
 		return nil
 	case channelmonitor.FieldGroupName:
 		m.ResetGroupName()

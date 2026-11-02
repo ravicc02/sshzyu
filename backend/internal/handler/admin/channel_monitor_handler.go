@@ -46,6 +46,7 @@ type channelMonitorCreateRequest struct {
 	APIKey                      string            `json:"api_key" binding:"omitempty,max=2000"`
 	PrimaryModel                string            `json:"primary_model" binding:"max=200"`
 	ExtraModels                 []string          `json:"extra_models"`
+	ProviderModels              map[string]string `json:"provider_models"`
 	GroupName                   string            `json:"group_name" binding:"max=100"`
 	GroupID                     *int64            `json:"group_id"`
 	ProbeFallbackEnabled        *bool             `json:"probe_fallback_enabled"`
@@ -75,6 +76,7 @@ type channelMonitorUpdateRequest struct {
 	APIKey                      *string            `json:"api_key" binding:"omitempty,max=2000"`
 	PrimaryModel                *string            `json:"primary_model" binding:"omitempty,max=200"`
 	ExtraModels                 *[]string          `json:"extra_models"`
+	ProviderModels              *map[string]string `json:"provider_models"`
 	GroupName                   *string            `json:"group_name" binding:"omitempty,max=100"`
 	GroupID                     *int64             `json:"group_id"`
 	ProbeFallbackEnabled        *bool              `json:"probe_fallback_enabled"`
@@ -105,6 +107,7 @@ type channelMonitorResponse struct {
 	APIKeyDecryptFailed         bool                                 `json:"api_key_decrypt_failed"`
 	PrimaryModel                string                               `json:"primary_model"`
 	ExtraModels                 []string                             `json:"extra_models"`
+	ProviderModels              map[string]string                    `json:"provider_models"`
 	GroupName                   string                               `json:"group_name"`
 	GroupID                     *int64                               `json:"group_id"`
 	ProbeFallbackEnabled        bool                                 `json:"probe_fallback_enabled"`
@@ -193,6 +196,7 @@ func channelMonitorToResponse(m *service.ChannelMonitor) *channelMonitorResponse
 		APIKeyDecryptFailed:         m.APIKeyDecryptFailed,
 		PrimaryModel:                m.PrimaryModel,
 		ExtraModels:                 extras,
+		ProviderModels:              m.ProviderModels,
 		GroupName:                   m.GroupName,
 		GroupID:                     m.GroupID,
 		ProbeFallbackEnabled:        m.ProbeFallbackEnabled,
@@ -403,6 +407,7 @@ func (h *ChannelMonitorHandler) Create(c *gin.Context) {
 		APIKey:                      req.APIKey,
 		PrimaryModel:                req.PrimaryModel,
 		ExtraModels:                 req.ExtraModels,
+		ProviderModels:              req.ProviderModels,
 		GroupName:                   req.GroupName,
 		GroupID:                     req.GroupID,
 		ProbeFallbackEnabled:        probeFallbackEnabled,
@@ -504,6 +509,7 @@ func (h *ChannelMonitorHandler) Update(c *gin.Context) {
 		APIKey:                      req.APIKey,
 		PrimaryModel:                req.PrimaryModel,
 		ExtraModels:                 req.ExtraModels,
+		ProviderModels:              req.ProviderModels,
 		GroupName:                   req.GroupName,
 		GroupID:                     req.GroupID,
 		ProbeFallbackEnabled:        req.ProbeFallbackEnabled,

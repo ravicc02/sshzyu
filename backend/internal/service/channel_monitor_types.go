@@ -40,7 +40,10 @@ type ChannelMonitor struct {
 	APIKey       string // 解密后的明文 API Key（仅在 service 内部使用，handler 层不应直接序列化返回）
 	PrimaryModel string
 	ExtraModels  []string
-	GroupName    string
+	// ProviderModels holds one active probe model per provider for composite
+	// channels. ExtraModels remains legacy display/persistence compatibility.
+	ProviderModels map[string]string
+	GroupName      string
 	// GroupID is the durable group link used by hybrid monitoring. GroupName is
 	// kept as a display and backward-compatibility fallback for legacy rows.
 	GroupID                     *int64
@@ -96,6 +99,7 @@ type ChannelMonitorCreateParams struct {
 	APIKey                      string
 	PrimaryModel                string
 	ExtraModels                 []string
+	ProviderModels              map[string]string
 	GroupName                   string
 	GroupID                     *int64
 	ProbeFallbackEnabled        bool
@@ -125,6 +129,7 @@ type ChannelMonitorUpdateParams struct {
 	APIKey                      *string // 空字符串表示不修改；非空字符串覆盖
 	PrimaryModel                *string
 	ExtraModels                 *[]string
+	ProviderModels              *map[string]string
 	GroupName                   *string
 	GroupID                     *int64 // 0 clears the association; nil leaves it unchanged
 	ProbeFallbackEnabled        *bool

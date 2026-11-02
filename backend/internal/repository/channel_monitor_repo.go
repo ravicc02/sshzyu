@@ -48,6 +48,7 @@ func (r *channelMonitorRepository) Create(ctx context.Context, m *service.Channe
 		SetAPIKeyEncrypted(m.APIKey). // 调用方传入的已是密文
 		SetPrimaryModel(m.PrimaryModel).
 		SetExtraModels(emptySliceIfNil(m.ExtraModels)).
+		SetProviderModels(emptyStringMapIfNil(m.ProviderModels)).
 		SetGroupName(m.GroupName).
 		SetProbeFallbackEnabled(m.ProbeFallbackEnabled).
 		SetIntelligenceEnabled(m.IntelligenceEnabled).
@@ -125,6 +126,7 @@ func (r *channelMonitorRepository) Update(ctx context.Context, m *service.Channe
 		SetAPIKeyEncrypted(m.APIKey).
 		SetPrimaryModel(m.PrimaryModel).
 		SetExtraModels(emptySliceIfNil(m.ExtraModels)).
+		SetProviderModels(emptyStringMapIfNil(m.ProviderModels)).
 		SetGroupName(m.GroupName).
 		SetProbeFallbackEnabled(m.ProbeFallbackEnabled).
 		SetIntelligenceEnabled(m.IntelligenceEnabled).
@@ -1059,6 +1061,7 @@ func entToServiceMonitor(row *dbent.ChannelMonitor) *service.ChannelMonitor {
 		APIKey:                      row.APIKeyEncrypted, // 仍为密文，service 层负责解密
 		PrimaryModel:                row.PrimaryModel,
 		ExtraModels:                 extras,
+		ProviderModels:              emptyStringMapIfNil(row.ProviderModels),
 		GroupName:                   row.GroupName,
 		GroupID:                     cloneInt64PointerRepo(row.GroupID),
 		ProbeFallbackEnabled:        row.ProbeFallbackEnabled,
@@ -1095,6 +1098,13 @@ func cloneInt64PointerRepo(value *int64) *int64 {
 	}
 	cloned := *value
 	return &cloned
+}
+
+func emptyStringMapIfNil(value map[string]string) map[string]string {
+	if value == nil {
+		return map[string]string{}
+	}
+	return value
 }
 
 func channelMonitorHeadersForPersistence(m *service.ChannelMonitor) map[string]string {

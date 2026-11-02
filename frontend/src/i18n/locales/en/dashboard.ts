@@ -555,7 +555,8 @@ export default {
       antigravity: 'Antigravity',
       kimi: 'Kimi',
       zhipu: 'Zhipu GLM',
-      deepseek: 'DeepSeek'
+      deepseek: 'DeepSeek',
+      minimax: 'MiniMax'
     },
     // Check modes (how a monitor performs its checks)
     checkMode: {

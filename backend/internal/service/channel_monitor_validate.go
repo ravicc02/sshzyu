@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"net/url"
+	"sort"
 	"strings"
 )
 
@@ -223,6 +224,80 @@ func normalizeModels(in []string) []string {
 		out = append(out, m)
 	}
 	return out
+}
+
+func normalizeMonitorProviderModels(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(in))
+	for provider, model := range in {
+		provider = strings.ToLower(strings.TrimSpace(provider))
+		model = strings.TrimSpace(model)
+		if _, ok := groupProviderSortOrder[provider]; !ok || model == "" {
+			continue
+		}
+		out[provider] = model
+	}
+	return out
+}
+
+func cloneMonitorStringMap(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
+func monitorProviderModelValues(in map[string]string) []string {
+	if len(in) == 0 {
+		return []string{}
+	}
+	providers := make([]string, 0, len(in))
+	for provider := range in {
+		if _, ok := groupProviderSortOrder[provider]; ok {
+			providers = append(providers, provider)
+		}
+	}
+	sort.SliceStable(providers, func(i, j int) bool {
+		return groupProviderSortOrder[providers[i]] < groupProviderSortOrder[providers[j]]
+	})
+	seen := make(map[string]struct{}, len(providers))
+	out := make([]string, 0, len(providers))
+	for _, provider := range providers {
+		model := strings.TrimSpace(in[provider])
+		if model == "" {
+			continue
+		}
+		if _, ok := seen[model]; ok {
+			continue
+		}
+		seen[model] = struct{}{}
+		out = append(out, model)
+	}
+	return out
+}
+
+func firstMonitorProbeModel(in map[string]string) string {
+	models := monitorProviderModelValues(in)
+	if len(models) == 0 {
+		return ""
+	}
+	return models[0]
+}
+
+func monitorProbeModels(m *ChannelMonitor) []string {
+	if m == nil {
+		return []string{}
+	}
+	if len(m.ProviderModels) > 0 {
+		return monitorProviderModelValues(m.ProviderModels)
+	}
+	return normalizeModels(append([]string{m.PrimaryModel}, m.ExtraModels...))
 }
 
 // normalizeMonitorPrimaryModel applies provider/check_mode defaults:

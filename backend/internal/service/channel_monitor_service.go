@@ -175,6 +175,11 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 		return nil, err
 	}
 	checkMode := defaultCheckMode(p.CheckMode)
+	providerModels := normalizeMonitorProviderModels(p.ProviderModels)
+	primaryModel := normalizeMonitorPrimaryModel(p.Provider, checkMode, p.PrimaryModel)
+	if primaryModel == "" {
+		primaryModel = firstMonitorProbeModel(providerModels)
+	}
 	encrypted, err := s.encryptor.Encrypt(p.APIKey)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt api key: %w", err)
@@ -185,8 +190,9 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 		APIMode:                     defaultAPIMode(p.APIMode),
 		Endpoint:                    normalizeEndpoint(p.Endpoint),
 		APIKey:                      encrypted, // 注意：传入 repository 时该字段为密文
-		PrimaryModel:                normalizeMonitorPrimaryModel(p.Provider, checkMode, p.PrimaryModel),
+		PrimaryModel:                primaryModel,
 		ExtraModels:                 normalizeModels(p.ExtraModels),
+		ProviderModels:              providerModels,
 		GroupName:                   strings.TrimSpace(p.GroupName),
 		GroupID:                     cloneInt64Pointer(p.GroupID),
 		ProbeFallbackEnabled:        p.ProbeFallbackEnabled,
@@ -265,6 +271,7 @@ func (s *ChannelMonitorService) Duplicate(
 		APIKey:                      encryptedAPIKey,
 		PrimaryModel:                source.PrimaryModel,
 		ExtraModels:                 append([]string{}, source.ExtraModels...),
+		ProviderModels:              cloneMonitorStringMap(source.ProviderModels),
 		GroupName:                   source.GroupName,
 		GroupID:                     cloneInt64Pointer(source.GroupID),
 		ProbeFallbackEnabled:        source.ProbeFallbackEnabled,
@@ -437,7 +444,8 @@ func validateCreateParams(p ChannelMonitorCreateParams) error {
 	if usesQuota && (p.AccountID == nil || *p.AccountID <= 0) {
 		return ErrChannelMonitorAccountRequired
 	}
-	if normalizeMonitorPrimaryModel(p.Provider, checkMode, p.PrimaryModel) == "" {
+	if normalizeMonitorPrimaryModel(p.Provider, checkMode, p.PrimaryModel) == "" &&
+		firstMonitorProbeModel(normalizeMonitorProviderModels(p.ProviderModels)) == "" {
 		return ErrChannelMonitorMissingPrimaryModel
 	}
 	if err := validateChannelMonitorIntelligenceReasoningEffort(p.PrimaryModel, p.IntelligenceReasoningEffort); err != nil {
@@ -876,10 +884,11 @@ func (s *ChannelMonitorService) persistCheckResults(ctx context.Context, m *Chan
 	}
 }
 
-// runChecksConcurrent 对 primary + extra 模型并发执行检测。
+// runChecksConcurrent probes provider_models when configured (one model per
+// composite provider), otherwise falls back to the legacy primary + extras set.
 // errgroup 仅用于等待，不传播错误（每个 model 失败都已打包进 CheckResult）。
 func (s *ChannelMonitorService) runChecksConcurrent(ctx context.Context, m *ChannelMonitor) []*CheckResult {
-	models := append([]string{m.PrimaryModel}, m.ExtraModels...)
+	models := monitorProbeModels(m)
 	results := make([]*CheckResult, len(models))
 
 	// ping 共享一次，所有模型记录同一个 ping 延迟。
@@ -1127,6 +1136,14 @@ func applyMonitorUpdate(existing *ChannelMonitor, p ChannelMonitorUpdateParams) 
 	}
 	if p.ExtraModels != nil {
 		existing.ExtraModels = normalizeModels(*p.ExtraModels)
+	}
+	if p.ProviderModels != nil {
+		existing.ProviderModels = normalizeMonitorProviderModels(*p.ProviderModels)
+		if p.PrimaryModel == nil {
+			if first := firstMonitorProbeModel(existing.ProviderModels); first != "" {
+				existing.PrimaryModel = first
+			}
+		}
 	}
 	if p.GroupName != nil {
 		existing.GroupName = strings.TrimSpace(*p.GroupName)

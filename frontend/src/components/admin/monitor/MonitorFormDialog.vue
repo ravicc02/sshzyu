@@ -148,7 +148,41 @@
         <p v-if="editing && editing.api_key_masked" class="mt-1 text-xs text-gray-400">{{ editing.api_key_masked }}</p>
       </div>
 
-      <div v-if="usesProbePart">
+      <div v-if="usesProbePart && isCompositeGroup" class="rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-dark-700 dark:bg-dark-900/30" data-testid="monitor-provider-models">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0">
+            <label class="input-label mb-0">{{ t('admin.channelMonitor.form.providerProbeModels') }} <span class="text-red-500">*</span></label>
+            <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('admin.channelMonitor.form.providerProbeModelsHint') }}</p>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" @click="openGroupModelPicker">
+            <Icon name="download" size="sm" />
+            {{ t('admin.channelMonitor.form.fetchGroupModels') }}
+          </button>
+        </div>
+        <div class="mt-4 space-y-3">
+          <label
+            v-for="item in compositeProbeProviderOptions"
+            :key="item.value"
+            class="grid items-center gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]"
+          >
+            <span class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+              <span class="grid h-8 w-8 place-items-center rounded-lg bg-white text-gray-600 ring-1 ring-gray-200 dark:bg-dark-800 dark:text-gray-300 dark:ring-dark-600">
+                <ProviderIcon :provider="item.value" :size="16" />
+              </span>
+              {{ item.label }}
+            </span>
+            <input
+              v-model.trim="form.provider_models[item.value]"
+              type="text"
+              class="input font-medium"
+              :class="getPlatformTextClass(item.value)"
+              :placeholder="t('admin.channelMonitor.form.providerProbeModelPlaceholder', { provider: item.label })"
+            />
+          </label>
+        </div>
+      </div>
+
+      <div v-if="usesProbePart && !isCompositeGroup">
         <label class="input-label">{{ t('admin.channelMonitor.form.primaryModel') }} <span class="text-red-500">*</span></label>
         <input
           v-model="form.primary_model"
@@ -161,7 +195,7 @@
         />
       </div>
 
-      <div v-if="usesProbePart">
+      <div v-if="usesProbePart && !isCompositeGroup">
         <div class="mb-1.5 flex items-center justify-between gap-3">
           <label class="input-label mb-0">{{ t('admin.channelMonitor.form.extraModels') }}</label>
           <button type="button" class="btn btn-ghost btn-sm" @click="openGroupModelPicker">
@@ -255,7 +289,9 @@
       width="wide"
       @close="showGroupModelPicker = false"
     >
-      <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('admin.channelMonitor.form.groupModelsHint') }}</p>
+      <p class="text-sm text-gray-500 dark:text-gray-400">
+        {{ isCompositeGroup ? t('admin.channelMonitor.form.groupModelsCompositeHint') : t('admin.channelMonitor.form.groupModelsHint') }}
+      </p>
       <input v-model.trim="groupModelSearch" type="search" class="input mt-3 w-full" :placeholder="t('admin.channelMonitor.form.groupModelsSearch')" />
       <div v-if="groupModelsLoading" class="py-8 text-center text-sm text-gray-400">{{ t('common.loading') }}</div>
       <div v-else-if="filteredGroupModels.length" class="mt-3 grid max-h-[min(55vh,460px)] grid-cols-1 gap-1 overflow-y-auto sm:grid-cols-2">
@@ -273,7 +309,9 @@
       <template #footer>
         <button type="button" class="btn btn-secondary" @click="showGroupModelPicker = false">{{ t('common.cancel') }}</button>
         <button type="button" class="btn btn-primary" :disabled="groupModelChoices.length === 0" @click="applyGroupModels">
-          {{ t('admin.channelMonitor.form.groupModelsApply', { count: groupModelChoices.length }) }}
+          {{ isCompositeGroup
+            ? t('admin.channelMonitor.form.groupModelsCompositeApply', { count: groupModelChoices.length })
+            : t('admin.channelMonitor.form.groupModelsApply', { count: groupModelChoices.length }) }}
         </button>
       </template>
     </BaseDialog>
@@ -347,6 +385,7 @@ import {
   PROVIDER_KIMI,
   PROVIDER_ZHIPU,
   PROVIDER_DEEPSEEK,
+  PROVIDER_MINIMAX,
   API_MODE_CHAT_COMPLETIONS,
   API_MODE_RESPONSES,
   CHECK_MODE_PROBE,
@@ -357,6 +396,7 @@ import {
   DEFAULT_KIMI_ENDPOINT,
   DEFAULT_ZHIPU_ENDPOINT,
   DEFAULT_DEEPSEEK_ENDPOINT,
+  DEFAULT_MINIMAX_ENDPOINT,
   DEFAULT_INTERVAL_SECONDS,
 } from '@/constants/channelMonitor'
 
@@ -415,6 +455,7 @@ interface MonitorForm {
   api_key: string
   primary_model: string
   extra_models: string[]
+  provider_models: Record<string, string>
   group_name: string
   group_id: number | null
   probe_fallback_enabled: boolean
@@ -439,6 +480,7 @@ const form = reactive<MonitorForm>({
   api_key: '',
   primary_model: '',
   extra_models: [],
+  provider_models: {},
   group_name: '',
   group_id: null,
   probe_fallback_enabled: true,
@@ -475,7 +517,43 @@ const groupSupportsIntelligence = computed(() =>
   selectedGroup.value?.platform === PROVIDER_OPENAI
 )
 const compositeRoutes = ref<CompositeModelRoute[]>([])
-const compositeSelectedModels = computed(() => [...new Set([form.primary_model, ...form.extra_models].map((model) => model.trim()).filter(Boolean))])
+
+function normalizedProviderModels(input: Record<string, string> | null | undefined): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (!input) return out
+  for (const provider of compositeProbeProviders) {
+    const model = (input[provider] || '').trim()
+    if (model) out[provider] = model
+  }
+  return out
+}
+
+function providerModelsFromLegacy(primaryModel: string, extraModels: string[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const rawModel of [primaryModel, ...extraModels]) {
+    const model = rawModel.trim()
+    if (!model) continue
+    const provider = probeProviderForModel(model)
+    if (compositeProbeProviders.includes(provider) && !out[provider]) {
+      out[provider] = model
+    }
+  }
+  return out
+}
+
+function providerModelValues(input: Record<string, string>): string[] {
+  return [...new Set(
+    compositeProbeProviders
+      .map((provider) => (input[provider] || '').trim())
+      .filter(Boolean),
+  )]
+}
+
+function firstProviderModel(input: Record<string, string>): string {
+  return providerModelValues(input)[0] || ''
+}
+
+const compositeSelectedModels = computed(() => providerModelValues(form.provider_models))
 const groupSelectValue = computed<string>({
   get: () => (form.group_id == null ? '' : String(form.group_id)),
   set: (raw: string) => {
@@ -502,9 +580,15 @@ function compositeRouteProvider(model: string): Provider {
     .filter((route) => route.enabled && route.match_type === 'prefix' && normalized.startsWith(route.public_model))
     .sort((a, b) => b.public_model.length - a.public_model.length)[0]
   if (prefix) return monitorProviderFor(prefix.target_platform)
+  return probeProviderForModel(normalized)
+}
+
+function probeProviderForModel(model: string): Provider {
+  const normalized = model.trim()
   if (/glm|zhipu/i.test(normalized)) return PROVIDER_ZHIPU
   if (/kimi|moonshot/i.test(normalized)) return PROVIDER_KIMI
   if (/deepseek/i.test(normalized)) return PROVIDER_DEEPSEEK
+  if (/minimax|abab/i.test(normalized)) return PROVIDER_MINIMAX
   if (/grok/i.test(normalized)) return PROVIDER_GROK
   if (/gemini/i.test(normalized)) return PROVIDER_GEMINI
   if (/claude|anthropic/i.test(normalized)) return PROVIDER_ANTHROPIC
@@ -521,6 +605,7 @@ function monitorProviderFor(platform: string): Provider {
     case PROVIDER_KIMI:
     case PROVIDER_ZHIPU:
     case PROVIDER_DEEPSEEK:
+    case PROVIDER_MINIMAX:
       return platform
     default:
       return PROVIDER_OPENAI
@@ -705,17 +790,30 @@ const providerOptions = computed<ProviderOption[]>(() => [
   { value: PROVIDER_KIMI, label: t('monitorCommon.providers.kimi') },
   { value: PROVIDER_ZHIPU, label: t('monitorCommon.providers.zhipu') },
   { value: PROVIDER_DEEPSEEK, label: t('monitorCommon.providers.deepseek') },
+  { value: PROVIDER_MINIMAX, label: t('monitorCommon.providers.minimax') },
 ])
 
 function providerLabel(provider: Provider): string {
   return providerOptions.value.find((option) => option.value === provider)?.label || provider
 }
 
+const compositeProbeProviders: Provider[] = [
+  PROVIDER_DEEPSEEK,
+  PROVIDER_ZHIPU,
+  PROVIDER_KIMI,
+  PROVIDER_MINIMAX,
+]
+
+const compositeProbeProviderOptions = computed(() =>
+  compositeProbeProviders.map((value) => ({ value, label: providerLabel(value) }))
+)
+
 // 国产 provider 预填的官方 endpoint（仅探活侧；配额模式 endpoint 可留空）。
 const PROVIDER_DEFAULT_ENDPOINTS: Partial<Record<Provider, string>> = {
   [PROVIDER_KIMI]: DEFAULT_KIMI_ENDPOINT,
   [PROVIDER_ZHIPU]: DEFAULT_ZHIPU_ENDPOINT,
   [PROVIDER_DEEPSEEK]: DEFAULT_DEEPSEEK_ENDPOINT,
+  [PROVIDER_MINIMAX]: DEFAULT_MINIMAX_ENDPOINT,
 }
 
 interface CheckModeOption {
@@ -962,6 +1060,7 @@ function resetForm() {
   form.api_key = ''
   form.primary_model = ''
   form.extra_models = []
+  form.provider_models = {}
   form.group_name = ''
   form.group_id = null
   form.probe_fallback_enabled = true
@@ -987,6 +1086,10 @@ function loadFromMonitor(m: ChannelMonitor) {
   form.api_key = ''
   form.primary_model = m.primary_model
   form.extra_models = [...(m.extra_models || [])]
+  const providerModels = normalizedProviderModels(m.provider_models)
+  form.provider_models = Object.keys(providerModels).length > 0
+    ? providerModels
+    : providerModelsFromLegacy(m.primary_model, m.extra_models || [])
   form.group_name = m.group_name || ''
   form.group_id = m.group_id ?? null
   form.probe_fallback_enabled = true
@@ -1005,6 +1108,12 @@ async function loadInitialGroupModels(group: AdminGroup) {
   try {
     const models = await loadGroupModels(group.id)
     if (!props.show || props.monitor || props.initialGroup?.id !== group.id || models.length === 0) return
+    if (group.platform === 'composite') {
+      form.provider_models = providerModelsFromLegacy('', models)
+      form.primary_model = firstProviderModel(form.provider_models)
+      form.extra_models = []
+      return
+    }
     form.primary_model = models[0] || ''
     form.extra_models = models.slice(1)
   } catch (error) {
@@ -1023,7 +1132,10 @@ async function openGroupModelPicker() {
   groupModelChoices.value = []
   try {
     groupModelOptions.value = await loadGroupModels(form.group_id)
-    const current = new Set([form.primary_model.trim(), ...form.extra_models].filter(Boolean))
+    const currentModels = isCompositeGroup.value
+      ? providerModelValues(form.provider_models)
+      : [form.primary_model.trim(), ...form.extra_models].filter(Boolean)
+    const current = new Set(currentModels)
     groupModelChoices.value = groupModelOptions.value.filter((model) => current.has(model))
   } catch (error) {
     groupModelOptions.value = []
@@ -1040,6 +1152,19 @@ async function loadGroupModels(groupID: number): Promise<string[]> {
 }
 
 function toggleGroupModelChoice(model: string) {
+  if (isCompositeGroup.value) {
+    const provider = compositeRouteProvider(model)
+    if (!compositeProbeProviders.includes(provider)) return
+    if (groupModelChoices.value.includes(model)) {
+      groupModelChoices.value = groupModelChoices.value.filter((item) => item !== model)
+      return
+    }
+    groupModelChoices.value = [
+      ...groupModelChoices.value.filter((item) => compositeRouteProvider(item) !== provider),
+      model,
+    ]
+    return
+  }
   groupModelChoices.value = groupModelChoices.value.includes(model)
     ? groupModelChoices.value.filter((item) => item !== model)
     : [...groupModelChoices.value, model]
@@ -1047,6 +1172,13 @@ function toggleGroupModelChoice(model: string) {
 
 function applyGroupModels() {
   const selected = [...new Set(groupModelChoices.value)].sort()
+  if (isCompositeGroup.value) {
+    form.provider_models = providerModelsFromLegacy('', selected)
+    form.primary_model = firstProviderModel(form.provider_models)
+    form.extra_models = []
+    showGroupModelPicker.value = false
+    return
+  }
   if (!form.primary_model.trim() && selected.length > 0) {
     form.primary_model = selected.shift() || ''
   }
@@ -1065,6 +1197,7 @@ function applyInitialGroup(group: AdminGroup) {
   form.enabled = props.initialEnabled !== false
   form.primary_model = ''
   form.extra_models = []
+  form.provider_models = {}
   void loadInitialGroupModels(group)
 }
 
@@ -1133,6 +1266,9 @@ function pickMyKey(k: ApiKey) {
 }
 
 function buildPayload(): CreateParams {
+  const providerModels = isCompositeGroup.value
+    ? normalizedProviderModels(form.provider_models)
+    : {}
   return {
     name: form.name.trim(),
     provider: monitorProvider.value,
@@ -1141,8 +1277,13 @@ function buildPayload(): CreateParams {
     account_id: usesQuotaMode.value ? form.account_id : null,
     endpoint: usesProbePart.value ? form.endpoint.trim() : '',
     api_key: usesProbePart.value ? form.api_key.trim() : '',
-    primary_model: usesProbePart.value ? form.primary_model.trim() : 'quota',
-    extra_models: usesProbePart.value ? form.extra_models : [],
+    primary_model: usesProbePart.value
+      ? isCompositeGroup.value
+        ? firstProviderModel(providerModels)
+        : form.primary_model.trim()
+      : 'quota',
+    extra_models: usesProbePart.value && !isCompositeGroup.value ? form.extra_models : [],
+    provider_models: providerModels,
     group_name: form.group_name.trim(),
     group_id: form.group_id,
     probe_fallback_enabled: true,
@@ -1171,7 +1312,11 @@ async function handleSubmit() {
     appStore.showError(t('admin.channelMonitor.linkedAccountRequired'))
     return
   }
-  if (usesProbePart.value && !form.primary_model.trim()) {
+  if (usesProbePart.value && isCompositeGroup.value && providerModelValues(form.provider_models).length === 0) {
+    appStore.showError(t('admin.channelMonitor.providerModelRequired'))
+    return
+  }
+  if (usesProbePart.value && !isCompositeGroup.value && !form.primary_model.trim()) {
     appStore.showError(t('admin.channelMonitor.primaryModelRequired'))
     return
   }

@@ -37,6 +37,8 @@ const (
 	FieldPrimaryModel = "primary_model"
 	// FieldExtraModels holds the string denoting the extra_models field in the database.
 	FieldExtraModels = "extra_models"
+	// FieldProviderModels holds the string denoting the provider_models field in the database.
+	FieldProviderModels = "provider_models"
 	// FieldGroupName holds the string denoting the group_name field in the database.
 	FieldGroupName = "group_name"
 	// FieldGroupID holds the string denoting the group_id field in the database.
@@ -108,6 +110,7 @@ var Columns = []string{
 	FieldAPIKeyEncrypted,
 	FieldPrimaryModel,
 	FieldExtraModels,
+	FieldProviderModels,
 	FieldGroupName,
 	FieldGroupID,
 	FieldProbeFallbackEnabled,
@@ -158,6 +161,8 @@ var (
 	PrimaryModelValidator func(string) error
 	// DefaultExtraModels holds the default value on creation for the "extra_models" field.
 	DefaultExtraModels []string
+	// DefaultProviderModels holds the default value on creation for the "provider_models" field.
+	DefaultProviderModels map[string]string
 	// DefaultGroupName holds the default value on creation for the "group_name" field.
 	DefaultGroupName string
 	// GroupNameValidator is a validator for the "group_name" field. It is called by the builders before save.

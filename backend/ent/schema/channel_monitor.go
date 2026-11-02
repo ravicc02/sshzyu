@@ -71,6 +71,9 @@ func (ChannelMonitor) Fields() []ent.Field {
 		field.JSON("extra_models", []string{}).
 			Default([]string{}).
 			Comment("Additional model names to test alongside primary_model"),
+		field.JSON("provider_models", map[string]string{}).
+			Default(map[string]string{}).
+			Comment("Composite monitor probe model per provider; exactly one primary model per provider"),
 		field.String("group_name").
 			Optional().
 			Default("").

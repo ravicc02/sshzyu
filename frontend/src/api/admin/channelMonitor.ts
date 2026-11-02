@@ -14,6 +14,7 @@ export type Provider =
   | 'kimi'
   | 'zhipu'
   | 'deepseek'
+  | 'minimax'
 export type MonitorStatus = 'operational' | 'degraded' | 'failed' | 'error'
 export type BodyOverrideMode = 'off' | 'merge' | 'replace'
 export type APIMode = 'chat_completions' | 'responses'
@@ -72,6 +73,7 @@ export interface ChannelMonitor {
   api_key_decrypt_failed?: boolean
   primary_model: string
   extra_models: string[]
+  provider_models?: Record<string, string>
   group_name: string
   /** Durable group association used by hybrid status cards. */
   group_id?: number | null
@@ -157,6 +159,7 @@ export interface CreateParams {
   account_id?: number | null
   primary_model: string
   extra_models?: string[]
+  provider_models?: Record<string, string>
   group_name?: string
   /** 0 clears the link on update; null/undefined leaves it unchanged. */
   group_id?: number | null
