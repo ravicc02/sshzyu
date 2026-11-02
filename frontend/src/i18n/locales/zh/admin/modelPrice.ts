@@ -23,6 +23,7 @@ export default {
     modelOverrideCount: '{count} 个模型倍率',
     adjustModel: '模型倍率',
     adjust: '调整倍率',
+    adjustChannel: '调整渠道倍率',
     reset: '恢复默认',
     dialogTitle: '调整模型倍率',
     inputPlaceholder: '输入倍率（如 1.35）',

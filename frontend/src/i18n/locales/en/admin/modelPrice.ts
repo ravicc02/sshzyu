@@ -24,6 +24,7 @@ export default {
     modelOverrideCount: '{count} model rates',
     adjustModel: 'Model rate',
     adjust: 'Adjust multiplier',
+    adjustChannel: 'Adjust channel rate',
     reset: 'Reset to default',
     dialogTitle: 'Adjust model multiplier',
     inputPlaceholder: 'Enter multiplier (e.g. 1.35)',

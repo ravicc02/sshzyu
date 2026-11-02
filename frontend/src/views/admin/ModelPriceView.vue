@@ -127,7 +127,7 @@
                           class="rounded-md border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-dark-600 dark:text-dark-200 dark:hover:bg-dark-900"
                           @click="openProviderDialog(g, provider)"
                         >
-                          {{ t('admin.modelPrice.adjust') }}
+                          {{ t('admin.modelPrice.adjustChannel') }}
                         </button>
                         <button
                           v-if="provider.custom"
