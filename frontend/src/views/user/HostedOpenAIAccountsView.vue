@@ -69,8 +69,30 @@
           </dl>
 
           <div class="quota-zone">
-            <QuotaBar label="5 小时" :window="account.quota.five_hour" />
-            <QuotaBar label="每周" :window="account.quota.weekly" />
+            <div class="quota-window-grid">
+              <div class="quota-window">
+                <UsageProgressBar
+                  v-if="account.quota.five_hour"
+                  label="5h"
+                  :utilization="account.quota.five_hour.used_percent"
+                  :resets-at="account.quota.five_hour.reset_at"
+                  :show-now-when-idle="true"
+                  color="indigo"
+                />
+                <div v-else class="quota-empty-row"><span>5h</span><em>暂无数据</em></div>
+              </div>
+              <div class="quota-window">
+                <UsageProgressBar
+                  v-if="account.quota.weekly"
+                  label="7d"
+                  :utilization="account.quota.weekly.used_percent"
+                  :resets-at="account.quota.weekly.reset_at"
+                  :show-now-when-idle="true"
+                  color="emerald"
+                />
+                <div v-else class="quota-empty-row"><span>7d</span><em>暂无数据</em></div>
+              </div>
+            </div>
             <p v-if="account.quota.error" class="quota-error">{{ account.quota.error }}</p>
             <p v-else-if="!account.quota.fetched_at" class="quota-caption">刷新后读取实时窗口</p>
             <p v-else class="quota-caption">更新于 {{ formatTime(account.quota.fetched_at) }}</p>
@@ -319,7 +341,7 @@ import {
   type HostedOpenAIAccount,
   type HostedOpenAIOptions
 } from '@/api/hostedOpenAIAccounts'
-import QuotaBar from '@/components/hosted/QuotaBar.vue'
+import UsageProgressBar from '@/components/account/UsageProgressBar.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { useClipboard } from '@/composables/useClipboard'
@@ -612,7 +634,12 @@ onMounted(load)
 .account-meta > div:nth-child(even) { padding-left: 14px; border-left: 1px solid var(--border-color); }
 .account-meta dt { margin-bottom: 4px; color: var(--text-tertiary); font-size: 10px; }
 .account-meta dd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 550; }
-.quota-zone { display: grid; gap: 14px; padding: 16px 18px 18px; background: color-mix(in srgb, var(--surface-secondary) 70%, var(--surface)); }
+.quota-zone { display: grid; gap: 10px; padding: 14px 18px 16px; background: color-mix(in srgb, var(--surface-secondary) 70%, var(--surface)); }
+.quota-window-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.quota-window { min-width: 0; padding: 10px 11px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); }
+.quota-empty-row { display: flex; align-items: center; gap: 8px; color: var(--text-tertiary); font-size: 10px; }
+.quota-empty-row span { display: inline-flex; min-width: 32px; height: 18px; align-items: center; justify-content: center; border-radius: 4px; color: var(--text-secondary); background: var(--surface-secondary); font-weight: 600; }
+.quota-empty-row em { font-style: normal; }
 .quota-error { color: var(--error-600); font-size: 11px; }
 .quota-caption { color: var(--text-tertiary); font-size: 10px; }
 .card-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border-color); }
@@ -659,6 +686,7 @@ onMounted(load)
   .head-actions .btn { flex: 1; justify-content: center; }
   .account-meta { grid-template-columns: 1fr; }
   .account-meta > div:nth-child(odd), .account-meta > div:nth-child(even) { padding: 10px 0; border-left: 0; }
+  .quota-window-grid { grid-template-columns: 1fr; }
   .card-actions .btn { flex: 1; justify-content: center; }
   .modal-content { margin: 10px; max-height: calc(100vh - 20px); }
 }
