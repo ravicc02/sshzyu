@@ -1,19 +1,6 @@
 <template>
   <AppLayout>
     <main class="admin-hosted-page">
-      <header class="admin-head">
-        <div>
-          <h1>托管管理</h1>
-          <p>{{ filteredAccounts.length }} 条记录</p>
-        </div>
-        <div class="head-actions">
-          <button type="button" class="btn btn-secondary" :disabled="loading" @click="load">
-            <Icon name="refresh" size="sm" :class="{ spinning: loading }" />
-            刷新
-          </button>
-        </div>
-      </header>
-
       <section class="filter-bar">
         <label class="search-box">
           <Icon name="search" size="sm" />
@@ -25,6 +12,11 @@
           <option value="suspended">已停用</option>
           <option value="archived">已归档</option>
         </select>
+        <span class="filter-meta">{{ filteredAccounts.length }} 条记录</span>
+        <button type="button" class="btn btn-secondary" :disabled="loading" @click="load">
+          <Icon name="refresh" size="sm" :class="{ spinning: loading }" />
+          刷新
+        </button>
       </section>
 
       <section v-if="loading && accounts.length === 0" class="hosted-empty">
@@ -345,19 +337,16 @@ onMounted(load)
 
 <style scoped>
 .admin-hosted-page { width: min(1480px, 100%); margin: 0 auto; padding: 24px 24px 64px; color: var(--text-primary); }
-.admin-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
-.admin-head h1 { font-size: 23px; font-weight: 650; line-height: 1.1; }
-.admin-head p { margin-top: 6px; color: var(--text-tertiary); font-size: 11px; }
-.head-actions { display: flex; gap: 8px; }
 .filter-bar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--border-color); border-bottom: 0; border-radius: 10px 10px 0 0; background: var(--surface); }
 .search-box { display: flex; align-items: center; width: min(440px, 100%); gap: 8px; padding: 0 10px; border: 1px solid var(--border-color); border-radius: 7px; background: var(--surface); color: var(--text-tertiary); }
 .search-box input { width: 100%; height: 34px; border: 0; outline: 0; background: transparent; color: var(--text-primary); font-size: 12px; }
 .status-select { width: 132px; height: 36px; }
+.filter-meta { margin-left: auto; color: var(--text-tertiary); font-size: 10px; white-space: nowrap; }
 .hosted-empty { min-height: 300px; display: grid; place-items: center; align-content: center; gap: 14px; border: 1px solid var(--border-color); border-radius: 0 0 10px 10px; background: var(--surface); color: var(--text-tertiary); }
 .hosted-empty h2 { font-size: 14px; font-weight: 600; }
 .loading-ring { width: 28px; height: 28px; border: 2px solid var(--border-color); border-top-color: var(--primary-500); border-radius: 50%; animation: spin 0.8s linear infinite; }
 .hosted-list { overflow: hidden; border: 1px solid var(--border-color); border-radius: 0 0 10px 10px; background: var(--surface); }
-.list-head, .hosted-row { display: grid; grid-template-columns: minmax(190px, 1.05fr) minmax(245px, 1.55fr) minmax(105px, .62fr) minmax(235px, 1.15fr) 92px 150px; align-items: center; gap: 18px; padding: 0 18px; }
+.list-head, .hosted-row { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(205px, 1.35fr) 82px minmax(180px, 1fr) 72px 140px; align-items: center; gap: 12px; padding: 0 14px; }
 .list-head { min-height: 38px; border-bottom: 1px solid var(--border-color); color: var(--text-tertiary); background: var(--surface-secondary); font-size: 10px; font-weight: 650; letter-spacing: .01em; }
 .hosted-row { min-height: 112px; border-bottom: 1px solid var(--border-color); transition: background-color .15s ease; }
 .hosted-row:last-child { border-bottom: 0; }
@@ -412,10 +401,6 @@ onMounted(load)
 :global(.dark) .status-chip.is-active { color: #9df1ce; background: rgb(4 120 87 / 0.26); }
 :global(.dark) .status-chip.is-muted { color: #ffd38a; background: rgb(146 94 0 / 0.25); }
 :global(.dark) .messages-state.enabled { color: #9df1ce; background: rgb(4 120 87 / 0.26); }
-@media (max-width: 1120px) {
-  .hosted-list { overflow-x: auto; }
-  .list-head, .hosted-row { min-width: 1070px; }
-}
 @media (max-width: 900px) {
   .hosted-list { overflow: visible; border: 0; border-radius: 0; background: transparent; }
   .list-head { display: none; }
@@ -426,7 +411,8 @@ onMounted(load)
 }
 @media (max-width: 700px) {
   .admin-hosted-page { padding: 16px 12px 48px; }
-  .filter-bar { flex-direction: column; }
+  .filter-bar { flex-wrap: wrap; }
   .search-box, .status-select { width: 100%; }
+  .filter-meta { margin-left: 0; }
 }
 </style>

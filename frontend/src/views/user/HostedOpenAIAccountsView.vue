@@ -1,11 +1,8 @@
 <template>
   <AppLayout>
     <main class="hosted-page">
-      <header class="page-head">
-        <div>
-          <h1>托管账号</h1>
-          <p>{{ activeCount }} 个运行中</p>
-        </div>
+      <header class="hosted-toolbar">
+        <span class="toolbar-meta">{{ accounts.length }} 个账号 · {{ activeCount }} 个运行中</span>
         <div class="head-actions">
           <button type="button" class="btn btn-secondary" :disabled="loading" @click="load">
             <Icon name="refresh" size="sm" :class="{ spinning: loading }" />
@@ -606,9 +603,8 @@ onMounted(load)
 
 <style scoped>
 .hosted-page { width: min(1180px, 100%); margin: 0 auto; padding: 28px 24px 72px; color: var(--text-primary); }
-.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
-.page-head h1 { font-size: 24px; line-height: 1.1; font-weight: 650; letter-spacing: 0; }
-.page-head p { margin-top: 7px; color: var(--text-tertiary); font-size: 12px; }
+.hosted-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface); }
+.toolbar-meta { color: var(--text-tertiary); font-size: 11px; }
 .head-actions { display: flex; gap: 8px; }
 .empty-panel { min-height: 330px; display: grid; place-items: center; align-content: center; gap: 16px; border: 1px dashed var(--border-color); border-radius: 12px; background: var(--surface); }
 .empty-mark { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; color: var(--primary-600); background: color-mix(in srgb, var(--primary-500) 10%, transparent); }
@@ -678,10 +674,10 @@ onMounted(load)
 @media (max-width: 860px) {
   .hosted-page { padding: 18px 14px 56px; }
   .account-grid { grid-template-columns: 1fr; }
-  .page-head { align-items: flex-start; }
+  .hosted-toolbar { align-items: flex-start; }
 }
 @media (max-width: 560px) {
-  .page-head { flex-direction: column; }
+  .hosted-toolbar { flex-direction: column; }
   .head-actions { width: 100%; }
   .head-actions .btn { flex: 1; justify-content: center; }
   .account-meta { grid-template-columns: 1fr; }
