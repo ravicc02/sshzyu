@@ -741,6 +741,7 @@ export default {
         paidPrice: '实付',
       pricingHint: '以下为标准时段价；卡片对比倍率前基准价与实付价，官方参考价见详情表',
       standardRate: '分组生效倍率 ×{rate}',
+      defaultRate: '分组默认倍率 ×{rate}，各模型按实际渠道倍率结算',
       discount: '优惠 {percent}%',
       surcharge: '加价 {percent}%',
       independentRate: '独立倍率',

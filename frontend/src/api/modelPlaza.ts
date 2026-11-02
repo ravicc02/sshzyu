@@ -46,6 +46,11 @@ export interface PlazaTimePricing {
 export interface PlazaModel {
   name: string
   platform: string
+  /**
+   * 模型或供应商的独立计费倍率；存在时替代用户/分组倍率。
+   * 图片、视频独立倍率在展示时仍按分组配置优先。
+   */
+  rate_multiplier?: number
   /** Explicit cross-model channel mapping target, e.g. gpt-6-luna -> gpt-6-sol. */
   route_target?: string
   /** 实收口径的展示定价：多档时 intervals 为各档绝对单价（已由计费服务折算）；均为标准时段价。 */

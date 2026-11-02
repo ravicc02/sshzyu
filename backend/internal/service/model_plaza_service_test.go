@@ -742,3 +742,18 @@ func TestListGroups_TimePricingPassthrough(t *testing.T) {
 	// 展示单价为标准时段价
 	require.InDelta(t, 0.28e-6, *m.Pricing.InputPrice, 1e-15)
 }
+
+func TestPlazaModelRateMultiplier_UsesProviderOverride(t *testing.T) {
+	providerRate := 0.8
+	group := &Group{
+		Platform: PlatformComposite,
+		ModelPricing: []ChannelModelPricing{
+			{Models: []string{"__provider_rate__:kimi"}, RateMultiplier: &providerRate},
+		},
+	}
+
+	kimiRate := plazaModelRateMultiplier(group, "kimi-k3.1-pro")
+	require.NotNil(t, kimiRate)
+	require.InDelta(t, 0.8, *kimiRate, 1e-12)
+	require.Nil(t, plazaModelRateMultiplier(group, "glm-5.3-flash"))
+}

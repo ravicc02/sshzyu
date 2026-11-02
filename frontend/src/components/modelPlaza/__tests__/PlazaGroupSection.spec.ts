@@ -103,6 +103,17 @@ describe('PlazaGroupSection 模型卡片', () => {
     expect(wrapper.findComponent(PlazaModelPricingTable).exists()).toBe(true)
   })
 
+  it('uses the model provider rate instead of the group default rate', () => {
+    const model = ladderModel(1)
+    model.name = 'kimi-k3.1-pro'
+    model.platform = 'kimi'
+    model.rate_multiplier = 0.8
+    const wrapper = mountSection(group({ platform: 'composite', rate_multiplier: 0.4, models: [model] }))
+
+    expect(wrapper.text()).toContain('¥4.00')
+    expect(wrapper.text()).toContain('¥24.00')
+  })
+
   it('uses the API route target to show an explicit mapping arrow', () => {
     const model = ladderModel(1)
     model.name = 'gpt-6-luna'

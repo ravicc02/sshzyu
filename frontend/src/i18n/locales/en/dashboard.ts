@@ -736,6 +736,7 @@ export default {
       paidPrice: 'Your price',
       pricingHint: 'Standard-period rates. Group cards compare the base rate with your price after the multiplier; official reference pricing is in the detailed table.',
       standardRate: 'Effective group rate ×{rate}',
+      defaultRate: 'Default group rate ×{rate}; each model uses its actual channel rate',
       discount: '{percent}% off',
       surcharge: '{percent}% higher',
       independentRate: 'Independent rate',

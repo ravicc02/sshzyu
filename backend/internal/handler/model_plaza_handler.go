@@ -71,6 +71,9 @@ type modelPlazaModel struct {
 	RouteTarget     string                     `json:"route_target,omitempty"`
 	Pricing         *userSupportedModelPricing `json:"pricing"`
 	OfficialPricing *modelPlazaOfficialPricing `json:"official_pricing"`
+	// RateMultiplier is an explicit model/provider billing override. When absent,
+	// clients use the group or user-specific multiplier.
+	RateMultiplier *float64 `json:"rate_multiplier,omitempty"`
 	// LongContextBasis 多档时的计价基准："whole_request"（整单按档）| "marginal"（仅超出部分）。
 	LongContextBasis string `json:"long_context_basis,omitempty"`
 	// TimePricing 分时倍率时段，落在时段内的请求整单乘倍率；无分时省略。
@@ -211,6 +214,7 @@ func toModelPlazaGroupDTO(g *service.PlazaGroup, userRates map[int64]float64) mo
 			RouteTarget:      m.RouteTarget,
 			Pricing:          toUserPricing(m.Pricing),
 			OfficialPricing:  toModelPlazaOfficialPricing(m.OfficialPricing),
+			RateMultiplier:   m.RateMultiplier,
 			LongContextBasis: string(m.LongContextBasis),
 			TimePricing:      toModelPlazaTimePricing(m.TimePricing),
 		})

@@ -101,7 +101,11 @@
       <div v-if="expanded" class="border-t border-gray-100 dark:border-dark-700/60">
         <div class="flex flex-wrap items-center justify-between gap-2 bg-gray-50/70 px-5 py-3 text-xs text-gray-500 dark:bg-dark-900/30 dark:text-dark-400 sm:px-6">
           <span class="font-medium">{{ t('modelPlaza.card.pricingHint') }}</span>
-          <span>{{ t('modelPlaza.card.standardRate', { rate: effectiveRate }) }}</span>
+          <span>
+            {{ hasModelRateOverrides
+              ? t('modelPlaza.card.defaultRate', { rate: effectiveRate })
+              : t('modelPlaza.card.standardRate', { rate: effectiveRate }) }}
+          </span>
         </div>
         <div class="px-0 pb-1 pt-1">
           <PlazaModelPricingTable
@@ -155,6 +159,9 @@ const appStore = useAppStore()
 const expanded = ref(false)
 
 const effectiveRate = computed(() => props.group.user_rate_multiplier ?? props.group.rate_multiplier)
+const hasModelRateOverrides = computed(() =>
+  props.group.models.some((model) => model.rate_multiplier != null && model.rate_multiplier > 0)
+)
 
 interface PreviewPrice {
   standard: string
@@ -240,7 +247,7 @@ function modelRate(model: ModelPlazaGroup['models'][number]): number {
   const mode = billingMode(model)
   if (mode === BILLING_MODE_IMAGE && props.group.image_rate_independent) return props.group.image_rate_multiplier ?? 1
   if (mode === BILLING_MODE_VIDEO && props.group.video_rate_independent) return props.group.video_rate_multiplier ?? 1
-  return effectiveRate.value
+  return model.rate_multiplier ?? effectiveRate.value
 }
 
 /** 高峰窗口描述(含倍率与服务器时区标注);分组未启用高峰为空串。 */

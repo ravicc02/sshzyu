@@ -27,6 +27,9 @@ type PlazaModel struct {
 	Platform        string
 	Pricing         *ChannelModelPricing
 	OfficialPricing *PlazaOfficialPricing
+	// RateMultiplier is the model/provider billing override configured in group
+	// model pricing. Nil means the group/user rate remains effective.
+	RateMultiplier *float64
 	// RouteTarget 是渠道显式跨模型映射的目标；同名或隐式映射为空。
 	RouteTarget string
 	// LongContextBasis 多档时的计价基准（整单 / 仅超出部分），单档为空。
@@ -326,6 +329,7 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 		g := groupEnt[gid]
 		for j := range pg.Models {
 			s.fillDisplayPricing(ctx, &pg.Models[j], g)
+			pg.Models[j].RateMultiplier = plazaModelRateMultiplier(g, pg.Models[j].Name)
 			pg.Models[j].OfficialPricing = s.resolveOfficialPricing(ctx, &pg.Models[j], officialMemo)
 		}
 		out = append(out, *pg)
@@ -338,6 +342,15 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 		return out[i].Name < out[j].Name
 	})
 	return out, nil
+}
+
+func plazaModelRateMultiplier(group *Group, modelName string) *float64 {
+	pricing := matchGroupModelPricing(group, modelName)
+	if pricing == nil || pricing.RateMultiplier == nil || *pricing.RateMultiplier <= 0 {
+		return nil
+	}
+	rate := *pricing.RateMultiplier
+	return &rate
 }
 
 // fillDisplayPricing 把模型的展示定价换成实收口径：
