@@ -36,6 +36,7 @@
           <span>代理</span>
           <span>用量窗口</span>
           <span>状态</span>
+          <span>调度</span>
           <span class="actions-col">操作</span>
         </div>
         <article v-for="account in accounts" :key="account.id" class="hosted-row">
@@ -48,9 +49,9 @@
             </div>
           </div>
 
-          <HostedAccountMeta :account="account" />
+          <HostedAccountMeta data-label="平台 / 类型" :account="account" />
 
-          <div class="group-cell">
+          <div class="group-cell" data-label="专属分组设置">
             <strong :title="account.group_name">{{ account.group_name }}</strong>
             <div class="model-chips" :title="account.models.join(', ')">
               <code v-for="model in account.models.slice(0, 3)" :key="model">{{ model }}</code>
@@ -58,24 +59,40 @@
             </div>
           </div>
 
-          <div class="proxy-cell">
+          <div class="proxy-cell" data-label="代理 / 协议">
             <strong>{{ account.proxy_name || '直连' }}</strong>
             <span class="messages-state" :class="{ enabled: account.supports_messages }">
               {{ account.supports_messages ? '/v1/messages' : 'Messages 关闭' }}
             </span>
           </div>
 
-          <HostedAccountUsage :account="account" />
+          <HostedAccountUsage data-label="用量窗口" :account="account" />
 
-          <div class="status-cell">
+          <div class="status-cell" data-label="状态">
             <span class="status-chip" :class="statusClass(account)">{{ statusLabel(account) }}</span>
           </div>
 
+          <div class="schedule-cell" data-label="参与账号调度">
+            <button
+              type="button"
+              role="switch"
+              class="switch-control"
+              :class="{ checked: account.schedulable }"
+              :aria-checked="account.schedulable"
+              :aria-label="account.schedulable ? '关闭账号调度' : '开启账号调度'"
+              :disabled="busyID === account.id || account.status !== 'active' || account.account_status !== 'active'"
+              :title="account.schedulable ? '关闭账号调度' : '开启账号调度'"
+              @click="toggleSchedulable(account)"
+            >
+              <span />
+            </button>
+          </div>
+
           <div class="row-actions">
-            <button type="button" class="icon-button" title="刷新额度" :disabled="refreshingID === account.id" @click="refreshQuota(account)">
+            <button type="button" class="icon-button" title="刷新额度" :disabled="busyID === account.id" @click="refreshQuota(account)">
               <Icon name="refresh" size="sm" :class="{ spinning: refreshingID === account.id }" />
             </button>
-            <button type="button" class="icon-button" title="配置" @click="openEdit(account)">
+            <button type="button" class="icon-button" title="编辑账号与专属分组设置" @click="openEdit(account)">
               <Icon name="edit" size="sm" />
             </button>
             <button type="button" class="icon-button" title="重新授权" @click="openReauth(account)">
@@ -116,8 +133,8 @@
             <header class="settings-section-head">
               <span class="section-icon"><Icon name="users" size="sm" /></span>
               <div>
-                <strong>自动分配订阅分组</strong>
-                <p>创建后自动生成专属私密分组与订阅，以下选项作用于该分组。</p>
+                <strong>专属分组设置</strong>
+                <p>创建后自动生成专属分组与订阅，以下模型和协议选项作用于该分组。</p>
               </div>
             </header>
             <label class="field">
@@ -187,7 +204,7 @@
       <div class="modal-content hosted-modal w-full">
         <header class="modal-head">
           <div>
-            <h2>账号配置</h2>
+            <h2>编辑托管账号</h2>
             <p>{{ editAccount.account_email }}</p>
           </div>
           <button type="button" class="icon-button" title="关闭" @click="editAccount = null">
@@ -210,8 +227,8 @@
             <header class="settings-section-head">
               <span class="section-icon"><Icon name="users" size="sm" /></span>
               <div>
-                <strong>自动分配订阅分组</strong>
-                <p>这些设置直接作用于该托管账号对应的专属分组。</p>
+                <strong>专属分组设置</strong>
+                <p>模型白名单和协议支持只作用于此账号对应的专属分组。</p>
               </div>
             </header>
             <label class="field">
@@ -232,7 +249,7 @@
           </section>
         </div>
         <footer class="modal-foot">
-          <button type="button" class="btn btn-secondary" @click="editAccount = null">取消</button>
+          <button type="button" class="btn btn-secondary" :disabled="savingEdit" @click="editAccount = null">取消</button>
           <button type="button" class="btn btn-primary" :disabled="savingEdit || !editForm.account_name || editForm.models.length === 0" @click="saveEdit">
             {{ savingEdit ? '保存中' : '保存' }}
           </button>
@@ -311,6 +328,7 @@ import {
   listHostedOpenAIAccounts,
   reauthorizeHostedOpenAIAccount,
   refreshHostedOpenAIQuota,
+  setHostedOpenAIAccountSchedulable,
   updateHostedOpenAIAccount,
   type HostedOpenAIAccount,
   type HostedOpenAIOptions
@@ -327,6 +345,7 @@ const { copied, copyToClipboard } = useClipboard()
 const loading = ref(true)
 const accounts = ref<HostedOpenAIAccount[]>([])
 const options = ref<HostedOpenAIOptions>({ proxies: [], suggested_models: [] })
+const busyID = ref<number | null>(null)
 const refreshingID = ref<number | null>(null)
 
 const createOpen = ref(false)
@@ -470,6 +489,7 @@ async function saveEdit() {
 }
 
 async function refreshQuota(account: HostedOpenAIAccount) {
+  busyID.value = account.id
   refreshingID.value = account.id
   try {
     replaceAccount(await refreshHostedOpenAIQuota(account.id))
@@ -477,6 +497,19 @@ async function refreshQuota(account: HostedOpenAIAccount) {
     appStore.showError(extractApiErrorMessage(error, '刷新额度失败'))
   } finally {
     refreshingID.value = null
+    busyID.value = null
+  }
+}
+
+async function toggleSchedulable(account: HostedOpenAIAccount) {
+  busyID.value = account.id
+  try {
+    replaceAccount(await setHostedOpenAIAccountSchedulable(account.id, !account.schedulable))
+    appStore.showSuccess?.(account.schedulable ? '已从调度中停用' : '已加入账号调度')
+  } catch (error) {
+    appStore.showError(extractApiErrorMessage(error, '更新调度状态失败'))
+  } finally {
+    busyID.value = null
   }
 }
 
@@ -576,7 +609,7 @@ onMounted(load)
 </script>
 
 <style scoped>
-.hosted-page { width: min(1180px, 100%); margin: 0 auto; padding: 28px 24px 72px; color: var(--text-primary); }
+.hosted-page { width: min(1480px, 100%); margin: 0 auto; padding: 24px 24px 72px; color: var(--text-primary); }
 .hosted-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface); }
 .toolbar-meta { color: var(--text-tertiary); font-size: 11px; }
 .head-actions { display: flex; gap: 8px; }
@@ -585,11 +618,13 @@ onMounted(load)
 .empty-panel h2 { font-size: 15px; font-weight: 600; }
 .loading-ring { width: 30px; height: 30px; border: 2px solid var(--border-color); border-top-color: var(--primary-500); border-radius: 50%; animation: spin 0.8s linear infinite; }
 .hosted-list { overflow: hidden; border: 1px solid var(--border-color); border-radius: 10px; background: var(--surface); }
-.list-head, .hosted-row { display: grid; grid-template-columns: minmax(220px, 1.2fr) minmax(140px, .78fr) minmax(190px, 1.1fr) minmax(96px, .55fr) minmax(190px, 1fr) 76px 112px; align-items: center; gap: 14px; padding: 0 16px; }
+.list-head, .hosted-row { display: grid; grid-template-columns: minmax(180px, 1.1fr) minmax(120px, .76fr) minmax(168px, 1.05fr) minmax(96px, .6fr) minmax(160px, 1fr) 66px 58px 90px; align-items: center; gap: 10px; padding: 0 14px; }
 .list-head { min-height: 40px; border-bottom: 1px solid var(--border-color); color: var(--text-tertiary); background: var(--surface-secondary); font-size: 10px; font-weight: 650; }
 .hosted-row { min-height: 116px; border-bottom: 1px solid var(--border-color); transition: background-color .15s ease; }
 .hosted-row:last-child { border-bottom: 0; }
 .hosted-row:hover { background: color-mix(in srgb, var(--primary-500) 3%, var(--surface)); }
+.hosted-row > :not(:first-child) { align-self: stretch; padding-inline-start: 10px; border-inline-start: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent); }
+.list-head > :not(:first-child) { min-height: 20px; padding-inline-start: 10px; border-inline-start: 1px solid var(--border-color); }
 .identity-cell { display: flex; align-items: center; min-width: 0; gap: 11px; }
 .account-avatar { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; border: 1px solid color-mix(in srgb, var(--primary-500) 25%, var(--border-color)); border-radius: 8px; color: var(--primary-700); background: color-mix(in srgb, var(--primary-500) 9%, var(--surface)); font-size: 13px; font-weight: 700; }
 .identity-copy, .group-cell, .proxy-cell { display: grid; min-width: 0; gap: 4px; }
@@ -608,6 +643,13 @@ onMounted(load)
 .status-chip.is-active { color: #087a55; background: #e7f8ef; }
 .status-chip.is-muted { color: #8a5a00; background: #fff3d8; }
 .status-chip.is-error { color: #be123c; background: #ffe4e6; }
+.schedule-cell { display: flex; align-items: center; justify-content: center; }
+.switch-control { position: relative; width: 36px; height: 22px; padding: 0; border: 0; border-radius: 999px; background: #cbd5e1; transition: background-color .16s ease; }
+.switch-control span { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(15 23 42 / .28); transition: transform .16s ease; }
+.switch-control.checked { background: var(--primary-600); }
+.switch-control.checked span { transform: translateX(14px); }
+.switch-control:disabled { cursor: not-allowed; opacity: .48; }
+.icon-button:focus-visible, .switch-control:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
 .icon-button { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border: 1px solid var(--border-color); border-radius: 7px; color: var(--text-secondary); background: var(--surface); }
 .icon-button:disabled { opacity: 0.55; }
 .row-actions { display: flex; justify-content: flex-end; gap: 5px; }
@@ -646,22 +688,22 @@ onMounted(load)
 :global(.dark) .status-chip.is-muted { color: #ffd38a; background: rgb(146 94 0 / 0.25); }
 :global(.dark) .status-chip.is-error { color: #fecdd3; background: rgb(159 18 57 / 0.28); }
 :global(.dark) .messages-state.enabled { color: #9df1ce; background: rgb(4 120 87 / 0.26); }
-@media (max-width: 1080px) and (min-width: 861px) {
+@media (max-width: 1300px) and (min-width: 861px) {
   .hosted-list { overflow-x: auto; }
-  .list-head, .hosted-row { min-width: 1040px; }
+  .list-head, .hosted-row { min-width: 1060px; }
 }
 @media (max-width: 860px) {
   .hosted-page { padding: 18px 14px 56px; }
   .hosted-toolbar { align-items: flex-start; }
   .hosted-list { overflow: visible; border: 0; background: transparent; }
   .list-head { display: none; }
-  .hosted-row { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 18px; margin-bottom: 10px; padding: 16px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface); }
+  .hosted-row { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 14px; margin-bottom: 10px; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); }
   .hosted-row:last-child { border-bottom: 1px solid var(--border-color); }
-  .identity-cell { grid-column: 1 / -1; }
-  .hosted-row > :nth-child(3) { grid-column: 1 / -1; }
-  .hosted-row > :nth-child(5) { grid-column: 1 / -1; }
-  .status-cell { justify-content: flex-end; }
-  .row-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .hosted-row > :not(:first-child) { min-height: 48px; padding: 9px 0 0; border-inline-start: 0; border-top: 1px solid var(--border-color); }
+  .hosted-row > [data-label]::before { display: block; margin-bottom: 7px; color: var(--text-tertiary); content: attr(data-label); font-size: 10px; font-weight: 600; }
+  .identity-cell, .hosted-row > :nth-child(2), .hosted-row > :nth-child(3), .hosted-row > :nth-child(4), .hosted-row > :nth-child(5), .hosted-row > :nth-child(6), .hosted-row > :nth-child(7), .hosted-row > :nth-child(8) { grid-column: 1 / -1; }
+  .schedule-cell { justify-content: flex-start; }
+  .row-actions { grid-column: 1 / -1; justify-content: flex-start; padding-top: 10px !important; }
 }
 @media (max-width: 560px) {
   .hosted-toolbar { flex-direction: column; }

@@ -374,6 +374,41 @@ func (s *HostedOpenAIAccountService) UpdateForUser(
 	return s.update(ctx, record, input)
 }
 
+func (s *HostedOpenAIAccountService) SetSchedulableForUser(
+	ctx context.Context,
+	userID, id int64,
+	schedulable bool,
+) (*HostedOpenAIAccountView, error) {
+	record, err := s.repo.GetByIDForUser(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+	if schedulable {
+		if record.Status != "active" {
+			return nil, infraerrors.Conflict("HOSTED_OPENAI_ACCOUNT_NOT_ACTIVE", "only active hosted accounts can be scheduled")
+		}
+		accounts, err := s.adminService.GetAccountsByIDs(ctx, []int64{record.AccountID})
+		if err != nil {
+			return nil, fmt.Errorf("check hosted account status: %w", err)
+		}
+		if len(accounts) == 0 || accounts[0] == nil || accounts[0].Status != "active" {
+			return nil, infraerrors.Conflict("HOSTED_OPENAI_ACCOUNT_UNAVAILABLE", "unavailable accounts cannot be scheduled")
+		}
+	}
+	if _, err := s.adminService.SetAccountSchedulable(ctx, record.AccountID, schedulable); err != nil {
+		return nil, fmt.Errorf("update hosted account scheduling state: %w", err)
+	}
+	updated, err := s.repo.GetByIDForUser(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+	views := s.views(ctx, []HostedOpenAIAccountRecord{*updated})
+	if len(views) == 0 {
+		return nil, ErrHostedOpenAIAccountNotFound
+	}
+	return &views[0], nil
+}
+
 func (s *HostedOpenAIAccountService) UpdateForAdmin(
 	ctx context.Context,
 	id int64,

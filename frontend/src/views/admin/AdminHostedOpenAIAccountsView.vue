@@ -49,14 +49,14 @@
             </div>
           </div>
 
-          <div class="account-id-cell">
+          <div class="account-id-cell" data-label="账号 ID / 容量">
             <code>#{{ account.account_id }}</code>
             <HostedAccountCapacity :concurrency="account.concurrency" />
           </div>
 
-          <HostedAccountMeta :account="account" />
+          <HostedAccountMeta data-label="平台 / 类型" :account="account" />
 
-          <div class="group-cell">
+          <div class="group-cell" data-label="专属分组设置">
             <strong class="ellipsis" :title="account.group_name">{{ account.group_name }}</strong>
             <div class="model-chips" :title="(account.models || [account.model]).join(', ')">
               <code v-for="model in (account.models || [account.model]).slice(0, 3)" :key="model">{{ model }}</code>
@@ -64,27 +64,28 @@
             </div>
           </div>
 
-          <div class="proxy-cell">
+          <div class="proxy-cell" data-label="代理 / 协议">
             <strong>{{ account.proxy_name || '直连' }}</strong>
             <span class="messages-state" :class="{ enabled: account.supports_messages }">
               {{ account.supports_messages ? '/v1/messages' : 'Messages 关闭' }}
             </span>
           </div>
 
-          <HostedAccountUsage :account="account" />
+          <HostedAccountUsage data-label="用量窗口" :account="account" />
 
-          <div class="status-stack">
+          <div class="status-stack" data-label="状态">
             <span class="status-chip" :class="statusClass(account)">{{ statusLabel(account) }}</span>
             <small>{{ schedulingLabel(account) }}</small>
           </div>
 
-          <div class="schedule-cell">
+          <div class="schedule-cell" data-label="参与账号调度">
             <button
               type="button"
               role="switch"
               class="switch-control"
               :class="{ checked: account.schedulable }"
               :aria-checked="account.schedulable"
+              :aria-label="account.schedulable ? '关闭账号调度' : '开启账号调度'"
               :disabled="busyID === account.id || account.status === 'archived'"
               :title="account.schedulable ? '关闭账号调度' : '开启账号调度'"
               @click="toggleStatus(account)"
@@ -119,7 +120,7 @@
       <div class="modal-content hosted-modal w-full">
         <header class="modal-head">
           <div>
-            <h2>托管配置</h2>
+            <h2>编辑托管账号</h2>
             <p>{{ editing.user_name }} · {{ editing.account_email }}</p>
           </div>
           <button type="button" class="icon-button" title="关闭" @click="editing = null">
@@ -142,7 +143,7 @@
             <header class="settings-section-head">
               <span class="section-icon"><Icon name="users" size="sm" /></span>
               <div>
-                <strong>自动分配订阅分组</strong>
+                <strong>专属分组设置</strong>
                 <p>这些配置直接作用于该托管账号对应的专属分组。</p>
               </div>
             </header>
@@ -345,11 +346,13 @@ onMounted(load)
 .hosted-empty h2 { font-size: 14px; font-weight: 600; }
 .loading-ring { width: 28px; height: 28px; border: 2px solid var(--border-color); border-top-color: var(--primary-500); border-radius: 50%; animation: spin 0.8s linear infinite; }
 .hosted-list { overflow: hidden; border: 1px solid var(--border-color); border-radius: 0 0 10px 10px; background: var(--surface); }
-.list-head, .hosted-row { display: grid; grid-template-columns: minmax(210px, 1.2fr) 82px minmax(128px, .72fr) minmax(190px, 1.15fr) minmax(92px, .55fr) minmax(190px, 1fr) 76px 54px 112px; align-items: center; gap: 12px; padding: 0 14px; }
+.list-head, .hosted-row { display: grid; grid-template-columns: minmax(190px, 1.15fr) 84px minmax(128px, .76fr) minmax(178px, 1.1fr) minmax(104px, .62fr) minmax(176px, 1fr) 76px 62px 104px; align-items: center; gap: 9px; padding: 0 14px; }
 .list-head { min-height: 38px; border-bottom: 1px solid var(--border-color); color: var(--text-tertiary); background: var(--surface-secondary); font-size: 10px; font-weight: 650; letter-spacing: .01em; }
 .hosted-row { min-height: 116px; border-bottom: 1px solid var(--border-color); transition: background-color .15s ease; }
 .hosted-row:last-child { border-bottom: 0; }
 .hosted-row:hover { background: color-mix(in srgb, var(--primary-500) 3%, var(--surface)); }
+.hosted-row > :not(:first-child) { align-self: stretch; padding-inline-start: 9px; border-inline-start: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent); }
+.list-head > :not(:first-child) { min-height: 20px; padding-inline-start: 9px; border-inline-start: 1px solid var(--border-color); }
 .identity-cell { display: flex; align-items: center; min-width: 0; gap: 10px; }
 .avatar { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border-radius: 8px; color: var(--primary-700); background: color-mix(in srgb, var(--primary-500) 10%, var(--surface)); font-size: 12px; font-weight: 700; }
 .identity-copy, .group-cell, .proxy-cell, .account-id-cell { display: grid; min-width: 0; gap: 4px; }
@@ -381,6 +384,7 @@ onMounted(load)
 .icon-button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-secondary); background: var(--surface); }
 .icon-button.danger { color: var(--error-600); }
 .icon-button:disabled { opacity: 0.45; }
+.icon-button:focus-visible, .switch-control:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
 .hosted-modal { max-width: 580px; }
 .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px 22px; border-bottom: 1px solid var(--border-color); }
 .modal-head h2 { font-size: 17px; font-weight: 650; }
@@ -407,21 +411,21 @@ onMounted(load)
 :global(.dark) .status-chip.is-muted { color: #ffd38a; background: rgb(146 94 0 / 0.25); }
 :global(.dark) .status-chip.is-error { color: #fecdd3; background: rgb(159 18 57 / 0.28); }
 :global(.dark) .messages-state.enabled { color: #9df1ce; background: rgb(4 120 87 / 0.26); }
-@media (max-width: 1200px) and (min-width: 901px) {
+@media (max-width: 1300px) and (min-width: 901px) {
   .hosted-list { overflow-x: auto; }
-  .list-head, .hosted-row { min-width: 1180px; }
+  .list-head, .hosted-row { min-width: 1240px; }
 }
 @media (max-width: 900px) {
   .hosted-list { overflow: visible; border: 0; border-radius: 0; background: transparent; }
   .list-head { display: none; }
-  .hosted-row { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 18px; margin-bottom: 10px; padding: 16px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface); }
+  .hosted-row { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 14px; margin-bottom: 10px; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); }
   .hosted-row:last-child { border-bottom: 1px solid var(--border-color); }
-  .identity-cell { grid-column: 1 / -1; }
-  .account-id-cell, .status-stack { align-self: center; }
+  .hosted-row > :not(:first-child) { min-height: 48px; padding: 9px 0 0; border-inline-start: 0; border-top: 1px solid var(--border-color); }
+  .hosted-row > [data-label]::before { display: block; margin-bottom: 7px; color: var(--text-tertiary); content: attr(data-label); font-size: 10px; font-weight: 600; }
+  .identity-cell, .hosted-row > :nth-child(2), .hosted-row > :nth-child(3), .hosted-row > :nth-child(4), .hosted-row > :nth-child(5), .hosted-row > :nth-child(6), .hosted-row > :nth-child(7), .hosted-row > :nth-child(8), .hosted-row > :nth-child(9) { grid-column: 1 / -1; }
   .hosted-account-meta, .group-cell, .proxy-cell { min-width: 0; }
-  .hosted-row > :nth-child(6) { grid-column: 1 / -1; }
-  .schedule-cell { justify-content: flex-end; }
-  .row-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .schedule-cell { justify-content: flex-start; }
+  .row-actions { grid-column: 1 / -1; justify-content: flex-start; padding-top: 10px !important; }
 }
 @media (max-width: 700px) {
   .admin-hosted-page { padding: 16px 12px 48px; }

@@ -142,6 +142,7 @@ func RegisterUserRoutes(
 			hosted.POST("/auth-url", h.HostedOpenAIAccounts.GenerateAuthURL)
 			hosted.POST("", h.HostedOpenAIAccounts.Create)
 			hosted.PUT("/:id", h.HostedOpenAIAccounts.Update)
+			hosted.POST("/:id/schedulable", h.HostedOpenAIAccounts.SetSchedulable)
 			hosted.POST("/:id/refresh-quota", h.HostedOpenAIAccounts.RefreshQuota)
 			hosted.POST("/:id/reauthorize", h.HostedOpenAIAccounts.Reauthorize)
 		}

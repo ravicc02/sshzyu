@@ -59,6 +59,10 @@ type hostedOpenAIStatusRequest struct {
 	Status string `json:"status"`
 }
 
+type hostedOpenAISchedulableRequest struct {
+	Schedulable *bool `json:"schedulable"`
+}
+
 func (h *HostedOpenAIAccountHandler) GenerateAuthURL(c *gin.Context) {
 	userID, ok := currentHostedUserID(c)
 	if !ok {
@@ -164,6 +168,32 @@ func (h *HostedOpenAIAccountHandler) Update(c *gin.Context) {
 		ProxyID:          req.ProxyID,
 		SupportsMessages: req.SupportsMessages,
 	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, item)
+}
+
+func (h *HostedOpenAIAccountHandler) SetSchedulable(c *gin.Context) {
+	userID, ok := currentHostedUserID(c)
+	if !ok {
+		return
+	}
+	id, ok := hostedPathID(c)
+	if !ok {
+		return
+	}
+	var req hostedOpenAISchedulableRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if req.Schedulable == nil {
+		response.BadRequest(c, "schedulable is required")
+		return
+	}
+	item, err := h.service.SetSchedulableForUser(c.Request.Context(), userID, id, *req.Schedulable)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

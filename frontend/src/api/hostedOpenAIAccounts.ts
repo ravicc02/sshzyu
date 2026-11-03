@@ -120,6 +120,16 @@ export async function updateHostedOpenAIAccount(
   return data
 }
 
+export async function setHostedOpenAIAccountSchedulable(
+  id: number,
+  schedulable: boolean
+): Promise<HostedOpenAIAccount> {
+  const { data } = await apiClient.post<HostedOpenAIAccount>(`/hosted-openai-accounts/${id}/schedulable`, {
+    schedulable
+  })
+  return data
+}
+
 export async function refreshHostedOpenAIQuota(id: number): Promise<HostedOpenAIAccount> {
   const { data } = await apiClient.post<HostedOpenAIAccount>(`/hosted-openai-accounts/${id}/refresh-quota`)
   return data
