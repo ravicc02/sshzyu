@@ -375,9 +375,10 @@ func (r *channelMonitorRepository) ListGroupAccountDegradationSummaries(
 	return out, rows.Err()
 }
 
-// ListGroupDegradationRounds 按探测轮次聚合降智结果，供用户视图时间条逐格展示。
-// 轮次划分不依赖固定时间桶：同一组内相邻探测间隔超过间隔的 75% 即视为新的一轮，
-// 这样即使某轮跨越整点/桶边界也不会被拆开。每组最多返回 limit 轮，最新在前。
+// ListGroupDegradationRounds 按探测间隔的固定窗口聚合降智结果，供用户视图时间条逐格展示。
+// 调度器会按账号到期时间错峰执行，不能用“相邻探测间隔”判断轮次，否则持续错峰探测
+// 会把多个小时甚至多天合并成一轮。固定窗口保证每个测试周期都有独立展示点。
+// 每组最多返回 limit 轮，最新在前。
 func (r *channelMonitorRepository) ListGroupDegradationRounds(
 	ctx context.Context,
 	groupIDs []int64,
@@ -413,10 +414,11 @@ func (r *channelMonitorRepository) ListGroupDegradationRounds(
 				p.account_id,
 				p.status,
 				p.checked_at,
-				gs.interval_seconds,
-				EXTRACT(EPOCH FROM p.checked_at - LAG(p.checked_at) OVER (
-					PARTITION BY p.group_id ORDER BY p.checked_at
-				)) AS gap_seconds
+				date_bin(
+					make_interval(secs => GREATEST(gs.interval_seconds, 60)),
+					p.checked_at,
+					TIMESTAMPTZ '2000-01-01 00:00:00+08'
+				) AS bucket_start
 			FROM account_degradation_probes p
 			JOIN group_settings gs ON gs.group_id = p.group_id
 			JOIN eligible_accounts ea
@@ -429,41 +431,24 @@ func (r *channelMonitorRepository) ListGroupDegradationRounds(
 				OR p.model = gs.test_model
 			  )
 		),
-		marked AS (
-			SELECT *,
-				CASE
-					WHEN gap_seconds IS NULL
-					  OR gap_seconds > GREATEST(interval_seconds, 60) * 0.75
-					THEN 1 ELSE 0
-				END AS new_round
-			FROM probes
-		),
-		numbered AS (
-			SELECT *,
-				SUM(new_round) OVER (
-					PARTITION BY group_id ORDER BY checked_at
-				) AS round_no
-			FROM marked
-		),
 		latest_per_account AS (
 			SELECT *,
 				ROW_NUMBER() OVER (
-					PARTITION BY group_id, round_no, account_id
+					PARTITION BY group_id, bucket_start, account_id
 					ORDER BY checked_at DESC
 				) AS account_rank
-			FROM numbered
+			FROM probes
 		),
 		rounds AS (
 			SELECT
 				group_id,
-				round_no,
-				MIN(checked_at) AS bucket_start,
+				bucket_start,
 				MAX(checked_at) AS latest_at,
 				COUNT(*) FILTER (WHERE account_rank = 1 AND status = 'pass') AS pass_count,
 				COUNT(*) FILTER (WHERE account_rank = 1 AND status = 'degraded') AS degraded_count,
 				COUNT(*) FILTER (WHERE account_rank = 1 AND status = 'error') AS error_count
 			FROM latest_per_account
-			GROUP BY group_id, round_no
+			GROUP BY group_id, bucket_start
 		),
 		recent AS (
 			SELECT *,
