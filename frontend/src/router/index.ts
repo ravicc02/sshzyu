@@ -1036,8 +1036,7 @@ router.beforeEach(async (to, _from, next) => {
 
 
   // 公共设置可能尚未加载（App.vue 的 onMounted 异步拉取晚于首次导航，且纯静态部署
-  // 无 __APP_CONFIG__ 注入）。此时 cachedPublicSettings 为空会把 payment/risk_control
-  // 误判为“未启用”而错误拦截，故这里先确保设置加载完成。
+  // 无 __APP_CONFIG__ 注入）。此时 cachedPublicSettings 为空会把功能开关误判为关闭。
   if ((to.meta.requiresPayment || to.meta.requiresRiskControl || to.path === '/hosted-accounts') && !appStore.publicSettingsLoaded) {
     try {
       await appStore.fetchPublicSettings()
@@ -1046,8 +1045,12 @@ router.beforeEach(async (to, _from, next) => {
     }
   }
 
-  // Opt-in: a missing or stale public setting cannot expose the hosted-account page.
-  if (to.path === '/hosted-accounts' && appStore.cachedPublicSettings?.hosted_accounts_enabled !== true) {
+  // A transient settings failure is unknown; only an explicit, successfully loaded false disables this route.
+  if (
+    to.path === '/hosted-accounts' &&
+    appStore.publicSettingsLoaded &&
+    appStore.cachedPublicSettings?.hosted_accounts_enabled === false
+  ) {
     next(authStore.isAdmin ? '/admin/hosted-accounts' : '/dashboard')
     return
   }

@@ -285,7 +285,7 @@ async function refreshQuota(account: HostedOpenAIAccount) {
 async function toggleStatus(account: HostedOpenAIAccount) {
   busyID.value = account.id
   try {
-    replaceAccount(await setAdminHostedOpenAIStatus(account.id, account.status === 'active' ? 'suspended' : 'active'))
+    replaceAccount(await setAdminHostedOpenAIStatus(account.id, account.schedulable ? 'suspended' : 'active'))
   } catch (error) {
     appStore.showError(extractApiErrorMessage(error, '更新状态失败'))
   } finally {
