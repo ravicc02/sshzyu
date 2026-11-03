@@ -39,7 +39,7 @@
 .search-box input { width: 100%; height: 36px; border: 0; outline: 0; background: transparent; color: var(--text-primary); font-size: 12px; }
 .status-select { width: 132px; height: 38px; font-size: 12px; }
 .hosted-list { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); }
-.list-head, .hosted-row { display: grid; grid-template-columns: minmax(200px, 1.2fr) 152px minmax(220px, 1.4fr) 188px 72px 64px 136px; min-width: 1056px; align-items: center; letter-spacing: 0; }
+.list-head, .hosted-row { display: grid; grid-template-columns: minmax(200px, 1.2fr) 200px minmax(220px, 1.4fr) 188px 72px 64px 136px; min-width: 1080px; align-items: center; letter-spacing: 0; }
 .list-head { min-height: 40px; border-bottom: 1px solid var(--border-color); background: var(--surface-secondary); color: var(--text-secondary); font-size: 12px; font-weight: 500; }
 .list-head > span { min-width: 0; padding: 0 16px; white-space: nowrap; }
 .hosted-row { border-bottom: 1px solid var(--border-color); transition: background-color .15s ease; }

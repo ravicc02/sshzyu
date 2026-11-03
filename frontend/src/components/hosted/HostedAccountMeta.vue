@@ -54,8 +54,18 @@ const compactMeta = computed(() => {
 <style scoped>
 .hosted-account-meta {
   display: grid;
+  min-width: 0;
   width: fit-content;
   gap: 5px;
+}
+
+.hosted-account-meta :deep(.inline-flex.flex-col) {
+  max-width: 100%;
+}
+
+.hosted-account-meta :deep(.inline-flex.flex-col > div) {
+  max-width: 100%;
+  flex-wrap: wrap;
 }
 
 .compact-state {
