@@ -170,6 +170,7 @@ describe('admin AccountsView bulk edit scope', () => {
       global: {
         stubs: {
           AppLayout: { template: '<div><slot /></div>' },
+          AccountManagementTabs: true,
           TablePageLayout: {
             template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
           },
@@ -235,6 +236,7 @@ describe('admin AccountsView bulk edit scope', () => {
       global: {
         stubs: {
           AppLayout: { template: '<div><slot /></div>' },
+          AccountManagementTabs: true,
           TablePageLayout: {
             template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
           },
@@ -304,6 +306,7 @@ describe('admin AccountsView bulk edit scope', () => {
       global: {
         stubs: {
           AppLayout: { template: '<div><slot /></div>' },
+          AccountManagementTabs: true,
           TablePageLayout: { template: '<div><slot name="table" /></div>' },
           DataTable: {
             props: ['data'],
@@ -367,6 +370,7 @@ describe('admin AccountsView bulk edit scope', () => {
       global: {
         stubs: {
           AppLayout: { template: '<div><slot /></div>' },
+          AccountManagementTabs: true,
           TablePageLayout: { template: '<div><slot name="table" /><slot name="pagination" /></div>' },
           DataTable: DataTableStub,
           Pagination: PaginationStub,
@@ -442,6 +446,7 @@ describe('admin AccountsView bulk edit scope', () => {
       global: {
         stubs: {
           AppLayout: { template: '<div><slot /></div>' },
+          AccountManagementTabs: true,
           TablePageLayout: { template: '<div><slot name="table" /><slot name="pagination" /></div>' },
           DataTable: DataTableStub,
           AccountBulkActionsBar: AccountBulkActionsBarStub,
@@ -516,6 +521,7 @@ describe('admin AccountsView bulk edit scope', () => {
       global: {
         stubs: {
           AppLayout: { template: '<div><slot /></div>' },
+          AccountManagementTabs: true,
           TablePageLayout: { template: '<div><slot name="table" /></div>' },
           DataTable: DataTableStub,
           AccountBulkActionsBar: AccountBulkActionsBarStub,
@@ -588,6 +594,7 @@ describe('admin AccountsView bulk edit scope', () => {
       global: {
         stubs: {
           AppLayout: { template: '<div><slot /></div>' },
+          AccountManagementTabs: true,
           TablePageLayout: { template: '<div><slot name="table" /></div>' },
           DataTable: ProbeDataTableStub,
           AccountBulkActionsBar: true,

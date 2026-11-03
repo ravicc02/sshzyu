@@ -89,11 +89,11 @@ func TestToModelPlazaGroupDTO_UserRateAndFieldWhitelist(t *testing.T) {
 		ID: 2, Name: "vip", Description: "d", Platform: "anthropic",
 		SubscriptionType: "standard", RateMultiplier: 1, IsExclusive: true,
 		VideoRateIndependent: true, VideoRateMultiplier: 0.7,
+		ChannelRateMultipliers: map[string]float64{"kimi": 0.8},
 		Models: []service.PlazaModel{{
-			Name:           "claude-sonnet",
-			Platform:       "anthropic",
-			RouteTarget:    "claude-opus",
-			RateMultiplier: testPtr(0.8),
+			Name:        "claude-sonnet",
+			Platform:    "anthropic",
+			RouteTarget: "claude-opus",
 			Pricing: &service.ChannelModelPricing{
 				BillingMode: service.BillingModeToken,
 				InputPrice:  testPtr(3e-6),
@@ -132,7 +132,8 @@ func TestToModelPlazaGroupDTO_UserRateAndFieldWhitelist(t *testing.T) {
 	model := models[0].(map[string]any)
 	require.Contains(t, model, "pricing")
 	require.Contains(t, model, "official_pricing")
-	require.InDelta(t, 0.8, model["rate_multiplier"], 1e-9)
+	require.NotContains(t, model, "rate_multiplier", "model overrides must not enter the public plaza")
+	require.Equal(t, map[string]any{"kimi": 0.8}, decoded["channel_rate_multipliers"])
 	require.Equal(t, "claude-opus", model["route_target"])
 	official := model["official_pricing"].(map[string]any)
 	require.Contains(t, official, "input_price")

@@ -103,7 +103,7 @@ const stubs = {
   AppLayout: { template: '<div><slot /></div>' },
   BaseDialog: { template: '<div v-if="show"><slot /><slot name="footer" /></div>', props: ['show'] },
   ConfirmDialog: { template: '<div />' },
-  Select: { template: '<select />' },
+  Select: { template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', Number($event.target.value))"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>', props: ['modelValue', 'options'], emits: ['update:modelValue'] },
   RouterLink: { template: '<a><slot /></a>' },
 }
 
@@ -149,6 +149,26 @@ describe('BatchKeysView', () => {
 
     expect(bulkUpdate).toHaveBeenCalledWith([1, 2], { status: 'inactive' })
     expect(showSuccess).toHaveBeenCalled()
+  })
+
+  it.each([['M', 1500000], ['B', 1500000000]])('creates token-only batches with %s units', async (unit, expected) => {
+    getAvailableGroups.mockResolvedValue([{ id: 9, name: 'OpenAI group', platform: 'openai' }])
+    createBatch.mockResolvedValue({ batch_id: 'new-batch', keys: [] })
+    const wrapper = mount(BatchKeysView, { global: { stubs } })
+    await flushPromises()
+    const create = wrapper.findAll('button').find(button => button.text().includes('batchKeys.createBatch'))
+    expect(create).toBeTruthy()
+    await create!.trigger('click')
+    const numbers = wrapper.findAll('#batch-key-create-form input[type="number"]')
+    await numbers[0].setValue('2')
+    await numbers[1].setValue('0')
+    await numbers[2].setValue('1.5')
+    await wrapper.get('#batch-key-create-form select').setValue(unit)
+    await wrapper.findAll('#batch-key-create-form select')[1].setValue('9')
+    await wrapper.get('#batch-key-create-form').trigger('submit')
+    await flushPromises()
+    expect(createBatch).toHaveBeenCalledWith(expect.objectContaining({ count: 2, quota: 0, quota_tokens: expected, group_id: 9 }))
+    wrapper.unmount()
   })
 
   it('exports the whole batch as one key per line', async () => {

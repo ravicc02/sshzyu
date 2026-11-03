@@ -88,11 +88,13 @@ const AccountStatsModalStub = defineComponent({
   template: '<div data-test="stats-account">{{ show ? account?.name : "" }}</div>'
 })
 
-function mountView() {
+function mountView(hosted = false) {
   return mount(AccountsView, {
+    props: { hosted },
     global: {
       stubs: {
         AppLayout: { template: '<div><slot /></div>' },
+        AccountManagementTabs: true,
         TablePageLayout: { template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
         DataTable: DataTableStub,
         AccountTableActions: { template: '<div><slot name="after" /></div>' },
@@ -175,7 +177,7 @@ describe('admin AccountsView lite account list', () => {
     expect(listAccounts).toHaveBeenCalledWith(
       1,
       20,
-      expect.objectContaining({ lite: '1' }),
+      expect.objectContaining({ lite: '1', ownership: 'standard' }),
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
     wrapper.unmount()
@@ -186,6 +188,16 @@ describe('admin AccountsView lite account list', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-test="account-groups"]').text()).toBe('codex')
+    wrapper.unmount()
+  })
+
+  it('keeps ownership scoped when switching between hosted and platform inventory', async () => {
+    const wrapper = mountView(true)
+    await flushPromises()
+    expect(listAccounts).toHaveBeenLastCalledWith(1, 20, expect.objectContaining({ ownership: 'hosted' }), expect.anything())
+    await wrapper.setProps({ hosted: false })
+    await flushPromises()
+    expect(listAccounts).toHaveBeenLastCalledWith(1, 20, expect.objectContaining({ ownership: 'standard' }), expect.anything())
     wrapper.unmount()
   })
 

@@ -98,11 +98,12 @@ describe('effectiveModelRate', () => {
 })
 
 describe('buildProviderPriceGroups', () => {
-  it('groups composite models by provider and keeps one effective rate', () => {
+  it('keeps channel rates separate from exact model overrides', () => {
     const group = g({
       id: 65,
       platform: 'composite',
       rate_multiplier: 0.4,
+      channel_rate_multipliers: { deepseek: 0.65, kimi: 0.8 },
       models: [
         { model: 'kimi-k3.1-pro', provider: 'kimi', custom_rate: false, rate_multiplier: null },
         { model: 'deepseek-v4.1-flash', provider: 'deepseek', custom_rate: true, rate_multiplier: 0.4 },
@@ -113,9 +114,12 @@ describe('buildProviderPriceGroups', () => {
     const providers = buildProviderPriceGroups(group)
 
     expect(providers.map((entry) => entry.provider)).toEqual(['deepseek', 'zhipu', 'kimi'])
-    expect(providers[0].rate).toBe(0.4)
-    expect(providers[0].mixed).toBe(false)
+    expect(providers[0].rate).toBe(0.65)
+    expect(providers[0].modelOverrideCount).toBe(1)
     expect(providers[0].custom).toBe(true)
+    expect(providers[1].rate).toBe(0.4)
+    expect(providers[1].custom).toBe(false)
+    expect(providers[2].rate).toBe(0.8)
     expect(providers[2].models.map((entry) => entry.model)).toEqual(['kimi-k3.1-pro'])
   })
 })

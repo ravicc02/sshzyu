@@ -29,6 +29,7 @@ function createAppState() {
       model_plaza_require_auth: true,
       payment_enabled: true,
       affiliate_enabled: true,
+      hosted_accounts_enabled: true,
       risk_control_enabled: true,
       plugin_management_enabled: true,
       custom_menu_items: [] as CustomMenu[]
@@ -235,6 +236,16 @@ describe('AppSidebar Dock navigation', () => {
     expect(wrapper.get('button[aria-label="个人空间"]').attributes('aria-pressed')).toBe('true')
     await wrapper.get('button[aria-label="管理空间"]').trigger('click')
     expect(wrapper.find('a[href="/admin/settings"]').exists()).toBe(true)
+  })
+
+  it('hides hosted navigation when the explicit feature switch is off', async () => {
+    authStore.isAdmin = false
+    appStore.cachedPublicSettings.hosted_accounts_enabled = false
+    const wrapper = await renderSidebar('/dashboard')
+    expect(wrapper.find('a[href="/hosted-accounts"]').exists()).toBe(false)
+    appStore.cachedPublicSettings.hosted_accounts_enabled = true
+    await nextTick()
+    expect(wrapper.find('a[href="/hosted-accounts"]').exists()).toBe(true)
   })
 
   it('keeps regular-user navigation separate from management and adds its dashboard', async () => {

@@ -743,20 +743,24 @@ func TestListGroups_TimePricingPassthrough(t *testing.T) {
 	require.InDelta(t, 0.28e-6, *m.Pricing.InputPrice, 1e-15)
 }
 
-func TestPlazaModelRateMultiplier_UsesProviderOverride(t *testing.T) {
+func TestGroupChannelRates_ExcludeExactModelOverrides(t *testing.T) {
 	providerRate := 0.8
+	modelRate := 0.2
 	group := &Group{
 		Platform: PlatformComposite,
 		ModelPricing: []ChannelModelPricing{
 			{Models: []string{"__provider_rate__:kimi"}, RateMultiplier: &providerRate},
+			{Models: []string{"kimi-k3.1-pro"}, RateMultiplier: &modelRate},
 		},
 	}
 
-	kimiRate := plazaModelRateMultiplier(group, "kimi-k3.1-pro")
+	rates := GroupChannelRates(group)
+	require.Equal(t, []GroupProviderRate{{Platform: PlatformKimi, RateMultiplier: 0.8}}, rates)
+	kimiRate := GroupModelRateOverride(group, "kimi-k3.1-pro")
 	require.NotNil(t, kimiRate)
-	require.InDelta(t, 0.8, *kimiRate, 1e-12)
-	require.Nil(t, plazaModelRateMultiplier(group, "glm-5.3-flash"))
+	require.InDelta(t, 0.2, *kimiRate, 1e-12)
+	require.Nil(t, GroupModelRateOverride(group, "glm-5.3-flash"))
 
 	group.Platform = PlatformOpenAI
-	require.Nil(t, plazaModelRateMultiplier(group, "kimi-k3.1-pro"))
+	require.Empty(t, GroupChannelRates(group))
 }

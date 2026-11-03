@@ -103,15 +103,16 @@ describe('PlazaGroupSection 模型卡片', () => {
     expect(wrapper.findComponent(PlazaModelPricingTable).exists()).toBe(true)
   })
 
-  it('uses the model provider rate instead of the group default rate', () => {
+  it('uses the channel rate instead of a model override or group default', () => {
     const model = ladderModel(1)
     model.name = 'kimi-k3.1-pro'
     model.platform = 'kimi'
-    model.rate_multiplier = 0.8
-    const wrapper = mountSection(group({ platform: 'composite', rate_multiplier: 0.4, models: [model] }))
+    model.rate_multiplier = 0.2
+    const wrapper = mountSection(group({ platform: 'composite', rate_multiplier: 0.4, channel_rate_multipliers: { kimi: 0.8 }, models: [model] }))
 
     expect(wrapper.text()).toContain('¥4.00')
     expect(wrapper.text()).toContain('¥24.00')
+    expect(wrapper.text()).not.toContain('¥1.00')
   })
 
   it('ignores model rate overrides for non-composite groups', () => {
@@ -132,7 +133,7 @@ describe('PlazaGroupSection 模型卡片', () => {
     kimi.name = 'kimi-k3.1-pro'
     kimi.platform = 'kimi'
     kimi.rate_multiplier = 0.8
-    const wrapper = mountSection(group({ platform: 'composite', models: [deepseek, kimi] }))
+    const wrapper = mountSection(group({ platform: 'composite', channel_rate_multipliers: { deepseek: 0.4, kimi: 0.8 }, models: [deepseek, kimi] }))
 
     const text = wrapper.text()
     expect(text).toContain('DeepSeek')
