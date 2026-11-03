@@ -3,10 +3,10 @@
   "upstream_release": "v0.2.19",
   "upstream_commit": "dece26153621959ccd7635814f4b2d08304e681a",
   "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.19",
-  "local_build_version": "0.2.19-r6",
+  "local_build_version": "0.2.19-r7",
   "integration_commit": "9b2da920e2201901d0c19472b66a76121e60db26",
   "integrated_at": "2026-10-31",
-  "verified_at": "2026-11-02",
-  "note": "Integrated official v0.2.19 with scoped admin API keys, image-count billing, Grok model catalog diagnostics and the custom unified security audit preserved. r4 fixed the scheduler degradation probe WaitGroup panic and r5 restored the per-round monitor timeline. r6 adds managed OpenAI account hosting and token quota limits, probes one primary model per composite provider, renders composite model-plaza pricing by provider using the channel rate from model pricing, fixes monitor degradation aggregation and hides proxy network addresses from user labels. Migrations 268-270 add token quotas and hosted OpenAI account fields; migration 271 adds channel_monitors.provider_models and backfills composite monitors.",
+  "verified_at": "2026-11-04",
+  "note": "Integrated official v0.2.19 with scoped admin API keys, image-count billing, Grok model catalog diagnostics and the custom unified security audit preserved. r6 added hosted OpenAI accounts, token quotas and composite provider monitoring. r7 separates hosted account and group inventories, adds a default-off hosted access switch and owner-scoped scheduling controls, reuses OAuth callback handling and quota-window UI, fixes hosted badge overflow, supports token-only batch key quotas in M/B units, separates channel and model multipliers while preserving model overrides, synchronizes channel rates to model plaza and monitoring, and buckets degradation rounds by their configured interval. No new database migrations beyond r6; migrations 268-271 remain unchanged.",
   "integration_status": "committed"
 }
