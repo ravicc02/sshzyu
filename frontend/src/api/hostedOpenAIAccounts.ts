@@ -1,3 +1,4 @@
+import type { AccountPlatform, AccountType } from '@/types'
 import { apiClient } from './client'
 
 export interface HostedQuotaWindow {
@@ -37,6 +38,13 @@ export interface HostedOpenAIAccount {
   group_name: string
   proxy_name: string
   account_status: string
+  account_platform: AccountPlatform
+  account_type: AccountType
+  auth_mode?: string
+  privacy_mode?: string
+  openai_compact_state?: 'active' | 'blocked' | 'auto'
+  schedulable: boolean
+  concurrency: number
   quota: HostedQuotaSnapshot
 }
 
@@ -83,6 +91,11 @@ export async function listHostedOpenAIAccounts(): Promise<HostedOpenAIAccount[]>
 
 export async function getHostedOpenAIOptions(): Promise<HostedOpenAIOptions> {
   const { data } = await apiClient.get<HostedOpenAIOptions>('/hosted-openai-accounts/options')
+  return data
+}
+
+export async function getAdminHostedOpenAIOptions(): Promise<HostedOpenAIOptions> {
+  const { data } = await apiClient.get<HostedOpenAIOptions>('/admin/hosted-openai-accounts/options')
   return data
 }
 

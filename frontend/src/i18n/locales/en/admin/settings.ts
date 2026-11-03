@@ -44,6 +44,11 @@ export default {
           enabled: 'Enable Available Channels',
           enabledHint: 'When off, the sidebar entry is hidden and the endpoint returns an empty list.',
         },
+        hostedAccounts: {
+          title: 'Hosted accounts',
+          enabled: 'Enable hosted accounts for users',
+          enabledHint: 'When off, hide the user entry and block user APIs. Existing accounts and admin management remain available.',
+        },
         modelPlaza: {
           title: 'Model Plaza',
           description: 'A public page showcasing available models and pricing by group. Disabled by default.',

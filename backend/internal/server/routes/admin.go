@@ -660,6 +660,7 @@ func registerHostedOpenAIRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	hosted := admin.Group("/hosted-openai-accounts")
 	{
 		hosted.GET("", h.Admin.HostedOpenAIAccounts.AdminList)
+		hosted.GET("/options", h.Admin.HostedOpenAIAccounts.AdminOptions)
 		hosted.PUT("/:id", h.Admin.HostedOpenAIAccounts.AdminUpdate)
 		hosted.POST("/:id/refresh-quota", h.Admin.HostedOpenAIAccounts.AdminRefreshQuota)
 		hosted.POST("/:id/status", h.Admin.HostedOpenAIAccounts.AdminSetStatus)

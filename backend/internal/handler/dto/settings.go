@@ -324,6 +324,7 @@ type SystemSettings struct {
 
 	// Available Channels feature switch (user-facing aggregate view)
 	AvailableChannelsEnabled bool `json:"available_channels_enabled"`
+	HostedAccountsEnabled    bool `json:"hosted_accounts_enabled"`
 
 	// Subscription feature switch: gates the whole user-facing subscription surface
 	// (sidebar entries, purchase-page subscription tab, header badge, /subscriptions route).
@@ -438,6 +439,7 @@ type PublicSettings struct {
 	ChannelMonitorHideUserRanking        bool   `json:"channel_monitor_hide_user_ranking"`
 
 	AvailableChannelsEnabled bool `json:"available_channels_enabled"`
+	HostedAccountsEnabled    bool `json:"hosted_accounts_enabled"`
 
 	SubscriptionEnabled bool `json:"subscription_enabled"`
 

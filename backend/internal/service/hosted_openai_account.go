@@ -68,8 +68,15 @@ type HostedOpenAIQuota struct {
 
 type HostedOpenAIAccountView struct {
 	HostedOpenAIAccountRecord
-	AccountStatus string            `json:"account_status"`
-	Quota         HostedOpenAIQuota `json:"quota"`
+	AccountStatus      string            `json:"account_status"`
+	AccountPlatform    string            `json:"account_platform"`
+	AccountType        string            `json:"account_type"`
+	AuthMode           string            `json:"auth_mode,omitempty"`
+	PrivacyMode        string            `json:"privacy_mode,omitempty"`
+	OpenAICompactState string            `json:"openai_compact_state,omitempty"`
+	Schedulable        bool              `json:"schedulable"`
+	Concurrency        int               `json:"concurrency"`
+	Quota              HostedOpenAIQuota `json:"quota"`
 }
 
 type HostedProxyOption struct {
@@ -334,11 +341,7 @@ func (s *HostedOpenAIAccountService) Create(
 			record.ProxyName = hostedProxyDisplayName(proxy.Name, proxy.ID)
 		}
 	}
-	view := HostedOpenAIAccountView{
-		HostedOpenAIAccountRecord: *record,
-		AccountStatus:             account.Status,
-		Quota:                     buildHostedQuotaFromAccount(account),
-	}
+	view := hostedOpenAIAccountViewFor(*record, account, buildHostedQuotaFromAccount(account))
 	if s.quotaService != nil {
 		if usage, quotaErr := s.quotaService.QueryUsage(ctx, account.ID); quotaErr == nil && usage != nil {
 			if cacheErr := s.quotaService.CachePostResetSnapshot(ctx, account.ID, usage); cacheErr != nil {
@@ -490,11 +493,7 @@ func (s *HostedOpenAIAccountService) refreshQuota(ctx context.Context, record *H
 		return nil, err
 	}
 	account, _ := s.adminService.GetAccount(ctx, record.AccountID)
-	view := HostedOpenAIAccountView{
-		HostedOpenAIAccountRecord: *record,
-		AccountStatus:             accountStatus(account),
-		Quota:                     buildHostedQuotaFromUsage(usage),
-	}
+	view := hostedOpenAIAccountViewFor(*record, account, buildHostedQuotaFromUsage(usage))
 	view.PlanType = planType
 	refreshedAt := time.Unix(usage.FetchedAt, 0).UTC()
 	view.LastQuotaRefreshedAt = &refreshedAt
@@ -593,13 +592,28 @@ func (s *HostedOpenAIAccountService) views(ctx context.Context, records []Hosted
 		} else {
 			quota = buildHostedQuotaFromAccount(account)
 		}
-		views = append(views, HostedOpenAIAccountView{
-			HostedOpenAIAccountRecord: record,
-			AccountStatus:             accountStatus(account),
-			Quota:                     quota,
-		})
+		views = append(views, hostedOpenAIAccountViewFor(record, account, quota))
 	}
 	return views
+}
+
+func hostedOpenAIAccountViewFor(record HostedOpenAIAccountRecord, account *Account, quota HostedOpenAIQuota) HostedOpenAIAccountView {
+	view := HostedOpenAIAccountView{
+		HostedOpenAIAccountRecord: record,
+		AccountStatus:             accountStatus(account),
+		Quota:                     quota,
+	}
+	if account == nil {
+		return view
+	}
+	view.AccountPlatform = account.Platform
+	view.AccountType = account.Type
+	view.AuthMode = accountCredentialString(account, "auth_mode")
+	view.PrivacyMode = accountExtraString(account, "privacy_mode")
+	view.OpenAICompactState = hostedOpenAICompactState(account)
+	view.Schedulable = account.Schedulable
+	view.Concurrency = account.Concurrency
+	return view
 }
 
 func (s *HostedOpenAIAccountService) validProxy(ctx context.Context, proxyID *int64) (*Proxy, error) {
@@ -806,6 +820,33 @@ func accountCredentialString(account *Account, key string) string {
 	}
 	value, _ := account.Credentials[key].(string)
 	return strings.TrimSpace(value)
+}
+
+func accountExtraString(account *Account, key string) string {
+	if account == nil {
+		return ""
+	}
+	value, _ := account.Extra[key].(string)
+	return strings.TrimSpace(value)
+}
+
+func hostedOpenAICompactState(account *Account) string {
+	if account == nil || account.Platform != PlatformOpenAI || (account.Type != AccountTypeOAuth && account.Type != AccountTypeAPIKey) {
+		return ""
+	}
+	switch accountExtraString(account, "openai_compact_mode") {
+	case "force_on":
+		return "active"
+	case "force_off":
+		return "blocked"
+	}
+	if supported, ok := account.Extra["openai_compact_supported"].(bool); ok {
+		if supported {
+			return "active"
+		}
+		return "blocked"
+	}
+	return "auto"
 }
 
 func hostedFirstNonEmpty(values ...string) string {

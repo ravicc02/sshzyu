@@ -28,83 +28,60 @@
         </button>
       </section>
 
-      <section v-else class="account-grid">
-        <article v-for="account in accounts" :key="account.id" class="account-card">
-          <header class="card-head">
-            <div class="identity">
-              <div class="account-avatar">{{ initials(account) }}</div>
-              <div class="identity-copy">
-                <div class="title-line">
-                  <h2>{{ account.account_name || account.account_email || account.user_name }}</h2>
-                  <span class="status-chip" :class="statusClass(account)">{{ statusLabel(account) }}</span>
-                </div>
-                <p>{{ account.account_email }} · {{ account.quota.account_type }}</p>
-              </div>
+      <section v-else class="hosted-list">
+        <div class="list-head" aria-hidden="true">
+          <span>账号</span>
+          <span>平台 / 类型</span>
+          <span>分组 / 模型</span>
+          <span>代理</span>
+          <span>用量窗口</span>
+          <span>状态</span>
+          <span class="actions-col">操作</span>
+        </div>
+        <article v-for="account in accounts" :key="account.id" class="hosted-row">
+          <div class="identity-cell">
+            <div class="account-avatar">{{ initials(account) }}</div>
+            <div class="identity-copy">
+              <strong :title="account.account_name || account.account_email">{{ account.account_name || account.account_email }}</strong>
+              <span :title="account.account_email">{{ account.account_email }}</span>
+              <small>#{{ account.account_id }} · {{ account.quota.account_type }}</small>
             </div>
+          </div>
+
+          <HostedAccountMeta :account="account" />
+
+          <div class="group-cell">
+            <strong :title="account.group_name">{{ account.group_name }}</strong>
+            <div class="model-chips" :title="account.models.join(', ')">
+              <code v-for="model in account.models.slice(0, 3)" :key="model">{{ model }}</code>
+              <span v-if="account.models.length > 3">+{{ account.models.length - 3 }}</span>
+            </div>
+          </div>
+
+          <div class="proxy-cell">
+            <strong>{{ account.proxy_name || '直连' }}</strong>
+            <span class="messages-state" :class="{ enabled: account.supports_messages }">
+              {{ account.supports_messages ? '/v1/messages' : 'Messages 关闭' }}
+            </span>
+          </div>
+
+          <HostedAccountUsage :account="account" />
+
+          <div class="status-cell">
+            <span class="status-chip" :class="statusClass(account)">{{ statusLabel(account) }}</span>
+          </div>
+
+          <div class="row-actions">
             <button type="button" class="icon-button" title="刷新额度" :disabled="refreshingID === account.id" @click="refreshQuota(account)">
               <Icon name="refresh" size="sm" :class="{ spinning: refreshingID === account.id }" />
             </button>
-          </header>
-
-          <dl class="account-meta">
-            <div>
-              <dt>模型</dt>
-              <dd :title="account.models.join(', ')">{{ account.models.join(' · ') }}</dd>
-            </div>
-            <div>
-              <dt>分组</dt>
-              <dd :title="account.group_name">{{ account.group_name }}</dd>
-            </div>
-            <div>
-              <dt>代理</dt>
-              <dd>{{ account.proxy_name || '直连' }}</dd>
-            </div>
-            <div>
-              <dt>Messages</dt>
-              <dd>{{ account.supports_messages ? '已启用' : '关闭' }}</dd>
-            </div>
-          </dl>
-
-          <div class="quota-zone">
-            <div class="quota-window-grid">
-              <div class="quota-window">
-                <UsageProgressBar
-                  v-if="account.quota.five_hour"
-                  label="5h"
-                  :utilization="account.quota.five_hour.used_percent"
-                  :resets-at="account.quota.five_hour.reset_at"
-                  :show-now-when-idle="true"
-                  color="indigo"
-                />
-                <div v-else class="quota-empty-row"><span>5h</span><em>暂无数据</em></div>
-              </div>
-              <div class="quota-window">
-                <UsageProgressBar
-                  v-if="account.quota.weekly"
-                  label="7d"
-                  :utilization="account.quota.weekly.used_percent"
-                  :resets-at="account.quota.weekly.reset_at"
-                  :show-now-when-idle="true"
-                  color="emerald"
-                />
-                <div v-else class="quota-empty-row"><span>7d</span><em>暂无数据</em></div>
-              </div>
-            </div>
-            <p v-if="account.quota.error" class="quota-error">{{ account.quota.error }}</p>
-            <p v-else-if="!account.quota.fetched_at" class="quota-caption">刷新后读取实时窗口</p>
-            <p v-else class="quota-caption">更新于 {{ formatTime(account.quota.fetched_at) }}</p>
-          </div>
-
-          <footer class="card-actions">
-            <button type="button" class="btn btn-secondary" @click="openEdit(account)">
+            <button type="button" class="icon-button" title="配置" @click="openEdit(account)">
               <Icon name="edit" size="sm" />
-              配置
             </button>
-            <button type="button" class="btn btn-secondary" @click="openReauth(account)">
+            <button type="button" class="icon-button" title="重新授权" @click="openReauth(account)">
               <Icon name="key" size="sm" />
-              重新授权
             </button>
-          </footer>
+          </div>
         </article>
       </section>
     </main>
@@ -338,8 +315,9 @@ import {
   type HostedOpenAIAccount,
   type HostedOpenAIOptions
 } from '@/api/hostedOpenAIAccounts'
-import UsageProgressBar from '@/components/account/UsageProgressBar.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
+import HostedAccountMeta from '@/components/hosted/HostedAccountMeta.vue'
+import HostedAccountUsage from '@/components/hosted/HostedAccountUsage.vue'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { useClipboard } from '@/composables/useClipboard'
 import { parseOAuthCallbackInput } from '@/utils/oauthCallback'
@@ -584,18 +562,14 @@ function initials(account: HostedOpenAIAccount) {
 function statusLabel(account: HostedOpenAIAccount) {
   if (account.status === 'suspended') return '已停用'
   if (account.status === 'archived') return '已归档'
-  if (account.account_status !== 'active') return '需检查'
-  return '运行中'
+  if (account.account_status !== 'active') return '错误'
+  return '正常'
 }
 
 function statusClass(account: HostedOpenAIAccount) {
-  if (account.status !== 'active' || account.account_status !== 'active') return 'is-muted'
+  if (account.account_status !== 'active') return 'is-error'
+  if (account.status !== 'active') return 'is-muted'
   return 'is-active'
-}
-
-function formatTime(value?: string | null) {
-  if (!value) return '—'
-  return new Date(value).toLocaleString('zh-CN', { hour12: false })
 }
 
 onMounted(load)
@@ -610,35 +584,34 @@ onMounted(load)
 .empty-mark { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; color: var(--primary-600); background: color-mix(in srgb, var(--primary-500) 10%, transparent); }
 .empty-panel h2 { font-size: 15px; font-weight: 600; }
 .loading-ring { width: 30px; height: 30px; border: 2px solid var(--border-color); border-top-color: var(--primary-500); border-radius: 50%; animation: spin 0.8s linear infinite; }
-.account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.account-card { min-width: 0; overflow: hidden; border: 1px solid var(--border-color); border-radius: 10px; background: var(--surface); box-shadow: 0 1px 2px rgb(0 0 0 / 0.03); }
-.card-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px; border-bottom: 1px solid var(--border-color); }
-.identity { display: flex; align-items: center; min-width: 0; gap: 12px; }
-.account-avatar { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto; border: 1px solid color-mix(in srgb, var(--primary-500) 25%, var(--border-color)); border-radius: 9px; color: var(--primary-700); background: color-mix(in srgb, var(--primary-500) 9%, var(--surface)); font-size: 15px; font-weight: 700; }
-.identity-copy { min-width: 0; }
-.title-line { display: flex; align-items: center; min-width: 0; gap: 8px; }
-.title-line h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 650; }
-.identity-copy p { margin-top: 3px; color: var(--text-tertiary); font-size: 11px; }
-.status-chip { flex: 0 0 auto; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+.hosted-list { overflow: hidden; border: 1px solid var(--border-color); border-radius: 10px; background: var(--surface); }
+.list-head, .hosted-row { display: grid; grid-template-columns: minmax(220px, 1.2fr) minmax(140px, .78fr) minmax(190px, 1.1fr) minmax(96px, .55fr) minmax(190px, 1fr) 76px 112px; align-items: center; gap: 14px; padding: 0 16px; }
+.list-head { min-height: 40px; border-bottom: 1px solid var(--border-color); color: var(--text-tertiary); background: var(--surface-secondary); font-size: 10px; font-weight: 650; }
+.hosted-row { min-height: 116px; border-bottom: 1px solid var(--border-color); transition: background-color .15s ease; }
+.hosted-row:last-child { border-bottom: 0; }
+.hosted-row:hover { background: color-mix(in srgb, var(--primary-500) 3%, var(--surface)); }
+.identity-cell { display: flex; align-items: center; min-width: 0; gap: 11px; }
+.account-avatar { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; border: 1px solid color-mix(in srgb, var(--primary-500) 25%, var(--border-color)); border-radius: 8px; color: var(--primary-700); background: color-mix(in srgb, var(--primary-500) 9%, var(--surface)); font-size: 13px; font-weight: 700; }
+.identity-copy, .group-cell, .proxy-cell { display: grid; min-width: 0; gap: 4px; }
+.identity-copy strong, .identity-copy span, .identity-copy small, .group-cell > strong, .proxy-cell strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.identity-copy strong { font-size: 12px; font-weight: 650; }
+.identity-copy span { color: var(--text-secondary); font-size: 10px; }
+.identity-copy small, .proxy-cell span { color: var(--text-tertiary); font-size: 9px; }
+.group-cell > strong, .proxy-cell strong { font-size: 11px; font-weight: 600; }
+.model-chips { display: flex; min-width: 0; align-items: center; gap: 3px; overflow: hidden; }
+.model-chips code { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 5px; border-radius: 4px; color: var(--text-secondary); background: var(--surface-secondary); font-size: 9px; }
+.model-chips > span { flex: 0 0 auto; color: var(--text-tertiary); font-size: 9px; }
+.messages-state { width: fit-content; padding: 1px 5px; border-radius: 4px; color: var(--text-tertiary); background: var(--surface-secondary); font-size: 9px; }
+.messages-state.enabled { color: #087a55; background: #e7f8ef; }
+.status-cell { display: flex; align-items: center; }
+.status-chip { flex: 0 0 auto; width: fit-content; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; }
 .status-chip.is-active { color: #087a55; background: #e7f8ef; }
 .status-chip.is-muted { color: #8a5a00; background: #fff3d8; }
+.status-chip.is-error { color: #be123c; background: #ffe4e6; }
 .icon-button { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border: 1px solid var(--border-color); border-radius: 7px; color: var(--text-secondary); background: var(--surface); }
 .icon-button:disabled { opacity: 0.55; }
-.account-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 0 18px; }
-.account-meta > div { min-width: 0; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
-.account-meta > div:nth-child(odd) { padding-right: 14px; }
-.account-meta > div:nth-child(even) { padding-left: 14px; border-left: 1px solid var(--border-color); }
-.account-meta dt { margin-bottom: 4px; color: var(--text-tertiary); font-size: 10px; }
-.account-meta dd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 550; }
-.quota-zone { display: grid; gap: 10px; padding: 14px 18px 16px; background: color-mix(in srgb, var(--surface-secondary) 70%, var(--surface)); }
-.quota-window-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.quota-window { min-width: 0; padding: 10px 11px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); }
-.quota-empty-row { display: flex; align-items: center; gap: 8px; color: var(--text-tertiary); font-size: 10px; }
-.quota-empty-row span { display: inline-flex; min-width: 32px; height: 18px; align-items: center; justify-content: center; border-radius: 4px; color: var(--text-secondary); background: var(--surface-secondary); font-weight: 600; }
-.quota-empty-row em { font-style: normal; }
-.quota-error { color: var(--error-600); font-size: 11px; }
-.quota-caption { color: var(--text-tertiary); font-size: 10px; }
-.card-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border-color); }
+.row-actions { display: flex; justify-content: flex-end; gap: 5px; }
+.actions-col { text-align: right; }
 .hosted-modal { max-width: 580px; }
 .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px 22px; border-bottom: 1px solid var(--border-color); }
 .modal-head h2 { font-size: 17px; font-weight: 650; }
@@ -671,19 +644,29 @@ onMounted(load)
 @keyframes spin { to { transform: rotate(360deg); } }
 :global(.dark) .status-chip.is-active { color: #9df1ce; background: rgb(4 120 87 / 0.26); }
 :global(.dark) .status-chip.is-muted { color: #ffd38a; background: rgb(146 94 0 / 0.25); }
+:global(.dark) .status-chip.is-error { color: #fecdd3; background: rgb(159 18 57 / 0.28); }
+:global(.dark) .messages-state.enabled { color: #9df1ce; background: rgb(4 120 87 / 0.26); }
+@media (max-width: 1080px) and (min-width: 861px) {
+  .hosted-list { overflow-x: auto; }
+  .list-head, .hosted-row { min-width: 1040px; }
+}
 @media (max-width: 860px) {
   .hosted-page { padding: 18px 14px 56px; }
-  .account-grid { grid-template-columns: 1fr; }
   .hosted-toolbar { align-items: flex-start; }
+  .hosted-list { overflow: visible; border: 0; background: transparent; }
+  .list-head { display: none; }
+  .hosted-row { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 18px; margin-bottom: 10px; padding: 16px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface); }
+  .hosted-row:last-child { border-bottom: 1px solid var(--border-color); }
+  .identity-cell { grid-column: 1 / -1; }
+  .hosted-row > :nth-child(3) { grid-column: 1 / -1; }
+  .hosted-row > :nth-child(5) { grid-column: 1 / -1; }
+  .status-cell { justify-content: flex-end; }
+  .row-actions { grid-column: 1 / -1; justify-content: flex-start; }
 }
 @media (max-width: 560px) {
   .hosted-toolbar { flex-direction: column; }
   .head-actions { width: 100%; }
   .head-actions .btn { flex: 1; justify-content: center; }
-  .account-meta { grid-template-columns: 1fr; }
-  .account-meta > div:nth-child(odd), .account-meta > div:nth-child(even) { padding: 10px 0; border-left: 0; }
-  .quota-window-grid { grid-template-columns: 1fr; }
-  .card-actions .btn { flex: 1; justify-content: center; }
   .modal-content { margin: 10px; max-height: calc(100vh - 20px); }
 }
 </style>

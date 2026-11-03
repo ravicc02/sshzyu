@@ -379,6 +379,7 @@ export const useAppStore = defineStore('app', () => {
         channel_monitor_show_quota: false,
         channel_monitor_hide_user_ranking: false,
         available_channels_enabled: false,
+        hosted_accounts_enabled: false,
         model_plaza_enabled: false,
         model_plaza_require_auth: false,
         plugin_management_enabled: false,

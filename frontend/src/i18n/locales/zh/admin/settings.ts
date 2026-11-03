@@ -44,6 +44,11 @@ export default {
           enabled: '启用可用渠道',
           enabledHint: '关闭后用户端侧边栏入口隐藏，接口返回空数组。',
         },
+        hostedAccounts: {
+          title: '账号托管',
+          enabled: '向用户开放账号托管',
+          enabledHint: '关闭后隐藏用户入口并拒绝用户托管接口；已有账号和管理员管理不受影响。',
+        },
         modelPlaza: {
           title: '模型广场',
           description: '以分组为单位向访客展示可用模型与价格的公开页面。默认关闭。',

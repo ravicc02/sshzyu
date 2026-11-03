@@ -29,22 +29,32 @@
 
       <section v-else class="hosted-list">
         <div class="list-head" aria-hidden="true">
-          <span>用户 / 账号</span>
-          <span>分组与模型</span>
+          <span>账号</span>
+          <span>ID / 容量</span>
+          <span>平台 / 类型</span>
+          <span>分组 / 模型</span>
           <span>代理</span>
-          <span>额度窗口</span>
+          <span>用量窗口</span>
           <span>状态</span>
+          <span>调度</span>
           <span class="actions-col">操作</span>
         </div>
         <article v-for="account in filteredAccounts" :key="account.id" class="hosted-row">
-          <div class="user-cell">
+          <div class="identity-cell">
             <div class="avatar">{{ initials(account) }}</div>
-            <div class="cell-stack">
-              <strong>{{ account.user_name }}</strong>
-              <span>{{ account.account_name || account.account_email || account.user_email }}</span>
-              <small>#{{ account.user_id }} · {{ account.quota.account_type }}</small>
+            <div class="identity-copy">
+              <strong :title="account.account_name || account.account_email">{{ account.account_name || account.account_email }}</strong>
+              <span :title="account.account_email">{{ account.account_email }}</span>
+              <small :title="account.user_email">{{ account.user_name }} · {{ account.user_email }}</small>
             </div>
           </div>
+
+          <div class="account-id-cell">
+            <code>#{{ account.account_id }}</code>
+            <HostedAccountCapacity :concurrency="account.concurrency" />
+          </div>
+
+          <HostedAccountMeta :account="account" />
 
           <div class="group-cell">
             <strong class="ellipsis" :title="account.group_name">{{ account.group_name }}</strong>
@@ -52,44 +62,35 @@
               <code v-for="model in (account.models || [account.model]).slice(0, 3)" :key="model">{{ model }}</code>
               <span v-if="(account.models || [account.model]).length > 3">+{{ (account.models || [account.model]).length - 3 }}</span>
             </div>
+          </div>
+
+          <div class="proxy-cell">
+            <strong>{{ account.proxy_name || '直连' }}</strong>
             <span class="messages-state" :class="{ enabled: account.supports_messages }">
-              {{ account.supports_messages ? '/v1/messages 已启用' : '/v1/messages 关闭' }}
+              {{ account.supports_messages ? '/v1/messages' : 'Messages 关闭' }}
             </span>
           </div>
 
-          <div class="cell-stack proxy-cell">
-            <strong>{{ account.proxy_name || '直连' }}</strong>
-            <span>账号 #{{ account.account_id }}</span>
-          </div>
-
-          <div class="admin-quota">
-            <div class="quota-window">
-              <UsageProgressBar
-                v-if="account.quota.five_hour"
-                label="5h"
-                :utilization="account.quota.five_hour.used_percent"
-                :resets-at="account.quota.five_hour.reset_at"
-                :show-now-when-idle="true"
-                color="indigo"
-              />
-              <span v-else class="quota-empty"><b>5h</b>暂无数据</span>
-            </div>
-            <div class="quota-window">
-              <UsageProgressBar
-                v-if="account.quota.weekly"
-                label="7d"
-                :utilization="account.quota.weekly.used_percent"
-                :resets-at="account.quota.weekly.reset_at"
-                :show-now-when-idle="true"
-                color="emerald"
-              />
-              <span v-else class="quota-empty"><b>7d</b>暂无数据</span>
-            </div>
-          </div>
+          <HostedAccountUsage :account="account" />
 
           <div class="status-stack">
             <span class="status-chip" :class="statusClass(account)">{{ statusLabel(account) }}</span>
-            <small>{{ account.account_status }}</small>
+            <small>{{ schedulingLabel(account) }}</small>
+          </div>
+
+          <div class="schedule-cell">
+            <button
+              type="button"
+              role="switch"
+              class="switch-control"
+              :class="{ checked: account.schedulable }"
+              :aria-checked="account.schedulable"
+              :disabled="busyID === account.id || account.status === 'archived'"
+              :title="account.schedulable ? '关闭账号调度' : '开启账号调度'"
+              @click="toggleStatus(account)"
+            >
+              <span />
+            </button>
           </div>
 
           <div class="row-actions">
@@ -98,16 +99,6 @@
             </button>
             <button type="button" class="icon-button" title="编辑" @click="openEdit(account)">
               <Icon name="edit" size="sm" />
-            </button>
-            <button
-              v-if="account.status !== 'archived'"
-              type="button"
-              class="icon-button"
-              :title="account.status === 'active' ? '停用' : '恢复'"
-              :disabled="busyID === account.id"
-              @click="toggleStatus(account)"
-            >
-              <Icon :name="account.status === 'active' ? 'pauseCircle' : 'play'" size="sm" />
             </button>
             <button
               v-if="account.status !== 'archived'"
@@ -187,12 +178,14 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
-import UsageProgressBar from '@/components/account/UsageProgressBar.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
+import HostedAccountCapacity from '@/components/hosted/HostedAccountCapacity.vue'
+import HostedAccountMeta from '@/components/hosted/HostedAccountMeta.vue'
+import HostedAccountUsage from '@/components/hosted/HostedAccountUsage.vue'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import {
-  getHostedOpenAIOptions,
+  getAdminHostedOpenAIOptions,
   listAdminHostedOpenAIAccounts,
   refreshAdminHostedOpenAIQuota,
   setAdminHostedOpenAIStatus,
@@ -239,7 +232,7 @@ const filteredAccounts = computed(() => {
 async function load() {
   loading.value = true
   try {
-    const [items, hostedOptions] = await Promise.all([listAdminHostedOpenAIAccounts(), getHostedOpenAIOptions()])
+    const [items, hostedOptions] = await Promise.all([listAdminHostedOpenAIAccounts(), getAdminHostedOpenAIOptions()])
     accounts.value = items
     options.value = hostedOptions
   } catch (error) {
@@ -323,13 +316,19 @@ function initials(account: HostedOpenAIAccount) {
 function statusLabel(account: HostedOpenAIAccount) {
   if (account.status === 'archived') return '已归档'
   if (account.status === 'suspended') return '已停用'
-  if (account.account_status !== 'active') return '需检查'
-  return '运行中'
+  if (account.account_status !== 'active') return '错误'
+  return '正常'
 }
 
 function statusClass(account: HostedOpenAIAccount) {
   if (account.status === 'active' && account.account_status === 'active') return 'is-active'
+  if (account.account_status !== 'active') return 'is-error'
   return 'is-muted'
+}
+
+function schedulingLabel(account: HostedOpenAIAccount) {
+  if (account.status === 'archived') return '已归档'
+  return account.schedulable ? '可调度' : '已关闭'
 }
 
 onMounted(load)
@@ -346,31 +345,37 @@ onMounted(load)
 .hosted-empty h2 { font-size: 14px; font-weight: 600; }
 .loading-ring { width: 28px; height: 28px; border: 2px solid var(--border-color); border-top-color: var(--primary-500); border-radius: 50%; animation: spin 0.8s linear infinite; }
 .hosted-list { overflow: hidden; border: 1px solid var(--border-color); border-radius: 0 0 10px 10px; background: var(--surface); }
-.list-head, .hosted-row { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(205px, 1.35fr) 82px minmax(180px, 1fr) 72px 140px; align-items: center; gap: 12px; padding: 0 14px; }
+.list-head, .hosted-row { display: grid; grid-template-columns: minmax(210px, 1.2fr) 82px minmax(128px, .72fr) minmax(190px, 1.15fr) minmax(92px, .55fr) minmax(190px, 1fr) 76px 54px 112px; align-items: center; gap: 12px; padding: 0 14px; }
 .list-head { min-height: 38px; border-bottom: 1px solid var(--border-color); color: var(--text-tertiary); background: var(--surface-secondary); font-size: 10px; font-weight: 650; letter-spacing: .01em; }
-.hosted-row { min-height: 112px; border-bottom: 1px solid var(--border-color); transition: background-color .15s ease; }
+.hosted-row { min-height: 116px; border-bottom: 1px solid var(--border-color); transition: background-color .15s ease; }
 .hosted-row:last-child { border-bottom: 0; }
 .hosted-row:hover { background: color-mix(in srgb, var(--primary-500) 3%, var(--surface)); }
-.user-cell { display: flex; align-items: center; min-width: 0; gap: 10px; }
+.identity-cell { display: flex; align-items: center; min-width: 0; gap: 10px; }
 .avatar { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border-radius: 8px; color: var(--primary-700); background: color-mix(in srgb, var(--primary-500) 10%, var(--surface)); font-size: 12px; font-weight: 700; }
-.cell-stack, .group-cell { display: grid; min-width: 0; gap: 4px; }
-.cell-stack strong, .group-cell > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 650; }
-.cell-stack span, .cell-stack small, .status-stack small { color: var(--text-tertiary); font-size: 10px; }
+.identity-copy, .group-cell, .proxy-cell, .account-id-cell { display: grid; min-width: 0; gap: 4px; }
+.identity-copy strong, .identity-copy span, .identity-copy small, .group-cell > strong, .proxy-cell strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.identity-copy strong { font-size: 12px; font-weight: 650; }
+.identity-copy span { color: var(--text-secondary); font-size: 10px; }
+.identity-copy small, .status-stack small, .proxy-cell span { color: var(--text-tertiary); font-size: 9px; }
+.account-id-cell code { width: fit-content; color: var(--text-secondary); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 10px; }
 .group-cell > strong { max-width: 100%; }
+.group-cell > strong, .proxy-cell strong { font-size: 11px; font-weight: 600; }
 .model-chips { display: flex; min-width: 0; align-items: center; gap: 3px; overflow: hidden; }
 .model-chips code { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 5px; border-radius: 4px; color: var(--text-secondary); background: var(--surface-secondary); font-size: 9px; }
 .model-chips > span { flex: 0 0 auto; color: var(--text-tertiary); font-size: 9px; }
 .messages-state { width: fit-content; padding: 1px 5px; border-radius: 4px; color: var(--text-tertiary); background: var(--surface-secondary); font-size: 9px; }
 .messages-state.enabled { color: #087a55; background: #e7f8ef; }
-.proxy-cell { padding-left: 0; }
-.admin-quota { display: grid; min-width: 0; gap: 5px; }
-.quota-window { min-width: 0; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 7px; background: color-mix(in srgb, var(--surface-secondary) 65%, var(--surface)); }
-.quota-empty { display: flex; align-items: center; gap: 7px; color: var(--text-tertiary); font-size: 9px; }
-.quota-empty b { display: inline-flex; min-width: 30px; height: 17px; align-items: center; justify-content: center; border-radius: 4px; color: var(--text-secondary); background: var(--surface-secondary); font-size: 9px; }
 .status-stack { display: grid; gap: 4px; }
 .status-chip { width: fit-content; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; }
 .status-chip.is-active { color: #087a55; background: #e7f8ef; }
 .status-chip.is-muted { color: #8a5a00; background: #fff3d8; }
+.status-chip.is-error { color: #be123c; background: #ffe4e6; }
+.schedule-cell { display: flex; justify-content: center; }
+.switch-control { position: relative; width: 34px; height: 20px; padding: 0; border: 0; border-radius: 999px; background: #cbd5e1; transition: background-color .16s ease; }
+.switch-control span { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(15 23 42 / .28); transition: transform .16s ease; }
+.switch-control.checked { background: var(--primary-600); }
+.switch-control.checked span { transform: translateX(14px); }
+.switch-control:disabled { cursor: not-allowed; opacity: .48; }
 .row-actions { display: flex; justify-content: flex-end; gap: 5px; }
 .actions-col { text-align: right; }
 .icon-button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-secondary); background: var(--surface); }
@@ -400,14 +405,23 @@ onMounted(load)
 @keyframes spin { to { transform: rotate(360deg); } }
 :global(.dark) .status-chip.is-active { color: #9df1ce; background: rgb(4 120 87 / 0.26); }
 :global(.dark) .status-chip.is-muted { color: #ffd38a; background: rgb(146 94 0 / 0.25); }
+:global(.dark) .status-chip.is-error { color: #fecdd3; background: rgb(159 18 57 / 0.28); }
 :global(.dark) .messages-state.enabled { color: #9df1ce; background: rgb(4 120 87 / 0.26); }
+@media (max-width: 1200px) and (min-width: 901px) {
+  .hosted-list { overflow-x: auto; }
+  .list-head, .hosted-row { min-width: 1180px; }
+}
 @media (max-width: 900px) {
   .hosted-list { overflow: visible; border: 0; border-radius: 0; background: transparent; }
   .list-head { display: none; }
-  .hosted-row { min-width: 0; grid-template-columns: 1fr; gap: 12px; margin-bottom: 10px; padding: 16px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface); }
+  .hosted-row { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 18px; margin-bottom: 10px; padding: 16px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface); }
   .hosted-row:last-child { border-bottom: 1px solid var(--border-color); }
-  .admin-quota { width: 100%; }
-  .row-actions { justify-content: flex-start; }
+  .identity-cell { grid-column: 1 / -1; }
+  .account-id-cell, .status-stack { align-self: center; }
+  .hosted-account-meta, .group-cell, .proxy-cell { min-width: 0; }
+  .hosted-row > :nth-child(6) { grid-column: 1 / -1; }
+  .schedule-cell { justify-content: flex-end; }
+  .row-actions { grid-column: 1 / -1; justify-content: flex-start; }
 }
 @media (max-width: 700px) {
   .admin-hosted-page { padding: 16px 12px 48px; }

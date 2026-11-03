@@ -90,6 +90,15 @@ func (h *HostedOpenAIAccountHandler) Options(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *HostedOpenAIAccountHandler) AdminOptions(c *gin.Context) {
+	result, err := h.service.Options(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
 func (h *HostedOpenAIAccountHandler) List(c *gin.Context) {
 	userID, ok := currentHostedUserID(c)
 	if !ok {

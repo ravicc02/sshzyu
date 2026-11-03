@@ -809,6 +809,7 @@ const ChevronDownIcon = {
 const flagChannelMonitor = makeSidebarFlag(FeatureFlags.channelMonitor)
 const flagPayment = makeSidebarFlag(FeatureFlags.payment)
 const flagAvailableChannels = makeSidebarFlag(FeatureFlags.availableChannels)
+const flagHostedAccounts = makeSidebarFlag(FeatureFlags.hostedAccounts)
 const flagModelPlaza = makeSidebarFlag(FeatureFlags.modelPlaza)
 const flagAffiliate = makeSidebarFlag(FeatureFlags.affiliate)
 const flagRiskControl = makeSidebarFlag(FeatureFlags.riskControl)
@@ -828,7 +829,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   }
   items.push(
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
-    { path: '/hosted-accounts', label: t('nav.hostedAccounts'), icon: UsersIcon, hideInSimpleMode: true },
+    { path: '/hosted-accounts', label: t('nav.hostedAccounts'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagHostedAccounts },
     { path: '/model-plaza', query: { embedded: '1' }, label: t('nav.modelPlaza'), icon: ModelPlazaIcon, featureFlag: flagModelPlaza },
     // A canvas is useful before a user has an eligible key: they can organize
     // prompts and references, then create or enable a key when ready to run it.

@@ -2,6 +2,7 @@ package routes
 
 import (
 	"github.com/Wei-Shaw/sub2api/internal/handler"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -127,6 +128,14 @@ func RegisterUserRoutes(
 		}
 
 		hosted := authenticated.Group("/hosted-openai-accounts")
+		hosted.Use(func(c *gin.Context) {
+			if settingService != nil && settingService.HostedAccountsEnabled(c.Request.Context()) {
+				c.Next()
+				return
+			}
+			response.Forbidden(c, "账号托管尚未开放")
+			c.Abort()
+		})
 		{
 			hosted.GET("", h.HostedOpenAIAccounts.List)
 			hosted.GET("/options", h.HostedOpenAIAccounts.Options)
