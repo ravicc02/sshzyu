@@ -132,12 +132,14 @@ func TestAdminService_ClearGroupModelRateMultiplier_RemovesOnlyRate(t *testing.T
 	require.Contains(t, invalidator.groupIDs, groupID)
 }
 
-func TestAdminService_SetGroupProviderRateMultiplier_UsesWildcardAndKeepsOtherProviders(t *testing.T) {
+func TestAdminService_SetGroupProviderRateMultiplier_KeepsModelOverridesAndOtherChannels(t *testing.T) {
 	const groupID = int64(11)
 	group := &Group{
 		ID:       groupID,
 		Platform: PlatformComposite,
 		ModelPricing: []ChannelModelPricing{
+			{Models: []string{"__provider_rate__:zhipu"}, RateMultiplier: testRatePtr(0.6)},
+			{Models: []string{"__provider_rate__:kimi"}, RateMultiplier: testRatePtr(0.8)},
 			{Models: []string{"deepseek-v4.1-flash"}, InputPrice: testRatePtr(2), RateMultiplier: testRatePtr(0.4)},
 			{Models: []string{"glm-5.3-flash"}, InputPrice: testRatePtr(0.8), RateMultiplier: testRatePtr(0.4)},
 			{Models: []string{"kimi-k3.1-pro"}, InputPrice: testRatePtr(13), RateMultiplier: testRatePtr(0.4)},
@@ -162,7 +164,8 @@ func TestAdminService_SetGroupProviderRateMultiplier_UsesWildcardAndKeepsOtherPr
 			case "kimi-k3.1-pro":
 				kimiRate = entry.RateMultiplier
 			case "deepseek-v4.1-flash":
-				require.Nil(t, entry.RateMultiplier, "exact provider override must be cleared in favor of wildcard")
+				require.NotNil(t, entry.RateMultiplier, "exact model overrides are independent of the channel rate")
+				require.InDelta(t, 0.4, *entry.RateMultiplier, 1e-12)
 				require.NotNil(t, entry.InputPrice, "exact model pricing must be preserved")
 				require.InDelta(t, 2, *entry.InputPrice, 1e-12)
 			}
@@ -180,8 +183,8 @@ func TestAdminService_SetGroupProviderRateMultiplier_UsesWildcardAndKeepsOtherPr
 		byProvider[rate.Platform] = rate.RateMultiplier
 	}
 	require.InDelta(t, 0.75, byProvider[PlatformDeepseek], 1e-12)
-	require.InDelta(t, 0.4, byProvider[PlatformZhipu], 1e-12)
-	require.InDelta(t, 0.4, byProvider[PlatformKimi], 1e-12)
+	require.InDelta(t, 0.6, byProvider[PlatformZhipu], 1e-12)
+	require.InDelta(t, 0.8, byProvider[PlatformKimi], 1e-12)
 	futureDeepSeek := matchGroupModelPricing(groupRepo.updated, "deepseek-v9-future")
 	require.NotNil(t, futureDeepSeek)
 	require.NotNil(t, futureDeepSeek.RateMultiplier)
@@ -189,7 +192,7 @@ func TestAdminService_SetGroupProviderRateMultiplier_UsesWildcardAndKeepsOtherPr
 	existingDeepSeek := matchGroupModelPricing(groupRepo.updated, "deepseek-v4.1-flash")
 	require.NotNil(t, existingDeepSeek)
 	require.NotNil(t, existingDeepSeek.RateMultiplier)
-	require.InDelta(t, 0.75, *existingDeepSeek.RateMultiplier, 1e-12)
+	require.InDelta(t, 0.4, *existingDeepSeek.RateMultiplier, 1e-12)
 	require.NotNil(t, existingDeepSeek.InputPrice)
 	require.InDelta(t, 2, *existingDeepSeek.InputPrice, 1e-12)
 
@@ -198,6 +201,25 @@ func TestAdminService_SetGroupProviderRateMultiplier_UsesWildcardAndKeepsOtherPr
 		entry := groupRepo.updated.ModelPricing[i]
 		require.NotEqual(t, []string{"__provider_rate__:deepseek"}, entry.Models)
 	}
+	retainedRate := GroupModelRateOverride(groupRepo.updated, "deepseek-v4.1-flash")
+	require.NotNil(t, retainedRate)
+	require.InDelta(t, 0.4, *retainedRate, 1e-12)
+}
+
+func TestClearProviderRateOverrides_PreservesMixedModelPricing(t *testing.T) {
+	rate := testRatePtr(0.6)
+	pricing := []ChannelModelPricing{
+		{Models: []string{"deepseek-*", "kimi-k3.1-pro"}, RateMultiplier: rate, InputPrice: testRatePtr(3)},
+		{Models: []string{"__provider_rate__:deepseek"}, RateMultiplier: testRatePtr(0.8)},
+	}
+	out := clearProviderRateOverrides(pricing, PlatformDeepseek)
+	require.Len(t, out, 2)
+	require.Equal(t, []string{"kimi-k3.1-pro"}, out[0].Models)
+	require.Equal(t, rate, out[0].RateMultiplier)
+	require.Equal(t, []string{"deepseek-*"}, out[1].Models)
+	require.Nil(t, out[1].RateMultiplier)
+	require.InDelta(t, 3, *out[1].InputPrice, 1e-12)
+	require.Equal(t, []string{"deepseek-*", "kimi-k3.1-pro"}, pricing[0].Models)
 }
 
 // -----------------------------------------------------------------------------

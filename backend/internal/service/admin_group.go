@@ -1674,34 +1674,36 @@ func (s *adminServiceImpl) ClearGroupProviderRateMultiplier(ctx context.Context,
 func clearProviderRateOverrides(pricing []ChannelModelPricing, provider string) []ChannelModelPricing {
 	out := make([]ChannelModelPricing, 0, len(pricing))
 	for _, entry := range pricing {
-		providerOnly := len(entry.Models) > 0
-		touchesProvider := false
-		providerMarkerEntry := false
+		unchanged := make([]string, 0, len(entry.Models))
+		pricedWildcards := make([]string, 0, len(entry.Models))
 		for _, model := range entry.Models {
 			if entryProvider, ok := providerFromGroupRateEntry(model); ok {
-				providerMarkerEntry = true
-				touchesProvider = touchesProvider || entryProvider == provider
-				providerOnly = providerOnly && entryProvider == provider
+				if entryProvider == provider {
+					continue
+				}
+			}
+			if strings.HasSuffix(strings.TrimSpace(model), "*") && modelProviderPlatform(model) == provider {
+				pricedWildcards = append(pricedWildcards, model)
 				continue
 			}
-			if modelProviderPlatform(model) == provider {
-				touchesProvider = true
-			} else {
-				providerOnly = false
-			}
+			unchanged = append(unchanged, model)
 		}
-		if !touchesProvider {
+		if len(unchanged) == len(entry.Models) {
 			out = append(out, entry)
 			continue
 		}
-		entry.RateMultiplier = nil
-		if providerMarkerEntry {
-			continue
+		if len(unchanged) > 0 {
+			retained := entry
+			retained.Models = unchanged
+			out = append(out, retained)
 		}
-		if providerOnly && !groupPricingHasPricing(&entry) {
-			continue
+		// Legacy wildcard entries may also contain prices. Clear their channel
+		// rate while preserving those prices and any exact model overrides.
+		if len(pricedWildcards) > 0 && groupPricingHasPricing(&entry) {
+			entry.Models = pricedWildcards
+			entry.RateMultiplier = nil
+			out = append(out, entry)
 		}
-		out = append(out, entry)
 	}
 	return out
 }
