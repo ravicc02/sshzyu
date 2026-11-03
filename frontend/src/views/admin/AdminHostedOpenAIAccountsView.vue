@@ -45,7 +45,9 @@
             <div class="identity-copy">
               <strong :title="account.account_name || account.account_email">{{ account.account_name || account.account_email }}</strong>
               <span :title="account.account_email">{{ account.account_email }}</span>
-              <small :title="account.user_email">{{ account.user_name }} · {{ account.user_email }}</small>
+              <small :title="account.user_email">
+                {{ account.user_name }}<template v-if="account.user_email && account.user_email !== account.account_email"> · {{ account.user_email }}</template>
+              </small>
             </div>
           </div>
 
@@ -337,7 +339,7 @@ onMounted(load)
 
 <style scoped>
 .admin-hosted-page { width: min(1480px, 100%); margin: 0 auto; padding: 24px 24px 64px; color: var(--text-primary); }
-.filter-bar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--border-color); border-bottom: 0; border-radius: 10px 10px 0 0; background: var(--surface); }
+.filter-bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border-color); border-bottom: 0; border-radius: 10px 10px 0 0; background: var(--surface); }
 .search-box { display: flex; align-items: center; width: min(440px, 100%); gap: 8px; padding: 0 10px; border: 1px solid var(--border-color); border-radius: 7px; background: var(--surface); color: var(--text-tertiary); }
 .search-box input { width: 100%; height: 34px; border: 0; outline: 0; background: transparent; color: var(--text-primary); font-size: 12px; }
 .status-select { width: 132px; height: 36px; }
@@ -345,14 +347,14 @@ onMounted(load)
 .hosted-empty { min-height: 300px; display: grid; place-items: center; align-content: center; gap: 14px; border: 1px solid var(--border-color); border-radius: 0 0 10px 10px; background: var(--surface); color: var(--text-tertiary); }
 .hosted-empty h2 { font-size: 14px; font-weight: 600; }
 .loading-ring { width: 28px; height: 28px; border: 2px solid var(--border-color); border-top-color: var(--primary-500); border-radius: 50%; animation: spin 0.8s linear infinite; }
-.hosted-list { overflow: hidden; border: 1px solid var(--border-color); border-radius: 0 0 10px 10px; background: var(--surface); }
-.list-head, .hosted-row { display: grid; grid-template-columns: minmax(190px, 1.15fr) 84px minmax(128px, .76fr) minmax(178px, 1.1fr) minmax(104px, .62fr) minmax(176px, 1fr) 76px 62px 104px; align-items: center; gap: 9px; padding: 0 14px; }
+.hosted-list { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 0 0 10px 10px; background: var(--surface); }
+.list-head, .hosted-row { display: grid; grid-template-columns: minmax(142px, 1.25fr) 74px minmax(96px, .9fr) minmax(126px, 1.12fr) minmax(82px, .78fr) minmax(132px, 1.16fr) 54px 44px 96px; align-items: center; gap: 6px; min-width: 930px; padding: 0 10px; }
 .list-head { min-height: 38px; border-bottom: 1px solid var(--border-color); color: var(--text-tertiary); background: var(--surface-secondary); font-size: 10px; font-weight: 650; letter-spacing: .01em; }
-.hosted-row { min-height: 116px; border-bottom: 1px solid var(--border-color); transition: background-color .15s ease; }
+.hosted-row { min-height: 104px; border-bottom: 1px solid var(--border-color); transition: background-color .15s ease; }
 .hosted-row:last-child { border-bottom: 0; }
 .hosted-row:hover { background: color-mix(in srgb, var(--primary-500) 3%, var(--surface)); }
-.hosted-row > :not(:first-child) { align-self: stretch; padding-inline-start: 9px; border-inline-start: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent); }
-.list-head > :not(:first-child) { min-height: 20px; padding-inline-start: 9px; border-inline-start: 1px solid var(--border-color); }
+.hosted-row > :not(:first-child) { align-self: stretch; padding-inline-start: 8px; border-inline-start: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent); }
+.list-head > :not(:first-child) { min-height: 20px; padding-inline-start: 8px; border-inline-start: 1px solid var(--border-color); }
 .identity-cell { display: flex; align-items: center; min-width: 0; gap: 10px; }
 .avatar { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border-radius: 8px; color: var(--primary-700); background: color-mix(in srgb, var(--primary-500) 10%, var(--surface)); font-size: 12px; font-weight: 700; }
 .identity-copy, .group-cell, .proxy-cell, .account-id-cell { display: grid; min-width: 0; gap: 4px; }
@@ -411,18 +413,14 @@ onMounted(load)
 :global(.dark) .status-chip.is-muted { color: #ffd38a; background: rgb(146 94 0 / 0.25); }
 :global(.dark) .status-chip.is-error { color: #fecdd3; background: rgb(159 18 57 / 0.28); }
 :global(.dark) .messages-state.enabled { color: #9df1ce; background: rgb(4 120 87 / 0.26); }
-@media (max-width: 1300px) and (min-width: 901px) {
-  .hosted-list { overflow-x: auto; }
-  .list-head, .hosted-row { min-width: 1240px; }
-}
 @media (max-width: 900px) {
   .hosted-list { overflow: visible; border: 0; border-radius: 0; background: transparent; }
   .list-head { display: none; }
-  .hosted-row { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 14px; margin-bottom: 10px; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); }
+  .hosted-row { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; margin-bottom: 10px; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); }
   .hosted-row:last-child { border-bottom: 1px solid var(--border-color); }
   .hosted-row > :not(:first-child) { min-height: 48px; padding: 9px 0 0; border-inline-start: 0; border-top: 1px solid var(--border-color); }
   .hosted-row > [data-label]::before { display: block; margin-bottom: 7px; color: var(--text-tertiary); content: attr(data-label); font-size: 10px; font-weight: 600; }
-  .identity-cell, .hosted-row > :nth-child(2), .hosted-row > :nth-child(3), .hosted-row > :nth-child(4), .hosted-row > :nth-child(5), .hosted-row > :nth-child(6), .hosted-row > :nth-child(7), .hosted-row > :nth-child(8), .hosted-row > :nth-child(9) { grid-column: 1 / -1; }
+  .identity-cell, .hosted-row > :not(.identity-cell) { grid-column: 1 / -1; }
   .hosted-account-meta, .group-cell, .proxy-cell { min-width: 0; }
   .schedule-cell { justify-content: flex-start; }
   .row-actions { grid-column: 1 / -1; justify-content: flex-start; padding-top: 10px !important; }

@@ -31,6 +31,7 @@
       <section v-else class="hosted-list">
         <div class="list-head" aria-hidden="true">
           <span>账号</span>
+          <span>账号 ID / 容量</span>
           <span>平台 / 类型</span>
           <span>分组 / 模型</span>
           <span>代理</span>
@@ -45,8 +46,13 @@
             <div class="identity-copy">
               <strong :title="account.account_name || account.account_email">{{ account.account_name || account.account_email }}</strong>
               <span :title="account.account_email">{{ account.account_email }}</span>
-              <small>#{{ account.account_id }} · {{ account.quota.account_type }}</small>
+              <small>{{ account.quota.account_type }}</small>
             </div>
+          </div>
+
+          <div class="account-id-cell" data-label="账号 ID / 容量">
+            <code>#{{ account.account_id }}</code>
+            <HostedAccountCapacity :concurrency="account.concurrency" />
           </div>
 
           <HostedAccountMeta data-label="平台 / 类型" :account="account" />
@@ -334,6 +340,7 @@ import {
   type HostedOpenAIOptions
 } from '@/api/hostedOpenAIAccounts'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
+import HostedAccountCapacity from '@/components/hosted/HostedAccountCapacity.vue'
 import HostedAccountMeta from '@/components/hosted/HostedAccountMeta.vue'
 import HostedAccountUsage from '@/components/hosted/HostedAccountUsage.vue'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -617,21 +624,22 @@ onMounted(load)
 .empty-mark { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; color: var(--primary-600); background: color-mix(in srgb, var(--primary-500) 10%, transparent); }
 .empty-panel h2 { font-size: 15px; font-weight: 600; }
 .loading-ring { width: 30px; height: 30px; border: 2px solid var(--border-color); border-top-color: var(--primary-500); border-radius: 50%; animation: spin 0.8s linear infinite; }
-.hosted-list { overflow: hidden; border: 1px solid var(--border-color); border-radius: 10px; background: var(--surface); }
-.list-head, .hosted-row { display: grid; grid-template-columns: minmax(180px, 1.1fr) minmax(120px, .76fr) minmax(168px, 1.05fr) minmax(96px, .6fr) minmax(160px, 1fr) 66px 58px 90px; align-items: center; gap: 10px; padding: 0 14px; }
+.hosted-list { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 10px; background: var(--surface); }
+.list-head, .hosted-row { display: grid; grid-template-columns: minmax(140px, 1.25fr) 82px minmax(96px, .9fr) minmax(124px, 1.1fr) minmax(82px, .76fr) minmax(132px, 1.15fr) 54px 46px 106px; align-items: center; gap: 6px; min-width: 944px; padding: 0 10px; }
 .list-head { min-height: 40px; border-bottom: 1px solid var(--border-color); color: var(--text-tertiary); background: var(--surface-secondary); font-size: 10px; font-weight: 650; }
-.hosted-row { min-height: 116px; border-bottom: 1px solid var(--border-color); transition: background-color .15s ease; }
+.hosted-row { min-height: 104px; border-bottom: 1px solid var(--border-color); transition: background-color .15s ease; }
 .hosted-row:last-child { border-bottom: 0; }
 .hosted-row:hover { background: color-mix(in srgb, var(--primary-500) 3%, var(--surface)); }
-.hosted-row > :not(:first-child) { align-self: stretch; padding-inline-start: 10px; border-inline-start: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent); }
-.list-head > :not(:first-child) { min-height: 20px; padding-inline-start: 10px; border-inline-start: 1px solid var(--border-color); }
+.hosted-row > :not(:first-child) { align-self: stretch; padding-inline-start: 8px; border-inline-start: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent); }
+.list-head > :not(:first-child) { min-height: 20px; padding-inline-start: 8px; border-inline-start: 1px solid var(--border-color); }
 .identity-cell { display: flex; align-items: center; min-width: 0; gap: 11px; }
 .account-avatar { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; border: 1px solid color-mix(in srgb, var(--primary-500) 25%, var(--border-color)); border-radius: 8px; color: var(--primary-700); background: color-mix(in srgb, var(--primary-500) 9%, var(--surface)); font-size: 13px; font-weight: 700; }
-.identity-copy, .group-cell, .proxy-cell { display: grid; min-width: 0; gap: 4px; }
+.identity-copy, .group-cell, .proxy-cell, .account-id-cell { display: grid; min-width: 0; gap: 4px; }
 .identity-copy strong, .identity-copy span, .identity-copy small, .group-cell > strong, .proxy-cell strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .identity-copy strong { font-size: 12px; font-weight: 650; }
 .identity-copy span { color: var(--text-secondary); font-size: 10px; }
 .identity-copy small, .proxy-cell span { color: var(--text-tertiary); font-size: 9px; }
+.account-id-cell code { width: fit-content; color: var(--text-secondary); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 10px; }
 .group-cell > strong, .proxy-cell strong { font-size: 11px; font-weight: 600; }
 .model-chips { display: flex; min-width: 0; align-items: center; gap: 3px; overflow: hidden; }
 .model-chips code { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 5px; border-radius: 4px; color: var(--text-secondary); background: var(--surface-secondary); font-size: 9px; }
@@ -688,20 +696,16 @@ onMounted(load)
 :global(.dark) .status-chip.is-muted { color: #ffd38a; background: rgb(146 94 0 / 0.25); }
 :global(.dark) .status-chip.is-error { color: #fecdd3; background: rgb(159 18 57 / 0.28); }
 :global(.dark) .messages-state.enabled { color: #9df1ce; background: rgb(4 120 87 / 0.26); }
-@media (max-width: 1300px) and (min-width: 861px) {
-  .hosted-list { overflow-x: auto; }
-  .list-head, .hosted-row { min-width: 1060px; }
-}
 @media (max-width: 860px) {
   .hosted-page { padding: 18px 14px 56px; }
   .hosted-toolbar { align-items: flex-start; }
   .hosted-list { overflow: visible; border: 0; background: transparent; }
   .list-head { display: none; }
-  .hosted-row { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 14px; margin-bottom: 10px; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); }
+  .hosted-row { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; margin-bottom: 10px; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); }
   .hosted-row:last-child { border-bottom: 1px solid var(--border-color); }
   .hosted-row > :not(:first-child) { min-height: 48px; padding: 9px 0 0; border-inline-start: 0; border-top: 1px solid var(--border-color); }
   .hosted-row > [data-label]::before { display: block; margin-bottom: 7px; color: var(--text-tertiary); content: attr(data-label); font-size: 10px; font-weight: 600; }
-  .identity-cell, .hosted-row > :nth-child(2), .hosted-row > :nth-child(3), .hosted-row > :nth-child(4), .hosted-row > :nth-child(5), .hosted-row > :nth-child(6), .hosted-row > :nth-child(7), .hosted-row > :nth-child(8) { grid-column: 1 / -1; }
+  .identity-cell, .hosted-row > :not(.identity-cell) { grid-column: 1 / -1; }
   .schedule-cell { justify-content: flex-start; }
   .row-actions { grid-column: 1 / -1; justify-content: flex-start; padding-top: 10px !important; }
 }
