@@ -501,6 +501,7 @@ func (r *groupRepository) ListBindableWithFilters(ctx context.Context, params pa
 }
 
 func (r *groupRepository) listWithFiltersQuery(ctx context.Context, q *dbent.GroupQuery, params pagination.PaginationParams, platform, status, search string, isExclusive *bool) ([]service.Group, *pagination.PaginationResult, error) {
+	q.Where(func(s *entsql.Selector) { applyHostedResourceFilter(ctx, s, "group_id") })
 
 	if platform != "" {
 		q = q.Where(group.PlatformEQ(platform))

@@ -2,6 +2,7 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
+        <AccountManagementTabs :hosted="props.hosted" />
         <div class="flex flex-wrap-reverse items-start justify-between gap-3">
           <AccountTableFilters
             v-model:searchQuery="params.search"
@@ -13,6 +14,7 @@
           />
           <AccountTableActions
             :loading="loading"
+            :show-create="!props.hosted"
             @refresh="handleManualRefresh"
             @create="showCreate = true"
           >
@@ -510,6 +512,7 @@ import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal } from '@/components/account'
 import AccountTableActions from '@/components/admin/account/AccountTableActions.vue'
+import AccountManagementTabs from '@/components/admin/account/AccountManagementTabs.vue'
 import AccountTableFilters from '@/components/admin/account/AccountTableFilters.vue'
 import AccountBulkActionsBar from '@/components/admin/account/AccountBulkActionsBar.vue'
 import AccountActionMenu from '@/components/admin/account/AccountActionMenu.vue'
@@ -541,6 +544,8 @@ import { formatMultiplier } from '@/utils/formatters'
 import type { Account, AccountListItem, AccountPlatform, AccountSchedulerGroupScore, AccountType, AccountUsageInfo, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
 
 const { t } = useI18n()
+const props = withDefaults(defineProps<{ hosted?: boolean }>(), { hosted: false })
+const accountOwnership = computed(() => props.hosted ? 'hosted' : 'standard')
 const appStore = useAppStore()
 const authStore = useAuthStore()
 
@@ -564,6 +569,7 @@ type AccountBulkEditTarget =
   | {
       mode: 'filtered'
       filters: {
+        ownership?: string
         platform?: string
         type?: string
         status?: string
@@ -1094,6 +1100,7 @@ const shouldIncludeSchedulerScore = () => isColumnVisible('scheduler_score')
 const syncAccountListDerivedParams = () => {
   // Keep every load path, including auto-refresh and sorting, aligned with the current column visibility.
   const requestParams = params as any
+  requestParams.ownership = accountOwnership.value
   requestParams.include_scheduler_score = shouldIncludeSchedulerScore() ? '1' : '0'
 }
 
@@ -1111,6 +1118,8 @@ const {
   fetchFn: adminAPI.accounts.list,
   initialParams: {
     ...loadInitialAccountFilterValues(),
+    ...(props.hosted ? { platform: 'openai', status: '' } : {}),
+    ownership: accountOwnership.value,
     type: '',
     privacy_mode: '',
     group: '',
@@ -1206,6 +1215,7 @@ const reload = async () => {
 const buildUpstreamBillingRateFilters = () => {
   const rawParams = toRaw(params) as Record<string, unknown>
   return {
+    ownership: accountOwnership.value,
     platform: typeof rawParams.platform === 'string' ? rawParams.platform : '',
     type: typeof rawParams.type === 'string' ? rawParams.type : '',
     status: typeof rawParams.status === 'string' ? rawParams.status : '',
@@ -1367,6 +1377,13 @@ const handleSort = (key: string, order: AccountSortOrder) => {
   pendingTodayStatsRefresh.value = true
   load()
 }
+
+watch(() => props.hosted, () => {
+  clearSelection()
+  accounts.value = []
+  Object.assign(params, { platform: props.hosted ? 'openai' : '', type: '', status: '', group: '', privacy_mode: '', search: '' })
+  reload().catch((error) => appStore.showError(extractApiErrorMessage(error, t('common.error'))))
+})
 
 watch(loading, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) {
@@ -2087,6 +2104,7 @@ const buildBulkEditFilterSnapshot = () => {
   const rawParams = toRaw(params) as Record<string, unknown>
   const sortOrder: AccountSortOrder = rawParams.sort_order === 'desc' ? 'desc' : 'asc'
   return {
+    ownership: accountOwnership.value,
     platform: typeof rawParams.platform === 'string' ? rawParams.platform : '',
     type: typeof rawParams.type === 'string' ? rawParams.type : '',
     status: typeof rawParams.status === 'string' ? rawParams.status : '',
@@ -2164,6 +2182,7 @@ const handleDataImported = () => { showImportData.value = false; reload() }
 const ACCOUNT_UNGROUPED_GROUP_QUERY_VALUE = 'ungrouped'
 const ACCOUNT_PRIVACY_MODE_UNSET_QUERY_VALUE = '__unset__'
 const buildAccountQueryFilters = () => ({
+  ownership: accountOwnership.value,
   platform: params.platform || '',
   type: params.type || '',
   status: params.status || '',

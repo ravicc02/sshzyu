@@ -615,6 +615,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/accounts/hosted',
+    name: 'AdminHostedAccountInventory',
+    component: () => import('@/views/admin/AccountsView.vue'),
+    props: { hosted: true },
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Hosted Accounts',
+      titleKey: 'nav.hostedAccounts'
+    }
+  },
+  {
     path: '/admin/hosted-accounts',
     name: 'AdminHostedOpenAIAccounts',
     component: () => import('@/views/admin/AdminHostedOpenAIAccountsView.vue'),

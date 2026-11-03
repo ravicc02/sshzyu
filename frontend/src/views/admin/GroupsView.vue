@@ -7002,8 +7002,13 @@ const handleClickOutside = (event: MouseEvent) => {
 // 打开排序弹窗
 const openSortModal = async () => {
   try {
-    // 获取所有分组（不分页）
-    const allGroups = await adminAPI.groups.getAll();
+    // Reuse the management list so hosted groups stay outside manual sorting.
+    const allGroups: AdminGroup[] = [];
+    for (let page = 1; ; page++) {
+      const result = await adminAPI.groups.list(page, 1000, { status: 'active' });
+      allGroups.push(...result.items);
+      if (allGroups.length >= result.total || result.items.length === 0) break;
+    }
     // 按 sort_order 排序
     sortableGroups.value = [...allGroups].sort(
       (a, b) => a.sort_order - b.sort_order,

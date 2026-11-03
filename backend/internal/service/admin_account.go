@@ -1244,6 +1244,10 @@ func (s *adminServiceImpl) resolveBulkUpdateTargetIDs(ctx context.Context, filte
 	if filters == nil {
 		return nil, nil
 	}
+	ctx, err := WithAccountOwnershipFilter(ctx, filters.Ownership)
+	if err != nil {
+		return nil, err
+	}
 
 	groupID := int64(0)
 	switch strings.TrimSpace(filters.Group) {

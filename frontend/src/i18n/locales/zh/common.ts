@@ -189,6 +189,7 @@ export default {
     subscriptions: '订阅管理',
     accounts: '账号管理',
     accountScheduler: '账号调度',
+    platformAccounts: '平台账号',
     hostedAccounts: '托管账号',
     hostedAccountManagement: '托管管理',
     upstreamMonitor: '上游监控',

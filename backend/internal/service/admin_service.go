@@ -507,6 +507,7 @@ type BulkUpdateAccountsInput struct {
 }
 
 type BulkUpdateAccountFilters struct {
+	Ownership   string
 	Platform    string
 	Type        string
 	Status      string

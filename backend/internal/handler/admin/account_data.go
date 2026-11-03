@@ -540,6 +540,10 @@ func (h *AccountHandler) resolveExportAccounts(ctx context.Context, ids []int64,
 		return out, nil
 	}
 
+	ctx, err := service.WithAccountOwnershipFilter(ctx, c.Query("ownership"))
+	if err != nil {
+		return nil, err
+	}
 	platform := c.Query("platform")
 	accountType := c.Query("type")
 	status := c.Query("status")

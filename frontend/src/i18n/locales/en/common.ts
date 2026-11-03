@@ -189,6 +189,7 @@ export default {
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
     accountScheduler: 'Account Scheduler',
+    platformAccounts: 'Platform Accounts',
     hostedAccounts: 'Hosted Accounts',
     hostedAccountManagement: 'Hosted Management',
     upstreamMonitor: 'Upstream Monitor',

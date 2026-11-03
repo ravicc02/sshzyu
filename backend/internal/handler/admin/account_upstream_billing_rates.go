@@ -34,6 +34,11 @@ func (h *AccountHandler) GetUpstreamBillingRates(c *gin.Context) {
 		response.Error(c, http.StatusServiceUnavailable, "account service unavailable")
 		return
 	}
+	ctx, err := service.WithAccountOwnershipFilter(c.Request.Context(), c.Query("ownership"))
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 
 	page, pageSize := response.ParsePagination(c)
 	platform := c.Query("platform")
@@ -62,7 +67,7 @@ func (h *AccountHandler) GetUpstreamBillingRates(c *gin.Context) {
 	}
 
 	accounts, total, err := h.adminService.ListAccounts(
-		c.Request.Context(), page, pageSize, platform, accountType, status,
+		ctx, page, pageSize, platform, accountType, status,
 		search, groupID, privacyMode, sortBy, sortOrder,
 	)
 	if err != nil {
