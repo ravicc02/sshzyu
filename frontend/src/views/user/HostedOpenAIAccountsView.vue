@@ -31,10 +31,8 @@
       <section v-else class="hosted-list">
         <div class="list-head" aria-hidden="true">
           <span>账号</span>
-          <span>账号 ID / 容量</span>
           <span>平台 / 类型</span>
-          <span>分组 / 模型</span>
-          <span>代理</span>
+          <span>专属分组 / 接入</span>
           <span>用量窗口</span>
           <span>状态</span>
           <span>调度</span>
@@ -46,13 +44,11 @@
             <div class="identity-copy">
               <strong :title="account.account_name || account.account_email">{{ account.account_name || account.account_email }}</strong>
               <span :title="account.account_email">{{ account.account_email }}</span>
-              <small>{{ account.quota.account_type }}</small>
+              <div class="identity-meta">
+                <code>#{{ account.account_id }}</code>
+                <HostedAccountCapacity :concurrency="account.concurrency" />
+              </div>
             </div>
-          </div>
-
-          <div class="account-id-cell" data-label="账号 ID / 容量">
-            <code>#{{ account.account_id }}</code>
-            <HostedAccountCapacity :concurrency="account.concurrency" />
           </div>
 
           <HostedAccountMeta data-label="平台 / 类型" :account="account" />
@@ -60,16 +56,15 @@
           <div class="group-cell" data-label="专属分组设置">
             <strong :title="account.group_name">{{ account.group_name }}</strong>
             <div class="model-chips" :title="account.models.join(', ')">
-              <code v-for="model in account.models.slice(0, 3)" :key="model">{{ model }}</code>
-              <span v-if="account.models.length > 3">+{{ account.models.length - 3 }}</span>
+              <code v-for="model in account.models.slice(0, 2)" :key="model">{{ model }}</code>
+              <span v-if="account.models.length > 2">+{{ account.models.length - 2 }} 个模型</span>
             </div>
-          </div>
-
-          <div class="proxy-cell" data-label="代理 / 协议">
-            <strong>{{ account.proxy_name || '直连' }}</strong>
-            <span class="messages-state" :class="{ enabled: account.supports_messages }">
-              {{ account.supports_messages ? '/v1/messages' : 'Messages 关闭' }}
-            </span>
+            <div class="connection-meta">
+              <span :title="`代理：${account.proxy_name || '直连'}`"><Icon name="globe" size="xs" />{{ account.proxy_name || '直连' }}</span>
+              <span class="messages-state" :class="{ enabled: account.supports_messages }">
+                {{ account.supports_messages ? '/v1/messages' : 'Messages 关闭' }}
+              </span>
+            </div>
           </div>
 
           <HostedAccountUsage data-label="用量窗口" :account="account" />
@@ -615,53 +610,8 @@ function statusClass(account: HostedOpenAIAccount) {
 onMounted(load)
 </script>
 
+<style scoped src="../../styles/hosted-accounts.css"></style>
 <style scoped>
-.hosted-page { width: min(1480px, 100%); margin: 0 auto; padding: 24px 24px 72px; color: var(--text-primary); }
-.hosted-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface); }
-.toolbar-meta { color: var(--text-tertiary); font-size: 11px; }
-.head-actions { display: flex; gap: 8px; }
-.empty-panel { min-height: 330px; display: grid; place-items: center; align-content: center; gap: 16px; border: 1px dashed var(--border-color); border-radius: 12px; background: var(--surface); }
-.empty-mark { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; color: var(--primary-600); background: color-mix(in srgb, var(--primary-500) 10%, transparent); }
-.empty-panel h2 { font-size: 15px; font-weight: 600; }
-.loading-ring { width: 30px; height: 30px; border: 2px solid var(--border-color); border-top-color: var(--primary-500); border-radius: 50%; animation: spin 0.8s linear infinite; }
-.hosted-list { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 10px; background: var(--surface); }
-.list-head, .hosted-row { display: grid; grid-template-columns: minmax(140px, 1.25fr) 82px minmax(96px, .9fr) minmax(124px, 1.1fr) minmax(82px, .76fr) minmax(132px, 1.15fr) 54px 46px 106px; align-items: center; gap: 6px; min-width: 944px; padding: 0 10px; }
-.list-head { min-height: 40px; border-bottom: 1px solid var(--border-color); color: var(--text-tertiary); background: var(--surface-secondary); font-size: 10px; font-weight: 650; }
-.hosted-row { min-height: 104px; border-bottom: 1px solid var(--border-color); transition: background-color .15s ease; }
-.hosted-row:last-child { border-bottom: 0; }
-.hosted-row:hover { background: color-mix(in srgb, var(--primary-500) 3%, var(--surface)); }
-.hosted-row > :not(:first-child) { align-self: stretch; padding-inline-start: 8px; border-inline-start: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent); }
-.list-head > :not(:first-child) { min-height: 20px; padding-inline-start: 8px; border-inline-start: 1px solid var(--border-color); }
-.identity-cell { display: flex; align-items: center; min-width: 0; gap: 11px; }
-.account-avatar { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; border: 1px solid color-mix(in srgb, var(--primary-500) 25%, var(--border-color)); border-radius: 8px; color: var(--primary-700); background: color-mix(in srgb, var(--primary-500) 9%, var(--surface)); font-size: 13px; font-weight: 700; }
-.identity-copy, .group-cell, .proxy-cell, .account-id-cell { display: grid; min-width: 0; gap: 4px; }
-.identity-copy strong, .identity-copy span, .identity-copy small, .group-cell > strong, .proxy-cell strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.identity-copy strong { font-size: 12px; font-weight: 650; }
-.identity-copy span { color: var(--text-secondary); font-size: 10px; }
-.identity-copy small, .proxy-cell span { color: var(--text-tertiary); font-size: 9px; }
-.account-id-cell code { width: fit-content; color: var(--text-secondary); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 10px; }
-.group-cell > strong, .proxy-cell strong { font-size: 11px; font-weight: 600; }
-.model-chips { display: flex; min-width: 0; align-items: center; gap: 3px; overflow: hidden; }
-.model-chips code { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 5px; border-radius: 4px; color: var(--text-secondary); background: var(--surface-secondary); font-size: 9px; }
-.model-chips > span { flex: 0 0 auto; color: var(--text-tertiary); font-size: 9px; }
-.messages-state { width: fit-content; padding: 1px 5px; border-radius: 4px; color: var(--text-tertiary); background: var(--surface-secondary); font-size: 9px; }
-.messages-state.enabled { color: #087a55; background: #e7f8ef; }
-.status-cell { display: flex; align-items: center; }
-.status-chip { flex: 0 0 auto; width: fit-content; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; }
-.status-chip.is-active { color: #087a55; background: #e7f8ef; }
-.status-chip.is-muted { color: #8a5a00; background: #fff3d8; }
-.status-chip.is-error { color: #be123c; background: #ffe4e6; }
-.schedule-cell { display: flex; align-items: center; justify-content: center; }
-.switch-control { position: relative; width: 36px; height: 22px; padding: 0; border: 0; border-radius: 999px; background: #cbd5e1; transition: background-color .16s ease; }
-.switch-control span { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(15 23 42 / .28); transition: transform .16s ease; }
-.switch-control.checked { background: var(--primary-600); }
-.switch-control.checked span { transform: translateX(14px); }
-.switch-control:disabled { cursor: not-allowed; opacity: .48; }
-.icon-button:focus-visible, .switch-control:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
-.icon-button { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border: 1px solid var(--border-color); border-radius: 7px; color: var(--text-secondary); background: var(--surface); }
-.icon-button:disabled { opacity: 0.55; }
-.row-actions { display: flex; justify-content: flex-end; gap: 5px; }
-.actions-col { text-align: right; }
 .hosted-modal { max-width: 580px; }
 .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px 22px; border-bottom: 1px solid var(--border-color); }
 .modal-head h2 { font-size: 17px; font-weight: 650; }
@@ -690,29 +640,9 @@ onMounted(load)
 .callback-input { min-height: 82px; resize: vertical; line-height: 1.45; }
 .callback-recognized { display: inline-flex; align-items: center; gap: 5px; color: #087a55; font-size: 10px; font-weight: 600; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--border-color); }
-.spin, .spinning { animation: spin 0.8s linear infinite; }
+.spinning { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-:global(.dark) .status-chip.is-active { color: #9df1ce; background: rgb(4 120 87 / 0.26); }
-:global(.dark) .status-chip.is-muted { color: #ffd38a; background: rgb(146 94 0 / 0.25); }
-:global(.dark) .status-chip.is-error { color: #fecdd3; background: rgb(159 18 57 / 0.28); }
-:global(.dark) .messages-state.enabled { color: #9df1ce; background: rgb(4 120 87 / 0.26); }
-@media (max-width: 860px) {
-  .hosted-page { padding: 18px 14px 56px; }
-  .hosted-toolbar { align-items: flex-start; }
-  .hosted-list { overflow: visible; border: 0; background: transparent; }
-  .list-head { display: none; }
-  .hosted-row { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; margin-bottom: 10px; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); }
-  .hosted-row:last-child { border-bottom: 1px solid var(--border-color); }
-  .hosted-row > :not(:first-child) { min-height: 48px; padding: 9px 0 0; border-inline-start: 0; border-top: 1px solid var(--border-color); }
-  .hosted-row > [data-label]::before { display: block; margin-bottom: 7px; color: var(--text-tertiary); content: attr(data-label); font-size: 10px; font-weight: 600; }
-  .identity-cell, .hosted-row > :not(.identity-cell) { grid-column: 1 / -1; }
-  .schedule-cell { justify-content: flex-start; }
-  .row-actions { grid-column: 1 / -1; justify-content: flex-start; padding-top: 10px !important; }
-}
 @media (max-width: 560px) {
-  .hosted-toolbar { flex-direction: column; }
-  .head-actions { width: 100%; }
-  .head-actions .btn { flex: 1; justify-content: center; }
-  .modal-content { margin: 10px; max-height: calc(100vh - 20px); }
+  .modal-content { margin: 12px; max-height: calc(100dvh - 24px); }
 }
 </style>
