@@ -437,6 +437,7 @@ func TestSchedulerSnapshotServiceCheckOutboxLagFailedRebuildRearmsAfterRecovery(
 	}
 
 	svc.checkOutboxLag(context.Background(), 1)
+	advanceFullRebuildCooldown(svc)
 	repo.events = append(repo.events, SchedulerOutboxEvent{ID: 2, CreatedAt: time.Now().Add(-time.Hour)})
 	repo.rows = []int64{2}
 	svc.checkOutboxLag(context.Background(), 1)
@@ -480,6 +481,7 @@ func TestSchedulerSnapshotServiceCheckOutboxLagFailedRebuildRetriesAfterCooldown
 	}
 	svc.outboxRebuildRetryAt = time.Now().Add(-time.Second)
 	svc.lagMu.Unlock()
+	advanceFullRebuildCooldown(svc)
 	svc.checkOutboxLag(context.Background(), 0)
 	if cache.listBucketCalls != 2 {
 		t.Fatalf("expected persistent degradation to retry after cooldown, got %d attempts", cache.listBucketCalls)
@@ -495,6 +497,7 @@ func TestSchedulerSnapshotServiceCheckOutboxLagFailedRebuildRetriesAfterCooldown
 	svc.lagMu.Lock()
 	svc.outboxRebuildRetryAt = time.Now().Add(-time.Second)
 	svc.lagMu.Unlock()
+	advanceFullRebuildCooldown(svc)
 	cache.listBucketErr = nil
 	svc.checkOutboxLag(context.Background(), 0)
 	if cache.listBucketCalls != 3 {
@@ -534,6 +537,7 @@ func TestSchedulerSnapshotServiceCheckOutboxLagBacklogRetryDoesNotBypassNewLagTh
 	svc.lagMu.Lock()
 	svc.outboxRebuildRetryAt = time.Now().Add(-time.Second)
 	svc.lagMu.Unlock()
+	advanceFullRebuildCooldown(svc)
 
 	// The backlog recovers while lag becomes newly degraded. The stale backlog
 	// retry must not make the first lag observation bypass its failure threshold.
@@ -574,7 +578,8 @@ func TestSchedulerSnapshotServiceCheckOutboxLagLagRetryDoesNotDelayOrEscalateNew
 		t.Fatalf("expected the lag degradation to attempt one rebuild, got %d", cache.listBucketCalls)
 	}
 
-	// Lag recovers while backlog becomes newly degraded. It must start immediately
+	advanceFullRebuildCooldown(svc)
+	// Lag recovers while backlog becomes newly degraded. After the shared cooldown it can start
 	// and its first failure must use the base retry generation, not lag's count.
 	repo.events[0].CreatedAt = time.Now()
 	repo.rows = []int64{100}
@@ -639,6 +644,7 @@ func TestSchedulerSnapshotServiceCheckOutboxLagBacklogRetrySurvivesUnknownBacklo
 	svc.lagMu.Lock()
 	svc.outboxRebuildRetryAt = time.Now().Add(-time.Second)
 	svc.lagMu.Unlock()
+	advanceFullRebuildCooldown(svc)
 	svc.checkOutboxLag(context.Background(), 0)
 	if cache.listBucketCalls != 2 {
 		t.Fatalf("expected backlog retry after cooldown expiry, got %d attempts", cache.listBucketCalls)
@@ -670,6 +676,7 @@ func TestSchedulerSnapshotServiceCheckOutboxLagPreemptsUnknownBacklogRetryAtThre
 	repo.maxIDErr = errors.New("max id unavailable")
 	repo.events[0].CreatedAt = time.Now().Add(-time.Hour)
 
+	advanceFullRebuildCooldown(svc)
 	// A known lag degradation must keep accumulating independently of the active
 	// backlog cooldown and preempt it only after reaching its own threshold.
 	for observation := 1; observation <= 2; observation++ {
@@ -738,6 +745,7 @@ func TestSchedulerSnapshotServicePollOutboxEmptyBatchClearsDegradedEpisode(t *te
 		t.Fatalf("expected empty poll to skip a redundant backlog query, got %d health checks", repo.maxIDCalls)
 	}
 
+	advanceFullRebuildCooldown(svc)
 	repo.events = append(repo.events, SchedulerOutboxEvent{ID: 2, CreatedAt: time.Now().Add(-time.Hour)})
 	repo.rows = []int64{2}
 	svc.checkOutboxLag(context.Background(), 1)
@@ -891,4 +899,13 @@ func int64Range(start, end int64) []int64 {
 		values = append(values, id)
 	}
 	return values
+}
+
+// These tests already advance the outbox retry clock manually. Model the same
+// elapsed time for the shared full-rebuild guard instead of bypassing it.
+func advanceFullRebuildCooldown(svc *SchedulerSnapshotService) {
+	svc.fullRebuildStateMu.Lock()
+	now := svc.fullRebuildRetryAt.Add(time.Second)
+	svc.fullRebuildStateMu.Unlock()
+	svc.fullRebuildNow = func() time.Time { return now }
 }

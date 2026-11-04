@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -17,6 +18,7 @@ import (
 )
 
 var (
+	ErrSchedulerRebuildCoolingDown      = errors.New("scheduler snapshot rebuild cooling down")
 	ErrSchedulerCacheNotReady           = errors.New("scheduler cache not ready")
 	ErrSchedulerFallbackLimited         = errors.New("scheduler db fallback limited")
 	ErrSchedulerGroupLifecycleLeaseBusy = errors.New("scheduler group lifecycle lease busy")
@@ -127,6 +129,7 @@ type SchedulerSnapshotService struct {
 	cfg                          *config.Config
 	stopCh                       chan struct{}
 	stopOnce                     sync.Once
+	outboxIdlePolls              atomic.Uint32
 	wg                           sync.WaitGroup
 	fallbackLimit                *fallbackLimiter
 	lagMu                        sync.Mutex
@@ -144,6 +147,10 @@ type SchedulerSnapshotService struct {
 	fullRebuildRequested uint64
 	fullRebuildCompleted uint64
 	fullRebuildLastErr   error
+	fullRebuildFailures  int
+	fullRebuildRetryAt   time.Time
+	fullRebuildNow       func() time.Time
+	fullRebuildTimeout   time.Duration
 }
 
 func NewSchedulerSnapshotService(
@@ -331,7 +338,7 @@ func (s *SchedulerSnapshotService) runInitialRebuild() {
 		return
 	}
 	_ = s.coalesceFullRebuild(func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), s.snapshotRebuildTimeout())
 		defer cancel()
 		if err := s.rebuildFullSnapshot(ctx, "startup"); err != nil {
 			logger.LegacyPrintf("service.scheduler_snapshot", "[Scheduler] rebuild startup failed: %v", err)
@@ -342,14 +349,14 @@ func (s *SchedulerSnapshotService) runInitialRebuild() {
 }
 
 func (s *SchedulerSnapshotService) runOutboxWorker(interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
 	s.pollOutbox()
+	timer := time.NewTimer(schedulerIdlePollDelay(interval, s.outboxIdlePolls.Load()))
+	defer timer.Stop()
 	for {
 		select {
-		case <-ticker.C:
+		case <-timer.C:
 			s.pollOutbox()
+			timer.Reset(schedulerIdlePollDelay(interval, s.outboxIdlePolls.Load()))
 		case <-s.stopCh:
 			return
 		}
@@ -391,6 +398,7 @@ func (s *SchedulerSnapshotService) pollOutbox() {
 		return
 	}
 	if len(events) == 0 {
+		s.outboxIdlePolls.Add(1)
 		// The outbox query itself proves there is no event after the watermark.
 		// Clear degraded/retry state without adding two more repository queries to
 		// the healthy one-second poll path.
@@ -398,12 +406,16 @@ func (s *SchedulerSnapshotService) pollOutbox() {
 		return
 	}
 
+	s.outboxIdlePolls.Store(0)
 	seen := make(map[batchSeenKey]struct{})
 	for _, event := range events {
 		eventCtx, cancel := context.WithTimeout(context.Background(), outboxEventTimeout)
 		err := s.handleOutboxEvent(eventCtx, event, seen)
 		cancel()
 		if err != nil {
+			if errors.Is(err, ErrSchedulerRebuildCoolingDown) {
+				return
+			}
 			logger.LegacyPrintf("service.scheduler_snapshot", "[Scheduler] outbox handle failed: id=%d type=%s err=%v", event.ID, event.EventType, err)
 			return
 		}
@@ -1037,7 +1049,7 @@ func (s *SchedulerSnapshotService) triggerFullRebuild(reason string) error {
 		return ErrSchedulerCacheNotReady
 	}
 	return s.coalesceFullRebuild(func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), s.snapshotRebuildTimeout())
 		defer cancel()
 		return s.rebuildFullSnapshot(ctx, reason)
 	})
@@ -1275,11 +1287,36 @@ func (s *SchedulerSnapshotService) coalesceFullRebuild(run func() error) error {
 	coveredThrough := s.fullRebuildRequested
 	s.fullRebuildStateMu.Unlock()
 
+	// Every trigger (startup, timer and full_rebuild outbox events) shares this
+	// cooldown. Do not advance the outbox watermark when retry is deferred.
+	now := time.Now()
+	if s.fullRebuildNow != nil {
+		now = s.fullRebuildNow()
+	}
+	s.fullRebuildStateMu.Lock()
+	if now.Before(s.fullRebuildRetryAt) {
+		err := s.fullRebuildLastErr
+		retryAt := s.fullRebuildRetryAt
+		s.fullRebuildStateMu.Unlock()
+		return fmt.Errorf("%w until %s: %w", ErrSchedulerRebuildCoolingDown, retryAt.Format(time.RFC3339Nano), err)
+	}
+	s.fullRebuildStateMu.Unlock()
+	started := time.Now()
 	err := run()
 
 	s.fullRebuildStateMu.Lock()
 	s.fullRebuildCompleted = coveredThrough
 	s.fullRebuildLastErr = err
+	if err != nil {
+		s.fullRebuildFailures++
+		delay := schedulerFullRebuildRetryDelay(s.fullRebuildFailures)
+		s.fullRebuildRetryAt = now.Add(time.Since(started)).Add(delay)
+		slog.Warn("scheduler.snapshot_rebuild_failed", "error", err, "consecutive_failures", s.fullRebuildFailures, "retry_after", delay, "degraded", s.fullRebuildFailures >= 6)
+	} else {
+		s.fullRebuildFailures = 0
+		s.fullRebuildRetryAt = time.Time{}
+		slog.Info("scheduler.snapshot_rebuild_succeeded", "duration", time.Since(started))
+	}
 	s.fullRebuildStateMu.Unlock()
 	return err
 }
