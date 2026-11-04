@@ -32,13 +32,18 @@ func NewAPIKeyHandler(apiKeyService *service.APIKeyService) *APIKeyHandler {
 
 // CreateAPIKeyRequest represents the create API key request payload
 type CreateAPIKeyRequest struct {
-	Name          string   `json:"name" binding:"required"`
-	GroupID       *int64   `json:"group_id"`        // nullable
-	CustomKey     *string  `json:"custom_key"`      // 可选的自定义key
-	IPWhitelist   []string `json:"ip_whitelist"`    // IP 白名单
-	IPBlacklist   []string `json:"ip_blacklist"`    // IP 黑名单
-	Quota         *float64 `json:"quota"`           // 配额限制 (USD)
-	ExpiresInDays *int     `json:"expires_in_days"` // 过期天数
+	AllowedModels     []string `json:"allowed_models" binding:"max=200"`
+	QuotaTokens       int64    `json:"quota_tokens" binding:"gte=0"`
+	RateLimit5hTokens int64    `json:"rate_limit_5h_tokens" binding:"gte=0"`
+	RateLimit1dTokens int64    `json:"rate_limit_1d_tokens" binding:"gte=0"`
+	RateLimit7dTokens int64    `json:"rate_limit_7d_tokens" binding:"gte=0"`
+	Name              string   `json:"name" binding:"required"`
+	GroupID           *int64   `json:"group_id"`        // nullable
+	CustomKey         *string  `json:"custom_key"`      // 可选的自定义key
+	IPWhitelist       []string `json:"ip_whitelist"`    // IP 白名单
+	IPBlacklist       []string `json:"ip_blacklist"`    // IP 黑名单
+	Quota             *float64 `json:"quota"`           // 配额限制 (USD)
+	ExpiresInDays     *int     `json:"expires_in_days"` // 过期天数
 
 	// Rate limit fields (0 = unlimited)
 	RateLimit5h *float64 `json:"rate_limit_5h"`
@@ -47,11 +52,12 @@ type CreateAPIKeyRequest struct {
 }
 
 type CreateAPIKeyBatchRequest struct {
-	Name        string  `json:"name" binding:"max=100"`
-	GroupID     int64   `json:"group_id" binding:"required,gt=0"`
-	Count       int     `json:"count" binding:"required,min=1,max=50"`
-	Quota       float64 `json:"quota" binding:"gte=0"`
-	QuotaTokens int64   `json:"quota_tokens" binding:"gte=0"`
+	AllowedModels []string `json:"allowed_models" binding:"max=200"`
+	Name          string   `json:"name" binding:"max=100"`
+	GroupID       int64    `json:"group_id" binding:"required,gt=0"`
+	Count         int      `json:"count" binding:"required,min=1,max=50"`
+	Quota         float64  `json:"quota" binding:"gte=0"`
+	QuotaTokens   int64    `json:"quota_tokens" binding:"gte=0"`
 }
 
 type apiKeyBatchSummaryResponse struct {
@@ -94,14 +100,19 @@ func apiKeyBatchSummaryToResponse(item service.APIKeyBatchSummary) apiKeyBatchSu
 
 // UpdateAPIKeyRequest represents the update API key request payload
 type UpdateAPIKeyRequest struct {
-	Name        string    `json:"name"`
-	GroupID     *int64    `json:"group_id"`
-	Status      string    `json:"status" binding:"omitempty,oneof=active inactive"`
-	IPWhitelist *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
-	IPBlacklist *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
-	Quota       *float64  `json:"quota"`        // 配额限制 (USD), 0=无限制
-	ExpiresAt   *string   `json:"expires_at"`   // 过期时间 (ISO 8601)
-	ResetQuota  *bool     `json:"reset_quota"`  // 重置已用配额
+	AllowedModels     *[]string `json:"allowed_models" binding:"omitempty,max=200"`
+	QuotaTokens       *int64    `json:"quota_tokens" binding:"omitempty,gte=0"`
+	RateLimit5hTokens *int64    `json:"rate_limit_5h_tokens" binding:"omitempty,gte=0"`
+	RateLimit1dTokens *int64    `json:"rate_limit_1d_tokens" binding:"omitempty,gte=0"`
+	RateLimit7dTokens *int64    `json:"rate_limit_7d_tokens" binding:"omitempty,gte=0"`
+	Name              string    `json:"name"`
+	GroupID           *int64    `json:"group_id"`
+	Status            string    `json:"status" binding:"omitempty,oneof=active inactive"`
+	IPWhitelist       *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
+	IPBlacklist       *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
+	Quota             *float64  `json:"quota"`        // 配额限制 (USD), 0=无限制
+	ExpiresAt         *string   `json:"expires_at"`   // 过期时间 (ISO 8601)
+	ResetQuota        *bool     `json:"reset_quota"`  // 重置已用配额
 
 	// Rate limit fields (nil = no change, 0 = unlimited)
 	RateLimit5h         *float64 `json:"rate_limit_5h"`
@@ -243,6 +254,8 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 	}
 
 	svcReq := service.CreateAPIKeyRequest{
+		AllowedModels: req.AllowedModels, QuotaTokens: req.QuotaTokens,
+		RateLimit5hTokens: req.RateLimit5hTokens, RateLimit1dTokens: req.RateLimit1dTokens, RateLimit7dTokens: req.RateLimit7dTokens,
 		Name:          req.Name,
 		GroupID:       req.GroupID,
 		CustomKey:     req.CustomKey,
@@ -311,7 +324,7 @@ func (h *APIKeyHandler) CreateBatch(c *gin.Context) {
 	}
 	executeUserIdempotentJSON(c, "user.api_key_batches.create", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
 		keys, err := h.apiKeyService.CreateBatch(ctx, subject.UserID, service.CreateAPIKeyBatchRequest{
-			Name: req.Name, GroupID: req.GroupID, Count: req.Count, Quota: req.Quota, QuotaTokens: req.QuotaTokens,
+			Name: req.Name, GroupID: req.GroupID, Count: req.Count, Quota: req.Quota, QuotaTokens: req.QuotaTokens, AllowedModels: req.AllowedModels,
 		})
 		if err != nil {
 			return nil, err
@@ -370,6 +383,8 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 	}
 
 	svcReq := service.UpdateAPIKeyRequest{
+		AllowedModels: req.AllowedModels, QuotaTokens: req.QuotaTokens,
+		RateLimit5hTokens: req.RateLimit5hTokens, RateLimit1dTokens: req.RateLimit1dTokens, RateLimit7dTokens: req.RateLimit7dTokens,
 		IPWhitelist:         req.IPWhitelist,
 		IPBlacklist:         req.IPBlacklist,
 		Quota:               req.Quota,

@@ -125,6 +125,7 @@ func RegisterUserRoutes(
 			batchKeys.GET("", h.APIKey.ListBatches)
 			batchKeys.POST("", h.APIKey.CreateBatch)
 			batchKeys.GET("/:batch_id", h.APIKey.GetBatch)
+			batchKeys.PUT("/:batch_id", h.APIKey.UpdateBatch)
 		}
 
 		// 用户可用分组（非管理员接口）
@@ -132,6 +133,7 @@ func RegisterUserRoutes(
 		{
 			groups.GET("/available", h.APIKey.GetAvailableGroups)
 			groups.GET("/rates", h.APIKey.GetUserGroupRates)
+			groups.GET("/:id/models", h.Gateway.UserGroupModels)
 		}
 
 		hosted := authenticated.Group("/hosted-openai-accounts")

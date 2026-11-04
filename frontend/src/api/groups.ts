@@ -27,8 +27,17 @@ export async function getUserGroupRates(): Promise<Record<number, number>> {
   return data || {}
 }
 
+/** Model IDs use the same scoped catalog as the gateway's /v1/models. */
+export async function getModels(groupId: number, options?: { signal?: AbortSignal }): Promise<string[]> {
+  const { data } = await apiClient.get<{ data: Array<{ id: string }> }>(
+    `/groups/${groupId}/models`, { signal: options?.signal }
+  )
+  return [...new Set((data.data || []).map(model => model.id).filter(id => typeof id === 'string' && id.length > 0 && !id.includes('*') && !id.includes('?')))]
+}
+
 export const userGroupsAPI = {
   getAvailable,
+  getModels,
   getUserGroupRates
 }
 

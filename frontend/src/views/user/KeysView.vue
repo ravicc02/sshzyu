@@ -695,29 +695,10 @@
         <!-- Quota Limit Section -->
         <div class="space-y-3">
           <label class="input-label">{{ t('keys.quotaLimit') }}</label>
-          <!-- Switch commented out - always show input, 0 = unlimited
-          <div class="flex items-center justify-between">
-            <label class="input-label mb-0">{{ t('keys.quotaLimit') }}</label>
-            <button
-              type="button"
-              @click="formData.enable_quota = !formData.enable_quota"
-              :class="[
-                'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                formData.enable_quota ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
-              ]"
-            >
-              <span
-                :class="[
-                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-                  formData.enable_quota ? 'translate-x-4' : 'translate-x-0'
-                ]"
-              />
-            </button>
-          </div>
-          -->
+          <QuotaUnitSelector v-model="formData.quota_mode" name="key-quota-unit" />
 
           <div class="space-y-4">
-            <div>
+            <div v-if="formData.quota_mode === 'usd'">
               <div class="relative">
                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
                 <input
@@ -732,8 +713,8 @@
               <p class="input-hint">{{ t('keys.quotaAmountHint') }}</p>
             </div>
 
-            <div>
-              <label class="input-label">Token 配额</label>
+            <div v-else>
+              <label class="input-label">{{ t('keys.tokenQuotaLabel') }}</label>
               <div class="flex gap-2">
                 <input
                   v-model.number="formData.quota_token_amount"
@@ -751,16 +732,16 @@
             </div>
 
             <!-- Quota used display (only in edit mode) -->
-            <div v-if="showEditModal && selectedKey && selectedKey.quota > 0">
+            <div v-if="showEditModal && selectedKey && (formData.quota_mode === 'usd' ? selectedKey.quota > 0 : selectedKey.quota_tokens > 0)">
               <label class="input-label">{{ t('keys.quotaUsed') }}</label>
               <div class="flex items-center gap-2">
                 <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700">
                   <span class="font-medium text-gray-900 dark:text-white">
-                    ${{ selectedKey.quota_used?.toFixed(4) || '0.0000' }}
+                    {{ formData.quota_mode === 'tokens' ? formatTokenQuota(selectedKey.quota_tokens_used) : '$' + (selectedKey.quota_used?.toFixed(4) || '0.0000') }}
                   </span>
                   <span class="mx-2 text-gray-400">/</span>
                   <span class="text-gray-500 dark:text-gray-400">
-                    ${{ selectedKey.quota?.toFixed(2) || '0.00' }}
+                    {{ formData.quota_mode === 'tokens' ? formatTokenQuota(selectedKey.quota_tokens) : '$' + (selectedKey.quota?.toFixed(2) || '0.00') }}
                   </span>
                 </div>
                 <button
@@ -1260,6 +1241,7 @@
 	import { useAppStore } from '@/stores/app'
 	import { useOnboardingStore } from '@/stores/onboarding'
 	import { useClipboard } from '@/composables/useClipboard'
+import QuotaUnitSelector from '@/components/common/QuotaUnitSelector.vue'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 const { t } = useI18n()
@@ -1496,6 +1478,7 @@ const formData = ref({
   // Quota settings (empty = unlimited)
   enable_quota: false,
   quota: null as number | null,
+  quota_mode: 'usd' as 'usd' | 'tokens',
   quota_token_amount: null as number | null,
   quota_token_unit: 'M' as TokenQuotaUnit,
   // Rate limit settings
@@ -1767,6 +1750,7 @@ const editKey = (key: ApiKey) => {
     ip_blacklist: (key.ip_blacklist || []).join('\n'),
     enable_quota: key.quota > 0,
     quota: key.quota > 0 ? key.quota : null,
+    quota_mode: key.quota_tokens > 0 && key.quota <= 0 ? 'tokens' : 'usd',
     quota_token_amount: tokenBaseToAmount(key.quota_tokens, inferTokenQuotaUnit(key.quota_tokens)),
     quota_token_unit: inferTokenQuotaUnit(key.quota_tokens),
     enable_rate_limit:
@@ -1896,8 +1880,8 @@ const handleSubmit = async () => {
   const ipBlacklist = formData.value.enable_ip_restriction ? parseIPList(formData.value.ip_blacklist) : []
 
   // Calculate quota value (null/empty/0 = unlimited, stored as 0)
-  const quota = formData.value.quota && formData.value.quota > 0 ? formData.value.quota : 0
-  const quotaTokens = tokenAmountToBase(formData.value.quota_token_amount, formData.value.quota_token_unit)
+  const quota = formData.value.quota_mode === 'usd' && formData.value.quota && formData.value.quota > 0 ? formData.value.quota : 0
+  const quotaTokens = formData.value.quota_mode === 'tokens' ? tokenAmountToBase(formData.value.quota_token_amount, formData.value.quota_token_unit) : 0
 
   // Calculate expiration
   let expiresInDays: number | undefined
@@ -2023,6 +2007,7 @@ const closeModals = () => {
     ip_blacklist: '',
     enable_quota: false,
     quota: null,
+    quota_mode: 'usd',
     quota_token_amount: null,
     quota_token_unit: 'M',
     enable_rate_limit: false,

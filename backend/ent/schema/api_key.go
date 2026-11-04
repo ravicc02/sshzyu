@@ -67,6 +67,10 @@ func (APIKey) Fields() []ent.Field {
 			Optional().
 			Comment("Blocked IPs/CIDRs"),
 
+		field.JSON("allowed_models", []string{}).
+			Default([]string{}).
+			Comment("Allowed public model IDs; empty means the full group catalog"),
+
 		// ========== Quota fields ==========
 		// Quota limit in USD (0 = unlimited)
 		field.Float("quota").

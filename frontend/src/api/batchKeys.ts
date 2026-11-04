@@ -20,6 +20,7 @@ export interface APIKeyBatchSummary {
 }
 
 export interface CreateAPIKeyBatchRequest {
+  allowed_models?: string[]
   name?: string
   group_id: number
   count: number
@@ -46,9 +47,15 @@ export async function getBatch(batchId: string, options?: { signal?: AbortSignal
   return data
 }
 
+export async function updateBatch(batchId: string, payload: Omit<CreateAPIKeyBatchRequest, 'count'>): Promise<{ items: ApiKey[] }> {
+  const { data } = await apiClient.put<{ items: ApiKey[] }>(`/batch-keys/${encodeURIComponent(batchId)}`, payload)
+  return data
+}
+
 export const batchKeysAPI = {
   listBatches,
   createBatch,
+  updateBatch,
   getBatch,
 }
 

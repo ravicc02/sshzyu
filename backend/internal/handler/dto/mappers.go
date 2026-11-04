@@ -88,6 +88,7 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 		Name:               k.Name,
 		BatchID:            k.BatchID,
 		BatchName:          k.BatchName,
+		AllowedModels:      append([]string{}, k.AllowedModels...),
 		GroupID:            k.GroupID,
 		Status:             k.Status,
 		IPWhitelist:        k.IPWhitelist,

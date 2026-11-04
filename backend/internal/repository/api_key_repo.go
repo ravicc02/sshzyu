@@ -49,6 +49,7 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		SetName(key.Name).
 		SetNillableBatchID(key.BatchID).
 		SetBatchName(key.BatchName).
+		SetAllowedModels(append([]string{}, key.AllowedModels...)).
 		SetStatus(key.Status).
 		SetNillableGroupID(key.GroupID).
 		SetNillableLastUsedAt(key.LastUsedAt).
@@ -148,6 +149,12 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 			apikey.FieldStatus,
 			apikey.FieldIPWhitelist,
 			apikey.FieldIPBlacklist,
+			apikey.FieldAllowedModels,
+			apikey.FieldQuotaTokens,
+			apikey.FieldQuotaTokensUsed,
+			apikey.FieldRateLimit5hTokens,
+			apikey.FieldRateLimit1dTokens,
+			apikey.FieldRateLimit7dTokens,
 			apikey.FieldQuota,
 			apikey.FieldQuotaUsed,
 			apikey.FieldExpiresAt,
@@ -274,6 +281,9 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 	builder := client.APIKey.Update().
 		Where(apikey.IDEQ(key.ID), apikey.DeletedAtIsNil()).
 		SetUpdatedAt(now)
+	if fields.AllowedModels {
+		builder.SetAllowedModels(append([]string{}, key.AllowedModels...))
+	}
 	if fields.Name {
 		builder.SetName(key.Name)
 	}
@@ -1065,6 +1075,7 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		Name:              m.Name,
 		BatchID:           m.BatchID,
 		BatchName:         m.BatchName,
+		AllowedModels:     append([]string{}, m.AllowedModels...),
 		Status:            m.Status,
 		IPWhitelist:       m.IPWhitelist,
 		IPBlacklist:       m.IPBlacklist,

@@ -20,6 +20,9 @@ func (h *GatewayHandler) pinnedOpenAIModels(c *gin.Context, group *service.Group
 		return
 	}
 	etag := c.GetHeader("If-None-Match")
+	if apiKeyHasSelectedModels(c) {
+		etag = ""
+	}
 	if c.Param("model") != "" {
 		etag = "" // A collection ETag cannot validate a single-model representation.
 	}
@@ -46,6 +49,24 @@ func writeOpenAIModelsError(c *gin.Context, status int, errorType, message strin
 }
 
 func writeOpenAIModelsResponse(c *gin.Context, manifest *service.OpenAIModelsResponse) {
+	if apiKeyHasSelectedModels(c) {
+		c.Header("Cache-Control", "private, no-store")
+		if manifest.NotModified {
+			writeScopedModelsError(c)
+			return
+		}
+		body, err := filterAPIKeyModelCatalog(c, manifest.Body)
+		if err != nil {
+			writeScopedModelsError(c)
+			return
+		}
+		if c.Param("model") != "" {
+			writeRetrievedModel(c, body)
+		} else {
+			c.Data(http.StatusOK, "application/json", body)
+		}
+		return
+	}
 	if c.Param("model") != "" {
 		writeRetrievedModel(c, manifest.Body)
 		return
@@ -65,6 +86,24 @@ func writeOpenAIModelsResponse(c *gin.Context, manifest *service.OpenAIModelsRes
 // selection and allowlist filtering. Preserve every field on the selected entry.
 func writeModelsListResponse(c *gin.Context, models any) {
 	response := gin.H{"object": "list", "data": models}
+	if apiKeyHasSelectedModels(c) {
+		body, err := json.Marshal(response)
+		if err != nil {
+			writeScopedModelsError(c)
+			return
+		}
+		body, err = filterAPIKeyModelCatalog(c, body)
+		if err != nil {
+			writeScopedModelsError(c)
+			return
+		}
+		if c.Param("model") != "" {
+			writeRetrievedModel(c, body)
+		} else {
+			c.Data(http.StatusOK, "application/json", body)
+		}
+		return
+	}
 	if c.Param("model") == "" {
 		c.JSON(http.StatusOK, response)
 		return

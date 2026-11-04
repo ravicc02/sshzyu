@@ -123,7 +123,7 @@ func (p *platformAgentExecutor) Models(ctx context.Context, b agent.Binding, pur
 	for _, entry := range catalog.Data {
 		m := entry.ID
 		image := agentImageModel(m)
-		if (purpose == "image") != image || !k.Group.ModelAllowlist.Allows(m) {
+		if (purpose == "image") != image || !k.AllowsModel(m) {
 			continue
 		}
 		if purpose == "image" && (k.Group.Platform != service.PlatformOpenAI || !service.GroupAllowsImageGeneration(k.Group)) {

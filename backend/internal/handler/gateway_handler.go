@@ -1246,6 +1246,11 @@ func (h *GatewayHandler) CodexModels(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to build Codex models manifest")
 		return
 	}
+	body, err = filterAPIKeyModelCatalog(c, body)
+	if err != nil {
+		writeScopedModelsError(c)
+		return
+	}
 	etag := service.CodexModelsManifestETag(body)
 	c.Header("ETag", etag)
 	if service.CodexModelsManifestETagMatches(c.GetHeader("If-None-Match"), etag) {
@@ -1557,10 +1562,10 @@ func mergeModelIDs(primary, secondary []string) []string {
 // 分组级模型白名单开启时按白名单过滤。
 func (h *GatewayHandler) AntigravityModels(c *gin.Context) {
 	models := antigravity.DefaultModels()
-	if apiKey, ok := middleware2.GetAPIKeyFromContext(c); ok && apiKey != nil && apiKey.Group != nil && apiKey.Group.ModelAllowlistEnabled() {
+	if apiKey, ok := middleware2.GetAPIKeyFromContext(c); ok && apiKey != nil && apiKey.HasModelRestrictions() {
 		filtered := make([]antigravity.ClaudeModel, 0, len(models))
 		for _, model := range models {
-			if apiKey.Group.ModelAllowlist.Allows(model.ID) {
+			if apiKey.AllowsModel(model.ID) {
 				filtered = append(filtered, model)
 			}
 		}

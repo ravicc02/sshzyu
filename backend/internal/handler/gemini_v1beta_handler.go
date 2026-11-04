@@ -51,12 +51,12 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 
 	// 分组级模型白名单开启时过滤 models[].name（名字形如 models/xxx）。
 	filterGeminiModels := func(models []gemini.Model) []gemini.Model {
-		if apiKey.Group == nil || !apiKey.Group.ModelAllowlistEnabled() {
+		if !apiKey.HasModelRestrictions() {
 			return models
 		}
 		filtered := make([]gemini.Model, 0, len(models))
 		for _, model := range models {
-			if apiKey.Group.ModelAllowlist.Allows(model.Name) {
+			if apiKey.AllowsModel(model.Name) {
 				filtered = append(filtered, model)
 			}
 		}
@@ -85,8 +85,8 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 				ids = append(ids, id)
 			}
 		}
-		if apiKey.Group != nil && apiKey.Group.ModelAllowlistEnabled() {
-			ids = apiKey.Group.ModelAllowlist.FilterForListing(ids)
+		if apiKey.HasModelRestrictions() {
+			ids = apiKey.FilterModels(ids)
 		}
 		declaredModels := make([]gemini.Model, 0, len(ids))
 		for _, id := range ids {
@@ -128,6 +128,14 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 			// 统一经 writeUpstreamResponse 写出（保留全部上游响应头）。
 			res.Body = filtered
 		}
+	}
+	if res.StatusCode == http.StatusOK && len(apiKey.AllowedModels) > 0 {
+		filtered, err := filterAPIKeyModelCatalog(c, res.Body)
+		if err != nil {
+			googleError(c, http.StatusBadGateway, "Invalid model catalogue")
+			return
+		}
+		res.Body = filtered
 	}
 	writeUpstreamResponse(c, res)
 }

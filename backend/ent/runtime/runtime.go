@@ -5,7 +5,6 @@ package runtime
 import (
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/ent/schema"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
@@ -38,6 +37,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcodeclaim"
+	"github.com/Wei-Shaw/sub2api/ent/schema"
 	"github.com/Wei-Shaw/sub2api/ent/securitysecret"
 	"github.com/Wei-Shaw/sub2api/ent/setting"
 	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
@@ -128,68 +128,72 @@ func init() {
 	apikey.DefaultStatus = apikeyDescStatus.Default.(string)
 	// apikey.StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	apikey.StatusValidator = apikeyDescStatus.Validators[0].(func(string) error)
+	// apikeyDescAllowedModels is the schema descriptor for allowed_models field.
+	apikeyDescAllowedModels := apikeyFields[10].Descriptor()
+	// apikey.DefaultAllowedModels holds the default value on creation for the allowed_models field.
+	apikey.DefaultAllowedModels = apikeyDescAllowedModels.Default.([]string)
 	// apikeyDescQuota is the schema descriptor for quota field.
-	apikeyDescQuota := apikeyFields[10].Descriptor()
+	apikeyDescQuota := apikeyFields[11].Descriptor()
 	// apikey.DefaultQuota holds the default value on creation for the quota field.
 	apikey.DefaultQuota = apikeyDescQuota.Default.(float64)
 	// apikeyDescQuotaUsed is the schema descriptor for quota_used field.
-	apikeyDescQuotaUsed := apikeyFields[11].Descriptor()
+	apikeyDescQuotaUsed := apikeyFields[12].Descriptor()
 	// apikey.DefaultQuotaUsed holds the default value on creation for the quota_used field.
 	apikey.DefaultQuotaUsed = apikeyDescQuotaUsed.Default.(float64)
 	// apikeyDescQuotaTokens is the schema descriptor for quota_tokens field.
-	apikeyDescQuotaTokens := apikeyFields[12].Descriptor()
+	apikeyDescQuotaTokens := apikeyFields[13].Descriptor()
 	// apikey.DefaultQuotaTokens holds the default value on creation for the quota_tokens field.
 	apikey.DefaultQuotaTokens = apikeyDescQuotaTokens.Default.(int64)
 	// apikeyDescQuotaTokensUsed is the schema descriptor for quota_tokens_used field.
-	apikeyDescQuotaTokensUsed := apikeyFields[13].Descriptor()
+	apikeyDescQuotaTokensUsed := apikeyFields[14].Descriptor()
 	// apikey.DefaultQuotaTokensUsed holds the default value on creation for the quota_tokens_used field.
 	apikey.DefaultQuotaTokensUsed = apikeyDescQuotaTokensUsed.Default.(int64)
 	// apikeyDescRateLimit5h is the schema descriptor for rate_limit_5h field.
-	apikeyDescRateLimit5h := apikeyFields[15].Descriptor()
+	apikeyDescRateLimit5h := apikeyFields[16].Descriptor()
 	// apikey.DefaultRateLimit5h holds the default value on creation for the rate_limit_5h field.
 	apikey.DefaultRateLimit5h = apikeyDescRateLimit5h.Default.(float64)
 	// apikeyDescRateLimit1d is the schema descriptor for rate_limit_1d field.
-	apikeyDescRateLimit1d := apikeyFields[16].Descriptor()
+	apikeyDescRateLimit1d := apikeyFields[17].Descriptor()
 	// apikey.DefaultRateLimit1d holds the default value on creation for the rate_limit_1d field.
 	apikey.DefaultRateLimit1d = apikeyDescRateLimit1d.Default.(float64)
 	// apikeyDescRateLimit7d is the schema descriptor for rate_limit_7d field.
-	apikeyDescRateLimit7d := apikeyFields[17].Descriptor()
+	apikeyDescRateLimit7d := apikeyFields[18].Descriptor()
 	// apikey.DefaultRateLimit7d holds the default value on creation for the rate_limit_7d field.
 	apikey.DefaultRateLimit7d = apikeyDescRateLimit7d.Default.(float64)
 	// apikeyDescUsage5h is the schema descriptor for usage_5h field.
-	apikeyDescUsage5h := apikeyFields[18].Descriptor()
+	apikeyDescUsage5h := apikeyFields[19].Descriptor()
 	// apikey.DefaultUsage5h holds the default value on creation for the usage_5h field.
 	apikey.DefaultUsage5h = apikeyDescUsage5h.Default.(float64)
 	// apikeyDescUsage1d is the schema descriptor for usage_1d field.
-	apikeyDescUsage1d := apikeyFields[19].Descriptor()
+	apikeyDescUsage1d := apikeyFields[20].Descriptor()
 	// apikey.DefaultUsage1d holds the default value on creation for the usage_1d field.
 	apikey.DefaultUsage1d = apikeyDescUsage1d.Default.(float64)
 	// apikeyDescUsage7d is the schema descriptor for usage_7d field.
-	apikeyDescUsage7d := apikeyFields[20].Descriptor()
+	apikeyDescUsage7d := apikeyFields[21].Descriptor()
 	// apikey.DefaultUsage7d holds the default value on creation for the usage_7d field.
 	apikey.DefaultUsage7d = apikeyDescUsage7d.Default.(float64)
 	// apikeyDescRateLimit5hTokens is the schema descriptor for rate_limit_5h_tokens field.
-	apikeyDescRateLimit5hTokens := apikeyFields[21].Descriptor()
+	apikeyDescRateLimit5hTokens := apikeyFields[22].Descriptor()
 	// apikey.DefaultRateLimit5hTokens holds the default value on creation for the rate_limit_5h_tokens field.
 	apikey.DefaultRateLimit5hTokens = apikeyDescRateLimit5hTokens.Default.(int64)
 	// apikeyDescRateLimit1dTokens is the schema descriptor for rate_limit_1d_tokens field.
-	apikeyDescRateLimit1dTokens := apikeyFields[22].Descriptor()
+	apikeyDescRateLimit1dTokens := apikeyFields[23].Descriptor()
 	// apikey.DefaultRateLimit1dTokens holds the default value on creation for the rate_limit_1d_tokens field.
 	apikey.DefaultRateLimit1dTokens = apikeyDescRateLimit1dTokens.Default.(int64)
 	// apikeyDescRateLimit7dTokens is the schema descriptor for rate_limit_7d_tokens field.
-	apikeyDescRateLimit7dTokens := apikeyFields[23].Descriptor()
+	apikeyDescRateLimit7dTokens := apikeyFields[24].Descriptor()
 	// apikey.DefaultRateLimit7dTokens holds the default value on creation for the rate_limit_7d_tokens field.
 	apikey.DefaultRateLimit7dTokens = apikeyDescRateLimit7dTokens.Default.(int64)
 	// apikeyDescUsage5hTokens is the schema descriptor for usage_5h_tokens field.
-	apikeyDescUsage5hTokens := apikeyFields[24].Descriptor()
+	apikeyDescUsage5hTokens := apikeyFields[25].Descriptor()
 	// apikey.DefaultUsage5hTokens holds the default value on creation for the usage_5h_tokens field.
 	apikey.DefaultUsage5hTokens = apikeyDescUsage5hTokens.Default.(int64)
 	// apikeyDescUsage1dTokens is the schema descriptor for usage_1d_tokens field.
-	apikeyDescUsage1dTokens := apikeyFields[25].Descriptor()
+	apikeyDescUsage1dTokens := apikeyFields[26].Descriptor()
 	// apikey.DefaultUsage1dTokens holds the default value on creation for the usage_1d_tokens field.
 	apikey.DefaultUsage1dTokens = apikeyDescUsage1dTokens.Default.(int64)
 	// apikeyDescUsage7dTokens is the schema descriptor for usage_7d_tokens field.
-	apikeyDescUsage7dTokens := apikeyFields[26].Descriptor()
+	apikeyDescUsage7dTokens := apikeyFields[27].Descriptor()
 	// apikey.DefaultUsage7dTokens holds the default value on creation for the usage_7d_tokens field.
 	apikey.DefaultUsage7dTokens = apikeyDescUsage7dTokens.Default.(int64)
 	accountMixin := schema.Account{}.Mixin()

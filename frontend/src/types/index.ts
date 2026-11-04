@@ -751,6 +751,7 @@ export interface CompositeRouteDecision {
 }
 
 export interface ApiKey {
+  allowed_models?: string[]
   id: number
   user_id: number
   key: string
@@ -793,6 +794,7 @@ export interface ApiKey {
 }
 
 export interface CreateApiKeyRequest {
+  allowed_models?: string[]
   name: string
   group_id?: number | null
   custom_key?: string // Optional custom API Key
@@ -810,6 +812,7 @@ export interface CreateApiKeyRequest {
 }
 
 export interface UpdateApiKeyRequest {
+  allowed_models?: string[]
   name?: string
   group_id?: number | null
   status?: 'active' | 'inactive'

@@ -28,14 +28,13 @@
           <button type="button" class="btn btn-primary btn-sm mt-4" @click="openCreate">{{ t('batchKeys.createBatch') }}</button>
         </div>
         <div v-else class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <button
+          <article
             v-for="batch in batches"
             :key="batch.batch_id"
-            type="button"
-            class="min-w-0 rounded-xl border bg-white p-4 text-left shadow-sm transition hover:border-primary-400 hover:shadow-md dark:bg-dark-800"
+            class="min-w-0 rounded-xl border bg-white text-left shadow-sm transition hover:border-primary-400 hover:shadow-md dark:bg-dark-800"
             :class="batch.batch_id === selectedBatchId ? 'border-primary-500 ring-2 ring-primary-500/15' : 'border-gray-200 dark:border-dark-700'"
-            @click="selectBatch(batch.batch_id)"
           >
+            <button type="button" class="block w-full p-4 text-left" @click="selectBatch(batch.batch_id)">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <h3 class="truncate font-bold text-gray-900 dark:text-white">{{ batch.batch_name || t('batchKeys.unnamedBatch') }}</h3>
@@ -54,23 +53,27 @@
               </div>
               <div>
                 <p class="text-gray-500 dark:text-gray-400">{{ t('batchKeys.quotaPerKey') }}</p>
-                <p class="mt-1 font-bold tabular-nums text-gray-900 dark:text-white">{{ formatMoney(batch.quota_per_key) }}</p>
+                <p class="mt-1 font-bold tabular-nums text-gray-900 dark:text-white">{{ batch.quota_tokens_per_key > 0 && batch.quota_per_key <= 0 ? formatTokenQuota(batch.quota_tokens_per_key) + ' Token' : formatMoney(batch.quota_per_key) }}</p>
               </div>
               <div>
                 <p class="text-gray-500 dark:text-gray-400">{{ t('batchKeys.quotaUsed') }}</p>
-                <p class="mt-1 font-bold tabular-nums text-gray-900 dark:text-white">{{ formatMoney(batch.quota_used_total) }}</p>
+                <p class="mt-1 font-bold tabular-nums text-gray-900 dark:text-white">{{ batch.quota_tokens_per_key > 0 && batch.quota_per_key <= 0 ? formatUsedTokens(batch.quota_tokens_used_total) : formatMoney(batch.quota_used_total) }}</p>
               </div>
             </div>
             <div class="mt-4 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-dark-700">
               <div class="h-full rounded-full bg-primary-500" :style="{ width: `${batchUsagePercent(batch)}%` }" />
             </div>
-            <div v-if="batch.quota_tokens_total > 0" class="mt-3 flex items-center justify-between gap-2 text-xs">
+            <div v-if="batch.quota_tokens_total > 0 && batch.quota_total > 0" class="mt-3 flex items-center justify-between gap-2 text-xs">
               <span class="text-gray-500 dark:text-gray-400">{{ t('batchKeys.tokenQuotaUsed') }}</span>
               <strong class="tabular-nums text-gray-900 dark:text-white">
-                {{ formatTokenQuota(batch.quota_tokens_used_total) }} / {{ formatTokenQuota(batch.quota_tokens_total) }}
+                {{ formatUsedTokens(batch.quota_tokens_used_total) }} / {{ formatTokenQuota(batch.quota_tokens_total) }}
               </strong>
             </div>
-          </button>
+            </button>
+            <div class="flex justify-end border-t border-gray-100 px-4 py-2 dark:border-dark-700">
+              <button type="button" class="text-sm font-medium text-primary-600 hover:underline dark:text-primary-400" :aria-label="t('batchKeys.editBatchName', { name: batch.batch_name })" @click="openEdit(batch)">{{ t('common.edit') }}</button>
+            </div>
+          </article>
         </div>
       </section>
 
@@ -79,19 +82,20 @@
           <div class="min-w-0">
             <h2 class="truncate text-base font-bold text-gray-900 dark:text-white">{{ selectedBatch.batch_name }}</h2>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ selectedBatch.group_name }} · {{ t('batchKeys.quotaSummary', {
-                used: formatMoney(selectedBatch.quota_used_total),
-                total: formatMoney(selectedBatch.quota_total),
+              {{ selectedBatch.group_name }} · {{ t(selectedBatch.quota_total > 0 ? 'batchKeys.quotaSummary' : 'batchKeys.tokenQuotaSummary', {
+                used: selectedBatch.quota_total > 0 ? formatMoney(selectedBatch.quota_used_total) : formatUsedTokens(selectedBatch.quota_tokens_used_total),
+                total: selectedBatch.quota_total > 0 ? formatMoney(selectedBatch.quota_total) : formatTokenQuota(selectedBatch.quota_tokens_total),
               }) }}
-              <template v-if="selectedBatch.quota_tokens_total > 0">
+              <template v-if="selectedBatch.quota_tokens_total > 0 && selectedBatch.quota_total > 0">
                 · {{ t('batchKeys.tokenQuotaSummary', {
-                  used: formatTokenQuota(selectedBatch.quota_tokens_used_total),
+                  used: formatUsedTokens(selectedBatch.quota_tokens_used_total),
                   total: formatTokenQuota(selectedBatch.quota_tokens_total),
                 }) }}
               </template>
             </p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
+            <button type="button" class="btn btn-secondary btn-sm" @click="openEdit(selectedBatch)">{{ t('common.edit') }}</button>
             <button type="button" class="btn btn-secondary btn-sm" :disabled="!selectedIds.size" @click="copySelected">
               <Icon name="clipboard" size="sm" class="mr-1" />
               {{ t('batchKeys.copySelected') }}
@@ -150,17 +154,17 @@
                     <code class="rounded bg-gray-100 px-2 py-1 font-mono text-xs text-gray-700 dark:bg-dark-700 dark:text-gray-200">{{ maskApiKey(key.key) }}</code>
                   </td>
                   <td class="min-w-[210px] px-4 py-3">
-                    <div class="flex items-center justify-between gap-2 text-xs">
+                    <div v-if="key.quota > 0 || key.quota_tokens <= 0" class="flex items-center justify-between gap-2 text-xs">
                       <span class="font-medium tabular-nums text-gray-900 dark:text-white">{{ formatMoney(key.quota_used) }} / {{ formatMoney(key.quota) }}</span>
                       <span class="tabular-nums text-gray-400">{{ quotaPercent(key) }}%</span>
                     </div>
-                    <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-dark-700">
+                    <div v-if="key.quota > 0 || key.quota_tokens <= 0" class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-dark-700">
                       <div class="h-full rounded-full" :class="quotaPercent(key) >= 100 ? 'bg-rose-500' : quotaPercent(key) >= 80 ? 'bg-amber-400' : 'bg-emerald-500'" :style="{ width: `${quotaPercent(key)}%` }" />
                     </div>
                     <div v-if="key.quota_tokens > 0" class="mt-2.5">
                       <div class="flex items-center justify-between gap-2 text-xs">
                         <span class="font-medium tabular-nums text-gray-900 dark:text-white">
-                          {{ formatTokenQuota(key.quota_tokens_used) }} / {{ formatTokenQuota(key.quota_tokens) }} Token
+                          {{ formatUsedTokens(key.quota_tokens_used) }} / {{ formatTokenQuota(key.quota_tokens) }} Token
                         </span>
                         <span class="tabular-nums text-gray-400">{{ tokenQuotaPercent(key) }}%</span>
                       </div>
@@ -188,11 +192,11 @@
       </section>
     </div>
 
-    <BaseDialog :show="showCreateDialog" :title="t('batchKeys.createBatch')" width="normal" @close="showCreateDialog = false">
+    <BaseDialog :show="showCreateDialog" :title="t(editingBatchId ? 'batchKeys.editBatch' : 'batchKeys.createBatch')" width="normal" @close="showCreateDialog = false">
       <form id="batch-key-create-form" class="space-y-5" @submit.prevent="submitCreate">
         <div>
           <label class="input-label">{{ t('batchKeys.batchName') }}</label>
-          <input v-model="createForm.name" class="input" maxlength="100" :placeholder="t('batchKeys.batchNamePlaceholder')" />
+          <input v-model="createForm.name" class="input" maxlength="100" :required="!!editingBatchId" :placeholder="editingBatchId ? t('batchKeys.batchName') : t('batchKeys.batchNamePlaceholder')" />
         </div>
         <div>
           <label class="input-label">{{ t('batchKeys.quotaMode') }} <span class="text-red-500">*</span></label>
@@ -228,9 +232,9 @@
         </div>
         <div class="grid gap-4 sm:grid-cols-2">
           <div>
-            <label class="input-label">{{ t('batchKeys.count') }} <span class="text-red-500">*</span></label>
-            <input v-model.number="createForm.count" type="number" min="1" max="50" required class="input" />
-            <p class="input-hint">{{ t('batchKeys.countHint') }}</p>
+            <label class="input-label">{{ t(editingBatchId ? 'batchKeys.editCount' : 'batchKeys.count') }} <span class="text-red-500">*</span></label>
+            <input v-model.number="createForm.count" type="number" min="1" max="50" required :disabled="!!editingBatchId" class="input" />
+            <p v-if="!editingBatchId" class="input-hint">{{ t('batchKeys.countHint') }}</p>
           </div>
           <div v-if="createForm.quota_mode === 'balance'" data-quota-mode="balance">
             <label class="input-label">{{ t('batchKeys.balanceQuota') }}</label>
@@ -254,8 +258,9 @@
         </div>
         <div>
           <label class="input-label">{{ t('keys.groupLabel') }} <span class="text-red-500">*</span></label>
-          <Select v-model="createForm.group_id" data-group-select :options="groupOptions" :placeholder="t('keys.selectGroup')" searchable />
+          <Select v-model="createForm.group_id" data-group-select :options="groupOptions" :placeholder="t('keys.selectGroup')" searchable @update:model-value="createForm.allowed_models = []" />
         </div>
+        <GroupModelSelect v-model="createForm.allowed_models" :group-id="createForm.group_id" />
         <div class="rounded-xl border border-primary-100 bg-primary-50/70 p-4 dark:border-primary-500/20 dark:bg-primary-500/10">
           <div v-if="createForm.quota_mode === 'balance'" class="flex items-center justify-between gap-3 text-sm">
             <span class="text-gray-600 dark:text-gray-300">{{ t('batchKeys.estimatedTotal') }}</span>
@@ -271,7 +276,7 @@
         <div class="flex justify-end gap-3">
           <button type="button" class="btn btn-secondary" @click="showCreateDialog = false">{{ t('common.cancel') }}</button>
           <button type="submit" form="batch-key-create-form" class="btn btn-primary" :disabled="creating">
-            {{ creating ? t('common.submitting') : t('batchKeys.createNow') }}
+            {{ creating ? t('common.submitting') : t(editingBatchId ? 'batchKeys.saveBatch' : 'batchKeys.createNow') }}
           </button>
         </div>
       </template>
@@ -298,6 +303,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import Select from '@/components/common/Select.vue'
+import GroupModelSelect from '@/components/common/GroupModelSelect.vue'
 import { batchKeysAPI, keysAPI, userGroupsAPI } from '@/api'
 import type { APIKeyBatchSummary, CreateAPIKeyBatchRequest } from '@/api/batchKeys'
 import type { ApiKey, Group, UpdateApiKeyRequest } from '@/types'
@@ -306,7 +312,7 @@ import { useClipboard } from '@/composables/useClipboard'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { formatDateTime } from '@/utils/format'
 import { maskApiKey } from '@/utils/maskApiKey'
-import { formatTokenQuota, tokenAmountToBase, type TokenQuotaUnit } from '@/utils/tokenQuota'
+import { formatTokenQuota, inferTokenQuotaUnit, TOKEN_UNIT_FACTORS, tokenAmountToBase, type TokenQuotaUnit } from '@/utils/tokenQuota'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -321,6 +327,7 @@ const loadingBatches = ref(false)
 const loadingKeys = ref(false)
 const creating = ref(false)
 const showCreateDialog = ref(false)
+const editingBatchId = ref('')
 const showDeleteDialog = ref(false)
 let batchesController: AbortController | null = null
 let keysController: AbortController | null = null
@@ -330,6 +337,7 @@ const createForm = reactive({
   count: 10,
   quota_mode: 'balance' as 'balance' | 'token',
   quota: 1,
+  allowed_models: [] as string[],
   quota_token_amount: 0,
   quota_token_unit: 'M' as TokenQuotaUnit,
   group_id: null as number | null,
@@ -408,6 +416,8 @@ function selectBatch(batchId: string) {
 }
 
 function openCreate() {
+  editingBatchId.value = ''
+  createForm.allowed_models = []
   createForm.name = ''
   createForm.count = 10
   createForm.quota_mode = 'balance'
@@ -425,6 +435,23 @@ function selectQuotaMode(mode: 'balance' | 'token') {
   } else {
     createForm.quota = 0
   }
+}
+
+async function openEdit(batch: APIKeyBatchSummary) {
+  try {
+    const response = await batchKeysAPI.getBatch(batch.batch_id)
+    if (!response.items.length) { appStore.showError(t('batchKeys.emptyKeys')); return }
+    editingBatchId.value = batch.batch_id
+    createForm.name = batch.batch_name
+    createForm.count = response.items.length
+    createForm.group_id = batch.group_id
+    createForm.quota_mode = batch.quota_tokens_per_key > 0 && batch.quota_per_key <= 0 ? 'token' : 'balance'
+    createForm.quota = batch.quota_per_key
+    createForm.quota_token_unit = inferTokenQuotaUnit(batch.quota_tokens_per_key)
+    createForm.quota_token_amount = batch.quota_tokens_per_key / TOKEN_UNIT_FACTORS[createForm.quota_token_unit]
+    createForm.allowed_models = [...(response.items[0]?.allowed_models || [])]
+    showCreateDialog.value = true
+  } catch (error) { appStore.showError(extractApiErrorMessage(error, t('batchKeys.loadFailed'))) }
 }
 
 async function submitCreate() {
@@ -447,15 +474,22 @@ async function submitCreate() {
       count: Number(createForm.count),
       quota: createForm.quota_mode === 'balance' ? Math.max(0, Number(createForm.quota) || 0) : 0,
       quota_tokens: createForm.quota_mode === 'token' ? quotaTokens.value : 0,
+      allowed_models: [...createForm.allowed_models],
     }
-    const response = await batchKeysAPI.createBatch(payload)
-    const createdBatchID = response.items[0]?.batch_id || ''
+    const editedId = editingBatchId.value
+    const response = editedId
+      ? await batchKeysAPI.updateBatch(editedId, { name: payload.name, group_id: payload.group_id, quota: payload.quota, quota_tokens: payload.quota_tokens, allowed_models: payload.allowed_models })
+      : await batchKeysAPI.createBatch(payload)
+    const createdBatchID = editedId || response.items[0]?.batch_id || ''
     showCreateDialog.value = false
     await loadBatches()
     if (createdBatchID) selectedBatchId.value = createdBatchID
-    appStore.showSuccess(t('batchKeys.createSuccess', { count: response.items.length }))
+    if (editedId) {
+      await loadBatchKeys(editedId)
+      appStore.showSuccess(t('batchKeys.editSuccess'))
+    } else appStore.showSuccess(t('batchKeys.createSuccess', { count: response.items.length }))
   } catch (error) {
-    appStore.showError(extractApiErrorMessage(error, t('batchKeys.createFailed')))
+    appStore.showError(extractApiErrorMessage(error, t(editingBatchId.value ? 'batchKeys.editFailed' : 'batchKeys.createFailed')))
   } finally {
     creating.value = false
   }
@@ -544,6 +578,10 @@ function batchUsagePercent(batch: APIKeyBatchSummary) {
     return Math.max(0, Math.min(100, Math.round((batch.quota_tokens_used_total / batch.quota_tokens_total) * 100)))
   }
   return 0
+}
+
+function formatUsedTokens(value: number) {
+  return value > 0 ? formatTokenQuota(value) : '0'
 }
 
 function formatMoney(value: number) {

@@ -66,12 +66,13 @@ const (
 // 若编辑 Key 时无条件整行回写，并发累计的配额与限流计数就会被旧快照覆盖。
 // 因此调用方必须显式声明要改的列。
 type APIKeyUpdateFields struct {
-	Name        bool
-	Status      bool
-	Quota       bool
-	QuotaTokens bool
-	GroupID     bool
-	ExpiresAt   bool
+	AllowedModels bool
+	Name          bool
+	Status        bool
+	Quota         bool
+	QuotaTokens   bool
+	GroupID       bool
+	ExpiresAt     bool
 	// QuotaUsed 仅供"重置配额用量"路径声明；常规计费走 IncrementQuotaUsed。
 	QuotaUsed       bool
 	QuotaTokensUsed bool
@@ -250,13 +251,14 @@ type APIKeyAuthCacheInvalidator interface {
 
 // CreateAPIKeyRequest 创建API Key请求
 type CreateAPIKeyRequest struct {
-	Name        string   `json:"name"`
-	GroupID     *int64   `json:"group_id"`
-	BatchID     *string  `json:"-"`
-	BatchName   string   `json:"-"`
-	CustomKey   *string  `json:"custom_key"`   // 可选的自定义key
-	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单
-	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单
+	AllowedModels []string `json:"allowed_models"`
+	Name          string   `json:"name"`
+	GroupID       *int64   `json:"group_id"`
+	BatchID       *string  `json:"-"`
+	BatchName     string   `json:"-"`
+	CustomKey     *string  `json:"custom_key"`   // 可选的自定义key
+	IPWhitelist   []string `json:"ip_whitelist"` // IP 白名单
+	IPBlacklist   []string `json:"ip_blacklist"` // IP 黑名单
 
 	// Quota fields
 	Quota         float64 `json:"quota"` // Quota limit in USD (0 = unlimited)
@@ -275,20 +277,22 @@ type CreateAPIKeyRequest struct {
 const MaxBatchAPIKeys = 50
 
 type CreateAPIKeyBatchRequest struct {
-	Name        string
-	GroupID     int64
-	Count       int
-	Quota       float64
-	QuotaTokens int64
+	AllowedModels []string
+	Name          string
+	GroupID       int64
+	Count         int
+	Quota         float64
+	QuotaTokens   int64
 }
 
 // UpdateAPIKeyRequest 更新API Key请求
 type UpdateAPIKeyRequest struct {
-	Name        *string   `json:"name"`
-	GroupID     *int64    `json:"group_id"`
-	Status      *string   `json:"status"`
-	IPWhitelist *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
-	IPBlacklist *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
+	AllowedModels *[]string `json:"allowed_models"`
+	Name          *string   `json:"name"`
+	GroupID       *int64    `json:"group_id"`
+	Status        *string   `json:"status"`
+	IPWhitelist   *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
+	IPBlacklist   *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
 
 	// Quota fields
 	Quota           *float64   `json:"quota"` // Quota limit in USD (nil = no change, 0 = unlimited)
@@ -315,6 +319,9 @@ func validateAPIKeyLimit(v float64) error {
 }
 
 func validateCreateAPIKeyRequest(req CreateAPIKeyRequest) error {
+	if req.Quota > 0 && req.QuotaTokens > 0 {
+		return infraerrors.BadRequest("API_KEY_QUOTA_UNIT_CONFLICT", "choose either a balance quota or a token quota")
+	}
 	for _, v := range []float64{req.Quota, req.RateLimit5h, req.RateLimit1d, req.RateLimit7d} {
 		if err := validateAPIKeyLimit(v); err != nil {
 			return err
@@ -332,6 +339,9 @@ func validateCreateAPIKeyRequest(req CreateAPIKeyRequest) error {
 }
 
 func validateUpdateAPIKeyRequest(req UpdateAPIKeyRequest) error {
+	if req.Quota != nil && req.QuotaTokens != nil && *req.Quota > 0 && *req.QuotaTokens > 0 {
+		return infraerrors.BadRequest("API_KEY_QUOTA_UNIT_CONFLICT", "choose either a balance quota or a token quota")
+	}
 	for _, v := range []*float64{req.Quota, req.RateLimit5h, req.RateLimit1d, req.RateLimit7d} {
 		if v != nil {
 			if err := validateAPIKeyLimit(*v); err != nil {
@@ -561,6 +571,10 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	if err := validateCreateAPIKeyRequest(req); err != nil {
 		return nil, err
 	}
+	allowedModels, err := normalizeAPIKeyAllowedModels(req.AllowedModels)
+	if err != nil {
+		return nil, err
+	}
 	// 验证用户存在
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
@@ -640,6 +654,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		Name:              html.EscapeString(req.Name),
 		BatchID:           req.BatchID,
 		BatchName:         html.EscapeString(req.BatchName),
+		AllowedModels:     allowedModels,
 		GroupID:           req.GroupID,
 		Status:            StatusActive,
 		IPWhitelist:       req.IPWhitelist,
@@ -721,12 +736,13 @@ func (s *APIKeyService) CreateBatch(ctx context.Context, userID int64, req Creat
 	created := make([]APIKey, 0, req.Count)
 	for i := 1; i <= req.Count; i++ {
 		key, err := s.Create(ctx, userID, CreateAPIKeyRequest{
-			Name:        batchAPIKeyName(baseName, i, req.Count),
-			GroupID:     &groupID,
-			BatchID:     &batchID,
-			BatchName:   baseName,
-			Quota:       req.Quota,
-			QuotaTokens: req.QuotaTokens,
+			Name:          batchAPIKeyName(baseName, i, req.Count),
+			GroupID:       &groupID,
+			BatchID:       &batchID,
+			BatchName:     baseName,
+			AllowedModels: req.AllowedModels,
+			Quota:         req.Quota,
+			QuotaTokens:   req.QuotaTokens,
 		})
 		if err != nil {
 			for j := range created {
@@ -748,6 +764,11 @@ func truncateBatchName(name string, count int) string {
 		runes = runes[:maxRunes]
 	}
 	return string(runes)
+}
+
+// BatchAPIKeyDisplayName preserves the generated key naming scheme when renaming a batch.
+func BatchAPIKeyDisplayName(base string, index, count int) string {
+	return batchAPIKeyName(base, index, count)
 }
 
 func batchAPIKeyName(base string, index, count int) string {
@@ -978,6 +999,20 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	if err := validateUpdateAPIKeyRequest(req); err != nil {
 		return nil, err
 	}
+	if req.Quota != nil && *req.Quota > 0 {
+		zero := int64(0)
+		req.QuotaTokens = &zero
+	} else if req.QuotaTokens != nil && *req.QuotaTokens > 0 {
+		zero := float64(0)
+		req.Quota = &zero
+	}
+	if req.AllowedModels != nil {
+		models, err := normalizeAPIKeyAllowedModels(*req.AllowedModels)
+		if err != nil {
+			return nil, err
+		}
+		req.AllowedModels = &models
+	}
 	apiKey, err := s.apiKeyRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get api key: %w", err)
@@ -1010,6 +1045,10 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	originalStatus := apiKey.Status
 
 	// 更新字段
+	if req.AllowedModels != nil {
+		apiKey.AllowedModels = append([]string{}, (*req.AllowedModels)...)
+		fields.AllowedModels = true
+	}
 	if req.Name != nil {
 		apiKey.Name = html.EscapeString(*req.Name)
 		fields.Name = true
@@ -1133,6 +1172,14 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		fields.RateLimitUsage = true
 	}
 
+	if (req.Quota != nil || req.QuotaTokens != nil) && (apiKey.Status == StatusActive || apiKey.Status == StatusAPIKeyQuotaExhausted) {
+		exhausted := (apiKey.Quota > 0 && apiKey.QuotaUsed >= apiKey.Quota) || (apiKey.QuotaTokens > 0 && apiKey.QuotaTokensUsed >= apiKey.QuotaTokens)
+		if exhausted {
+			apiKey.Status = StatusAPIKeyQuotaExhausted
+		} else {
+			apiKey.Status = StatusActive
+		}
+	}
 	// 上面的自动复活分支可能改了 status，这里统一登记。
 	if apiKey.Status != originalStatus {
 		fields.Status = true
