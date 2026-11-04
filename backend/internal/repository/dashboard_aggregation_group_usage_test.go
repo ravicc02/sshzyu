@@ -20,7 +20,7 @@ func TestDashboardAggregationRepositorySyncGroupUsageRollupsNoopsAtCurrentDate(t
 	repo := newDashboardAggregationRepositoryWithSQL(db)
 	todayStart := time.Date(2026, 8, 13, 16, 0, 0, 0, time.UTC)
 
-	mock.ExpectBegin()
+	expectRollupLock(mock, true)
 	mock.ExpectQuery(`SELECT closed_before::text, retained_from.*FOR UPDATE`).
 		WillReturnRows(sqlmock.NewRows([]string{"closed_before", "retained_from", "timezone_name"}).
 			AddRow("2026-08-14", time.Unix(0, 0).UTC(), "Asia/Shanghai"))
@@ -38,7 +38,7 @@ func TestDashboardAggregationRepositorySyncGroupUsageRollupsRebuildsWhenTimezone
 	todayStart := time.Date(2026, 3, 9, 4, 0, 0, 0, time.UTC)
 	retainedFrom := time.Date(2026, 3, 1, 5, 0, 0, 0, time.UTC)
 
-	mock.ExpectBegin()
+	expectRollupLock(mock, true)
 	mock.ExpectQuery(`SELECT closed_before::text, retained_from.*FOR UPDATE`).
 		WillReturnRows(sqlmock.NewRows([]string{"closed_before", "retained_from", "timezone_name"}).
 			AddRow("2026-03-09", time.Unix(0, 0).UTC(), "Asia/Shanghai"))
@@ -47,11 +47,11 @@ func TestDashboardAggregationRepositorySyncGroupUsageRollupsRebuildsWhenTimezone
 	mock.ExpectExec(`DELETE FROM usage_group_daily_rollups`).
 		WithArgs("2026-03-01", "2026-03-01", "2026-03-09").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(`INSERT INTO usage_group_daily_rollups`).
-		WithArgs(retainedFrom, todayStart, "America/New_York").
-		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`WITH source AS MATERIALIZED`).
+		WithArgs(retainedFrom, retainedFrom.AddDate(0, 0, 1), "America/New_York").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(33360))
 	mock.ExpectExec(`UPDATE usage_group_rollup_state`).
-		WithArgs("2026-03-09", retainedFrom, "America/New_York").
+		WithArgs("2026-03-02", retainedFrom, "America/New_York").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
@@ -67,7 +67,7 @@ func TestDashboardAggregationRepositorySyncGroupUsageRollupsPublishesWatermarkLa
 	retainedFrom := time.Date(2026, 5, 1, 3, 0, 0, 0, time.UTC)
 	rebuildStart := time.Date(2026, 8, 12, 16, 0, 0, 0, time.UTC)
 
-	mock.ExpectBegin()
+	expectRollupLock(mock, true)
 	mock.ExpectQuery(`SELECT closed_before::text, retained_from.*FOR UPDATE`).
 		WillReturnRows(sqlmock.NewRows([]string{"closed_before", "retained_from", "timezone_name"}).
 			AddRow("2026-08-13", time.Unix(0, 0).UTC(), "Asia/Shanghai"))
@@ -76,9 +76,9 @@ func TestDashboardAggregationRepositorySyncGroupUsageRollupsPublishesWatermarkLa
 	mock.ExpectExec(`DELETE FROM usage_group_daily_rollups`).
 		WithArgs("2026-05-01", "2026-08-13", "2026-08-14").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(`INSERT INTO usage_group_daily_rollups`).
+	mock.ExpectQuery(`WITH source AS MATERIALIZED`).
 		WithArgs(rebuildStart, todayStart, "Asia/Shanghai").
-		WillReturnResult(sqlmock.NewResult(0, 2))
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(33360))
 	mock.ExpectExec(`UPDATE usage_group_rollup_state`).
 		WithArgs("2026-08-14", retainedFrom, "Asia/Shanghai").
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -94,7 +94,7 @@ func TestDashboardAggregationRepositorySyncGroupUsageRollupsRejectsFutureWaterma
 	repo := newDashboardAggregationRepositoryWithSQL(db)
 	todayStart := time.Date(2026, 8, 13, 16, 0, 0, 0, time.UTC)
 
-	mock.ExpectBegin()
+	expectRollupLock(mock, true)
 	mock.ExpectQuery(`SELECT closed_before::text, retained_from.*FOR UPDATE`).
 		WillReturnRows(sqlmock.NewRows([]string{"closed_before", "retained_from", "timezone_name"}).
 			AddRow("2026-08-15", time.Unix(0, 0).UTC(), "Asia/Shanghai"))

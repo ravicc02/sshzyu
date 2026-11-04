@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
@@ -167,6 +168,8 @@ func (r *dashboardAggregationRepository) SyncGroupUsageRollups(ctx context.Conte
 	if r == nil || r.sql == nil {
 		return nil
 	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	todayStart = service.GroupUsageTodayStart(todayStart)
 	if db, ok := r.sql.(*sql.DB); ok {
 		tx, err := db.BeginTx(ctx, nil)
@@ -184,6 +187,20 @@ func (r *dashboardAggregationRepository) SyncGroupUsageRollups(ctx context.Conte
 }
 
 func (r *dashboardAggregationRepository) syncGroupUsageRollupsInTx(ctx context.Context, todayStart time.Time) error {
+	// Transaction-scoped: a busy worker is skipped, never queued behind a full scan.
+	var acquired bool
+	if err := scanSingleRow(ctx, r.sql, "SELECT pg_try_advisory_xact_lock(7070441104)", nil, &acquired); err != nil {
+		return err
+	}
+	if !acquired {
+		return nil
+	}
+	if _, err := r.sql.ExecContext(ctx, "SET LOCAL statement_timeout = '25s'"); err != nil {
+		return err
+	}
+	if _, err := r.sql.ExecContext(ctx, "SET LOCAL lock_timeout = '1s'"); err != nil {
+		return err
+	}
 	var closedBefore string
 	var previousRetainedFrom time.Time
 	var stateTimezoneName string
@@ -240,6 +257,15 @@ func (r *dashboardAggregationRepository) syncGroupUsageRollupsInTx(ctx context.C
 		return err
 	}
 
+	// closed_before is the durable last_processed_at, rounded to a local day.
+	// Commit at most one calendar day per run so a failed historical backfill
+	// never rescans the entire retained history. AddDate preserves DST boundaries.
+	windowEnd := rebuildStart.AddDate(0, 0, 1).UTC()
+	if windowEnd.After(todayStart) || !rebuildStart.Before(todayStart) {
+		windowEnd = todayStart
+	}
+	processedDate := service.GroupUsageDate(windowEnd)
+
 	if _, err := r.sql.ExecContext(ctx, `
 		DELETE FROM usage_group_daily_rollups
 		WHERE bucket_date < $1::date
@@ -249,23 +275,27 @@ func (r *dashboardAggregationRepository) syncGroupUsageRollupsInTx(ctx context.C
 		return fmt.Errorf("清理分组用量日桶: %w", err)
 	}
 
-	if _, err := r.sql.ExecContext(ctx, `
+	var scannedRows int64
+	if err := scanSingleRow(ctx, r.sql, `
+  WITH source AS MATERIALIZED (
+   SELECT created_at, group_id, actual_cost FROM usage_logs
+   WHERE group_id IS NOT NULL AND created_at >= $1 AND created_at < $2
+  ), published AS (
 		INSERT INTO usage_group_daily_rollups (bucket_date, group_id, actual_cost, computed_at)
 		SELECT
 			(created_at AT TIME ZONE $3::text)::date AS bucket_date,
 			group_id,
 			COALESCE(SUM(actual_cost), 0) AS actual_cost,
 			NOW()
-		FROM usage_logs
-		WHERE group_id IS NOT NULL
-			AND created_at >= $1
-			AND created_at < $2
+		FROM source
 		GROUP BY 1, 2
 		ON CONFLICT (bucket_date, group_id)
 		DO UPDATE SET
 			actual_cost = EXCLUDED.actual_cost,
 			computed_at = EXCLUDED.computed_at
-	`, rebuildStart.UTC(), todayStart.UTC(), timezoneName); err != nil {
+  RETURNING 1
+  ) SELECT COUNT(*) FROM source
+	`, []any{rebuildStart.UTC(), windowEnd, timezoneName}, &scannedRows); err != nil {
 		return fmt.Errorf("重建分组用量日桶: %w", err)
 	}
 
@@ -276,9 +306,10 @@ func (r *dashboardAggregationRepository) syncGroupUsageRollupsInTx(ctx context.C
 			timezone_name = $3,
 			updated_at = NOW()
 		WHERE id = 1
-	`, todayDate, retainedFrom, timezoneName); err != nil {
+	`, processedDate, retainedFrom, timezoneName); err != nil {
 		return fmt.Errorf("更新分组用量汇总水位: %w", err)
 	}
+	slog.Info("usage.group_rollup_window_prepared", "scan_from", rebuildStart.UTC(), "scan_until", windowEnd, "last_processed_at", windowEnd, "scanned_rows", scannedRows, "caught_up", !windowEnd.Before(todayStart))
 	return nil
 }
 
