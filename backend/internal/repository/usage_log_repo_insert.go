@@ -152,11 +152,6 @@ const (
 )
 
 func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) (created bool, resultErr error) {
-	defer func() {
-		if resultErr == nil && created {
-			accountSchedulerUsageEpoch.Add(1)
-		}
-	}()
 	if log == nil {
 		return false, nil
 	}
@@ -173,11 +168,6 @@ func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) 
 }
 
 func (r *usageLogRepository) CreateBestEffort(ctx context.Context, log *service.UsageLog) (resultErr error) {
-	defer func() {
-		if resultErr == nil && log != nil {
-			accountSchedulerUsageEpoch.Add(1)
-		}
-	}()
 	if log == nil {
 		return nil
 	}

@@ -4,47 +4,65 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"golang.org/x/sync/singleflight"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
 )
 
+const (
+	accountSchedulerRecentModelsTTL   = 5 * time.Minute
+	accountSchedulerDispatchCountsTTL = time.Minute
+)
+
 type accountSchedulerRepository struct {
-	db            *sql.DB
-	recentMu      sync.Mutex
-	recentAt      time.Time
-	recentEpoch   uint64
-	recentModels  map[int64][]string
-	recentRefresh singleflight.Group
+	db             *sql.DB
+	recentModels   schedulerUsageCache[[]string]
+	dispatchCounts schedulerUsageCache[map[int64]int64]
 }
 
 func NewAccountSchedulerRepository(db *sql.DB) service.AccountSchedulerRepository {
-	return &accountSchedulerRepository{db: db}
+	return &accountSchedulerRepository{
+		db:             db,
+		recentModels:   schedulerUsageCache[[]string]{kind: "recent_models_7d"},
+		dispatchCounts: schedulerUsageCache[map[int64]int64]{kind: "dispatch_counts_24h"},
+	}
 }
 
 func (r *accountSchedulerRepository) ListGroups(ctx context.Context) ([]service.AccountSchedulerGroup, error) {
+	return r.listGroups(ctx, nil)
+}
+
+// ListGroupsByIDs avoids loading usage for unrelated or disabled probe groups.
+func (r *accountSchedulerRepository) ListGroupsByIDs(ctx context.Context, groupIDs []int64) ([]service.AccountSchedulerGroup, error) {
+	groupIDs = schedulerUsageGroupIDs(groupIDs)
+	if len(groupIDs) == 0 {
+		return []service.AccountSchedulerGroup{}, nil
+	}
+	return r.listGroups(ctx, groupIDs)
+}
+
+func (r *accountSchedulerRepository) listGroups(ctx context.Context, groupIDs []int64) ([]service.AccountSchedulerGroup, error) {
+	filter := ""
+	args := []any{service.StatusActive}
+	if len(groupIDs) > 0 {
+		filter = " AND g.id = ANY($2)"
+		args = append(args, pq.Array(groupIDs))
+	}
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT
-			g.id,
-			g.name,
-			g.platform,
-			g.status,
+		SELECT g.id, g.name, g.platform, g.status,
 			COALESCE(g.model_allowlist->'models', '[]'::jsonb)::text
 		FROM groups g
-		WHERE g.deleted_at IS NULL
-			AND g.status = $1
+		WHERE g.deleted_at IS NULL AND g.status = $1`+filter+`
 		ORDER BY g.sort_order ASC, g.id ASC
-	`, service.StatusActive)
+	`, args...)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
-
+	defer rows.Close()
 	groups := make([]service.AccountSchedulerGroup, 0)
+	activeIDs := make([]int64, 0)
 	for rows.Next() {
 		var group service.AccountSchedulerGroup
 		var allowlistRaw string
@@ -53,6 +71,7 @@ func (r *accountSchedulerRepository) ListGroups(ctx context.Context) ([]service.
 		}
 		group.ModelCandidates = decodeAccountSchedulerAllowlist(allowlistRaw)
 		groups = append(groups, group)
+		activeIDs = append(activeIDs, group.ID)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -60,12 +79,12 @@ func (r *accountSchedulerRepository) ListGroups(ctx context.Context) ([]service.
 	if err := rows.Close(); err != nil {
 		return nil, err
 	}
-	recent, err := r.loadRecentModels(ctx)
+	recentModels, err := r.recentModels.get(ctx, activeIDs, accountSchedulerRecentModelsTTL, r.loadRecentModels)
 	if err != nil {
 		return nil, err
 	}
 	for i := range groups {
-		groups[i].ModelCandidates = mergeAccountSchedulerModels(groups[i].ModelCandidates, recent[groups[i].ID])
+		groups[i].ModelCandidates = mergeAccountSchedulerModels(groups[i].ModelCandidates, recentModels[groups[i].ID])
 	}
 	return groups, nil
 }
@@ -197,16 +216,6 @@ func (r *accountSchedulerRepository) ListGroupAccounts(
 		return nil, nil
 	}
 	rows, err := r.db.QueryContext(ctx, `
-		WITH dispatch_counts AS (
-			SELECT
-				group_id,
-				account_id,
-				COUNT(*) AS dispatch_count
-			FROM usage_logs
-			WHERE created_at >= NOW() - INTERVAL '24 hours'
-				AND group_id = ANY($1)
-			GROUP BY group_id, account_id
-		)
 		SELECT
 			a.id,
 			ag.group_id,
@@ -224,13 +233,9 @@ func (r *accountSchedulerRepository) ListGroupAccounts(
 			a.temp_unschedulable_until,
 			COALESCE(a.temp_unschedulable_reason, ''),
 			a.expires_at,
-			a.auto_pause_on_expired,
-			COALESCE(dc.dispatch_count, 0)
+			a.auto_pause_on_expired
 		FROM account_groups ag
 		JOIN accounts a ON a.id = ag.account_id
-		LEFT JOIN dispatch_counts dc
-			ON dc.group_id = ag.group_id
-			AND dc.account_id = a.id
 		WHERE ag.group_id = ANY($1)
 			AND a.deleted_at IS NULL
 		ORDER BY ag.group_id ASC, ag.priority ASC, a.priority ASC, a.id ASC
@@ -261,13 +266,32 @@ func (r *accountSchedulerRepository) ListGroupAccounts(
 			&account.TempUnschedulableReason,
 			&account.ExpiresAt,
 			&account.AutoPauseOnExpired,
-			&account.DispatchCount,
 		); err != nil {
 			return nil, err
 		}
 		accounts = append(accounts, account)
 	}
-	return accounts, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if len(accounts) == 0 {
+		return accounts, nil
+	}
+	activeIDs := make([]int64, 0, len(accounts))
+	for _, account := range accounts {
+		activeIDs = append(activeIDs, account.GroupID)
+	}
+	counts, err := r.dispatchCounts.get(ctx, activeIDs, accountSchedulerDispatchCountsTTL, r.loadDispatchCounts)
+	if err != nil {
+		return nil, err
+	}
+	for i := range accounts {
+		accounts[i].DispatchCount = counts[accounts[i].GroupID][accounts[i].ID]
+	}
+	return accounts, nil
 }
 
 func (r *accountSchedulerRepository) ListDegradationStats(

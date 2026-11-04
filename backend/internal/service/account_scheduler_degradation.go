@@ -734,24 +734,43 @@ func (s *AccountSchedulerService) RunScheduled(ctx context.Context) (*AccountSch
 	s.runMu.Lock()
 	defer s.runMu.Unlock()
 
-	groups, err := s.repo.ListGroups(ctx)
-	if err != nil {
-		return nil, err
-	}
 	settings, err := s.repo.ListGroupSettings(ctx)
 	if err != nil {
 		return nil, err
 	}
-	groupIDs := make([]int64, 0)
+	enabledIDs := make([]int64, 0, len(settings))
 	for groupID, setting := range settings {
-		group := findAccountSchedulerGroup(groups, groupID)
-		if setting.DegradationEnabled && group != nil && accountSchedulerGroupSupportsDegradation(*group) {
-			groupIDs = append(groupIDs, groupID)
+		if groupID > 0 && setting.DegradationEnabled {
+			enabledIDs = append(enabledIDs, groupID)
+		}
+	}
+	if len(enabledIDs) == 0 {
+		return &AccountSchedulerRunResult{}, nil
+	}
+	sort.Slice(enabledIDs, func(i, j int) bool { return enabledIDs[i] < enabledIDs[j] })
+	var groups []AccountSchedulerGroup
+	if reader, ok := s.repo.(interface {
+		ListGroupsByIDs(context.Context, []int64) ([]AccountSchedulerGroup, error)
+	}); ok {
+		groups, err = reader.ListGroupsByIDs(ctx, enabledIDs)
+	} else {
+		groups, err = s.repo.ListGroups(ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	groupIDs := make([]int64, 0, len(groups))
+	enabledGroups := make([]AccountSchedulerGroup, 0, len(groups))
+	for _, group := range groups {
+		if settings[group.ID].DegradationEnabled && accountSchedulerGroupSupportsDegradation(group) {
+			groupIDs = append(groupIDs, group.ID)
+			enabledGroups = append(enabledGroups, group)
 		}
 	}
 	if len(groupIDs) == 0 {
 		return &AccountSchedulerRunResult{}, nil
 	}
+	groups = enabledGroups
 	accounts, err := s.repo.ListGroupAccounts(ctx, groupIDs)
 	if err != nil {
 		return nil, err

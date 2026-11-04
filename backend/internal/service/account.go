@@ -4,7 +4,6 @@ package service
 import (
 	"encoding/json"
 	"errors"
-	cachedtimezone "github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"log/slog"
 	"net/url"
 	"reflect"
@@ -18,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/typesafe"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 )
@@ -2873,7 +2873,7 @@ func (a *Account) isFixedDailyPeriodExpired(periodStart time.Time) bool {
 	if periodStart.IsZero() {
 		return true
 	}
-	tz, err := cachedtimezone.LoadLocation(a.GetQuotaResetTimezone())
+	tz, err := timezone.LoadLocation(a.GetQuotaResetTimezone())
 	if err != nil {
 		tz = time.UTC
 	}
@@ -2886,7 +2886,7 @@ func (a *Account) isFixedWeeklyPeriodExpired(periodStart time.Time) bool {
 	if periodStart.IsZero() {
 		return true
 	}
-	tz, err := cachedtimezone.LoadLocation(a.GetQuotaResetTimezone())
+	tz, err := timezone.LoadLocation(a.GetQuotaResetTimezone())
 	if err != nil {
 		tz = time.UTC
 	}
@@ -2902,7 +2902,7 @@ func ComputeQuotaResetAt(extra map[string]any) {
 	if tzName == "" {
 		tzName = "UTC"
 	}
-	tz, err := cachedtimezone.LoadLocation(tzName)
+	tz, err := timezone.LoadLocation(tzName)
 	if err != nil {
 		tz = time.UTC
 	}
@@ -2954,7 +2954,7 @@ func NormalizeFixedQuotaWindows(extra map[string]any) {
 	if tzName == "" {
 		tzName = "UTC"
 	}
-	tz, err := cachedtimezone.LoadLocation(tzName)
+	tz, err := timezone.LoadLocation(tzName)
 	if err != nil {
 		tz = time.UTC
 	}
@@ -3000,7 +3000,7 @@ func ValidateQuotaResetConfig(extra map[string]any) error {
 	}
 	// 校验时区
 	if tz, ok := extra["quota_reset_timezone"].(string); ok && tz != "" {
-		if _, err := cachedtimezone.LoadLocation(tz); err != nil {
+		if _, err := timezone.LoadLocation(tz); err != nil {
 			return errors.New("invalid quota_reset_timezone: must be a valid IANA timezone name")
 		}
 	}

@@ -900,15 +900,23 @@ function formatTime(value?: string, withDate = false) {
   ).format(date);
 }
 
+function refreshWhenVisible() {
+  if (!document.hidden) void load(true);
+}
+
 onMounted(() => {
   void load();
-  overviewTimer = window.setInterval(() => void load(true), 15000);
+  window.addEventListener("focus", refreshWhenVisible);
+  document.addEventListener("visibilitychange", refreshWhenVisible);
+  overviewTimer = window.setInterval(refreshWhenVisible, 15000);
 });
 
 onBeforeUnmount(() => {
   if (overviewTimer !== undefined) {
     window.clearInterval(overviewTimer);
   }
+  window.removeEventListener("focus", refreshWhenVisible);
+  document.removeEventListener("visibilitychange", refreshWhenVisible);
 });
 </script>
 
