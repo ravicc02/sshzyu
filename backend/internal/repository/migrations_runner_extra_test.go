@@ -12,6 +12,7 @@ import (
 	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
+	"github.com/Wei-Shaw/sub2api/migrations"
 	"github.com/stretchr/testify/require"
 )
 
@@ -383,4 +384,22 @@ func TestPgAdvisoryLockAndUnlock_ErrorBranches(t *testing.T) {
 func migrationChecksum(content string) string {
 	sum := sha256.Sum256([]byte(strings.TrimSpace(content)))
 	return hex.EncodeToString(sum[:])
+}
+
+func TestMigration258ChecksumCompatibilityOnlyAcceptsVerifiedLineEndings(t *testing.T) {
+	const name = "258_upstream_balance_monitor.sql"
+	raw, err := fs.ReadFile(migrations.FS, name)
+	require.NoError(t, err)
+	lf := strings.ReplaceAll(string(raw), "\r\n", "\n")
+	crlf := strings.ReplaceAll(lf, "\n", "\r\n")
+	lfChecksum := migrationChecksum(lf)
+	crlfChecksum := migrationChecksum(crlf)
+	require.Equal(t, "430003fbeac3f9caaf8f9dca9d44115a83ad02a3e3601b6d26d780ba70e4fe41", lfChecksum)
+	require.Equal(t, "20e6b40d13efc1f077016a14ce6ac0f3f96564288c179fa3e24946bcf4aa685d", crlfChecksum)
+	require.True(t, isMigrationChecksumCompatible(name, crlfChecksum, lfChecksum))
+	require.True(t, isMigrationChecksumCompatible(name, lfChecksum, crlfChecksum))
+	changed := migrationChecksum(lf + "\nSELECT 1;")
+	require.False(t, isMigrationChecksumCompatible(name, changed, lfChecksum))
+	require.False(t, isMigrationChecksumCompatible(name, crlfChecksum, changed))
+	require.False(t, isMigrationChecksumCompatible("other.sql", crlfChecksum, lfChecksum))
 }
