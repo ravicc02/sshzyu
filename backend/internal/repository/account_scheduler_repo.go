@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"golang.org/x/sync/singleflight"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -12,7 +14,12 @@ import (
 )
 
 type accountSchedulerRepository struct {
-	db *sql.DB
+	db            *sql.DB
+	recentMu      sync.Mutex
+	recentAt      time.Time
+	recentEpoch   uint64
+	recentModels  map[int64][]string
+	recentRefresh singleflight.Group
 }
 
 func NewAccountSchedulerRepository(db *sql.DB) service.AccountSchedulerRepository {
@@ -26,20 +33,7 @@ func (r *accountSchedulerRepository) ListGroups(ctx context.Context) ([]service.
 			g.name,
 			g.platform,
 			g.status,
-			COALESCE(g.model_allowlist->'models', '[]'::jsonb)::text,
-			COALESCE((
-				SELECT array_agg(model ORDER BY request_count DESC, model ASC)
-				FROM (
-					SELECT model, COUNT(*) AS request_count
-					FROM usage_logs
-					WHERE group_id = g.id
-						AND created_at >= NOW() - INTERVAL '7 days'
-						AND COALESCE(model, '') <> ''
-					GROUP BY model
-					ORDER BY request_count DESC, model ASC
-					LIMIT 5
-				) recent_models
-			), '{}'::text[])
+			COALESCE(g.model_allowlist->'models', '[]'::jsonb)::text
 		FROM groups g
 		WHERE g.deleted_at IS NULL
 			AND g.status = $1
@@ -54,14 +48,26 @@ func (r *accountSchedulerRepository) ListGroups(ctx context.Context) ([]service.
 	for rows.Next() {
 		var group service.AccountSchedulerGroup
 		var allowlistRaw string
-		var recentModels pq.StringArray
-		if err := rows.Scan(&group.ID, &group.Name, &group.Platform, &group.Status, &allowlistRaw, &recentModels); err != nil {
+		if err := rows.Scan(&group.ID, &group.Name, &group.Platform, &group.Status, &allowlistRaw); err != nil {
 			return nil, err
 		}
-		group.ModelCandidates = mergeAccountSchedulerModels(decodeAccountSchedulerAllowlist(allowlistRaw), recentModels)
+		group.ModelCandidates = decodeAccountSchedulerAllowlist(allowlistRaw)
 		groups = append(groups, group)
 	}
-	return groups, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	recent, err := r.loadRecentModels(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range groups {
+		groups[i].ModelCandidates = mergeAccountSchedulerModels(groups[i].ModelCandidates, recent[groups[i].ID])
+	}
+	return groups, nil
 }
 
 func (r *accountSchedulerRepository) ListGroupSettings(ctx context.Context) (map[int64]service.AccountSchedulerGroupSetting, error) {
