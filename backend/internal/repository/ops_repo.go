@@ -668,6 +668,7 @@ func (r *opsRepository) BatchInsertSystemLogs(ctx context.Context, inputs []*ser
 
 	var inserted int64
 	for _, input := range inputs {
+		input = service.BoundOpsSystemLog(input)
 		if input == nil {
 			continue
 		}

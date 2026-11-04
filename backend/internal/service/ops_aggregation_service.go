@@ -67,8 +67,10 @@ type OpsAggregationService struct {
 	hourlyMu sync.Mutex
 	dailyMu  sync.Mutex
 
-	skipLogMu sync.Mutex
-	skipLogAt time.Time
+	skipLogMu          sync.Mutex
+	skipLogAt          time.Time
+	hourlyCompletedEnd time.Time
+	dailyCompletedEnd  time.Time
 }
 
 func NewOpsAggregationService(
@@ -182,6 +184,9 @@ func (s *OpsAggregationService) aggregateHourly() {
 
 	// Aggregate stable full hours only.
 	end := utcFloorToHour(time.Now().UTC().Add(-opsAggSafeDelay))
+	if !end.After(s.hourlyCompletedEnd) {
+		return
+	}
 	start := end.Add(-opsAggBackfillWindow)
 
 	// Resume from the latest bucket with overlap.
@@ -233,6 +238,7 @@ func (s *OpsAggregationService) aggregateHourly() {
 		return
 	}
 
+	s.hourlyCompletedEnd = end
 	successAt := finishedAt
 	hbCtx, hbCancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer hbCancel()
@@ -281,6 +287,9 @@ func (s *OpsAggregationService) aggregateDaily() {
 	runAt := startedAt
 
 	end := utcFloorToDay(time.Now().UTC())
+	if !end.After(s.dailyCompletedEnd) {
+		return
+	}
 	start := end.Add(-opsAggBackfillWindow)
 
 	{
@@ -331,6 +340,7 @@ func (s *OpsAggregationService) aggregateDaily() {
 		return
 	}
 
+	s.dailyCompletedEnd = end
 	successAt := finishedAt
 	hbCtx, hbCancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer hbCancel()
