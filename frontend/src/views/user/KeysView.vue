@@ -234,7 +234,7 @@
                 <div class="flex items-center gap-1.5">
                   <span class="text-gray-500 dark:text-gray-400">Token:</span>
                   <span class="font-medium text-gray-900 dark:text-white">
-                    {{ formatTokenQuota(row.quota_tokens_used) }} / {{ formatTokenQuota(row.quota_tokens) }}
+                    {{ formatTokenUsage(row.quota_tokens_used) }} / {{ formatTokenQuota(row.quota_tokens) }}
                   </span>
                 </div>
                 <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
@@ -737,7 +737,7 @@
               <div class="flex items-center gap-2">
                 <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700">
                   <span class="font-medium text-gray-900 dark:text-white">
-                    {{ formData.quota_mode === 'tokens' ? formatTokenQuota(selectedKey.quota_tokens_used) : '$' + (selectedKey.quota_used?.toFixed(4) || '0.0000') }}
+                    {{ formData.quota_mode === 'tokens' ? formatTokenUsage(selectedKey.quota_tokens_used) : '$' + (selectedKey.quota_used?.toFixed(4) || '0.0000') }}
                   </span>
                   <span class="mx-2 text-gray-400">/</span>
                   <span class="text-gray-500 dark:text-gray-400">
@@ -1283,6 +1283,8 @@ import {
   tokenBaseToAmount,
   type TokenQuotaUnit
 } from '@/utils/tokenQuota'
+
+const formatTokenUsage = (value: number) => value > 0 ? formatTokenQuota(value) : '0'
 
 // Helper to format date for datetime-local input
 const formatDateTimeLocal = (isoDate: string): string => {
