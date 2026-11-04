@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	cachedtimezone "github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"log"
 	"strconv"
 	"strings"
@@ -66,7 +67,7 @@ func NewOpsScheduledReportService(
 
 	loc := time.Local
 	if cfg != nil && strings.TrimSpace(cfg.Timezone) != "" {
-		if parsed, err := time.LoadLocation(strings.TrimSpace(cfg.Timezone)); err == nil && parsed != nil {
+		if parsed, err := cachedtimezone.LoadLocation(strings.TrimSpace(cfg.Timezone)); err == nil && parsed != nil {
 			loc = parsed
 		}
 	}

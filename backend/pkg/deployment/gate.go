@@ -10,11 +10,16 @@ import (
 )
 
 type Gate struct {
-	path     string
-	mu       sync.Mutex
-	inflight int64
-	ctx      context.Context
-	cancel   context.CancelFunc
+	path        string
+	mu          sync.Mutex
+	inflight    int64
+	ctx         context.Context
+	cancel      context.CancelFunc
+	stateMu     sync.Mutex
+	cachedState State
+	cachedErr   error
+	cacheUntil  time.Time
+	cachedInfo  os.FileInfo
 }
 
 type State struct {
@@ -33,6 +38,25 @@ func (gate *Gate) state() (State, error) {
 	if gate.path == "" {
 		return State{}, nil
 	}
+	gate.stateMu.Lock()
+	defer gate.stateMu.Unlock()
+	now := time.Now()
+	info, statErr := os.Stat(gate.path)
+	if statErr != nil {
+		gate.cacheUntil = time.Time{}
+		return State{Active: true}, errors.New("maintenance state unavailable")
+	}
+	if now.Before(gate.cacheUntil) && gate.cachedInfo != nil && os.SameFile(info, gate.cachedInfo) && info.ModTime() == gate.cachedInfo.ModTime() && info.Size() == gate.cachedInfo.Size() && info.Mode() == gate.cachedInfo.Mode() {
+		return gate.cachedState, gate.cachedErr
+	}
+	state, err := gate.readState()
+	gate.cachedState, gate.cachedErr = state, err
+	gate.cachedInfo = info
+	gate.cacheUntil = now.Add(500 * time.Millisecond)
+	return state, err
+}
+
+func (gate *Gate) readState() (State, error) {
 	data, err := os.ReadFile(gate.path)
 	if err != nil || len(data) > 8192 {
 		return State{Active: true}, errors.New("maintenance state unavailable")

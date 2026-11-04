@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	cachedtimezone "github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"strings"
 	"sync"
 	"time"
@@ -158,7 +159,7 @@ func (s *OpsCleanupService) applyScheduleLocked(ctx context.Context) error {
 
 	loc := time.Local
 	if s.cfg != nil && strings.TrimSpace(s.cfg.Timezone) != "" {
-		if parsed, err := time.LoadLocation(strings.TrimSpace(s.cfg.Timezone)); err == nil && parsed != nil {
+		if parsed, err := cachedtimezone.LoadLocation(strings.TrimSpace(s.cfg.Timezone)); err == nil && parsed != nil {
 			loc = parsed
 		}
 	}

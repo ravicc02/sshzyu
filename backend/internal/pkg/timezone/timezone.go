@@ -24,7 +24,7 @@ func Init(tz string) error {
 		tz = "Asia/Shanghai" // Default timezone
 	}
 
-	loc, err := time.LoadLocation(tz)
+	loc, err := LoadLocation(tz)
 	if err != nil {
 		return fmt.Errorf("invalid timezone %q: %w", tz, err)
 	}
@@ -133,7 +133,7 @@ func ParseInLocation(layout, value string) (time.Time, error) {
 func ParseInUserLocation(layout, value, userTZ string) (time.Time, error) {
 	loc := Location() // default to server timezone
 	if userTZ != "" {
-		if userLoc, err := time.LoadLocation(userTZ); err == nil {
+		if userLoc, err := LoadLocation(userTZ); err == nil {
 			loc = userLoc
 		}
 	}
@@ -146,7 +146,7 @@ func NowInUserLocation(userTZ string) time.Time {
 	if userTZ == "" {
 		return Now()
 	}
-	if userLoc, err := time.LoadLocation(userTZ); err == nil {
+	if userLoc, err := LoadLocation(userTZ); err == nil {
 		return time.Now().In(userLoc)
 	}
 	return Now()
@@ -157,7 +157,7 @@ func NowInUserLocation(userTZ string) time.Time {
 func StartOfDayInUserLocation(t time.Time, userTZ string) time.Time {
 	loc := Location()
 	if userTZ != "" {
-		if userLoc, err := time.LoadLocation(userTZ); err == nil {
+		if userLoc, err := LoadLocation(userTZ); err == nil {
 			loc = userLoc
 		}
 	}

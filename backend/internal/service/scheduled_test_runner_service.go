@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	cachedtimezone "github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"sync"
 	"time"
 
@@ -50,7 +51,7 @@ func (s *ScheduledTestRunnerService) Start() {
 	s.startOnce.Do(func() {
 		loc := time.Local
 		if s.cfg != nil {
-			if parsed, err := time.LoadLocation(s.cfg.Timezone); err == nil && parsed != nil {
+			if parsed, err := cachedtimezone.LoadLocation(s.cfg.Timezone); err == nil && parsed != nil {
 				loc = parsed
 			}
 		}

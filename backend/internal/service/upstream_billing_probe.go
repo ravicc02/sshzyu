@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	cachedtimezone "github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/upstreammonitor"
 	"io"
 	"log/slog"
@@ -960,7 +961,7 @@ func upstreamBillingPeakMultiplierAt(data map[string]any, now time.Time) (float6
 		startMinute >= endMinute || peakMultiplier < 0 || math.IsNaN(peakMultiplier) || math.IsInf(peakMultiplier, 0) {
 		return 0, false
 	}
-	location, err := time.LoadLocation(timezoneName)
+	location, err := cachedtimezone.LoadLocation(timezoneName)
 	if err != nil {
 		return 0, false
 	}

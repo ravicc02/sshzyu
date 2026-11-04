@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	cachedtimezone "github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"log"
 	"strings"
 	"sync"
@@ -427,7 +428,7 @@ func geminiAggregateUsage(stats []usagestats.ModelStat) GeminiUsageTotals {
 }
 
 func geminiQuotaLocation() *time.Location {
-	loc, err := time.LoadLocation("America/Los_Angeles")
+	loc, err := cachedtimezone.LoadLocation("America/Los_Angeles")
 	if err != nil {
 		return time.FixedZone("PST", -8*3600)
 	}

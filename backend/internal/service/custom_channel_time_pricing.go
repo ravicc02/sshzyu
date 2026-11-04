@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	cachedtimezone "github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"math"
 	"sort"
 	"strings"
@@ -73,7 +74,7 @@ func loadChannelTimePricingLocation(name string) (*time.Location, error) {
 		}
 		channelTimePricingLocations.Delete(name)
 	}
-	location, err := time.LoadLocation(name)
+	location, err := cachedtimezone.LoadLocation(name)
 	if err != nil {
 		return nil, err
 	}
