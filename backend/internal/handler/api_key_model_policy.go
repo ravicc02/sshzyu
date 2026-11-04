@@ -12,8 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// The editor consumes the exact same catalog as /v1/models, scoped to a group
-// the signed-in user may bind. No temporary credential is created or disclosed.
+// The editor discovers models only on request, without static catalog defaults.
+// The selected group must be bindable by the signed-in user.
 func (h *GatewayHandler) UserGroupModels(c *gin.Context) {
 	subject, ok := middleware.GetAuthSubjectFromContext(c)
 	if !ok {
@@ -30,8 +30,18 @@ func (h *GatewayHandler) UserGroupModels(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
+	c.Header("Cache-Control", "private, no-store")
 	c.Set(string(middleware.ContextKeyAPIKey), &service.APIKey{UserID: subject.UserID, GroupID: &groupID, Group: group})
-	h.Models(c)
+	if group.Platform == service.PlatformOpenAI && group.CodexModelsManifestConfig.Enabled {
+		h.pinnedOpenAIModels(c, group)
+		return
+	}
+	models, err := h.gatewayService.GetConfiguredGroupModels(c.Request.Context(), group)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	writeModelsList(c, group.Platform, models)
 }
 
 func apiKeyHasSelectedModels(c *gin.Context) bool {

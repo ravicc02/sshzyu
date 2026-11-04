@@ -27,7 +27,7 @@ export async function getUserGroupRates(): Promise<Record<number, number>> {
   return data || {}
 }
 
-/** Model IDs use the same scoped catalog as the gateway's /v1/models. */
+/** Fetch declared group model IDs without adding built-in catalog defaults. */
 export async function getModels(groupId: number, options?: { signal?: AbortSignal }): Promise<string[]> {
   const { data } = await apiClient.get<{ data: Array<{ id: string }> }>(
     `/groups/${groupId}/models`, { signal: options?.signal }
