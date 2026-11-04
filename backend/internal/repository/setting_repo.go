@@ -13,7 +13,12 @@ import (
 // SetContentModerationConfig holds live group rows until the setting is written.
 // Deletion takes FOR UPDATE on the group before cleaning this setting, so both
 // operations follow the same lock order: groups, then settings.
-func (r *settingRepository) SetContentModerationConfig(ctx context.Context, value string, groupIDs []int64) error {
+func (r *settingRepository) SetContentModerationConfig(ctx context.Context, value string, groupIDs []int64) (resultErr error) {
+	defer func() {
+		if resultErr == nil {
+			service.InvalidateContentModerationRuntime()
+		}
+	}()
 	tx, err := r.client.Tx(ctx)
 	if err != nil && !errors.Is(err, ent.ErrTxStarted) {
 		return err
@@ -70,7 +75,12 @@ func (r *settingRepository) GetValue(ctx context.Context, key string) (string, e
 	return setting.Value, nil
 }
 
-func (r *settingRepository) Set(ctx context.Context, key, value string) error {
+func (r *settingRepository) Set(ctx context.Context, key, value string) (resultErr error) {
+	defer func() {
+		if resultErr == nil && isModerationRuntimeSetting(key) {
+			service.InvalidateContentModerationRuntime()
+		}
+	}()
 	now := time.Now()
 	return r.client.Setting.
 		Create().
@@ -112,7 +122,17 @@ func (r *settingRepository) GetMultiple(ctx context.Context, keys []string) (map
 	return result, nil
 }
 
-func (r *settingRepository) SetMultiple(ctx context.Context, settings map[string]string) error {
+func (r *settingRepository) SetMultiple(ctx context.Context, settings map[string]string) (resultErr error) {
+	defer func() {
+		if resultErr == nil {
+			for key := range settings {
+				if isModerationRuntimeSetting(key) {
+					service.InvalidateContentModerationRuntime()
+					break
+				}
+			}
+		}
+	}()
 	if len(settings) == 0 {
 		return nil
 	}
@@ -145,4 +165,8 @@ func (r *settingRepository) GetAll(ctx context.Context) (map[string]string, erro
 func (r *settingRepository) Delete(ctx context.Context, key string) error {
 	_, err := r.client.Setting.Delete().Where(setting.KeyEQ(key)).Exec(ctx)
 	return err
+}
+
+func isModerationRuntimeSetting(key string) bool {
+	return key == service.SettingKeyContentModerationConfig || key == service.SettingKeyRiskControlEnabled || key == service.SettingKeyCyberPolicyUserAllowlist
 }

@@ -45,6 +45,7 @@ func (c *channelCache) SubscribeUpdates(ctx context.Context, handler func()) {
 					return
 				}
 				if message != nil {
+					service.InvalidateContentModerationRuntime()
 					handler()
 				}
 			}

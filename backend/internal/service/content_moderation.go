@@ -95,7 +95,7 @@ const (
 	contentModerationCleanupTimeout  = 30 * time.Minute
 	contentModerationCleanupDelay    = 5 * time.Minute
 
-	contentModerationRuntimeCacheTTL       = time.Second
+	contentModerationRuntimeCacheTTL       = 5 * time.Second
 	contentModerationRuntimeRefreshTimeout = 5 * time.Second
 )
 
@@ -553,6 +553,7 @@ type contentModerationRuntimeSnapshot struct {
 	keywordMatcher     *contentModerationKeywordMatcher
 	configDigest       [sha256.Size]byte
 	loadedAt           time.Time
+	settingsVersion    uint64
 }
 
 type contentModerationTask struct {
@@ -864,7 +865,7 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 	cfg := runtimeSnapshot.config
 	inGroupScope := cfg.includesGroup(input.GroupID)
 	inModelScope := cfg.includesModel(input.Model)
-	slog.Info("content_moderation.config_loaded",
+	slog.Debug("content_moderation.config_loaded",
 		"user_id", input.UserID,
 		"api_key_id", input.APIKeyID,
 		"group_id", contentModerationLogGroupID(input.GroupID),
@@ -1551,7 +1552,7 @@ func (s *ContentModerationService) loadRuntimeSnapshot(ctx context.Context) (*co
 	}
 	now := time.Now()
 	if snapshot := s.runtimeSnapshot.Load(); snapshot != nil {
-		if now.Sub(snapshot.loadedAt) < s.runtimeSnapshotTTL() {
+		if snapshot.settingsVersion == contentModerationSettingsVersion.Load() && now.Sub(snapshot.loadedAt) < s.runtimeSnapshotTTL() {
 			return snapshot, nil
 		}
 		s.triggerRuntimeSnapshotRefresh()
@@ -1600,6 +1601,7 @@ func (s *ContentModerationService) runtimeRefreshDeferred() bool {
 }
 
 func (s *ContentModerationService) refreshRuntimeSnapshot(ctx context.Context) (*contentModerationRuntimeSnapshot, error) {
+	version := contentModerationSettingsVersion.Load()
 	values, err := s.settingRepo.GetMultiple(ctx, []string{
 		SettingKeyRiskControlEnabled,
 		SettingKeyContentModerationConfig,
@@ -1622,6 +1624,7 @@ func (s *ContentModerationService) refreshRuntimeSnapshot(ctx context.Context) (
 			keywordMatcher:     current.keywordMatcher,
 			configDigest:       configDigest,
 			loadedAt:           time.Now(),
+			settingsVersion:    version,
 		}
 		s.runtimeSnapshot.Store(snapshot)
 		s.runtimeRefreshRetryAt.Store(0)
@@ -1639,6 +1642,7 @@ func (s *ContentModerationService) refreshRuntimeSnapshot(ctx context.Context) (
 		keywordMatcher:     newContentModerationKeywordMatcher(cfg.BlockedKeywords),
 		configDigest:       configDigest,
 		loadedAt:           time.Now(),
+		settingsVersion:    version,
 	}
 	s.runtimeSnapshot.Store(snapshot)
 	s.runtimeRefreshRetryAt.Store(0)
@@ -1646,6 +1650,7 @@ func (s *ContentModerationService) refreshRuntimeSnapshot(ctx context.Context) (
 }
 
 func (s *ContentModerationService) replaceRuntimeConfig(cfg *ContentModerationConfig, raw []byte) {
+	version := contentModerationSettingsVersion.Load()
 	if s == nil || cfg == nil {
 		return
 	}
@@ -1672,6 +1677,7 @@ func (s *ContentModerationService) replaceRuntimeConfig(cfg *ContentModerationCo
 		keywordMatcher:     keywordMatcher,
 		configDigest:       configDigest,
 		loadedAt:           time.Now(),
+		settingsVersion:    version,
 	})
 }
 

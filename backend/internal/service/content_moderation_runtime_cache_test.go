@@ -454,3 +454,18 @@ func TestContentModerationRuntimeSnapshotConcurrentReadAndReplace(t *testing.T) 
 		require.NoError(t, err)
 	}
 }
+
+func TestContentModerationRuntimeSnapshotInvalidationRefreshesBeforeTTL(t *testing.T) {
+	repo := &contentModerationRuntimeSettingRepo{values: map[string]string{SettingKeyRiskControlEnabled: "true", SettingKeyContentModerationConfig: runtimeCacheTestConfig(t, "blocked")}}
+	svc := runtimeCacheTestService(repo, time.Hour)
+	first, err := svc.loadRuntimeSnapshot(context.Background())
+	require.NoError(t, err)
+	require.True(t, first.riskControlEnabled)
+	require.NoError(t, repo.Set(context.Background(), SettingKeyRiskControlEnabled, "false"))
+	InvalidateContentModerationRuntime()
+	_, err = svc.loadRuntimeSnapshot(context.Background())
+	require.NoError(t, err)
+	require.Eventually(t, func() bool { return !svc.runtimeSnapshot.Load().riskControlEnabled }, time.Second, time.Millisecond)
+	_, reads := repo.calls()
+	require.Equal(t, 2, reads)
+}
