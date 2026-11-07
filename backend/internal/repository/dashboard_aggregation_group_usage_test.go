@@ -158,6 +158,10 @@ func TestDashboardAggregationRepositoryRecomputeRangeRebuildsGroupRollupsBeforeC
 	} {
 		mock.ExpectExec(query).WillReturnResult(sqlmock.NewResult(0, 1))
 	}
+	mock.ExpectQuery(`SELECT pg_try_advisory_xact_lock\(7070441104\)`).
+		WillReturnRows(sqlmock.NewRows([]string{"locked"}).AddRow(true))
+	mock.ExpectExec(`SET LOCAL statement_timeout`).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(`SET LOCAL lock_timeout`).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectQuery(`SELECT closed_before::text, retained_from.*FOR UPDATE`).
 		WillReturnRows(sqlmock.NewRows([]string{"closed_before", "retained_from", "timezone_name"}).
 			AddRow(startDate, time.Unix(0, 0).UTC(), "Asia/Shanghai"))
@@ -166,11 +170,11 @@ func TestDashboardAggregationRepositoryRecomputeRangeRebuildsGroupRollupsBeforeC
 	mock.ExpectExec(`DELETE FROM usage_group_daily_rollups`).
 		WithArgs(startDate, startDate, service.GroupUsageDate(todayStart)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(`INSERT INTO usage_group_daily_rollups`).
-		WithArgs(rebuildStart.UTC(), todayStart.UTC(), "Asia/Shanghai").
-		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`WITH source AS MATERIALIZED`).
+		WithArgs(rebuildStart.UTC(), rebuildStart.AddDate(0, 0, 1).UTC(), "Asia/Shanghai").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(100))
 	mock.ExpectExec(`UPDATE usage_group_rollup_state`).
-		WithArgs(service.GroupUsageDate(todayStart), start, "Asia/Shanghai").
+		WithArgs(service.GroupUsageDate(rebuildStart.AddDate(0, 0, 1)), start, "Asia/Shanghai").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
@@ -202,7 +206,7 @@ func TestDashboardAggregationRepositoryCleanupUsageLogsNonPartitionedInvalidates
 		WithArgs(earliestDeletedAt, "Asia/Shanghai").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
-	mock.ExpectBegin()
+	expectRollupLock(mock, true)
 	mock.ExpectQuery(`SELECT closed_before::text, retained_from.*FOR UPDATE`).
 		WillReturnRows(sqlmock.NewRows([]string{"closed_before", "retained_from", "timezone_name"}).
 			AddRow(service.GroupUsageDate(todayStart), time.Unix(0, 0).UTC(), "Asia/Shanghai"))
@@ -261,7 +265,7 @@ func TestDashboardAggregationRepositoryCleanupUsageLogsPartitionedSortsAndInvali
 		WithArgs(cutoff.Add(-time.Hour), "Asia/Shanghai").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
-	mock.ExpectBegin()
+	expectRollupLock(mock, true)
 	mock.ExpectQuery(`SELECT closed_before::text, retained_from.*FOR UPDATE`).
 		WillReturnRows(sqlmock.NewRows([]string{"closed_before", "retained_from", "timezone_name"}).
 			AddRow(service.GroupUsageDate(todayStart), time.Unix(0, 0).UTC(), "Asia/Shanghai"))
