@@ -29,6 +29,8 @@ const commandCodeModelsSample = `{"object":"list","data":[
 	{"id":"no-endpoints"}
 ]}`
 
+var modelProtocolTestHostSequence atomic.Uint64
+
 func TestParseModelProtocolCatalog(t *testing.T) {
 	models, err := parseModelProtocolCatalog([]byte(commandCodeModelsSample))
 	require.NoError(t, err)
@@ -334,7 +336,7 @@ func TestCommandCodeGatewayPassesThroughCatalogProtocols(t *testing.T) {
 	}
 	forward := func(t *testing.T, ingress routingMatrixIngress, model string, catalog map[string][]string) observation {
 		t.Helper()
-		base := fmt.Sprintf("http://cc-%s-%d.example", strings.ReplaceAll(t.Name(), "/", "-"), time.Now().UnixNano())
+		base := fmt.Sprintf("http://cc-%s-%d.example", strings.ReplaceAll(t.Name(), "/", "-"), modelProtocolTestHostSequence.Add(1))
 		account := commandCodeTestAccount(12)
 		account.Credentials["api_base_urls"] = map[string]any{
 			APIProtocolChatCompletions: base + "/provider/v1",
@@ -349,8 +351,16 @@ func TestCommandCodeGatewayPassesThroughCatalogProtocols(t *testing.T) {
 			// 目录不可用（退避中）：不触发刷新，回落内置规则。
 			upstreamModelProtocols.store(key, nil, errors.New("unavailable"), time.Now())
 		}
+		if catalog != nil {
+			require.Equal(t, catalog[model], upstreamModelProtocols.lookup(context.Background(), key, model, time.Now(), nil))
+		} else {
+			require.Nil(t, upstreamModelProtocols.lookup(context.Background(), key, model, time.Now(), nil))
+		}
 		upstream := &httpUpstreamRecorder{err: errors.New("stop after capture")}
 		svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+		if ingress.name == "responses" && catalog == nil {
+			require.Equal(t, APIProtocolChatCompletions, svc.resolveUpstreamProtocolFor(context.Background(), account, APIProtocolResponses, model))
+		}
 		body := routingMatrixCase{ingress: ingress, model: model}.body()
 		_ = ingress.forward(svc, adaptiveProtocolTestContext(ingress.path, body), account, body)
 		require.NotEmpty(t, upstream.requests)
