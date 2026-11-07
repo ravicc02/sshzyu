@@ -1,17 +1,27 @@
 """Behavior tests for the sshzyu-image batch status contract."""
 
 import json
+import importlib.util
+import io
 from pathlib import Path
 import sys
 import tempfile
 import unittest
 from unittest import mock
+import zipfile
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = REPO_ROOT / "skills" / "sshzyu-image"
 sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 
 import sshzyu_image as cli
+
+PACKAGE_SCRIPT = REPO_ROOT / "scripts" / "package-sshzyu-image-skill.py"
+package_spec = importlib.util.spec_from_file_location("sshzyu_image_package", PACKAGE_SCRIPT)
+if package_spec is None or package_spec.loader is None:
+    raise RuntimeError("cannot load skill package builder")
+skill_package = importlib.util.module_from_spec(package_spec)
+package_spec.loader.exec_module(skill_package)
 
 PNG_BASE64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8"
@@ -69,6 +79,20 @@ class BatchStatusTests(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertEqual(summary["jobs_failed"], 1)
             self.assertEqual(summary["jobs_partial"], 0)
+
+
+class PackageContractTests(unittest.TestCase):
+    def test_package_is_deterministic_and_normalizes_text_line_endings(self):
+        first = skill_package.build_package()
+        second = skill_package.build_package()
+        self.assertEqual(first, second)
+
+        with zipfile.ZipFile(io.BytesIO(first)) as archive:
+            skill_md = archive.read("sshzyu-image/SKILL.md")
+            self.assertNotIn(b"\r\n", skill_md)
+            self.assertNotIn(b"\r", skill_md)
+            for info in archive.infolist():
+                self.assertEqual(3, info.create_system)
 
 
 if __name__ == "__main__":

@@ -26,6 +26,9 @@ REQUIRED = {
 }
 EXCLUDED_PARTS = {".env", "key.txt", "__pycache__", "tests"}
 EXCLUDED_SUFFIXES = {".pyc", ".skill", ".zip", ".sha256"}
+TEXT_SUFFIXES = {
+    ".example", ".gitignore", ".json", ".md", ".py", ".sh", ".toml", ".txt", ".yaml", ".yml"
+}
 
 
 class PackageError(Exception):
@@ -65,7 +68,10 @@ def source_files():
             continue
         if path.suffix.lower() in EXCLUDED_SUFFIXES:
             continue
-        files.append((relative, path.read_bytes()))
+        data = path.read_bytes()
+        if path.name == ".gitignore" or path.suffix.lower() in TEXT_SUFFIXES:
+            data = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        files.append((relative, data))
     files.sort(key=lambda item: item[0].as_posix())
     return files
 
@@ -80,6 +86,7 @@ def build_package():
                 date_time=(2026, 11, 6, 0, 0, 0),
             )
             info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
             info.external_attr = (0o644 & 0xFFFF) << 16
             archive.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
     payload = buffer.getvalue()
