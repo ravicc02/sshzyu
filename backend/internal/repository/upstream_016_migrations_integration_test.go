@@ -22,7 +22,7 @@ import (
 
 func TestMigrationsOfficial016KeepCustomLedgerAndSchema(t *testing.T) {
 	ctx := context.Background()
-	names := []string{"242_lottery.sql", "242_drop_platform_check_constraints.sql", "242_group_i18n.sql", "243_lottery_tier.sql", "243_gemini_cached_contents.sql", "244_lottery_activity_tier_config.sql", "244_gemini_cached_contents_channel_usage.sql", "245_lottery_dynamic_tiers.sql", "245_gemini_cached_contents_mutation_lease.sql", "249_mcp_oauth.sql", "249_multi_use_redeem_codes.sql"}
+	names := []string{"242_lottery.sql", "242_drop_platform_check_constraints.sql", "242_group_i18n.sql", "243_lottery_tier.sql", "243_gemini_cached_contents.sql", "244_lottery_activity_tier_config.sql", "244_gemini_cached_contents_channel_usage.sql", "245_lottery_dynamic_tiers.sql", "245_gemini_cached_contents_mutation_lease.sql", "249_mcp_oauth.sql", "249_multi_use_redeem_codes.sql", "272_api_key_allowed_models.sql"}
 	for _, name := range names {
 		content, err := dbmigrations.FS.ReadFile(name)
 		require.NoError(t, err)
@@ -40,6 +40,11 @@ func TestMigrationsOfficial016KeepCustomLedgerAndSchema(t *testing.T) {
 	requireColumn(t, tx, "redeem_codes", "max_uses", "integer", 0, false)
 	requireColumn(t, tx, "lottery_activities", "name", "character varying", 100, false)
 	requireIndex(t, tx, "mcp_oauth_grants", "idx_mcp_oauth_grants_expiry")
+	requireColumn(t, tx, "api_keys", "allowed_models", "jsonb", 0, false)
+	requireColumnDefaultContains(t, tx, "api_keys", "allowed_models", "'[]'::jsonb")
+	var authCacheTriggerFunction string
+	require.NoError(t, tx.QueryRowContext(ctx, `SELECT pg_get_functiondef('enqueue_api_key_auth_cache_invalidation()'::regprocedure)`).Scan(&authCacheTriggerFunction))
+	require.Contains(t, authCacheTriggerFunction, "allowed_models")
 }
 
 // Upgrade a separate disposable database from the exact 0.2.15-r2 migration set.
@@ -83,6 +88,7 @@ func TestMigrationsUpgradeOfficial016From015PreservesCustomData(t *testing.T) {
 		"269_hosted_openai_accounts.sql":                     true,
 		"270_hosted_account_identity_and_models.sql":         true,
 		"271_channel_monitor_provider_models.sql":            true,
+		"272_api_key_allowed_models.sql":                     true,
 		"249_mcp_oauth.sql":                                  true,
 	}
 	files, err := fs.Glob(dbmigrations.FS, "*.sql")

@@ -118,5 +118,10 @@
     "checksum": "a872dde339b19f311feb5fa6fd85c8ff7b11d69794c35a18e2086d9846b3499c",
     "risk": "backward-compatible",
     "description": "Add a default-off group-level image-count billing flag. Existing billing behavior remains unchanged until an administrator enables the option for an eligible OpenAI or Composite group."
+  },
+  "272_api_key_allowed_models.sql": {
+    "checksum": "e82ea75dd70906f3e217e8759ab82766a9a385fb894ba9831ad682c8261145df",
+    "risk": "backward-compatible",
+    "description": "Add an empty-by-default per-key allowed-models JSON array and extend the existing auth-cache invalidation trigger to cover allowed-model edits and quota fields. Existing keys remain unrestricted until an administrator configures a model policy."
   }
 }
