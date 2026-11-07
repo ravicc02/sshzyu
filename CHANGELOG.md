@@ -1,5 +1,46 @@
 # 更新日志
 
+## 0.2.20-r1 · 2026-11-07
+
+本次整合官方 `v0.2.20`，并汇入尚未发布的 `0.2.19-r8` 工作区内容。
+
+### 管理 MCP 与权限
+
+- 新增基于 OAuth 的管理 MCP 接口、授权确认页和连接管理页；未配置 `MCP_PUBLIC_URL` 时默认关闭。
+- 管理 MCP 的只读工具也会进入安全审计，并记录授权 grant 与工具名称。
+- 管理员密钥补全统计、OpenAI OAuth、邀请等权限项，新增“全权兼容模式”和对应的中英文权限展示。
+- 注册邮箱支持精确黑名单批量匹配，识别 Gmail 点号与 `+` 后缀变体，并可批量禁用命中的已注册用户。
+
+### 稳定性与资源边界
+
+- 网关新增请求体内存预算、请求体读取超时和下游写入超时，避免慢连接与大请求拖垮实例。
+- 请求体读取失败按 408、499、截断和解码错误分类处理，诊断日志不记录请求内容。
+- 客户端断开后的上游 drain、会话缓存和多项后台任务改为有界执行。
+- 新增 `gateway.disable_openai_transport_error_cooldown`，可按部署需要关闭 OpenAI 传输错误冷却。
+- 用户使用记录导出改为每页 1000 条，遇面板限流 `429` 时读取 `Retry-After` 后重试同一页。
+
+### 模型与网关兼容
+
+- OpenAI 生图账号支持按 1K、2K、4K 尺寸档位分流；尺寸溢出选号不再破坏会话粘性绑定。
+- 打通 GPT Image 2.6 原生图片链路，并保留 complexity 与原生编辑选项。
+- Codex 导出默认模型统一为 GPT-6.1 Sol，启用实时联网搜索并保留图片配置。
+- 修复 Anthropic setup-token 周用量、长会话 cyber transcript 误拦截、异步生图 503、Gemini SSE 与 Antigravity 非流式响应缺少读取上限等问题。
+- 修复 OpenAI Responses、WebSocket HTTP 桥接、Grok Voice、Gemini function response 和 Antigravity 流式转换的多项兼容问题。
+
+### SSHZYU 工作区
+
+- 保留 Agent、抽奖、托管账号、批量余额、幂等、账号调度和其他本站定制。
+- 纳入 ZIP-only 的 `sshzyu-image` Skill 安装入口，`docs/install/` 只保留下载包，不再保留 `npx` 或 `.skill` 回退。
+- docs 主页面提示词改为由 Agent 下载 ZIP、解压并安装到全局 Skill 目录，再执行 `--doctor`。
+- 批量 Key 额度继续硬性要求余额限额与 Token 限额二选一。
+- 汇入 AI Shop 海报素材、账号模型探测脚本、r4 热修记录和 Skill 打包与 CI 校验。
+
+### 发布边界
+
+- 官方基线更新为 `v0.2.20`，本地候选版本为 `0.2.20-r1`。
+- 新增迁移 `249_mcp_oauth.sql`，仅创建 MCP OAuth grant、code 与 credential 摘要表。
+- 生产迁移、备份、激活和回滚仍需在用户明确发布后单独执行。
+
 ## 0.2.19-r8 · 2026-11-07
 
 本次发布汇总当前工作区的全部未发布内容，并新增批量 Key 额度类型的硬性二选一。
@@ -14,9 +55,9 @@
 
 ### 接入文档
 
-- docs 主页面改用单条 Agent 安装提示词，用户复制后由 Agent 自动安装、验证并报告结果。
+- docs 主页面改用单条 Agent 安装提示词，由 Agent 下载 ZIP、解压到全局 Skill 目录、验证并报告结果。
 - 安装 Skill 不要求用户提供 API Key，也不触发生图。
-- 保留旧安装入口文档，并更新为同一套安装提示词。
+- `docs/install/` 只保留可直接下载的 ZIP，不再提供 `npx`、`.skill` 或其他回退入口。
 
 ### 批量 Key
 
