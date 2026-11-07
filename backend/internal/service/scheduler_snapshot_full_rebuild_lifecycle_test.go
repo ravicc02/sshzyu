@@ -522,6 +522,8 @@ func TestSchedulerFullRebuildPartialLifecycleFailureReturnsBeforeDBAndRetries(t 
 	}
 	accounts := &fullRebuildAccountRepo{}
 	svc := newFullRebuildLifecycleService(cache, nil, accounts, groups, config.RunModeStandard)
+	now := time.Now()
+	svc.fullRebuildNow = func() time.Time { return now }
 
 	err := svc.triggerFullRebuild("first")
 	require.ErrorIs(t, err, wantErr)
@@ -535,6 +537,7 @@ func TestSchedulerFullRebuildPartialLifecycleFailureReturnsBeforeDBAndRetries(t 
 	delete(groups.freshErr, 2)
 	groups.fresh[2] = &Group{ID: 2, Status: StatusDisabled, Hydrated: true}
 	groups.mu.Unlock()
+	now = now.Add(2 * time.Second)
 	require.NoError(t, svc.triggerFullRebuild("retry"))
 	_, _, freshCalls = groups.stats()
 	require.Equal(t, []int64{1, 2, 2, 3}, freshCalls)
@@ -629,6 +632,8 @@ func TestSchedulerFullRebuildFreshReopenLockBusyRetriesWithoutBlockingOrdinaryTa
 	accounts := &fullRebuildAccountRepo{}
 	outbox := &outboxCleanupRepo{events: []SchedulerOutboxEvent{{ID: 1, EventType: SchedulerOutboxEventFullRebuild}}}
 	svc := newFullRebuildLifecycleService(cache, outbox, accounts, groups, config.RunModeStandard)
+	now := time.Now()
+	svc.fullRebuildNow = func() time.Time { return now }
 
 	svc.pollOutbox()
 	require.Zero(t, cache.currentWatermark())
@@ -636,6 +641,7 @@ func TestSchedulerFullRebuildFreshReopenLockBusyRetriesWithoutBlockingOrdinaryTa
 	require.Equal(t, 1, groupZeroPublished, "ordinary tasks must still run when one strict Reopen task is busy")
 	require.Equal(t, 2*schedulerCanonicalAccountQueryCount(), accounts.callCount())
 
+	now = now.Add(2 * time.Second)
 	svc.pollOutbox()
 	require.Equal(t, int64(1), cache.currentWatermark())
 	require.Equal(t, 4*schedulerCanonicalAccountQueryCount(), accounts.callCount())
