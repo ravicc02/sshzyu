@@ -57,9 +57,9 @@ func TestAPIKeyUpdate_OnlyDeclaresRequestedColumns(t *testing.T) {
 			want: APIKeyUpdateFields{Name: true},
 		},
 		{
-			name: "quota only",
+			name: "balance quota switches quota mode",
 			req:  UpdateAPIKeyRequest{Quota: &quota},
-			want: APIKeyUpdateFields{Quota: true},
+			want: APIKeyUpdateFields{Quota: true, QuotaTokens: true},
 		},
 		{
 			name: "rate limit threshold only",
@@ -76,14 +76,15 @@ func TestAPIKeyUpdate_OnlyDeclaresRequestedColumns(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc, repo := newUpdateFieldsAPIKeyService(&APIKey{
-				ID:        1,
-				UserID:    7,
-				Key:       "sk-test",
-				Name:      "before",
-				Status:    StatusActive,
-				Quota:     100,
-				QuotaUsed: 30,
-				Usage5h:   12,
+				ID:          1,
+				UserID:      7,
+				Key:         "sk-test",
+				Name:        "before",
+				Status:      StatusActive,
+				Quota:       100,
+				QuotaUsed:   30,
+				QuotaTokens: 10,
+				Usage5h:     12,
 			})
 
 			_, err := svc.Update(context.Background(), 1, 7, tt.req)
@@ -117,7 +118,7 @@ func TestAPIKeyUpdate_DeclaresStatusWhenReactivated(t *testing.T) {
 
 	_, err := svc.Update(context.Background(), 1, 7, UpdateAPIKeyRequest{Quota: &quota})
 	require.NoError(t, err)
-	require.Equal(t, []APIKeyUpdateFields{{Quota: true, Status: true}}, repo.updateFields)
+	require.Equal(t, []APIKeyUpdateFields{{Quota: true, QuotaTokens: true, Status: true}}, repo.updateFields)
 }
 
 // 计费热路径把 Key 标记为配额耗尽时只写 status，
