@@ -3,10 +3,10 @@
   "upstream_release": "v0.2.20",
   "upstream_commit": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0",
   "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.20",
-  "local_build_version": "0.2.20-r1",
-  "integration_commit": "0e13c43bd4fc6b2aa9d2b07aab382adc55bd98ca",
-  "integrated_at": "2026-11-07",
+  "local_build_version": "0.2.20-r2",
+  "integration_commit": "dfc1a02542535a0a5df4a8660c03e919c844b334",
+  "integrated_at": "2026-11-08",
   "verified_at": "2026-11-08",
-  "note": "Integrated official v0.2.20 with management MCP OAuth, expanded custom admin Key permissions and statistics, exact registration email blacklist matching, OpenAI image account routing by 1K/2K/4K size tiers, bounded gateway request-body memory and read/write timeouts, transport-error cooldown controls, and Antigravity, Gemini and OpenAI compatibility fixes. This candidate also rolls up the unpublished 0.2.19-r8 workspace delta, including the ZIP-only sshzyu-image Skill installer and the enforced balance-versus-token choice for batch Key quotas. The new 249_mcp_oauth.sql migration is additive; production migration remains manual.",
+  "note": "Integrates the remaining unpublished editable batch-Key and per-key allowed-model work, strict balance-versus-token quota selection, the bounded scheduler usage cache, cached timezone parsing, scheduler backoff, bounded daily usage rollups, moderation runtime cache invalidation, completed-window aggregation skips, bounded system-log payloads, local CPU reproduction tools, and the Windows entrypoint/migration compatibility fix. The official baseline remains v0.2.20. The new 272_api_key_allowed_models.sql migration is backward-compatible and additive; production migration and activation remain manual.",
   "integration_status": "committed"
 }
