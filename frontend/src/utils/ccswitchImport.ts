@@ -21,9 +21,35 @@ export interface CcSwitchImportDeeplinkInput {
   usageScript: string
 }
 
+/**
+ * Balance query CC Switch runs against the imported provider. CC Switch fills
+ * `{{baseUrl}}` with the provider's stored base URL, so normalize it to one
+ * `/v1/usage` path instead of risking `/v1/v1/usage`.
+ */
+export const CC_SWITCH_USAGE_SCRIPT = `({
+    request: {
+      url: "{{baseUrl}}".replace(/\\/+$/, "").replace(/\\/v1$/, "") + "/v1/usage",
+      method: "GET",
+      headers: { "Authorization": "Bearer {{apiKey}}" }
+    },
+    extractor: function(response) {
+      const remaining = response?.remaining ?? response?.quota?.remaining ?? response?.balance;
+      const unit = response?.unit ?? response?.quota?.unit ?? "USD";
+      return {
+        isValid: response?.is_active ?? response?.isValid ?? true,
+        remaining,
+        unit
+      };
+    }
+  })`
+
 function withV1Endpoint(baseUrl: string): string {
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '')
   return normalizedBaseUrl.endsWith('/v1') ? normalizedBaseUrl : `${normalizedBaseUrl}/v1`
+}
+
+function withoutTrailingSlashes(baseUrl: string): string {
+  return baseUrl.replace(/\/+$/, '')
 }
 
 export function resolveCcSwitchImportConfig(
@@ -41,7 +67,8 @@ export function resolveCcSwitchImportConfig(
     case 'openai':
       return {
         app: 'codex',
-        endpoint: baseUrl,
+        // CC Switch's Codex provider appends the OpenAI-compatible path itself.
+        endpoint: withoutTrailingSlashes(baseUrl),
         model: OPENAI_CC_SWITCH_CODEX_MODEL
       }
     case 'gemini':

@@ -777,12 +777,14 @@ const currentFiles = computed((): FileConfig[] => {
       return [generateSystemOneCurl(baseRoot, apiKey)]
     case 'openai':
       if (activeClientTab.value === 'claude') {
-        return generateAnthropicFiles(baseUrl, apiKey)
+        // Anthropic clients append /v1/messages themselves.
+        return generateAnthropicFiles(baseRoot, apiKey)
       }
       if (activeClientTab.value === 'codex-ws') {
-        return generateOpenAIWsFiles(baseUrl, apiKey)
+        return generateOpenAIWsFiles(apiBase, apiKey)
       }
-      return generateOpenAIFiles(baseUrl, apiKey)
+      // Codex appends /responses directly and does not add /v1.
+      return generateOpenAIFiles(apiBase, apiKey)
     case 'gemini':
       if (activeClientTab.value === 'codex') {
         return generateRoutedCodexFiles(apiBase, apiKey, 'gemini')
@@ -807,6 +809,11 @@ const currentFiles = computed((): FileConfig[] => {
     case 'deepseek':
       if (activeClientTab.value === 'codex') {
         return generateRoutedCodexFiles(apiBase, apiKey, 'deepseek')
+      }
+      return generateAnthropicFiles(baseRoot, apiKey)
+    case 'minimax':
+      if (activeClientTab.value === 'codex') {
+        return generateRoutedCodexFiles(apiBase, apiKey, 'minimax')
       }
       return generateAnthropicFiles(baseRoot, apiKey)
     case 'composite':

@@ -6,7 +6,7 @@
   "local_build_version": "0.2.20-r1",
   "integration_commit": "0e13c43bd4fc6b2aa9d2b07aab382adc55bd98ca",
   "integrated_at": "2026-11-07",
-  "verified_at": "2026-11-07",
+  "verified_at": "2026-11-08",
   "note": "Integrated official v0.2.20 with management MCP OAuth, expanded custom admin Key permissions and statistics, exact registration email blacklist matching, OpenAI image account routing by 1K/2K/4K size tiers, bounded gateway request-body memory and read/write timeouts, transport-error cooldown controls, and Antigravity, Gemini and OpenAI compatibility fixes. This candidate also rolls up the unpublished 0.2.19-r8 workspace delta, including the ZIP-only sshzyu-image Skill installer and the enforced balance-versus-token choice for batch Key quotas. The new 249_mcp_oauth.sql migration is additive; production migration remains manual.",
   "integration_status": "committed"
 }

@@ -444,7 +444,7 @@ describe('UseKeyModal', () => {
     expect(configToml).toContain('model_catalog_url = "https://example.com/v1/models"')
     expect(configToml).not.toContain('model_catalog_json')
     expect(configToml).not.toContain('env_key')
-    expect(configToml).not.toContain('image_generation')
+    expect(configToml).toContain('image_generation = true')
     expect(codeBlocks).not.toContain('{\n  "OPENAI_API_KEY": "sk-test"\n}')
     expect(wrapper.text()).not.toContain('auth.json')
 

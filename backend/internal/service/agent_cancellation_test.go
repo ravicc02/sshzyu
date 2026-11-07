@@ -20,7 +20,9 @@ func TestAgentGatewayPreservesCancellationAndDeadline(t *testing.T) {
 		{"generic-json", func(ctx context.Context) (context.Context, context.CancelFunc) {
 			return detachStreamUpstreamContext(ctx, false)
 		}},
-		{"openai", detachUpstreamContext},
+		{"openai", func(ctx context.Context) (context.Context, context.CancelFunc) {
+			return detachUpstreamContext(ctx)
+		}},
 	} {
 		t.Run(adapter.name, func(t *testing.T) {
 			parent, cancel := context.WithTimeout(context.Background(), time.Second)

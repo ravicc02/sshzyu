@@ -30,7 +30,7 @@
     "description": "Add bounded redeem-code usage counters and immutable per-user entitlement snapshots with account/email uniqueness. Existing codes remain single-use. Coordinated rollout required: older applications do not enforce multi-use claim deduplication, so rolling back after shared codes are issued is unsafe. No schema or data deletion."
   },
   "249_mcp_oauth.sql": {
-    "checksum": "881ff2e8ecf430202c593c699b1441db1d2196ac2c312d8a3849acb6c97609e5",
+    "checksum": "751a1dcee6108afcecbd580b6e3140cca3480853fecd2174861b02f3a71e54a1",
     "risk": "backward-compatible",
     "description": "Create additive MCP OAuth grant, authorization-code digest and credential digest tables with foreign keys and indexes. No existing tables or rows are changed or deleted. MCP remains disabled without explicit deployment configuration, and production migration stays manual."
   },
