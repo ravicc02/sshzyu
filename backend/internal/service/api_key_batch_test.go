@@ -19,3 +19,10 @@ func TestTruncateBatchNameReservesSuffix(t *testing.T) {
 	require.Len(t, []rune(name), 96)
 	require.Equal(t, 100, len([]rune(batchAPIKeyName(name, 50, 50))))
 }
+
+func TestValidateBatchQuotaSelection(t *testing.T) {
+	require.NoError(t, validateBatchQuotaSelection(1, 0))
+	require.NoError(t, validateBatchQuotaSelection(0, 1_000_000))
+	require.Error(t, validateBatchQuotaSelection(0, 0))
+	require.Error(t, validateBatchQuotaSelection(1, 1_000_000))
+}

@@ -263,16 +263,32 @@ curl https://sshzyu.com/v1/chat/completions \
 
 如果已经在 CC Switch 中添加 SSHZYU，也可以在 NewMax 的“添加模型”页面选择“从 CC Switch 导入”，让 NewMax 自动带入 Base URL、API Key 和模型列表。
 
-### 让 Codex 接入生图能力
+### 安装 SSHZYU 生图 Skill
 
-把下面这段提示词发给 Codex 或其他 Agent，它会按照 [生图接入规范](https://sshzyu.com/docs/install/iamge_gen.md) 编写生图脚本，并封装为可复用的 Skill：
+把下面这段提示词完整发给 Agent。Agent 会安装预构建 Skill、执行安装检查并报告结果；你不需要手工下载、编写脚本或提供 API Key。
 
 ```text
-key: [填入你申请的 API 密钥]
-请根据 https://sshzyu.com/docs/install/iamge_gen.md 内的规范做好生图 skills
+请安装 SSHZYU 生图 Skill。
+
+下载：
+https://sshzyu.com/docs/install/sshzyu-image.zip
+
+安装后：
+1. 解压后应得到 sshzyu-image/ 目录。
+2. 将整个 sshzyu-image/ 目录安装到当前 Agent 的全局 Skill 目录。Codex 默认使用 ~/.codex/skills/sshzyu-image。
+3. 使用 Python 3 运行安装目录下的 scripts/sshzyu_image.py --doctor。
+4. 确认 SKILL.md、scripts/sshzyu_image.py 和 references/ 均已安装。
+5. 报告安装目录和 --doctor 结果。
+
+约束：
+- 不要生成图片。
+- 不要读取、输出或保存真实 API Key。
+- 不要修改 Skill 文件。
+- 不要使用 npx，也不要访问 GitHub。
+- 安装失败时停止并报告完整错误，不要自行改写脚本。
 ```
 
-> 使用前请先确认密钥所属分组已经开通图片生成权限，并把提示词中的 `key` 替换为你的密钥。
+> 安装 Skill 不需要 API Key。需要生图时，再按 Skill 的提示在本地录入密钥。
 
 ## 九、查看 Token 和扣费
 

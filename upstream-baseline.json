@@ -3,10 +3,10 @@
   "upstream_release": "v0.2.19",
   "upstream_commit": "dece26153621959ccd7635814f4b2d08304e681a",
   "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.19",
-  "local_build_version": "0.2.19-r7",
+  "local_build_version": "0.2.19-r8",
   "integration_commit": "9b2da920e2201901d0c19472b66a76121e60db26",
   "integrated_at": "2026-10-31",
-  "verified_at": "2026-11-04",
-  "note": "Integrated official v0.2.19 with scoped admin API keys, image-count billing, Grok model catalog diagnostics and the custom unified security audit preserved. r6 added hosted OpenAI accounts, token quotas and composite provider monitoring. r7 separates hosted account and group inventories, adds a default-off hosted access switch and owner-scoped scheduling controls, reuses OAuth callback handling and quota-window UI, fixes hosted badge overflow, supports token-only batch key quotas in M/B units, separates channel and model multipliers while preserving model overrides, synchronizes channel rates to model plaza and monitoring, and buckets degradation rounds by their configured interval. No new database migrations beyond r6; migrations 268-271 remain unchanged.",
+  "verified_at": "2026-11-07",
+  "note": "Integrated official v0.2.19 with scoped admin API keys, image-count billing, Grok model catalog diagnostics and the custom unified security audit preserved. r6 added hosted OpenAI accounts, token quotas and composite provider monitoring. r7 separates hosted account and group inventories, adds a default-off hosted access switch and owner-scoped scheduling controls, reuses OAuth callback handling and quota-window UI, fixes hosted badge overflow, supports token-only batch key quotas in M/B units, separates channel and model multipliers while preserving model overrides, synchronizes channel rates to model plaza and monitoring, and buckets degradation rounds by their configured interval. r8 publishes the complete local workspace delta: the sshzyu-image Agent Skill and package, one-prompt documentation, AI Shop poster source assets, account-model probe tooling, the r4 incident record, Skill CI and installer checks. r8 also makes batch Key quota creation an enforced choice between balance quota and token quota. No new database migrations beyond r6; migrations 268-271 remain unchanged.",
   "integration_status": "committed"
 }

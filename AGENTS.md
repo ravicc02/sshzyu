@@ -39,6 +39,7 @@
 | `docs/`                   | **线上文档站**（前端 nginx 挂到 `/docs/`）                                     | 对外公开                     |
 | `image-playground/`       | 生图工作台源码（React + TS + Vite，`npm run build` 产出 `dist`）                | 生图工作台源码（唯一源）              |
 | `playground/`             | 生图工作台构建产物（由 `image-playground/` 生成，nginx 挂到 `/image/`）            | 生图工作台产物，nginx 直读         |
+| `skills/sshzyu-image/`    | 对外发布的 SSHZYU 生图 Skill 源码（不含真实 `.env`）                             | `npx skills` 安装源               |
 | `scripts/`                | `rebuild.sh` + 构建/校验脚本                                              | 本地重建                     |
 | `scripts/release/`        | 发布准入、migration 审阅记录                                                 | GitHub 发布辅助              |
 | `backend/pkg/release/`    | 共享发布契约、版本比较和验签                                                      | 后端/执行器共用                 |
@@ -159,6 +160,7 @@ rsync -a --partial --info=progress2 ui/current/ "us-server:/opt/sshzyu-ui/releas
 ```bash
 # docs/ 直接是构建产物且无构建链，改完上传即可
 rsync -a --partial --info=progress2 docs/index.html docs/content.md us-server:/opt/sshzyu-docs/
+rsync -a --partial --info=progress2 docs/install/ us-server:/opt/sshzyu-docs/install/
 rsync -a --partial --info=progress2 docs/iamge/ us-server:/opt/sshzyu-docs/iamge/
 ```
 
@@ -222,7 +224,7 @@ ssh us-server 'docker exec sub2api /app/main --version && curl -s http://127.0.0
 **B. 协作者（`Eternite-0`）—— 必须提 PR，由维护者审核合并**
 
 1. 建分支（`feat/` `fix/` `docs/` `chore/` `build/`）→ push → 开 PR。
-2. `verify.yml` 三个 job（`backend` / `frontend` / `image-playground`）全绿才可合并。
+2. `verify.yml` 四个 job（`backend` / `frontend` / `image-playground` / `skills`）全绿才可合并；`skills` 首次成功运行后再加入服务端必需检查。
 3. **审核是「约定」，不是「硬拦截」**：当前 `required_approving_review_count=0`，协作者技术上能自己点 Merge。**团队约定：协作者的 PR 由维护者审核后合并，协作者不要自行 Merge。** 若日后要改成硬拦截，把该值改为 `1` 即可——维护者不走 PR，不受影响。
 4. **协作者的 PR 不得修改 `backend/cmd/server/VERSION`**（见下「发布」）。
 
@@ -236,7 +238,7 @@ ssh us-server 'docker exec sub2api /app/main --version && curl -s http://127.0.0
 
 **分支保护配置须知（改配置前必读）**
 
-- 必需检查的 context 必须写 `verify.yml` 的 **job 名**（`backend` / `frontend` / `image-playground`），**不要**写成 `verify / backend` 这种「workflow 名 / job 名」形式——写错会让 required check 永远停在 expected 未满足状态，导致所有 PR 永久 `BLOCKED`（症状：CI 全绿却始终无法合并）。
+- 必需检查的 context 必须写 `verify.yml` 的 **job 名**（`backend` / `frontend` / `image-playground` / `skills`），**不要**写成 `verify / backend` 这种「workflow 名 / job 名」形式——写错会让 required check 永远停在 expected 未满足状态，导致所有 PR 永久 `BLOCKED`（症状：CI 全绿却始终无法合并）。
 - **新增 job 必须先成功运行过一次**，才能加入 required checks，否则同样会卡死所有 PR。
 - `strict=false`：不要求 PR 基于最新 `main`，`main` 前进后无需再 rebase。
 - 禁止 force-push `main`、禁止删除 `main`。

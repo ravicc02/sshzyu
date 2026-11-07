@@ -305,8 +305,8 @@ func (h *APIKeyHandler) CreateBatch(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if !validAPIKeyLimit(req.Quota) || (req.Quota <= 0 && req.QuotaTokens <= 0) {
-		response.BadRequest(c, "Invalid request: quota or token quota must be greater than zero")
+	if !validAPIKeyLimit(req.Quota) || (req.Quota > 0) == (req.QuotaTokens > 0) {
+		response.BadRequest(c, "Invalid request: select exactly one of balance quota or token quota")
 		return
 	}
 	executeUserIdempotentJSON(c, "user.api_key_batches.create", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {

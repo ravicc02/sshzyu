@@ -159,15 +159,43 @@ describe('BatchKeysView', () => {
     const create = wrapper.findAll('button').find(button => button.text().includes('batchKeys.createBatch'))
     expect(create).toBeTruthy()
     await create!.trigger('click')
+    await wrapper.get('[role="radio"][data-quota-mode="token"]').trigger('click')
     const numbers = wrapper.findAll('#batch-key-create-form input[type="number"]')
     await numbers[0].setValue('2')
-    await numbers[1].setValue('0')
-    await numbers[2].setValue('1.5')
-    await wrapper.get('#batch-key-create-form select').setValue(unit)
-    await wrapper.findAll('#batch-key-create-form select')[1].setValue('9')
+    await numbers[1].setValue('1.5')
+    await wrapper.get('[data-quota-unit]').setValue(unit)
+    await wrapper.get('[data-group-select]').setValue('9')
     await wrapper.get('#batch-key-create-form').trigger('submit')
     await flushPromises()
     expect(createBatch).toHaveBeenCalledWith(expect.objectContaining({ count: 2, quota: 0, quota_tokens: expected, group_id: 9 }))
+    wrapper.unmount()
+  })
+
+  it('defaults to balance quota and omits token quota from the payload', async () => {
+    getAvailableGroups.mockResolvedValue([{ id: 9, name: 'OpenAI group', platform: 'openai' }])
+    createBatch.mockResolvedValue({ batch_id: 'new-batch', keys: [] })
+    const wrapper = mount(BatchKeysView, { global: { stubs } })
+    await flushPromises()
+    const create = wrapper.findAll('button').find(button => button.text().includes('batchKeys.createBatch'))
+    await create!.trigger('click')
+
+    expect(wrapper.get('[role="radio"][data-quota-mode="balance"]').attributes('aria-checked')).toBe('true')
+    expect(wrapper.find('[data-quota-mode="balance"] input').exists()).toBe(true)
+    expect(wrapper.find('[data-quota-mode="token"] input').exists()).toBe(false)
+
+    const numbers = wrapper.findAll('#batch-key-create-form input[type="number"]')
+    await numbers[0].setValue('2')
+    await numbers[1].setValue('1.5')
+    await wrapper.get('[data-group-select]').setValue('9')
+    await wrapper.get('#batch-key-create-form').trigger('submit')
+    await flushPromises()
+
+    expect(createBatch).toHaveBeenCalledWith(expect.objectContaining({
+      count: 2,
+      quota: 1.5,
+      quota_tokens: 0,
+      group_id: 9,
+    }))
     wrapper.unmount()
   })
 

@@ -194,41 +194,74 @@
           <label class="input-label">{{ t('batchKeys.batchName') }}</label>
           <input v-model="createForm.name" class="input" maxlength="100" :placeholder="t('batchKeys.batchNamePlaceholder')" />
         </div>
+        <div>
+          <label class="input-label">{{ t('batchKeys.quotaMode') }} <span class="text-red-500">*</span></label>
+          <div
+            role="radiogroup"
+            :aria-label="t('batchKeys.quotaMode')"
+            class="grid grid-cols-2 gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-dark-600 dark:bg-dark-900/60"
+          >
+            <button
+              type="button"
+              role="radio"
+              data-quota-mode="balance"
+              :aria-checked="createForm.quota_mode === 'balance'"
+              class="rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+              :class="createForm.quota_mode === 'balance' ? 'bg-white text-primary-600 shadow-sm dark:bg-dark-700 dark:text-primary-300' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
+              @click="selectQuotaMode('balance')"
+            >
+              {{ t('batchKeys.quotaModeBalance') }}
+            </button>
+            <button
+              type="button"
+              role="radio"
+              data-quota-mode="token"
+              :aria-checked="createForm.quota_mode === 'token'"
+              class="rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+              :class="createForm.quota_mode === 'token' ? 'bg-white text-primary-600 shadow-sm dark:bg-dark-700 dark:text-primary-300' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
+              @click="selectQuotaMode('token')"
+            >
+              {{ t('batchKeys.quotaModeToken') }}
+            </button>
+          </div>
+          <p class="input-hint">{{ t('batchKeys.quotaModeHint') }}</p>
+        </div>
         <div class="grid gap-4 sm:grid-cols-2">
           <div>
             <label class="input-label">{{ t('batchKeys.count') }} <span class="text-red-500">*</span></label>
             <input v-model.number="createForm.count" type="number" min="1" max="50" required class="input" />
             <p class="input-hint">{{ t('batchKeys.countHint') }}</p>
           </div>
-          <div>
+          <div v-if="createForm.quota_mode === 'balance'" data-quota-mode="balance">
             <label class="input-label">{{ t('batchKeys.balanceQuota') }}</label>
             <div class="relative">
               <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
               <input v-model.number="createForm.quota" type="number" min="0" step="0.01" class="input pl-7" />
             </div>
+            <p class="input-hint">{{ t('batchKeys.balanceQuotaHint') }}</p>
           </div>
         </div>
-        <div>
+        <div v-if="createForm.quota_mode === 'token'" data-quota-mode="token">
           <label class="input-label">{{ t('batchKeys.tokenQuotaPerKey') }}</label>
           <div class="flex gap-2">
             <input v-model.number="createForm.quota_token_amount" type="number" min="0" step="0.01" class="input" placeholder="0" />
-            <select v-model="createForm.quota_token_unit" class="input w-24">
+            <select v-model="createForm.quota_token_unit" data-quota-unit class="input w-24">
               <option value="M">M</option>
               <option value="B">B</option>
             </select>
           </div>
-          <p class="input-hint">{{ t('batchKeys.quotaHint') }}</p>
+          <p class="input-hint">{{ t('batchKeys.tokenQuotaHint') }}</p>
         </div>
         <div>
           <label class="input-label">{{ t('keys.groupLabel') }} <span class="text-red-500">*</span></label>
-          <Select v-model="createForm.group_id" :options="groupOptions" :placeholder="t('keys.selectGroup')" searchable />
+          <Select v-model="createForm.group_id" data-group-select :options="groupOptions" :placeholder="t('keys.selectGroup')" searchable />
         </div>
         <div class="rounded-xl border border-primary-100 bg-primary-50/70 p-4 dark:border-primary-500/20 dark:bg-primary-500/10">
-          <div class="flex items-center justify-between gap-3 text-sm">
+          <div v-if="createForm.quota_mode === 'balance'" class="flex items-center justify-between gap-3 text-sm">
             <span class="text-gray-600 dark:text-gray-300">{{ t('batchKeys.estimatedTotal') }}</span>
             <strong class="tabular-nums text-primary-700 dark:text-primary-300">{{ formatMoney(estimatedTotal) }}</strong>
           </div>
-          <div v-if="estimatedTokenTotal > 0" class="mt-2 flex items-center justify-between gap-3 border-t border-primary-100 pt-2 text-sm dark:border-primary-500/20">
+          <div v-else class="flex items-center justify-between gap-3 text-sm">
             <span class="text-gray-600 dark:text-gray-300">{{ t('batchKeys.estimatedTokenTotal') }}</span>
             <strong class="tabular-nums text-primary-700 dark:text-primary-300">{{ formatTokenQuota(estimatedTokenTotal) }}</strong>
           </div>
@@ -295,6 +328,7 @@ let keysController: AbortController | null = null
 const createForm = reactive({
   name: '',
   count: 10,
+  quota_mode: 'balance' as 'balance' | 'token',
   quota: 1,
   quota_token_amount: 0,
   quota_token_unit: 'M' as TokenQuotaUnit,
@@ -303,9 +337,13 @@ const createForm = reactive({
 
 const selectedBatch = computed(() => batches.value.find(batch => batch.batch_id === selectedBatchId.value) || null)
 const groupOptions = computed(() => groups.value.map(group => ({ value: group.id, label: group.name })))
-const estimatedTotal = computed(() => Math.max(0, Number(createForm.count) || 0) * Math.max(0, Number(createForm.quota) || 0))
+const estimatedTotal = computed(() => createForm.quota_mode === 'balance'
+  ? Math.max(0, Number(createForm.count) || 0) * Math.max(0, Number(createForm.quota) || 0)
+  : 0)
 const quotaTokens = computed(() => tokenAmountToBase(createForm.quota_token_amount, createForm.quota_token_unit))
-const estimatedTokenTotal = computed(() => Math.max(0, Number(createForm.count) || 0) * quotaTokens.value)
+const estimatedTokenTotal = computed(() => createForm.quota_mode === 'token'
+  ? Math.max(0, Number(createForm.count) || 0) * quotaTokens.value
+  : 0)
 const allSelected = computed(() => batchKeys.value.length > 0 && batchKeys.value.every(key => selectedIds.value.has(key.id)))
 
 function setSelectedIds(ids: number[]) {
@@ -372,6 +410,7 @@ function selectBatch(batchId: string) {
 function openCreate() {
   createForm.name = ''
   createForm.count = 10
+  createForm.quota_mode = 'balance'
   createForm.quota = 1
   createForm.quota_token_amount = 0
   createForm.quota_token_unit = 'M'
@@ -379,16 +418,24 @@ function openCreate() {
   showCreateDialog.value = true
 }
 
+function selectQuotaMode(mode: 'balance' | 'token') {
+  createForm.quota_mode = mode
+  if (mode === 'balance') {
+    createForm.quota_token_amount = 0
+  } else {
+    createForm.quota = 0
+  }
+}
+
 async function submitCreate() {
   if (!createForm.group_id) {
     appStore.showError(t('keys.groupRequired'))
     return
   }
-  if (
-    createForm.count < 1 ||
-    createForm.count > 50 ||
-    (Number(createForm.quota) <= 0 && quotaTokens.value <= 0)
-  ) {
+  const selectedQuota = createForm.quota_mode === 'balance'
+    ? Number(createForm.quota) || 0
+    : quotaTokens.value
+  if (createForm.count < 1 || createForm.count > 50 || selectedQuota <= 0) {
     appStore.showError(t('batchKeys.invalidCreate'))
     return
   }
@@ -398,8 +445,8 @@ async function submitCreate() {
       name: createForm.name.trim() || undefined,
       group_id: createForm.group_id,
       count: Number(createForm.count),
-      quota: Math.max(0, Number(createForm.quota) || 0),
-      quota_tokens: quotaTokens.value,
+      quota: createForm.quota_mode === 'balance' ? Math.max(0, Number(createForm.quota) || 0) : 0,
+      quota_tokens: createForm.quota_mode === 'token' ? quotaTokens.value : 0,
     }
     const response = await batchKeysAPI.createBatch(payload)
     const createdBatchID = response.items[0]?.batch_id || ''

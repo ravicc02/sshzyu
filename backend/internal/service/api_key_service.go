@@ -670,8 +670,23 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	return apiKey, nil
 }
 
+func validateBatchQuotaSelection(quota float64, quotaTokens int64) error {
+	if quotaTokens < 0 {
+		return infraerrors.BadRequest("BATCH_TOKEN_QUOTA_INVALID", "batch key token quota must be non-negative")
+	}
+	hasBalanceQuota := quota > 0
+	hasTokenQuota := quotaTokens > 0
+	if !hasBalanceQuota && !hasTokenQuota {
+		return infraerrors.BadRequest("BATCH_QUOTA_REQUIRED", "select either balance quota or token quota")
+	}
+	if hasBalanceQuota && hasTokenQuota {
+		return infraerrors.BadRequest("BATCH_QUOTA_MODE_CONFLICT", "balance quota and token quota are mutually exclusive")
+	}
+	return nil
+}
+
 // CreateBatch creates a set of independently manageable keys that share a
-// batch identifier, group, and per-key quota.
+// batch identifier, group, and one selected per-key quota type.
 func (s *APIKeyService) CreateBatch(ctx context.Context, userID int64, req CreateAPIKeyBatchRequest) ([]APIKey, error) {
 	if req.GroupID <= 0 {
 		return nil, infraerrors.BadRequest("BATCH_GROUP_REQUIRED", "group is required")
@@ -682,11 +697,8 @@ func (s *APIKeyService) CreateBatch(ctx context.Context, userID int64, req Creat
 	if err := validateAPIKeyLimit(req.Quota); err != nil {
 		return nil, err
 	}
-	if req.QuotaTokens < 0 {
-		return nil, infraerrors.BadRequest("BATCH_TOKEN_QUOTA_INVALID", "batch key token quota must be non-negative")
-	}
-	if req.Quota <= 0 && req.QuotaTokens <= 0 {
-		return nil, infraerrors.BadRequest("BATCH_QUOTA_REQUIRED", "batch key quota or token quota must be greater than zero")
+	if err := validateBatchQuotaSelection(req.Quota, req.QuotaTokens); err != nil {
+		return nil, err
 	}
 	if s.cfg != nil && s.cfg.APIKeyCreate.MaxActivePerUser > 0 {
 		count, err := s.apiKeyRepo.CountByUserID(ctx, userID)

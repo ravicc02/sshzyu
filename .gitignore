@@ -66,6 +66,13 @@ CLAUDE.md
 scripts
 !backend/scripts/
 !backend/scripts/resolve-version.sh
+!scripts/
+!scripts/package-sshzyu-image-skill.py
+!scripts/probe-account-models.py
+!scripts/tests/
+!scripts/tests/**
+scripts/tests/__pycache__/
+scripts/tests/**/*.pyc
 .code-review-state
 #openspec/
 code-reviews/
@@ -76,6 +83,9 @@ deploy/docker-compose.override.yml
 vite.config.js
 docs/*
 !docs/admin-api-keys.md
+!docs/install/
+!docs/install/**
+!docs/2026-11-02-0.2.19-r4热修记录.md
 !docs/PAYMENT.md
 !docs/PAYMENT_CN.md
 !docs/ADMIN_PAYMENT_INTEGRATION_API.md

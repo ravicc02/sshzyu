@@ -1,0 +1,21 @@
+{
+  "endpoint": "https://sshzyu.com/v1/images/generations",
+  "model": "gpt-image-2.5-sunburst",
+  "size": "1536x2048",
+  "billing_tier": "2K",
+  "quality": "xhigh",
+  "n": 1,
+  "output_format": "png",
+  "created": 1793599959,
+  "usage": null,
+  "images": [
+    {
+      "path": "F:\\中转站运营\\sshzy\\assets\\sshzyu-images\\posters\\20261102T061257607450Z-eb7f5d95-01.png",
+      "format": "png",
+      "width": 1086,
+      "height": 1448,
+      "bytes": 1733206,
+      "sha256": "f88820868b91951caba88712114e907a87ac19a17bc6199617047c37f3d239dd"
+    }
+  ]
+}
