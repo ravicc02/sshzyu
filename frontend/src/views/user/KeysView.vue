@@ -205,6 +205,25 @@
                   ${{ (usageStats[row.id]?.total_actual_cost ?? 0).toFixed(4) }}
                 </span>
               </div>
+              <div
+                v-if="getRequestQuotaEntries(row.group_id).length"
+                class="mt-2 space-y-1 border-t border-gray-100 pt-1.5 dark:border-dark-700"
+              >
+                <div class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-dark-500">
+                  {{ t('keys.groupRequestQuota') }}
+                </div>
+                <div class="flex flex-wrap gap-1">
+                  <span
+                    v-for="entry in getRequestQuotaEntries(row.group_id)"
+                    :key="entry.window"
+                    class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums"
+                    :class="requestQuotaUsageClass(entry)"
+                  >
+                    <span>{{ entry.label }}</span>
+                    <span>{{ entry.used.toLocaleString() }}/{{ entry.limit.toLocaleString() }}</span>
+                  </span>
+                </div>
+              </div>
               <!-- Quota progress (if quota is set) -->
               <div v-if="row.quota > 0" class="mt-1.5">
                 <div class="flex items-center gap-1.5">
@@ -566,7 +585,7 @@
             data-tour="key-form-group"
           >
             <template #selected="{ option }">
-              <div v-if="option" class="flex min-w-0 items-center">
+              <div v-if="option" class="flex min-w-0 flex-wrap items-center gap-1">
                 <GroupBadge
                   :name="(option as unknown as GroupOption).label"
                   :platform="(option as unknown as GroupOption).platform"
@@ -582,6 +601,12 @@
                   v-if="(option as unknown as GroupOption).providerRates.length"
                   :rates="(option as unknown as GroupOption).providerRates"
                 />
+                <span
+                  v-if="(option as unknown as GroupOption).requestQuotaLabel"
+                  class="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:bg-violet-900/25 dark:text-violet-300"
+                >
+                  {{ (option as unknown as GroupOption).requestQuotaLabel }}
+                </span>
               </div>
               <span v-else class="text-gray-400">{{ t('keys.selectGroup') }}</span>
             </template>
@@ -598,6 +623,7 @@
                 :peak-rate-multiplier="(option as unknown as GroupOption).peakRateMultiplier"
                 :provider-rates="(option as unknown as GroupOption).providerRates"
                 :description="(option as unknown as GroupOption).description"
+                :quota-label="(option as unknown as GroupOption).requestQuotaLabel"
                 :selected="selected"
               />
             </template>
@@ -1218,6 +1244,7 @@
               :peak-rate-multiplier="option.peakRateMultiplier"
               :provider-rates="option.providerRates"
               :description="option.description"
+              :quota-label="option.requestQuotaLabel"
               :selected="
                 selectedKeyForGroup?.group_id === option.value ||
                 (!selectedKeyForGroup?.group_id && option.value === null)
@@ -1240,6 +1267,7 @@
 	import { useI18n } from 'vue-i18n'
 	import { useAppStore } from '@/stores/app'
 	import { useOnboardingStore } from '@/stores/onboarding'
+import { useSubscriptionStore } from '@/stores/subscriptions'
 	import { useClipboard } from '@/composables/useClipboard'
 import QuotaUnitSelector from '@/components/common/QuotaUnitSelector.vue'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
@@ -1270,6 +1298,7 @@ import { maskApiKey } from '@/utils/maskApiKey'
 import { imageStudioKeyRoute } from '@/utils/imageStudioKeyHandoff'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { platformBadgeLightClass } from '@/utils/platformColors'
+import { formatGroupRequestQuotaLabel } from '@/utils/subscriptionQuota'
 import { KEY_GROUP_PROVIDERS, KEY_GROUP_PROVIDER_ICONS, getKeyGroupProviderForGroup, type KeyGroupProvider } from '@/utils/keyGroupProviders'
 import {
   CC_SWITCH_USAGE_SCRIPT,
@@ -1306,10 +1335,12 @@ interface GroupOption {
   subscriptionType: SubscriptionType
   platform: GroupPlatform
   providerRates: Array<{ platform: GroupPlatform; rate_multiplier: number }>
+  requestQuotaLabel: string
 }
 
 const appStore = useAppStore()
 const onboardingStore = useOnboardingStore()
+const subscriptionStore = useSubscriptionStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
 
 function goBatchKeys() {
@@ -1571,9 +1602,65 @@ const groupOptions = computed(() =>
     peakRateMultiplier: group.peak_rate_multiplier,
     subscriptionType: group.subscription_type,
     platform: group.platform,
-    providerRates: group.provider_rates ?? []
+    providerRates: group.provider_rates ?? [],
+    requestQuotaLabel: formatGroupRequestQuotaLabel(group, t)
   }))
 )
+
+interface RequestQuotaUsageEntry {
+  window: 'daily' | 'weekly' | 'monthly'
+  label: string
+  used: number
+  limit: number
+}
+
+const requestQuotaEntriesByGroupId = computed(() => {
+  const result = new Map<number, RequestQuotaUsageEntry[]>()
+  for (const subscription of subscriptionStore.activeSubscriptions) {
+    const group = subscription.group
+    if (!group || group.subscription_type !== 'subscription') continue
+
+    const entries: RequestQuotaUsageEntry[] = []
+    if ((group.daily_request_limit ?? 0) > 0) {
+      entries.push({
+        window: 'daily',
+        label: t('keys.requestQuotaDay'),
+        used: subscription.daily_usage_requests ?? 0,
+        limit: group.daily_request_limit ?? 0
+      })
+    }
+    if ((group.weekly_request_limit ?? 0) > 0) {
+      entries.push({
+        window: 'weekly',
+        label: t('keys.requestQuotaWeek'),
+        used: subscription.weekly_usage_requests ?? 0,
+        limit: group.weekly_request_limit ?? 0
+      })
+    }
+    if ((group.monthly_request_limit ?? 0) > 0) {
+      entries.push({
+        window: 'monthly',
+        label: t('keys.requestQuotaMonth'),
+        used: subscription.monthly_usage_requests ?? 0,
+        limit: group.monthly_request_limit ?? 0
+      })
+    }
+    if (entries.length > 0) {
+      result.set(subscription.group_id, entries)
+    }
+  }
+  return result
+})
+
+const getRequestQuotaEntries = (groupId?: number | null) =>
+  groupId ? requestQuotaEntriesByGroupId.value.get(groupId) ?? [] : []
+
+const requestQuotaUsageClass = (entry: RequestQuotaUsageEntry) => {
+  const ratio = entry.limit > 0 ? entry.used / entry.limit : 0
+  if (ratio >= 1) return 'bg-red-50 text-red-700 dark:bg-red-900/25 dark:text-red-300'
+  if (ratio >= 0.8) return 'bg-amber-50 text-amber-700 dark:bg-amber-900/25 dark:text-amber-300'
+  return 'bg-violet-50 text-violet-700 dark:bg-violet-900/25 dark:text-violet-300'
+}
 
 const createProvider = ref<KeyGroupProvider>('anthropic')
 const createProviderOptions = computed(() => KEY_GROUP_PROVIDERS.map((value) => ({
@@ -2164,6 +2251,9 @@ onMounted(() => {
   loadGroups()
   loadUserGroupRates()
   loadPublicSettings()
+  subscriptionStore.fetchActiveSubscriptions().catch((error) => {
+    console.error('Failed to load active subscriptions:', error)
+  })
   document.addEventListener('click', closeGroupSelector)
   resetTimer = setInterval(() => { now.value = new Date() }, 60000)
 })

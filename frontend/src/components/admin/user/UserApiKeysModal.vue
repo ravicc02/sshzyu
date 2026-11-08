@@ -97,6 +97,7 @@
             :peak-end="group.peak_end"
             :peak-rate-multiplier="group.peak_rate_multiplier"
             :description="group.description"
+            :quota-label="formatGroupRequestQuotaLabel(group, t)"
             :selected="selectedKeyForGroup?.group_id === group.id"
           />
         </button>
@@ -112,6 +113,7 @@ import { createRequestGuard } from '@/utils/requestGuard'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
 import { formatDateTime } from '@/utils/format'
+import { formatGroupRequestQuotaLabel } from '@/utils/subscriptionQuota'
 import type { AdminUser, AdminGroup, ApiKey } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'

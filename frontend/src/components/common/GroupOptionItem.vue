@@ -20,6 +20,12 @@
       >
         {{ description }}
       </span>
+      <span
+        v-if="quotaLabel"
+        class="mt-1.5 inline-flex max-w-full whitespace-normal rounded-full bg-violet-50 px-2 py-0.5 text-left text-[11px] font-medium leading-relaxed text-violet-700 dark:bg-violet-900/25 dark:text-violet-300"
+      >
+        {{ quotaLabel }}
+      </span>
     </div>
 
     <!-- Right: rate pill + checkmark (vertically centered to first row) -->
@@ -80,6 +86,7 @@ interface Props {
   peakEnd?: string
   peakRateMultiplier?: number
   description?: string | null
+  quotaLabel?: string
   selected?: boolean
   showCheckmark?: boolean
   providerRates?: Array<{ platform: GroupPlatform; rate_multiplier: number }>

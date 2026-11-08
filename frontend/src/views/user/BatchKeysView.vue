@@ -41,6 +41,9 @@
                 <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
                   {{ batch.group_name || t('batchKeys.noGroup') }} · {{ formatDateTime(batch.created_at) }}
                 </p>
+                <p v-if="batchGroupRequestQuota(batch.group_id)" class="mt-1 text-[11px] font-medium text-violet-600 dark:text-violet-300">
+                  {{ batchGroupRequestQuota(batch.group_id) }}
+                </p>
               </div>
               <span class="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600 dark:bg-dark-700 dark:text-gray-300">
                 {{ t('batchKeys.keyCount', { count: batch.key_count }) }}
@@ -91,6 +94,9 @@
                   used: formatUsedTokens(selectedBatch.quota_tokens_used_total),
                   total: formatTokenQuota(selectedBatch.quota_tokens_total),
                 }) }}
+              </template>
+              <template v-if="batchGroupRequestQuota(selectedBatch.group_id)">
+                · {{ batchGroupRequestQuota(selectedBatch.group_id) }}
               </template>
             </p>
           </div>
@@ -312,6 +318,7 @@ import { useClipboard } from '@/composables/useClipboard'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { formatDateTime } from '@/utils/format'
 import { maskApiKey } from '@/utils/maskApiKey'
+import { formatGroupRequestQuotaLabel } from '@/utils/subscriptionQuota'
 import { formatTokenQuota, inferTokenQuotaUnit, TOKEN_UNIT_FACTORS, tokenAmountToBase, type TokenQuotaUnit } from '@/utils/tokenQuota'
 
 const { t } = useI18n()
@@ -344,7 +351,20 @@ const createForm = reactive({
 })
 
 const selectedBatch = computed(() => batches.value.find(batch => batch.batch_id === selectedBatchId.value) || null)
-const groupOptions = computed(() => groups.value.map(group => ({ value: group.id, label: group.name })))
+const groupOptions = computed(() =>
+  groups.value.map((group) => {
+    const quotaLabel = formatGroupRequestQuotaLabel(group, t)
+    return {
+      value: group.id,
+      label: quotaLabel ? `${group.name} · ${quotaLabel}` : group.name
+    }
+  })
+)
+const groupById = computed(() => new Map(groups.value.map((group) => [group.id, group])))
+const batchGroupRequestQuota = (groupId?: number | null) => {
+  const group = groupId ? groupById.value.get(groupId) : null
+  return group ? formatGroupRequestQuotaLabel(group, t) : ''
+}
 const estimatedTotal = computed(() => createForm.quota_mode === 'balance'
   ? Math.max(0, Number(createForm.count) || 0) * Math.max(0, Number(createForm.quota) || 0)
   : 0)

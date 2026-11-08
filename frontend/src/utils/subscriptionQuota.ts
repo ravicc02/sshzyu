@@ -1,4 +1,4 @@
-import type { UserSubscription } from '@/types'
+import type { Group, UserSubscription } from '@/types'
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
@@ -12,6 +12,33 @@ export interface RemainingDurationParts {
   days: number
   hours: number
   minutes: number
+}
+
+type Translate = (key: string, named?: Record<string, unknown>) => string
+
+export function formatGroupRequestQuotaLabel(
+  group: Pick<
+    Group,
+    | 'subscription_type'
+    | 'daily_request_limit'
+    | 'weekly_request_limit'
+    | 'monthly_request_limit'
+  >,
+  t: Translate,
+): string {
+  if (group.subscription_type !== 'subscription') return ''
+
+  const parts: string[] = []
+  if ((group.daily_request_limit ?? 0) > 0) {
+    parts.push(t('keys.requestQuotaDaily', { limit: group.daily_request_limit }))
+  }
+  if ((group.weekly_request_limit ?? 0) > 0) {
+    parts.push(t('keys.requestQuotaWeekly', { limit: group.weekly_request_limit }))
+  }
+  if ((group.monthly_request_limit ?? 0) > 0) {
+    parts.push(t('keys.requestQuotaMonthly', { limit: group.monthly_request_limit }))
+  }
+  return parts.join(' · ')
 }
 
 export function isOneTimeDailyQuota(
