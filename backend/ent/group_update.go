@@ -405,6 +405,87 @@ func (_u *GroupUpdate) ClearMonthlyTokenLimit() *GroupUpdate {
 	return _u
 }
 
+// SetDailyRequestLimit sets the "daily_request_limit" field.
+func (_u *GroupUpdate) SetDailyRequestLimit(v int64) *GroupUpdate {
+	_u.mutation.ResetDailyRequestLimit()
+	_u.mutation.SetDailyRequestLimit(v)
+	return _u
+}
+
+// SetNillableDailyRequestLimit sets the "daily_request_limit" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableDailyRequestLimit(v *int64) *GroupUpdate {
+	if v != nil {
+		_u.SetDailyRequestLimit(*v)
+	}
+	return _u
+}
+
+// AddDailyRequestLimit adds value to the "daily_request_limit" field.
+func (_u *GroupUpdate) AddDailyRequestLimit(v int64) *GroupUpdate {
+	_u.mutation.AddDailyRequestLimit(v)
+	return _u
+}
+
+// ClearDailyRequestLimit clears the value of the "daily_request_limit" field.
+func (_u *GroupUpdate) ClearDailyRequestLimit() *GroupUpdate {
+	_u.mutation.ClearDailyRequestLimit()
+	return _u
+}
+
+// SetWeeklyRequestLimit sets the "weekly_request_limit" field.
+func (_u *GroupUpdate) SetWeeklyRequestLimit(v int64) *GroupUpdate {
+	_u.mutation.ResetWeeklyRequestLimit()
+	_u.mutation.SetWeeklyRequestLimit(v)
+	return _u
+}
+
+// SetNillableWeeklyRequestLimit sets the "weekly_request_limit" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableWeeklyRequestLimit(v *int64) *GroupUpdate {
+	if v != nil {
+		_u.SetWeeklyRequestLimit(*v)
+	}
+	return _u
+}
+
+// AddWeeklyRequestLimit adds value to the "weekly_request_limit" field.
+func (_u *GroupUpdate) AddWeeklyRequestLimit(v int64) *GroupUpdate {
+	_u.mutation.AddWeeklyRequestLimit(v)
+	return _u
+}
+
+// ClearWeeklyRequestLimit clears the value of the "weekly_request_limit" field.
+func (_u *GroupUpdate) ClearWeeklyRequestLimit() *GroupUpdate {
+	_u.mutation.ClearWeeklyRequestLimit()
+	return _u
+}
+
+// SetMonthlyRequestLimit sets the "monthly_request_limit" field.
+func (_u *GroupUpdate) SetMonthlyRequestLimit(v int64) *GroupUpdate {
+	_u.mutation.ResetMonthlyRequestLimit()
+	_u.mutation.SetMonthlyRequestLimit(v)
+	return _u
+}
+
+// SetNillableMonthlyRequestLimit sets the "monthly_request_limit" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableMonthlyRequestLimit(v *int64) *GroupUpdate {
+	if v != nil {
+		_u.SetMonthlyRequestLimit(*v)
+	}
+	return _u
+}
+
+// AddMonthlyRequestLimit adds value to the "monthly_request_limit" field.
+func (_u *GroupUpdate) AddMonthlyRequestLimit(v int64) *GroupUpdate {
+	_u.mutation.AddMonthlyRequestLimit(v)
+	return _u
+}
+
+// ClearMonthlyRequestLimit clears the value of the "monthly_request_limit" field.
+func (_u *GroupUpdate) ClearMonthlyRequestLimit() *GroupUpdate {
+	_u.mutation.ClearMonthlyRequestLimit()
+	return _u
+}
+
 // SetDefaultValidityDays sets the "default_validity_days" field.
 func (_u *GroupUpdate) SetDefaultValidityDays(v int) *GroupUpdate {
 	_u.mutation.ResetDefaultValidityDays()
@@ -1775,6 +1856,33 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.MonthlyTokenLimitCleared() {
 		_spec.ClearField(group.FieldMonthlyTokenLimit, field.TypeInt64)
 	}
+	if value, ok := _u.mutation.DailyRequestLimit(); ok {
+		_spec.SetField(group.FieldDailyRequestLimit, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedDailyRequestLimit(); ok {
+		_spec.AddField(group.FieldDailyRequestLimit, field.TypeInt64, value)
+	}
+	if _u.mutation.DailyRequestLimitCleared() {
+		_spec.ClearField(group.FieldDailyRequestLimit, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.WeeklyRequestLimit(); ok {
+		_spec.SetField(group.FieldWeeklyRequestLimit, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedWeeklyRequestLimit(); ok {
+		_spec.AddField(group.FieldWeeklyRequestLimit, field.TypeInt64, value)
+	}
+	if _u.mutation.WeeklyRequestLimitCleared() {
+		_spec.ClearField(group.FieldWeeklyRequestLimit, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.MonthlyRequestLimit(); ok {
+		_spec.SetField(group.FieldMonthlyRequestLimit, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedMonthlyRequestLimit(); ok {
+		_spec.AddField(group.FieldMonthlyRequestLimit, field.TypeInt64, value)
+	}
+	if _u.mutation.MonthlyRequestLimitCleared() {
+		_spec.ClearField(group.FieldMonthlyRequestLimit, field.TypeInt64)
+	}
 	if value, ok := _u.mutation.DefaultValidityDays(); ok {
 		_spec.SetField(group.FieldDefaultValidityDays, field.TypeInt, value)
 	}
@@ -2730,6 +2838,87 @@ func (_u *GroupUpdateOne) AddMonthlyTokenLimit(v int64) *GroupUpdateOne {
 // ClearMonthlyTokenLimit clears the value of the "monthly_token_limit" field.
 func (_u *GroupUpdateOne) ClearMonthlyTokenLimit() *GroupUpdateOne {
 	_u.mutation.ClearMonthlyTokenLimit()
+	return _u
+}
+
+// SetDailyRequestLimit sets the "daily_request_limit" field.
+func (_u *GroupUpdateOne) SetDailyRequestLimit(v int64) *GroupUpdateOne {
+	_u.mutation.ResetDailyRequestLimit()
+	_u.mutation.SetDailyRequestLimit(v)
+	return _u
+}
+
+// SetNillableDailyRequestLimit sets the "daily_request_limit" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableDailyRequestLimit(v *int64) *GroupUpdateOne {
+	if v != nil {
+		_u.SetDailyRequestLimit(*v)
+	}
+	return _u
+}
+
+// AddDailyRequestLimit adds value to the "daily_request_limit" field.
+func (_u *GroupUpdateOne) AddDailyRequestLimit(v int64) *GroupUpdateOne {
+	_u.mutation.AddDailyRequestLimit(v)
+	return _u
+}
+
+// ClearDailyRequestLimit clears the value of the "daily_request_limit" field.
+func (_u *GroupUpdateOne) ClearDailyRequestLimit() *GroupUpdateOne {
+	_u.mutation.ClearDailyRequestLimit()
+	return _u
+}
+
+// SetWeeklyRequestLimit sets the "weekly_request_limit" field.
+func (_u *GroupUpdateOne) SetWeeklyRequestLimit(v int64) *GroupUpdateOne {
+	_u.mutation.ResetWeeklyRequestLimit()
+	_u.mutation.SetWeeklyRequestLimit(v)
+	return _u
+}
+
+// SetNillableWeeklyRequestLimit sets the "weekly_request_limit" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableWeeklyRequestLimit(v *int64) *GroupUpdateOne {
+	if v != nil {
+		_u.SetWeeklyRequestLimit(*v)
+	}
+	return _u
+}
+
+// AddWeeklyRequestLimit adds value to the "weekly_request_limit" field.
+func (_u *GroupUpdateOne) AddWeeklyRequestLimit(v int64) *GroupUpdateOne {
+	_u.mutation.AddWeeklyRequestLimit(v)
+	return _u
+}
+
+// ClearWeeklyRequestLimit clears the value of the "weekly_request_limit" field.
+func (_u *GroupUpdateOne) ClearWeeklyRequestLimit() *GroupUpdateOne {
+	_u.mutation.ClearWeeklyRequestLimit()
+	return _u
+}
+
+// SetMonthlyRequestLimit sets the "monthly_request_limit" field.
+func (_u *GroupUpdateOne) SetMonthlyRequestLimit(v int64) *GroupUpdateOne {
+	_u.mutation.ResetMonthlyRequestLimit()
+	_u.mutation.SetMonthlyRequestLimit(v)
+	return _u
+}
+
+// SetNillableMonthlyRequestLimit sets the "monthly_request_limit" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableMonthlyRequestLimit(v *int64) *GroupUpdateOne {
+	if v != nil {
+		_u.SetMonthlyRequestLimit(*v)
+	}
+	return _u
+}
+
+// AddMonthlyRequestLimit adds value to the "monthly_request_limit" field.
+func (_u *GroupUpdateOne) AddMonthlyRequestLimit(v int64) *GroupUpdateOne {
+	_u.mutation.AddMonthlyRequestLimit(v)
+	return _u
+}
+
+// ClearMonthlyRequestLimit clears the value of the "monthly_request_limit" field.
+func (_u *GroupUpdateOne) ClearMonthlyRequestLimit() *GroupUpdateOne {
+	_u.mutation.ClearMonthlyRequestLimit()
 	return _u
 }
 
@@ -4132,6 +4321,33 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if _u.mutation.MonthlyTokenLimitCleared() {
 		_spec.ClearField(group.FieldMonthlyTokenLimit, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.DailyRequestLimit(); ok {
+		_spec.SetField(group.FieldDailyRequestLimit, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedDailyRequestLimit(); ok {
+		_spec.AddField(group.FieldDailyRequestLimit, field.TypeInt64, value)
+	}
+	if _u.mutation.DailyRequestLimitCleared() {
+		_spec.ClearField(group.FieldDailyRequestLimit, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.WeeklyRequestLimit(); ok {
+		_spec.SetField(group.FieldWeeklyRequestLimit, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedWeeklyRequestLimit(); ok {
+		_spec.AddField(group.FieldWeeklyRequestLimit, field.TypeInt64, value)
+	}
+	if _u.mutation.WeeklyRequestLimitCleared() {
+		_spec.ClearField(group.FieldWeeklyRequestLimit, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.MonthlyRequestLimit(); ok {
+		_spec.SetField(group.FieldMonthlyRequestLimit, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedMonthlyRequestLimit(); ok {
+		_spec.AddField(group.FieldMonthlyRequestLimit, field.TypeInt64, value)
+	}
+	if _u.mutation.MonthlyRequestLimitCleared() {
+		_spec.ClearField(group.FieldMonthlyRequestLimit, field.TypeInt64)
 	}
 	if value, ok := _u.mutation.DefaultValidityDays(); ok {
 		_spec.SetField(group.FieldDefaultValidityDays, field.TypeInt, value)

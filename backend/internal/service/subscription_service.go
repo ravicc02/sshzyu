@@ -396,6 +396,9 @@ func renewedSubscriptionTerm(existingSub *UserSubscription, notes string, starts
 	renewed.DailyUsageTokens = 0
 	renewed.WeeklyUsageTokens = 0
 	renewed.MonthlyUsageTokens = 0
+	renewed.DailyUsageRequests = 0
+	renewed.WeeklyUsageRequests = 0
+	renewed.MonthlyUsageRequests = 0
 	renewed.Notes = appendSubscriptionNotes(existingSub.Notes, notes)
 	return &renewed
 }
@@ -841,18 +844,21 @@ func normalizeExpiredWindowsAt(subs []UserSubscription, now time.Time) {
 			sub.DailyWindowStart = nil
 			sub.DailyUsageUSD = 0
 			sub.DailyUsageTokens = 0
+			sub.DailyUsageRequests = 0
 		}
 		// 周窗口过期：清零展示数据
 		if sub.canAutomaticallyResetWeeklyAt(now) {
 			sub.WeeklyWindowStart = nil
 			sub.WeeklyUsageUSD = 0
 			sub.WeeklyUsageTokens = 0
+			sub.WeeklyUsageRequests = 0
 		}
 		// 月窗口过期：清零展示数据
 		if sub.canAutomaticallyResetMonthlyAt(now) {
 			sub.MonthlyWindowStart = nil
 			sub.MonthlyUsageUSD = 0
 			sub.MonthlyUsageTokens = 0
+			sub.MonthlyUsageRequests = 0
 		}
 	}
 }
@@ -929,6 +935,7 @@ func (s *SubscriptionService) CheckAndResetWindows(ctx context.Context, sub *Use
 		sub.DailyWindowStart = &windowStart
 		sub.DailyUsageUSD = 0
 		sub.DailyUsageTokens = 0
+		sub.DailyUsageRequests = 0
 		needsInvalidateCache = true
 	}
 
@@ -941,6 +948,7 @@ func (s *SubscriptionService) CheckAndResetWindows(ctx context.Context, sub *Use
 		sub.WeeklyWindowStart = &windowStart
 		sub.WeeklyUsageUSD = 0
 		sub.WeeklyUsageTokens = 0
+		sub.WeeklyUsageRequests = 0
 		needsInvalidateCache = true
 	}
 
@@ -953,6 +961,7 @@ func (s *SubscriptionService) CheckAndResetWindows(ctx context.Context, sub *Use
 		sub.MonthlyWindowStart = &windowStart
 		sub.MonthlyUsageUSD = 0
 		sub.MonthlyUsageTokens = 0
+		sub.MonthlyUsageRequests = 0
 		needsInvalidateCache = true
 	}
 
@@ -1014,6 +1023,15 @@ func (s *SubscriptionService) CheckUsageLimits(ctx context.Context, sub *UserSub
 	if !sub.CheckMonthlyTokenLimit(group, 0) {
 		return ErrMonthlyLimitExceeded
 	}
+	if !sub.CheckDailyRequestLimit(group, 0) {
+		return ErrDailyLimitExceeded
+	}
+	if !sub.CheckWeeklyRequestLimit(group, 0) {
+		return ErrWeeklyLimitExceeded
+	}
+	if !sub.CheckMonthlyRequestLimit(group, 0) {
+		return ErrMonthlyLimitExceeded
+	}
 	return nil
 }
 
@@ -1038,19 +1056,19 @@ func (s *SubscriptionService) ValidateAndCheckLimits(sub *UserSubscription, grou
 	if sub.canAutomaticallyResetDailyAt(now) {
 		sub.DailyUsageUSD = 0
 		sub.DailyUsageTokens = 0
-		sub.DailyUsageTokens = 0
+		sub.DailyUsageRequests = 0
 		needsMaintenance = true
 	}
 	if sub.canAutomaticallyResetWeeklyAt(now) {
 		sub.WeeklyUsageUSD = 0
 		sub.WeeklyUsageTokens = 0
-		sub.WeeklyUsageTokens = 0
+		sub.WeeklyUsageRequests = 0
 		needsMaintenance = true
 	}
 	if sub.canAutomaticallyResetMonthlyAt(now) {
 		sub.MonthlyUsageUSD = 0
 		sub.MonthlyUsageTokens = 0
-		sub.MonthlyUsageTokens = 0
+		sub.MonthlyUsageRequests = 0
 		needsMaintenance = true
 	}
 	if !sub.IsWindowActivated() {
@@ -1074,6 +1092,15 @@ func (s *SubscriptionService) ValidateAndCheckLimits(sub *UserSubscription, grou
 		return needsMaintenance, ErrWeeklyLimitExceeded
 	}
 	if !sub.CheckMonthlyTokenLimit(group, 0) {
+		return needsMaintenance, ErrMonthlyLimitExceeded
+	}
+	if !sub.CheckDailyRequestLimit(group, 0) {
+		return needsMaintenance, ErrDailyLimitExceeded
+	}
+	if !sub.CheckWeeklyRequestLimit(group, 0) {
+		return needsMaintenance, ErrWeeklyLimitExceeded
+	}
+	if !sub.CheckMonthlyRequestLimit(group, 0) {
 		return needsMaintenance, ErrMonthlyLimitExceeded
 	}
 
@@ -1140,13 +1167,16 @@ type SubscriptionProgress struct {
 
 // UsageWindowProgress 使用窗口进度
 type UsageWindowProgress struct {
-	LimitUSD        float64   `json:"limit_usd"`
-	UsedUSD         float64   `json:"used_usd"`
-	RemainingUSD    float64   `json:"remaining_usd"`
-	Percentage      float64   `json:"percentage"`
-	WindowStart     time.Time `json:"window_start"`
-	ResetsAt        time.Time `json:"resets_at"`
-	ResetsInSeconds int64     `json:"resets_in_seconds"`
+	LimitUSD          float64   `json:"limit_usd"`
+	UsedUSD           float64   `json:"used_usd"`
+	RemainingUSD      float64   `json:"remaining_usd"`
+	LimitRequests     int64     `json:"limit_requests,omitempty"`
+	UsedRequests      int64     `json:"used_requests,omitempty"`
+	RemainingRequests int64     `json:"remaining_requests,omitempty"`
+	Percentage        float64   `json:"percentage"`
+	WindowStart       time.Time `json:"window_start"`
+	ResetsAt          time.Time `json:"resets_at"`
+	ResetsInSeconds   int64     `json:"resets_in_seconds"`
 }
 
 // GetSubscriptionProgress 获取订阅使用进度
@@ -1202,6 +1232,14 @@ func (s *SubscriptionService) calculateProgress(sub *UserSubscription, group *Gr
 			progress.Daily.ResetsInSeconds = 0
 		}
 	}
+	if group.HasDailyRequestLimit() && sub.DailyWindowStart != nil {
+		limit := *group.DailyRequestLimit
+		resetsAt := sub.DailyWindowStart.Add(24 * time.Hour)
+		if dailyResetTime := sub.DailyResetTime(); dailyResetTime != nil {
+			resetsAt = *dailyResetTime
+		}
+		progress.Daily = requestUsageProgress(progress.Daily, limit, sub.DailyUsageRequests, *sub.DailyWindowStart, resetsAt)
+	}
 
 	// 周进度
 	if group.HasWeeklyLimit() && sub.WeeklyWindowStart != nil {
@@ -1228,6 +1266,14 @@ func (s *SubscriptionService) calculateProgress(sub *UserSubscription, group *Gr
 		if progress.Weekly.ResetsInSeconds < 0 {
 			progress.Weekly.ResetsInSeconds = 0
 		}
+	}
+	if group.HasWeeklyRequestLimit() && sub.WeeklyWindowStart != nil {
+		limit := *group.WeeklyRequestLimit
+		resetsAt := sub.WeeklyWindowStart.Add(7 * 24 * time.Hour)
+		if weeklyResetTime := sub.WeeklyResetTime(); weeklyResetTime != nil {
+			resetsAt = *weeklyResetTime
+		}
+		progress.Weekly = requestUsageProgress(progress.Weekly, limit, sub.WeeklyUsageRequests, *sub.WeeklyWindowStart, resetsAt)
 	}
 
 	// 月进度
@@ -1256,7 +1302,42 @@ func (s *SubscriptionService) calculateProgress(sub *UserSubscription, group *Gr
 			progress.Monthly.ResetsInSeconds = 0
 		}
 	}
+	if group.HasMonthlyRequestLimit() && sub.MonthlyWindowStart != nil {
+		limit := *group.MonthlyRequestLimit
+		resetsAt := sub.MonthlyWindowStart.Add(30 * 24 * time.Hour)
+		if monthlyResetTime := sub.MonthlyResetTime(); monthlyResetTime != nil {
+			resetsAt = *monthlyResetTime
+		}
+		progress.Monthly = requestUsageProgress(progress.Monthly, limit, sub.MonthlyUsageRequests, *sub.MonthlyWindowStart, resetsAt)
+	}
 
+	return progress
+}
+
+func requestUsageProgress(existing *UsageWindowProgress, limit, used int64, windowStart, resetsAt time.Time) *UsageWindowProgress {
+	progress := existing
+	if progress == nil {
+		progress = &UsageWindowProgress{
+			WindowStart: windowStart,
+			ResetsAt:    resetsAt,
+		}
+	}
+	progress.LimitRequests = limit
+	progress.UsedRequests = used
+	progress.RemainingRequests = limit - used
+	if progress.RemainingRequests < 0 {
+		progress.RemainingRequests = 0
+	}
+	if limit > 0 {
+		progress.Percentage = float64(used) / float64(limit) * 100
+	}
+	if progress.Percentage > 100 {
+		progress.Percentage = 100
+	}
+	progress.ResetsInSeconds = int64(time.Until(resetsAt).Seconds())
+	if progress.ResetsInSeconds < 0 {
+		progress.ResetsInSeconds = 0
+	}
 	return progress
 }
 

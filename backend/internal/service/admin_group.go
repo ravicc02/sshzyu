@@ -446,10 +446,14 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	dailyTokenLimit := normalizeTokenLimit(input.DailyTokenLimit)
 	weeklyTokenLimit := normalizeTokenLimit(input.WeeklyTokenLimit)
 	monthlyTokenLimit := normalizeTokenLimit(input.MonthlyTokenLimit)
+	dailyRequestLimit := normalizeTokenLimit(input.DailyRequestLimit)
+	weeklyRequestLimit := normalizeTokenLimit(input.WeeklyRequestLimit)
+	monthlyRequestLimit := normalizeTokenLimit(input.MonthlyRequestLimit)
 	if err := validateGroupSubscriptionQuotaUnits(
 		subscriptionType,
 		dailyLimit, weeklyLimit, monthlyLimit,
 		dailyTokenLimit, weeklyTokenLimit, monthlyTokenLimit,
+		dailyRequestLimit, weeklyRequestLimit, monthlyRequestLimit,
 	); err != nil {
 		return nil, err
 	}
@@ -605,6 +609,9 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		DailyTokenLimit:                 dailyTokenLimit,
 		WeeklyTokenLimit:                weeklyTokenLimit,
 		MonthlyTokenLimit:               monthlyTokenLimit,
+		DailyRequestLimit:               dailyRequestLimit,
+		WeeklyRequestLimit:              weeklyRequestLimit,
+		MonthlyRequestLimit:             monthlyRequestLimit,
 		LongContextPricingEnabled:       input.LongContextPricingEnabled,
 		ModelPricing:                    modelPricing,
 		AllowImageGeneration:            allowImageGeneration,
@@ -721,23 +728,34 @@ func updateGroupQuotaUnitsProvided(input *UpdateGroupInput) bool {
 		input.MonthlyLimitUSD != nil ||
 		input.DailyTokenLimit != nil ||
 		input.WeeklyTokenLimit != nil ||
-		input.MonthlyTokenLimit != nil)
+		input.MonthlyTokenLimit != nil ||
+		input.DailyRequestLimit != nil ||
+		input.WeeklyRequestLimit != nil ||
+		input.MonthlyRequestLimit != nil)
 }
 
 func validateGroupSubscriptionQuotaUnits(
 	subscriptionType string,
 	dailyUSD, weeklyUSD, monthlyUSD *float64,
 	dailyTokens, weeklyTokens, monthlyTokens *int64,
+	dailyRequests, weeklyRequests, monthlyRequests *int64,
 ) error {
 	if subscriptionType != SubscriptionTypeSubscription {
 		return nil
 	}
 	hasUSD := dailyUSD != nil || weeklyUSD != nil || monthlyUSD != nil
 	hasTokens := dailyTokens != nil || weeklyTokens != nil || monthlyTokens != nil
-	if hasUSD && hasTokens {
+	hasRequests := dailyRequests != nil || weeklyRequests != nil || monthlyRequests != nil
+	unitsInUse := 0
+	for _, enabled := range []bool{hasUSD, hasTokens, hasRequests} {
+		if enabled {
+			unitsInUse++
+		}
+	}
+	if unitsInUse > 1 {
 		return infraerrors.BadRequest(
 			"GROUP_QUOTA_UNIT_CONFLICT",
-			"choose either USD limits or token limits for a subscription group",
+			"choose only one subscription quota unit: USD, tokens, or requests",
 		)
 	}
 	return nil
@@ -900,11 +918,21 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.MonthlyTokenLimit != nil {
 		group.MonthlyTokenLimit = normalizeTokenLimit(input.MonthlyTokenLimit)
 	}
+	if input.DailyRequestLimit != nil {
+		group.DailyRequestLimit = normalizeTokenLimit(input.DailyRequestLimit)
+	}
+	if input.WeeklyRequestLimit != nil {
+		group.WeeklyRequestLimit = normalizeTokenLimit(input.WeeklyRequestLimit)
+	}
+	if input.MonthlyRequestLimit != nil {
+		group.MonthlyRequestLimit = normalizeTokenLimit(input.MonthlyRequestLimit)
+	}
 	if updateGroupQuotaUnitsProvided(input) {
 		if err := validateGroupSubscriptionQuotaUnits(
 			group.SubscriptionType,
 			group.DailyLimitUSD, group.WeeklyLimitUSD, group.MonthlyLimitUSD,
 			group.DailyTokenLimit, group.WeeklyTokenLimit, group.MonthlyTokenLimit,
+			group.DailyRequestLimit, group.WeeklyRequestLimit, group.MonthlyRequestLimit,
 		); err != nil {
 			return nil, err
 		}

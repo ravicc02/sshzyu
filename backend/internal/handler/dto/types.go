@@ -122,6 +122,9 @@ type Group struct {
 	DailyTokenLimit           *int64   `json:"daily_token_limit"`
 	WeeklyTokenLimit          *int64   `json:"weekly_token_limit"`
 	MonthlyTokenLimit         *int64   `json:"monthly_token_limit"`
+	DailyRequestLimit         *int64   `json:"daily_request_limit"`
+	WeeklyRequestLimit        *int64   `json:"weekly_request_limit"`
+	MonthlyRequestLimit       *int64   `json:"monthly_request_limit"`
 	LongContextPricingEnabled bool     `json:"long_context_pricing_enabled"`
 
 	// 图片生成计费配置（仅 antigravity 平台使用）
@@ -789,12 +792,15 @@ type UserSubscription struct {
 	WeeklyWindowStart  *time.Time `json:"weekly_window_start"`
 	MonthlyWindowStart *time.Time `json:"monthly_window_start"`
 
-	DailyUsageUSD      float64 `json:"daily_usage_usd"`
-	WeeklyUsageUSD     float64 `json:"weekly_usage_usd"`
-	MonthlyUsageUSD    float64 `json:"monthly_usage_usd"`
-	DailyUsageTokens   int64   `json:"daily_usage_tokens"`
-	WeeklyUsageTokens  int64   `json:"weekly_usage_tokens"`
-	MonthlyUsageTokens int64   `json:"monthly_usage_tokens"`
+	DailyUsageUSD        float64 `json:"daily_usage_usd"`
+	WeeklyUsageUSD       float64 `json:"weekly_usage_usd"`
+	MonthlyUsageUSD      float64 `json:"monthly_usage_usd"`
+	DailyUsageTokens     int64   `json:"daily_usage_tokens"`
+	WeeklyUsageTokens    int64   `json:"weekly_usage_tokens"`
+	MonthlyUsageTokens   int64   `json:"monthly_usage_tokens"`
+	DailyUsageRequests   int64   `json:"daily_usage_requests"`
+	WeeklyUsageRequests  int64   `json:"weekly_usage_requests"`
+	MonthlyUsageRequests int64   `json:"monthly_usage_requests"`
 
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`

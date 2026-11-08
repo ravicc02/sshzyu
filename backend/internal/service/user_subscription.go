@@ -21,12 +21,15 @@ type UserSubscription struct {
 	WeeklyWindowStart  *time.Time
 	MonthlyWindowStart *time.Time
 
-	DailyUsageUSD      float64
-	WeeklyUsageUSD     float64
-	MonthlyUsageUSD    float64
-	DailyUsageTokens   int64
-	WeeklyUsageTokens  int64
-	MonthlyUsageTokens int64
+	DailyUsageUSD        float64
+	WeeklyUsageUSD       float64
+	MonthlyUsageUSD      float64
+	DailyUsageTokens     int64
+	WeeklyUsageTokens    int64
+	MonthlyUsageTokens   int64
+	DailyUsageRequests   int64
+	WeeklyUsageRequests  int64
+	MonthlyUsageRequests int64
 
 	AssignedBy *int64
 	AssignedAt time.Time
@@ -254,4 +257,25 @@ func (s *UserSubscription) CheckMonthlyTokenLimit(group *Group, additionalTokens
 		return true
 	}
 	return s.MonthlyUsageTokens+additionalTokens <= *group.MonthlyTokenLimit
+}
+
+func (s *UserSubscription) CheckDailyRequestLimit(group *Group, additionalRequests int64) bool {
+	if group == nil || !group.HasDailyRequestLimit() {
+		return true
+	}
+	return s.DailyUsageRequests+additionalRequests <= *group.DailyRequestLimit
+}
+
+func (s *UserSubscription) CheckWeeklyRequestLimit(group *Group, additionalRequests int64) bool {
+	if group == nil || !group.HasWeeklyRequestLimit() {
+		return true
+	}
+	return s.WeeklyUsageRequests+additionalRequests <= *group.WeeklyRequestLimit
+}
+
+func (s *UserSubscription) CheckMonthlyRequestLimit(group *Group, additionalRequests int64) bool {
+	if group == nil || !group.HasMonthlyRequestLimit() {
+		return true
+	}
+	return s.MonthlyUsageRequests+additionalRequests <= *group.MonthlyRequestLimit
 }

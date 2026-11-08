@@ -130,6 +130,60 @@ func TestUsageBillingRepositoryApply_DeduplicatesSubscriptionBilling(t *testing.
 	require.InDelta(t, 2.5, dailyUsage, 0.000001)
 }
 
+func TestUsageBillingRepositoryApply_CountsFreeSubscriptionRequestsOnce(t *testing.T) {
+	ctx := context.Background()
+	client := testEntClient(t)
+	repo := NewUsageBillingRepository(client, integrationDB)
+
+	user := mustCreateUser(t, client, &service.User{
+		Email:        fmt.Sprintf("usage-billing-free-request-user-%d@example.com", time.Now().UnixNano()),
+		PasswordHash: "hash",
+	})
+	limit := int64(10)
+	group := mustCreateGroup(t, client, &service.Group{
+		Name:              "usage-billing-free-request-group-" + uuid.NewString(),
+		Platform:          service.PlatformAnthropic,
+		SubscriptionType:  service.SubscriptionTypeSubscription,
+		DailyRequestLimit: &limit,
+	})
+	apiKey := mustCreateApiKey(t, client, &service.APIKey{
+		UserID:  user.ID,
+		GroupID: &group.ID,
+		Key:     "sk-usage-billing-free-request-" + uuid.NewString(),
+		Name:    "billing-free-request",
+	})
+	subscription := mustCreateSubscription(t, client, &service.UserSubscription{
+		UserID:  user.ID,
+		GroupID: group.ID,
+	})
+
+	cmd := &service.UsageBillingCommand{
+		RequestID:                uuid.NewString(),
+		APIKeyID:                 apiKey.ID,
+		UserID:                   user.ID,
+		SubscriptionID:           &subscription.ID,
+		SubscriptionRequestCount: 1,
+	}
+
+	result1, err := repo.Apply(ctx, cmd)
+	require.NoError(t, err)
+	require.True(t, result1.Applied)
+
+	result2, err := repo.Apply(ctx, cmd)
+	require.NoError(t, err)
+	require.False(t, result2.Applied)
+
+	var dailyRequests, weeklyRequests, monthlyRequests int64
+	require.NoError(t, integrationDB.QueryRowContext(ctx, `
+		SELECT daily_usage_requests, weekly_usage_requests, monthly_usage_requests
+		FROM user_subscriptions
+		WHERE id = $1
+	`, subscription.ID).Scan(&dailyRequests, &weeklyRequests, &monthlyRequests))
+	require.Equal(t, int64(1), dailyRequests)
+	require.Equal(t, int64(1), weeklyRequests)
+	require.Equal(t, int64(1), monthlyRequests)
+}
+
 func TestUsageBillingRepositoryApply_RequestFingerprintConflict(t *testing.T) {
 	ctx := context.Background()
 	client := testEntClient(t)

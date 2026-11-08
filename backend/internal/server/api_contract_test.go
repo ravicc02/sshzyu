@@ -385,6 +385,9 @@ func TestAPIContracts(t *testing.T) {
 						"daily_token_limit": null,
 						"weekly_token_limit": null,
 						"monthly_token_limit": null,
+						"daily_request_limit": null,
+						"weekly_request_limit": null,
+						"monthly_request_limit": null,
 						"long_context_pricing_enabled": false,
 						"image_price_1k": null,
 						"image_price_2k": null,
@@ -470,6 +473,9 @@ func TestAPIContracts(t *testing.T) {
 						"daily_usage_tokens": 0,
 						"weekly_usage_tokens": 0,
 						"monthly_usage_tokens": 0,
+						"daily_usage_requests": 0,
+						"weekly_usage_requests": 0,
+						"monthly_usage_requests": 0,
 						"created_at": "2025-01-02T03:04:05Z",
 						"updated_at": "2025-01-02T03:04:05Z"
 					}

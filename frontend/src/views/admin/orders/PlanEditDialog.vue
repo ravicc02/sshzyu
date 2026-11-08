@@ -27,9 +27,20 @@
           <GroupBadge :name="selectedGroupInfo.name" :platform="selectedGroupInfo.platform" :rate-multiplier="selectedGroupInfo.rate_multiplier" />
         </div>
         <div class="grid grid-cols-2 gap-2 text-xs">
-          <div><span class="text-gray-500">{{ t('payment.admin.dailyLimit') }}:</span> <span class="ml-1 font-medium text-gray-700 dark:text-gray-300">{{ selectedGroupInfo.daily_limit_usd != null ? '$' + selectedGroupInfo.daily_limit_usd : t('payment.admin.unlimited') }}</span></div>
-          <div><span class="text-gray-500">{{ t('payment.admin.weeklyLimit') }}:</span> <span class="ml-1 font-medium text-gray-700 dark:text-gray-300">{{ selectedGroupInfo.weekly_limit_usd != null ? '$' + selectedGroupInfo.weekly_limit_usd : t('payment.admin.unlimited') }}</span></div>
-          <div><span class="text-gray-500">{{ t('payment.admin.monthlyLimit') }}:</span> <span class="ml-1 font-medium text-gray-700 dark:text-gray-300">{{ selectedGroupInfo.monthly_limit_usd != null ? '$' + selectedGroupInfo.monthly_limit_usd : t('payment.admin.unlimited') }}</span></div>
+          <template v-if="selectedGroupInfo.daily_limit_usd != null || selectedGroupInfo.weekly_limit_usd != null || selectedGroupInfo.monthly_limit_usd != null">
+            <div><span class="text-gray-500">{{ t('payment.admin.dailyLimit') }}:</span> <span class="ml-1 font-medium text-gray-700 dark:text-gray-300">{{ selectedGroupInfo.daily_limit_usd != null ? '$' + selectedGroupInfo.daily_limit_usd : '-' }}</span></div>
+            <div><span class="text-gray-500">{{ t('payment.admin.weeklyLimit') }}:</span> <span class="ml-1 font-medium text-gray-700 dark:text-gray-300">{{ selectedGroupInfo.weekly_limit_usd != null ? '$' + selectedGroupInfo.weekly_limit_usd : '-' }}</span></div>
+            <div><span class="text-gray-500">{{ t('payment.admin.monthlyLimit') }}:</span> <span class="ml-1 font-medium text-gray-700 dark:text-gray-300">{{ selectedGroupInfo.monthly_limit_usd != null ? '$' + selectedGroupInfo.monthly_limit_usd : '-' }}</span></div>
+          </template>
+          <template v-if="selectedGroupInfo.daily_request_limit != null || selectedGroupInfo.weekly_request_limit != null || selectedGroupInfo.monthly_request_limit != null">
+            <div><span class="text-gray-500">{{ t('payment.admin.dailyRequestLimit') }}:</span> <span class="ml-1 font-medium text-gray-700 dark:text-gray-300">{{ selectedGroupInfo.daily_request_limit?.toLocaleString() ?? '-' }}</span></div>
+            <div><span class="text-gray-500">{{ t('payment.admin.weeklyRequestLimit') }}:</span> <span class="ml-1 font-medium text-gray-700 dark:text-gray-300">{{ selectedGroupInfo.weekly_request_limit?.toLocaleString() ?? '-' }}</span></div>
+            <div><span class="text-gray-500">{{ t('payment.admin.monthlyRequestLimit') }}:</span> <span class="ml-1 font-medium text-gray-700 dark:text-gray-300">{{ selectedGroupInfo.monthly_request_limit?.toLocaleString() ?? '-' }}</span></div>
+          </template>
+          <div v-if="selectedGroupInfo.daily_limit_usd == null && selectedGroupInfo.weekly_limit_usd == null && selectedGroupInfo.monthly_limit_usd == null && selectedGroupInfo.daily_request_limit == null && selectedGroupInfo.weekly_request_limit == null && selectedGroupInfo.monthly_request_limit == null">
+            <span class="text-gray-500">{{ t('payment.planCard.quota') }}:</span>
+            <span class="ml-1 font-medium text-gray-700 dark:text-gray-300">{{ t('payment.admin.unlimited') }}</span>
+          </div>
         </div>
       </div>
 

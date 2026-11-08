@@ -95,6 +95,29 @@ func TestAssignOrExtendSubscription_ExpiredSubscriptionAppendsMatchingNotes(t *t
 	require.Equal(t, "same\nsame", renewed.Notes)
 }
 
+func TestUserSubscriptionRequestLimits(t *testing.T) {
+	daily := int64(2)
+	weekly := int64(5)
+	monthly := int64(10)
+	group := &Group{
+		DailyRequestLimit:   &daily,
+		WeeklyRequestLimit:  &weekly,
+		MonthlyRequestLimit: &monthly,
+	}
+
+	sub := &UserSubscription{
+		DailyUsageRequests:   1,
+		WeeklyUsageRequests:  4,
+		MonthlyUsageRequests: 9,
+	}
+	require.True(t, sub.CheckDailyRequestLimit(group, 1))
+	require.True(t, sub.CheckWeeklyRequestLimit(group, 1))
+	require.True(t, sub.CheckMonthlyRequestLimit(group, 1))
+	require.False(t, sub.CheckDailyRequestLimit(group, 2))
+	require.False(t, sub.CheckWeeklyRequestLimit(group, 2))
+	require.False(t, sub.CheckMonthlyRequestLimit(group, 2))
+}
+
 func TestUserSubscriptionNeedsDailyReset_DailyCardKeepsOneTimeQuota(t *testing.T) {
 	start := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	dailyWindowStart := time.Date(2026, 5, 18, 0, 0, 0, 0, time.UTC)

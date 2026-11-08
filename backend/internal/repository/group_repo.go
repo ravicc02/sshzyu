@@ -109,6 +109,9 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 		SetNillableDailyTokenLimit(groupIn.DailyTokenLimit).
 		SetNillableWeeklyTokenLimit(groupIn.WeeklyTokenLimit).
 		SetNillableMonthlyTokenLimit(groupIn.MonthlyTokenLimit).
+		SetNillableDailyRequestLimit(groupIn.DailyRequestLimit).
+		SetNillableWeeklyRequestLimit(groupIn.WeeklyRequestLimit).
+		SetNillableMonthlyRequestLimit(groupIn.MonthlyRequestLimit).
 		SetAllowImageGeneration(groupIn.AllowImageGeneration).
 		SetAllowBatchImageGeneration(groupIn.AllowBatchImageGeneration).
 		SetImageCountBilling(groupIn.ImageCountBilling).
@@ -304,6 +307,9 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		SetNillableDailyTokenLimit(groupIn.DailyTokenLimit).
 		SetNillableWeeklyTokenLimit(groupIn.WeeklyTokenLimit).
 		SetNillableMonthlyTokenLimit(groupIn.MonthlyTokenLimit).
+		SetNillableDailyRequestLimit(groupIn.DailyRequestLimit).
+		SetNillableWeeklyRequestLimit(groupIn.WeeklyRequestLimit).
+		SetNillableMonthlyRequestLimit(groupIn.MonthlyRequestLimit).
 		SetAllowImageGeneration(groupIn.AllowImageGeneration).
 		SetAllowBatchImageGeneration(groupIn.AllowBatchImageGeneration).
 		SetImageCountBilling(groupIn.ImageCountBilling).
@@ -378,6 +384,21 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		builder = builder.SetMonthlyTokenLimit(*groupIn.MonthlyTokenLimit)
 	} else {
 		builder = builder.ClearMonthlyTokenLimit()
+	}
+	if groupIn.DailyRequestLimit != nil {
+		builder = builder.SetDailyRequestLimit(*groupIn.DailyRequestLimit)
+	} else {
+		builder = builder.ClearDailyRequestLimit()
+	}
+	if groupIn.WeeklyRequestLimit != nil {
+		builder = builder.SetWeeklyRequestLimit(*groupIn.WeeklyRequestLimit)
+	} else {
+		builder = builder.ClearWeeklyRequestLimit()
+	}
+	if groupIn.MonthlyRequestLimit != nil {
+		builder = builder.SetMonthlyRequestLimit(*groupIn.MonthlyRequestLimit)
+	} else {
+		builder = builder.ClearMonthlyRequestLimit()
 	}
 	if groupIn.ImagePrice1K != nil {
 		builder = builder.SetImagePrice1k(*groupIn.ImagePrice1K)

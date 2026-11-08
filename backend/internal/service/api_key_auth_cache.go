@@ -79,6 +79,9 @@ type APIKeyAuthGroupSnapshot struct {
 	DailyTokenLimit                 *int64                        `json:"daily_token_limit,omitempty"`
 	WeeklyTokenLimit                *int64                        `json:"weekly_token_limit,omitempty"`
 	MonthlyTokenLimit               *int64                        `json:"monthly_token_limit,omitempty"`
+	DailyRequestLimit               *int64                        `json:"daily_request_limit,omitempty"`
+	WeeklyRequestLimit              *int64                        `json:"weekly_request_limit,omitempty"`
+	MonthlyRequestLimit             *int64                        `json:"monthly_request_limit,omitempty"`
 	AllowImageGeneration            bool                          `json:"allow_image_generation"`
 	AllowBatchImageGeneration       bool                          `json:"allow_batch_image_generation"`
 	ImageCountBilling               bool                          `json:"image_count_billing"`

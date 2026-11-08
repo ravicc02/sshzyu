@@ -243,6 +243,9 @@ type CreateGroupRequest struct {
 	DailyTokenLimit           optionalTokenLimitField       `json:"daily_token_limit"`
 	WeeklyTokenLimit          optionalTokenLimitField       `json:"weekly_token_limit"`
 	MonthlyTokenLimit         optionalTokenLimitField       `json:"monthly_token_limit"`
+	DailyRequestLimit         optionalTokenLimitField       `json:"daily_request_limit"`
+	WeeklyRequestLimit        optionalTokenLimitField       `json:"weekly_request_limit"`
+	MonthlyRequestLimit       optionalTokenLimitField       `json:"monthly_request_limit"`
 	LongContextPricingEnabled bool                          `json:"long_context_pricing_enabled"`
 	ModelPricing              []service.ChannelModelPricing `json:"model_pricing"`
 	// 图片生成计费配置（antigravity 和 gemini 平台使用，负数表示清除配置）
@@ -323,6 +326,9 @@ type UpdateGroupRequest struct {
 	DailyTokenLimit           optionalTokenLimitField        `json:"daily_token_limit"`
 	WeeklyTokenLimit          optionalTokenLimitField        `json:"weekly_token_limit"`
 	MonthlyTokenLimit         optionalTokenLimitField        `json:"monthly_token_limit"`
+	DailyRequestLimit         optionalTokenLimitField        `json:"daily_request_limit"`
+	WeeklyRequestLimit        optionalTokenLimitField        `json:"weekly_request_limit"`
+	MonthlyRequestLimit       optionalTokenLimitField        `json:"monthly_request_limit"`
 	LongContextPricingEnabled *bool                          `json:"long_context_pricing_enabled"`
 	ModelPricing              *[]service.ChannelModelPricing `json:"model_pricing"`
 	// 图片生成计费配置（antigravity 和 gemini 平台使用，负数表示清除配置）
@@ -734,6 +740,9 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		DailyTokenLimit:                 req.DailyTokenLimit.ToServiceInput(),
 		WeeklyTokenLimit:                req.WeeklyTokenLimit.ToServiceInput(),
 		MonthlyTokenLimit:               req.MonthlyTokenLimit.ToServiceInput(),
+		DailyRequestLimit:               req.DailyRequestLimit.ToServiceInput(),
+		WeeklyRequestLimit:              req.WeeklyRequestLimit.ToServiceInput(),
+		MonthlyRequestLimit:             req.MonthlyRequestLimit.ToServiceInput(),
 		LongContextPricingEnabled:       req.LongContextPricingEnabled,
 		ModelPricing:                    req.ModelPricing,
 		AllowImageGeneration:            req.AllowImageGeneration,
@@ -885,6 +894,9 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		DailyTokenLimit:                 req.DailyTokenLimit.ToServiceInput(),
 		WeeklyTokenLimit:                req.WeeklyTokenLimit.ToServiceInput(),
 		MonthlyTokenLimit:               req.MonthlyTokenLimit.ToServiceInput(),
+		DailyRequestLimit:               req.DailyRequestLimit.ToServiceInput(),
+		WeeklyRequestLimit:              req.WeeklyRequestLimit.ToServiceInput(),
+		MonthlyRequestLimit:             req.MonthlyRequestLimit.ToServiceInput(),
 		LongContextPricingEnabled:       req.LongContextPricingEnabled,
 		ModelPricing:                    req.ModelPricing,
 		AllowImageGeneration:            req.AllowImageGeneration,

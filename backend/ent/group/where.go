@@ -160,6 +160,21 @@ func MonthlyTokenLimit(v int64) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldMonthlyTokenLimit, v))
 }
 
+// DailyRequestLimit applies equality check predicate on the "daily_request_limit" field. It's identical to DailyRequestLimitEQ.
+func DailyRequestLimit(v int64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldDailyRequestLimit, v))
+}
+
+// WeeklyRequestLimit applies equality check predicate on the "weekly_request_limit" field. It's identical to WeeklyRequestLimitEQ.
+func WeeklyRequestLimit(v int64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldWeeklyRequestLimit, v))
+}
+
+// MonthlyRequestLimit applies equality check predicate on the "monthly_request_limit" field. It's identical to MonthlyRequestLimitEQ.
+func MonthlyRequestLimit(v int64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldMonthlyRequestLimit, v))
+}
+
 // DefaultValidityDays applies equality check predicate on the "default_validity_days" field. It's identical to DefaultValidityDaysEQ.
 func DefaultValidityDays(v int) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldDefaultValidityDays, v))
@@ -1433,6 +1448,156 @@ func MonthlyTokenLimitIsNil() predicate.Group {
 // MonthlyTokenLimitNotNil applies the NotNil predicate on the "monthly_token_limit" field.
 func MonthlyTokenLimitNotNil() predicate.Group {
 	return predicate.Group(sql.FieldNotNull(FieldMonthlyTokenLimit))
+}
+
+// DailyRequestLimitEQ applies the EQ predicate on the "daily_request_limit" field.
+func DailyRequestLimitEQ(v int64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldDailyRequestLimit, v))
+}
+
+// DailyRequestLimitNEQ applies the NEQ predicate on the "daily_request_limit" field.
+func DailyRequestLimitNEQ(v int64) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldDailyRequestLimit, v))
+}
+
+// DailyRequestLimitIn applies the In predicate on the "daily_request_limit" field.
+func DailyRequestLimitIn(vs ...int64) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldDailyRequestLimit, vs...))
+}
+
+// DailyRequestLimitNotIn applies the NotIn predicate on the "daily_request_limit" field.
+func DailyRequestLimitNotIn(vs ...int64) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldDailyRequestLimit, vs...))
+}
+
+// DailyRequestLimitGT applies the GT predicate on the "daily_request_limit" field.
+func DailyRequestLimitGT(v int64) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldDailyRequestLimit, v))
+}
+
+// DailyRequestLimitGTE applies the GTE predicate on the "daily_request_limit" field.
+func DailyRequestLimitGTE(v int64) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldDailyRequestLimit, v))
+}
+
+// DailyRequestLimitLT applies the LT predicate on the "daily_request_limit" field.
+func DailyRequestLimitLT(v int64) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldDailyRequestLimit, v))
+}
+
+// DailyRequestLimitLTE applies the LTE predicate on the "daily_request_limit" field.
+func DailyRequestLimitLTE(v int64) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldDailyRequestLimit, v))
+}
+
+// DailyRequestLimitIsNil applies the IsNil predicate on the "daily_request_limit" field.
+func DailyRequestLimitIsNil() predicate.Group {
+	return predicate.Group(sql.FieldIsNull(FieldDailyRequestLimit))
+}
+
+// DailyRequestLimitNotNil applies the NotNil predicate on the "daily_request_limit" field.
+func DailyRequestLimitNotNil() predicate.Group {
+	return predicate.Group(sql.FieldNotNull(FieldDailyRequestLimit))
+}
+
+// WeeklyRequestLimitEQ applies the EQ predicate on the "weekly_request_limit" field.
+func WeeklyRequestLimitEQ(v int64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldWeeklyRequestLimit, v))
+}
+
+// WeeklyRequestLimitNEQ applies the NEQ predicate on the "weekly_request_limit" field.
+func WeeklyRequestLimitNEQ(v int64) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldWeeklyRequestLimit, v))
+}
+
+// WeeklyRequestLimitIn applies the In predicate on the "weekly_request_limit" field.
+func WeeklyRequestLimitIn(vs ...int64) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldWeeklyRequestLimit, vs...))
+}
+
+// WeeklyRequestLimitNotIn applies the NotIn predicate on the "weekly_request_limit" field.
+func WeeklyRequestLimitNotIn(vs ...int64) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldWeeklyRequestLimit, vs...))
+}
+
+// WeeklyRequestLimitGT applies the GT predicate on the "weekly_request_limit" field.
+func WeeklyRequestLimitGT(v int64) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldWeeklyRequestLimit, v))
+}
+
+// WeeklyRequestLimitGTE applies the GTE predicate on the "weekly_request_limit" field.
+func WeeklyRequestLimitGTE(v int64) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldWeeklyRequestLimit, v))
+}
+
+// WeeklyRequestLimitLT applies the LT predicate on the "weekly_request_limit" field.
+func WeeklyRequestLimitLT(v int64) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldWeeklyRequestLimit, v))
+}
+
+// WeeklyRequestLimitLTE applies the LTE predicate on the "weekly_request_limit" field.
+func WeeklyRequestLimitLTE(v int64) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldWeeklyRequestLimit, v))
+}
+
+// WeeklyRequestLimitIsNil applies the IsNil predicate on the "weekly_request_limit" field.
+func WeeklyRequestLimitIsNil() predicate.Group {
+	return predicate.Group(sql.FieldIsNull(FieldWeeklyRequestLimit))
+}
+
+// WeeklyRequestLimitNotNil applies the NotNil predicate on the "weekly_request_limit" field.
+func WeeklyRequestLimitNotNil() predicate.Group {
+	return predicate.Group(sql.FieldNotNull(FieldWeeklyRequestLimit))
+}
+
+// MonthlyRequestLimitEQ applies the EQ predicate on the "monthly_request_limit" field.
+func MonthlyRequestLimitEQ(v int64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldMonthlyRequestLimit, v))
+}
+
+// MonthlyRequestLimitNEQ applies the NEQ predicate on the "monthly_request_limit" field.
+func MonthlyRequestLimitNEQ(v int64) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldMonthlyRequestLimit, v))
+}
+
+// MonthlyRequestLimitIn applies the In predicate on the "monthly_request_limit" field.
+func MonthlyRequestLimitIn(vs ...int64) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldMonthlyRequestLimit, vs...))
+}
+
+// MonthlyRequestLimitNotIn applies the NotIn predicate on the "monthly_request_limit" field.
+func MonthlyRequestLimitNotIn(vs ...int64) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldMonthlyRequestLimit, vs...))
+}
+
+// MonthlyRequestLimitGT applies the GT predicate on the "monthly_request_limit" field.
+func MonthlyRequestLimitGT(v int64) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldMonthlyRequestLimit, v))
+}
+
+// MonthlyRequestLimitGTE applies the GTE predicate on the "monthly_request_limit" field.
+func MonthlyRequestLimitGTE(v int64) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldMonthlyRequestLimit, v))
+}
+
+// MonthlyRequestLimitLT applies the LT predicate on the "monthly_request_limit" field.
+func MonthlyRequestLimitLT(v int64) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldMonthlyRequestLimit, v))
+}
+
+// MonthlyRequestLimitLTE applies the LTE predicate on the "monthly_request_limit" field.
+func MonthlyRequestLimitLTE(v int64) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldMonthlyRequestLimit, v))
+}
+
+// MonthlyRequestLimitIsNil applies the IsNil predicate on the "monthly_request_limit" field.
+func MonthlyRequestLimitIsNil() predicate.Group {
+	return predicate.Group(sql.FieldIsNull(FieldMonthlyRequestLimit))
+}
+
+// MonthlyRequestLimitNotNil applies the NotNil predicate on the "monthly_request_limit" field.
+func MonthlyRequestLimitNotNil() predicate.Group {
+	return predicate.Group(sql.FieldNotNull(FieldMonthlyRequestLimit))
 }
 
 // DefaultValidityDaysEQ applies the EQ predicate on the "default_validity_days" field.

@@ -135,6 +135,12 @@ export interface SubscriptionPlan {
   daily_limit_usd?: number | null
   weekly_limit_usd?: number | null
   monthly_limit_usd?: number | null
+  daily_token_limit?: number | null
+  weekly_token_limit?: number | null
+  monthly_token_limit?: number | null
+  daily_request_limit?: number | null
+  weekly_request_limit?: number | null
+  monthly_request_limit?: number | null
   supported_model_scopes?: string[]
   name: string
   description: string

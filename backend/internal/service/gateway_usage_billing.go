@@ -336,9 +336,14 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	// user-specific) rate multiplier consumes subscription quota at the expected
 	// speed. TotalCost remains the raw (pre-multiplier) value; downstream guards
 	// on "> 0" still correctly skip free subscriptions (RateMultiplier == 0).
-	if p.IsSubscriptionBill && p.Subscription != nil && p.Cost.TotalCost > 0 {
+	if p.IsSubscriptionBill && p.Subscription != nil {
 		cmd.SubscriptionID = &p.Subscription.ID
-		cmd.SubscriptionCost = p.Cost.ActualCost
+		if p.Cost.TotalCost > 0 {
+			cmd.SubscriptionCost = p.Cost.ActualCost
+		}
+		if p.APIKey.Group != nil && p.APIKey.Group.HasAnyRequestLimit() {
+			cmd.SubscriptionRequestCount = 1
+		}
 	} else if p.Cost.ActualCost > 0 {
 		cmd.BalanceCost = p.Cost.ActualCost
 	}
@@ -373,6 +378,7 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 		// must retain request-id deduplication and never bill other balances.
 		postUsageBilling(ctx, p, deps)
 		applyTokenQuotaUsage(ctx, usageLog, p, deps)
+		applySubscriptionRequestQuotaUsage(ctx, p, deps)
 		return true, nil
 	}
 
@@ -390,6 +396,12 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 	}
 
 	applyTokenQuotaUsage(billingCtx, usageLog, p, deps)
+	if cmd.SubscriptionRequestCount > 0 && deps.billingCacheService != nil &&
+		p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil {
+		deps.billingCacheService.QueueUpdateSubscriptionRequestUsage(
+			p.User.ID, *p.APIKey.GroupID, cmd.SubscriptionRequestCount,
+		)
+	}
 
 	if result.APIKeyQuotaExhausted {
 		if invalidator, ok := p.APIKeyService.(apiKeyAuthCacheInvalidator); ok && p.APIKey != nil && p.APIKey.Key != "" {
@@ -430,6 +442,29 @@ func applyTokenQuotaUsage(ctx context.Context, usageLog *UsageLog, p *postUsageB
 						"subscription_id", p.Subscription.ID, "error", err)
 				}
 			}
+		}
+	}
+}
+
+func applySubscriptionRequestQuotaUsage(ctx context.Context, p *postUsageBillingParams, deps *billingDeps) {
+	if p == nil || deps == nil || !p.IsSubscriptionBill || p.Subscription == nil ||
+		p.APIKey == nil || p.APIKey.Group == nil || !p.APIKey.Group.HasAnyRequestLimit() {
+		return
+	}
+	updater, ok := deps.userSubRepo.(interface {
+		IncrementRequestUsage(context.Context, int64, int64) error
+	})
+	if !ok {
+		return
+	}
+	if err := updater.IncrementRequestUsage(ctx, p.Subscription.ID, 1); err != nil {
+		slog.Error("increment subscription request usage failed", "subscription_id", p.Subscription.ID, "error", err)
+		return
+	}
+	if deps.billingCacheService != nil {
+		if err := deps.billingCacheService.InvalidateSubscription(ctx, p.Subscription.UserID, p.Subscription.GroupID); err != nil {
+			slog.Warn("invalidate subscription request usage cache failed",
+				"subscription_id", p.Subscription.ID, "error", err)
 		}
 	}
 }

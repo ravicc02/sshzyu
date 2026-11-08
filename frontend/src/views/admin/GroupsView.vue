@@ -244,9 +244,53 @@
                     }}</span
                   >
                 </div>
-                <span v-else class="text-gray-400 dark:text-gray-500">{{
+                <span
+                  v-else-if="
+                    !row.daily_token_limit &&
+                    !row.weekly_token_limit &&
+                    !row.monthly_token_limit &&
+                    !row.daily_request_limit &&
+                    !row.weekly_request_limit &&
+                    !row.monthly_request_limit
+                  "
+                  class="text-gray-400 dark:text-gray-500"
+                >{{
                   t("admin.groups.subscription.noLimit")
                 }}</span>
+                <div
+                  v-if="
+                    row.daily_request_limit ||
+                    row.weekly_request_limit ||
+                    row.monthly_request_limit
+                  "
+                  class="flex flex-wrap items-center gap-x-1 gap-y-0.5"
+                >
+                  <span v-if="row.daily_request_limit" class="whitespace-nowrap">
+                    {{ row.daily_request_limit.toLocaleString() }}/{{
+                      t("admin.groups.limitDay")
+                    }}
+                  </span>
+                  <span
+                    v-if="row.daily_request_limit && row.weekly_request_limit"
+                    class="mx-1 text-gray-300 dark:text-gray-600"
+                    >·</span
+                  >
+                  <span v-if="row.weekly_request_limit" class="whitespace-nowrap">
+                    {{ row.weekly_request_limit.toLocaleString() }}/{{
+                      t("admin.groups.limitWeek")
+                    }}
+                  </span>
+                  <span
+                    v-if="row.weekly_request_limit && row.monthly_request_limit"
+                    class="mx-1 text-gray-300 dark:text-gray-600"
+                    >·</span
+                  >
+                  <span v-if="row.monthly_request_limit" class="whitespace-nowrap">
+                    {{ row.monthly_request_limit.toLocaleString() }}/{{
+                      t("admin.groups.limitMonth")
+                    }}
+                  </span>
+                </div>
                 <div class="text-gray-400 dark:text-gray-500">
                   {{ t("admin.groups.usageTotal") }}
                   <span class="ml-1 font-medium text-gray-600 dark:text-gray-300"
@@ -730,7 +774,7 @@
               <legend class="input-label">
                 {{ t("admin.groups.subscription.quotaMode") }}
               </legend>
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <label
                   class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm"
                   :class="
@@ -762,6 +806,22 @@
                     class="h-4 w-4 accent-primary-600"
                   />
                   {{ t("admin.groups.subscription.tokenQuota") }}
+                </label>
+                <label
+                  class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm"
+                  :class="
+                    createForm.subscription_quota_mode === 'requests'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300'
+                      : 'border-gray-300 text-gray-600 dark:border-dark-600 dark:text-gray-300'
+                  "
+                >
+                  <input
+                    v-model="createForm.subscription_quota_mode"
+                    type="radio"
+                    value="requests"
+                    class="h-4 w-4 accent-primary-600"
+                  />
+                  {{ t("admin.groups.subscription.requestQuota") }}
                 </label>
               </div>
             </fieldset>
@@ -811,7 +871,10 @@
               </div>
             </div>
 
-            <div v-else class="space-y-4">
+            <div
+              v-else-if="createForm.subscription_quota_mode === 'tokens'"
+              class="space-y-4"
+            >
               <div>
                 <label class="input-label">{{
                   t("admin.groups.subscription.dailyTokenLimit")
@@ -871,6 +934,48 @@
                     class="w-24"
                   />
                 </div>
+              </div>
+            </div>
+
+            <div v-else class="space-y-4">
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.dailyRequestLimit")
+                }}</label>
+                <input
+                  v-model.number="createForm.daily_request_limit"
+                  type="number"
+                  step="1"
+                  min="1"
+                  class="input"
+                  :placeholder="t('admin.groups.subscription.noLimit')"
+                />
+              </div>
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.weeklyRequestLimit")
+                }}</label>
+                <input
+                  v-model.number="createForm.weekly_request_limit"
+                  type="number"
+                  step="1"
+                  min="1"
+                  class="input"
+                  :placeholder="t('admin.groups.subscription.noLimit')"
+                />
+              </div>
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.monthlyRequestLimit")
+                }}</label>
+                <input
+                  v-model.number="createForm.monthly_request_limit"
+                  type="number"
+                  step="1"
+                  min="1"
+                  class="input"
+                  :placeholder="t('admin.groups.subscription.noLimit')"
+                />
               </div>
             </div>
           </div>
@@ -2498,7 +2603,7 @@
               <legend class="input-label">
                 {{ t("admin.groups.subscription.quotaMode") }}
               </legend>
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <label
                   class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm"
                   :class="
@@ -2530,6 +2635,22 @@
                     class="h-4 w-4 accent-primary-600"
                   />
                   {{ t("admin.groups.subscription.tokenQuota") }}
+                </label>
+                <label
+                  class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm"
+                  :class="
+                    editForm.subscription_quota_mode === 'requests'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300'
+                      : 'border-gray-300 text-gray-600 dark:border-dark-600 dark:text-gray-300'
+                  "
+                >
+                  <input
+                    v-model="editForm.subscription_quota_mode"
+                    type="radio"
+                    value="requests"
+                    class="h-4 w-4 accent-primary-600"
+                  />
+                  {{ t("admin.groups.subscription.requestQuota") }}
                 </label>
               </div>
             </fieldset>
@@ -2579,7 +2700,10 @@
               </div>
             </div>
 
-            <div v-else class="space-y-4">
+            <div
+              v-else-if="editForm.subscription_quota_mode === 'tokens'"
+              class="space-y-4"
+            >
               <div>
                 <label class="input-label">{{
                   t("admin.groups.subscription.dailyTokenLimit")
@@ -2639,6 +2763,48 @@
                     class="w-24"
                   />
                 </div>
+              </div>
+            </div>
+
+            <div v-else class="space-y-4">
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.dailyRequestLimit")
+                }}</label>
+                <input
+                  v-model.number="editForm.daily_request_limit"
+                  type="number"
+                  step="1"
+                  min="1"
+                  class="input"
+                  :placeholder="t('admin.groups.subscription.noLimit')"
+                />
+              </div>
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.weeklyRequestLimit")
+                }}</label>
+                <input
+                  v-model.number="editForm.weekly_request_limit"
+                  type="number"
+                  step="1"
+                  min="1"
+                  class="input"
+                  :placeholder="t('admin.groups.subscription.noLimit')"
+                />
+              </div>
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.monthlyRequestLimit")
+                }}</label>
+                <input
+                  v-model.number="editForm.monthly_request_limit"
+                  type="number"
+                  step="1"
+                  min="1"
+                  class="input"
+                  :placeholder="t('admin.groups.subscription.noLimit')"
+                />
               </div>
             </div>
           </div>
@@ -5208,7 +5374,7 @@ const submitEditAllowlistCustomEntry = () => {
   }
 };
 
-type SubscriptionQuotaMode = "usd" | "tokens";
+type SubscriptionQuotaMode = "usd" | "tokens" | "requests";
 
 const createForm = reactive({
   name: "",
@@ -5228,6 +5394,9 @@ const createForm = reactive({
   daily_token_unit: "M" as TokenQuotaUnit,
   weekly_token_unit: "M" as TokenQuotaUnit,
   monthly_token_unit: "M" as TokenQuotaUnit,
+  daily_request_limit: null as number | null,
+  weekly_request_limit: null as number | null,
+  monthly_request_limit: null as number | null,
   long_context_pricing_enabled: true,
   force_openai_fast: false,
   free_openai_fast: false,
@@ -5605,6 +5774,9 @@ const editForm = reactive({
   daily_token_unit: "M" as TokenQuotaUnit,
   weekly_token_unit: "M" as TokenQuotaUnit,
   monthly_token_unit: "M" as TokenQuotaUnit,
+  daily_request_limit: null as number | null,
+  weekly_request_limit: null as number | null,
+  monthly_request_limit: null as number | null,
   long_context_pricing_enabled: true,
   force_openai_fast: false,
   free_openai_fast: false,
@@ -6094,6 +6266,9 @@ const closeCreateModal = () => {
   createForm.daily_token_unit = "M";
   createForm.weekly_token_unit = "M";
   createForm.monthly_token_unit = "M";
+  createForm.daily_request_limit = null;
+  createForm.weekly_request_limit = null;
+  createForm.monthly_request_limit = null;
   createForm.allow_image_generation = false;
   createForm.allow_batch_image_generation = false;
   createForm.image_count_billing = false;
@@ -6172,6 +6347,13 @@ const normalizeOptionalTokenLimit = (
   return tokens > 0 ? tokens : null;
 };
 
+const normalizeOptionalRequestLimit = (
+  value: number | string | null | undefined,
+): number | null => {
+  const normalized = normalizeOptionalLimit(value);
+  return normalized === null ? null : Math.trunc(normalized);
+};
+
 const inferSubscriptionQuotaMode = (
   group: Pick<
     AdminGroup,
@@ -6181,6 +6363,9 @@ const inferSubscriptionQuotaMode = (
     | "daily_token_limit"
     | "weekly_token_limit"
     | "monthly_token_limit"
+    | "daily_request_limit"
+    | "weekly_request_limit"
+    | "monthly_request_limit"
   >,
 ): SubscriptionQuotaMode => {
   const hasUSD = [
@@ -6193,6 +6378,14 @@ const inferSubscriptionQuotaMode = (
     group.weekly_token_limit,
     group.monthly_token_limit,
   ].some((value) => value !== null && value !== undefined);
+  const hasRequests = [
+    group.daily_request_limit,
+    group.weekly_request_limit,
+    group.monthly_request_limit,
+  ].some((value) => value !== null && value !== undefined);
+  if (hasRequests && !hasUSD && !hasTokens) {
+    return "requests";
+  }
   return hasTokens && !hasUSD ? "tokens" : "usd";
 };
 
@@ -6268,6 +6461,8 @@ const handleCreateGroup = async () => {
       ...createGroupForm
     } = createForm;
     const useUSDQuota = createForm.subscription_quota_mode === "usd";
+    const useTokenQuota = createForm.subscription_quota_mode === "tokens";
+    const useRequestQuota = createForm.subscription_quota_mode === "requests";
     const videoModelPrices = serializeVideoModelPrices(
       createForm.video_model_prices,
     );
@@ -6301,24 +6496,33 @@ const handleCreateGroup = async () => {
             createForm.monthly_limit_usd as number | string | null,
           )
         : null,
-      daily_token_limit: useUSDQuota
-        ? null
-        : normalizeOptionalTokenLimit(
+      daily_token_limit: useTokenQuota
+        ? normalizeOptionalTokenLimit(
             createForm.daily_token_amount,
             createForm.daily_token_unit,
-          ),
-      weekly_token_limit: useUSDQuota
-        ? null
-        : normalizeOptionalTokenLimit(
+          )
+        : null,
+      weekly_token_limit: useTokenQuota
+        ? normalizeOptionalTokenLimit(
             createForm.weekly_token_amount,
             createForm.weekly_token_unit,
-          ),
-      monthly_token_limit: useUSDQuota
-        ? null
-        : normalizeOptionalTokenLimit(
+          )
+        : null,
+      monthly_token_limit: useTokenQuota
+        ? normalizeOptionalTokenLimit(
             createForm.monthly_token_amount,
             createForm.monthly_token_unit,
-          ),
+          )
+        : null,
+      daily_request_limit: useRequestQuota
+        ? normalizeOptionalRequestLimit(createForm.daily_request_limit)
+        : null,
+      weekly_request_limit: useRequestQuota
+        ? normalizeOptionalRequestLimit(createForm.weekly_request_limit)
+        : null,
+      monthly_request_limit: useRequestQuota
+        ? normalizeOptionalRequestLimit(createForm.monthly_request_limit)
+        : null,
       ...(Object.keys(videoModelPrices).length > 0
         ? { video_model_prices: videoModelPrices }
         : {}),
@@ -6455,6 +6659,9 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.daily_token_amount = tokenBaseToAmount(group.daily_token_limit, editForm.daily_token_unit);
   editForm.weekly_token_amount = tokenBaseToAmount(group.weekly_token_limit, editForm.weekly_token_unit);
   editForm.monthly_token_amount = tokenBaseToAmount(group.monthly_token_limit, editForm.monthly_token_unit);
+  editForm.daily_request_limit = group.daily_request_limit;
+  editForm.weekly_request_limit = group.weekly_request_limit;
+  editForm.monthly_request_limit = group.monthly_request_limit;
   editForm.long_context_pricing_enabled =
     group.long_context_pricing_enabled ?? true;
   editForm.force_openai_fast = group.force_openai_fast ?? false;
@@ -6657,6 +6864,8 @@ const handleUpdateGroup = async () => {
       ...editGroupForm
     } = editForm;
     const useUSDQuota = editForm.subscription_quota_mode === "usd";
+    const useTokenQuota = editForm.subscription_quota_mode === "tokens";
+    const useRequestQuota = editForm.subscription_quota_mode === "requests";
     // 转换 fallback_group_id: null -> 0 (后端使用 0 表示清除)
     const payload = {
       ...editGroupForm,
@@ -6687,24 +6896,33 @@ const handleUpdateGroup = async () => {
             editForm.monthly_limit_usd as number | string | null,
           )
         : null,
-      daily_token_limit: useUSDQuota
-        ? null
-        : normalizeOptionalTokenLimit(
+      daily_token_limit: useTokenQuota
+        ? normalizeOptionalTokenLimit(
             editForm.daily_token_amount,
             editForm.daily_token_unit,
-          ),
-      weekly_token_limit: useUSDQuota
-        ? null
-        : normalizeOptionalTokenLimit(
+          )
+        : null,
+      weekly_token_limit: useTokenQuota
+        ? normalizeOptionalTokenLimit(
             editForm.weekly_token_amount,
             editForm.weekly_token_unit,
-          ),
-      monthly_token_limit: useUSDQuota
-        ? null
-        : normalizeOptionalTokenLimit(
+          )
+        : null,
+      monthly_token_limit: useTokenQuota
+        ? normalizeOptionalTokenLimit(
             editForm.monthly_token_amount,
             editForm.monthly_token_unit,
-          ),
+          )
+        : null,
+      daily_request_limit: useRequestQuota
+        ? normalizeOptionalRequestLimit(editForm.daily_request_limit)
+        : null,
+      weekly_request_limit: useRequestQuota
+        ? normalizeOptionalRequestLimit(editForm.weekly_request_limit)
+        : null,
+      monthly_request_limit: useRequestQuota
+        ? normalizeOptionalRequestLimit(editForm.monthly_request_limit)
+        : null,
       video_model_prices: serializeVideoModelPrices(
         editForm.video_model_prices,
       ),

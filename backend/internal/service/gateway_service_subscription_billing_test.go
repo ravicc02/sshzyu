@@ -83,3 +83,41 @@ func TestBuildUsageBillingCommand_SubscriptionAppliesRateMultiplier(t *testing.T
 		})
 	}
 }
+
+func TestBuildUsageBillingCommand_CountsFreeRequestQuotaUsage(t *testing.T) {
+	t.Parallel()
+
+	groupID := int64(7)
+	limit := int64(100)
+	subID := int64(42)
+	p := &postUsageBillingParams{
+		Cost: &CostBreakdown{TotalCost: 1, ActualCost: 0},
+		User: &User{ID: 1},
+		APIKey: &APIKey{
+			ID:      2,
+			GroupID: &groupID,
+			Group: &Group{
+				ID:                groupID,
+				SubscriptionType:  SubscriptionTypeSubscription,
+				DailyRequestLimit: &limit,
+			},
+		},
+		Account:            &Account{ID: 3},
+		Subscription:       &UserSubscription{ID: subID},
+		IsSubscriptionBill: true,
+	}
+
+	cmd := buildUsageBillingCommand("req-free", nil, p)
+	if cmd == nil {
+		t.Fatal("buildUsageBillingCommand returned nil")
+	}
+	if cmd.SubscriptionID == nil || *cmd.SubscriptionID != subID {
+		t.Fatalf("SubscriptionID = %v, want %d", cmd.SubscriptionID, subID)
+	}
+	if cmd.SubscriptionCost != 0 {
+		t.Fatalf("SubscriptionCost = %v, want 0", cmd.SubscriptionCost)
+	}
+	if cmd.SubscriptionRequestCount != 1 {
+		t.Fatalf("SubscriptionRequestCount = %d, want 1", cmd.SubscriptionRequestCount)
+	}
+}

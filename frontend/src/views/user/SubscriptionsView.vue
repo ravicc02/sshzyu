@@ -259,6 +259,52 @@
               </div>
             </div>
 
+            <div
+              v-if="
+                subscription.group?.daily_request_limit ||
+                subscription.group?.weekly_request_limit ||
+                subscription.group?.monthly_request_limit
+              "
+              class="space-y-3 rounded-lg border border-gray-100 p-3 dark:border-dark-700"
+            >
+              <div
+                v-if="subscription.group?.daily_request_limit"
+                class="flex items-center justify-between text-sm"
+              >
+                <span class="text-gray-500 dark:text-dark-400">{{
+                  t('userSubscriptions.dailyRequests')
+                }}</span>
+                <span class="font-medium text-gray-700 dark:text-gray-300">
+                  {{ (subscription.daily_usage_requests || 0).toLocaleString() }} /
+                  {{ subscription.group.daily_request_limit.toLocaleString() }}
+                </span>
+              </div>
+              <div
+                v-if="subscription.group?.weekly_request_limit"
+                class="flex items-center justify-between text-sm"
+              >
+                <span class="text-gray-500 dark:text-dark-400">{{
+                  t('userSubscriptions.weeklyRequests')
+                }}</span>
+                <span class="font-medium text-gray-700 dark:text-gray-300">
+                  {{ (subscription.weekly_usage_requests || 0).toLocaleString() }} /
+                  {{ subscription.group.weekly_request_limit.toLocaleString() }}
+                </span>
+              </div>
+              <div
+                v-if="subscription.group?.monthly_request_limit"
+                class="flex items-center justify-between text-sm"
+              >
+                <span class="text-gray-500 dark:text-dark-400">{{
+                  t('userSubscriptions.monthlyRequests')
+                }}</span>
+                <span class="font-medium text-gray-700 dark:text-gray-300">
+                  {{ (subscription.monthly_usage_requests || 0).toLocaleString() }} /
+                  {{ subscription.group.monthly_request_limit.toLocaleString() }}
+                </span>
+              </div>
+            </div>
+
             <!-- No limits configured - Unlimited badge -->
             <div
               v-if="
@@ -267,7 +313,10 @@
                 !subscription.group?.monthly_limit_usd &&
                 !subscription.group?.daily_token_limit &&
                 !subscription.group?.weekly_token_limit &&
-                !subscription.group?.monthly_token_limit
+                !subscription.group?.monthly_token_limit &&
+                !subscription.group?.daily_request_limit &&
+                !subscription.group?.weekly_request_limit &&
+                !subscription.group?.monthly_request_limit
               "
               class="flex items-center justify-center rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 py-6 dark:from-emerald-900/20 dark:to-teal-900/20"
             >

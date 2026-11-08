@@ -597,6 +597,9 @@ export interface Group {
   daily_token_limit: number | null
   weekly_token_limit: number | null
   monthly_token_limit: number | null
+  daily_request_limit: number | null
+  weekly_request_limit: number | null
+  monthly_request_limit: number | null
   long_context_pricing_enabled: boolean
   // 图片生成计费配置
   allow_image_generation: boolean
@@ -845,6 +848,9 @@ export interface CreateGroupRequest {
   daily_token_limit?: number | null
   weekly_token_limit?: number | null
   monthly_token_limit?: number | null
+  daily_request_limit?: number | null
+  weekly_request_limit?: number | null
+  monthly_request_limit?: number | null
   long_context_pricing_enabled?: boolean
   force_openai_fast?: boolean
   free_openai_fast?: boolean
@@ -916,6 +922,9 @@ export interface UpdateGroupRequest {
   daily_token_limit?: number | null
   weekly_token_limit?: number | null
   monthly_token_limit?: number | null
+  daily_request_limit?: number | null
+  weekly_request_limit?: number | null
+  monthly_request_limit?: number | null
   long_context_pricing_enabled?: boolean
   force_openai_fast?: boolean
   free_openai_fast?: boolean
@@ -2231,6 +2240,9 @@ export interface UserSubscription {
   daily_usage_tokens: number
   weekly_usage_tokens: number
   monthly_usage_tokens: number
+  daily_usage_requests: number
+  weekly_usage_requests: number
+  monthly_usage_requests: number
   daily_window_start: string | null
   weekly_window_start: string | null
   monthly_window_start: string | null
@@ -2247,18 +2259,27 @@ export interface SubscriptionProgress {
   daily: {
     used: number
     limit: number | null
+    used_requests?: number
+    limit_requests?: number
+    remaining_requests?: number
     percentage: number
     reset_in_seconds: number | null
   } | null
   weekly: {
     used: number
     limit: number | null
+    used_requests?: number
+    limit_requests?: number
+    remaining_requests?: number
     percentage: number
     reset_in_seconds: number | null
   } | null
   monthly: {
     used: number
     limit: number | null
+    used_requests?: number
+    limit_requests?: number
+    remaining_requests?: number
     percentage: number
     reset_in_seconds: number | null
   } | null

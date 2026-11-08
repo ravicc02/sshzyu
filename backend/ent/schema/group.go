@@ -111,6 +111,18 @@ func (Group) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			Comment("Monthly token limit for subscription groups; nil = unlimited"),
+		field.Int64("daily_request_limit").
+			Optional().
+			Nillable().
+			Comment("Daily request limit for subscription groups; nil/0 = unlimited"),
+		field.Int64("weekly_request_limit").
+			Optional().
+			Nillable().
+			Comment("Weekly request limit for subscription groups; nil/0 = unlimited"),
+		field.Int64("monthly_request_limit").
+			Optional().
+			Nillable().
+			Comment("Monthly request limit for subscription groups; nil/0 = unlimited"),
 		field.Int("default_validity_days").
 			Default(30),
 

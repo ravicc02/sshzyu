@@ -217,6 +217,7 @@ func TestAdminServiceSimpleModeRejectsCompositeCreateAndConversionDirectly(t *te
 func TestAdminServiceSubscriptionQuotaUnitsAreExclusive(t *testing.T) {
 	usd := 10.0
 	tokens := int64(1_000_000)
+	requests := int64(500)
 
 	t.Run("create rejects mixed units", func(t *testing.T) {
 		repo := &groupRepoStubForAdmin{}
@@ -228,6 +229,21 @@ func TestAdminServiceSubscriptionQuotaUnitsAreExclusive(t *testing.T) {
 			SubscriptionType: SubscriptionTypeSubscription,
 			DailyLimitUSD:    &usd,
 			DailyTokenLimit:  &tokens,
+		})
+		require.Equal(t, http.StatusBadRequest, infraerrors.Code(err))
+		require.Nil(t, repo.created)
+	})
+
+	t.Run("create rejects request and token mix", func(t *testing.T) {
+		repo := &groupRepoStubForAdmin{}
+		svc := &adminServiceImpl{groupRepo: repo}
+		_, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
+			Name:              "mixed-requests",
+			Platform:          PlatformAnthropic,
+			RateMultiplier:    1,
+			SubscriptionType:  SubscriptionTypeSubscription,
+			DailyTokenLimit:   &tokens,
+			DailyRequestLimit: &requests,
 		})
 		require.Equal(t, http.StatusBadRequest, infraerrors.Code(err))
 		require.Nil(t, repo.created)
@@ -272,6 +288,29 @@ func TestAdminServiceSubscriptionQuotaUnitsAreExclusive(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, updated.DailyLimitUSD)
 		require.Equal(t, tokens, *updated.DailyTokenLimit)
+		require.NotNil(t, repo.updated)
+	})
+
+	t.Run("update can switch to request units", func(t *testing.T) {
+		existing := &Group{
+			ID:               1,
+			Name:             "existing",
+			Platform:         PlatformAnthropic,
+			Status:           StatusActive,
+			RateMultiplier:   1,
+			SubscriptionType: SubscriptionTypeSubscription,
+			DailyLimitUSD:    &usd,
+		}
+		negativeUSD := -1.0
+		repo := &groupRepoStubForAdmin{getByID: existing}
+		svc := &adminServiceImpl{groupRepo: repo}
+		updated, err := svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{
+			DailyLimitUSD:     &negativeUSD,
+			DailyRequestLimit: &requests,
+		})
+		require.NoError(t, err)
+		require.Nil(t, updated.DailyLimitUSD)
+		require.Equal(t, requests, *updated.DailyRequestLimit)
 		require.NotNil(t, repo.updated)
 	})
 }

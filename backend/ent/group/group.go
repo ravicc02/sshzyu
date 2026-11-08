@@ -60,6 +60,12 @@ const (
 	FieldWeeklyTokenLimit = "weekly_token_limit"
 	// FieldMonthlyTokenLimit holds the string denoting the monthly_token_limit field in the database.
 	FieldMonthlyTokenLimit = "monthly_token_limit"
+	// FieldDailyRequestLimit holds the string denoting the daily_request_limit field in the database.
+	FieldDailyRequestLimit = "daily_request_limit"
+	// FieldWeeklyRequestLimit holds the string denoting the weekly_request_limit field in the database.
+	FieldWeeklyRequestLimit = "weekly_request_limit"
+	// FieldMonthlyRequestLimit holds the string denoting the monthly_request_limit field in the database.
+	FieldMonthlyRequestLimit = "monthly_request_limit"
 	// FieldDefaultValidityDays holds the string denoting the default_validity_days field in the database.
 	FieldDefaultValidityDays = "default_validity_days"
 	// FieldAllowImageGeneration holds the string denoting the allow_image_generation field in the database.
@@ -255,6 +261,9 @@ var Columns = []string{
 	FieldDailyTokenLimit,
 	FieldWeeklyTokenLimit,
 	FieldMonthlyTokenLimit,
+	FieldDailyRequestLimit,
+	FieldWeeklyRequestLimit,
+	FieldMonthlyRequestLimit,
 	FieldDefaultValidityDays,
 	FieldAllowImageGeneration,
 	FieldAllowBatchImageGeneration,
@@ -566,6 +575,21 @@ func ByWeeklyTokenLimit(opts ...sql.OrderTermOption) OrderOption {
 // ByMonthlyTokenLimit orders the results by the monthly_token_limit field.
 func ByMonthlyTokenLimit(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMonthlyTokenLimit, opts...).ToFunc()
+}
+
+// ByDailyRequestLimit orders the results by the daily_request_limit field.
+func ByDailyRequestLimit(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDailyRequestLimit, opts...).ToFunc()
+}
+
+// ByWeeklyRequestLimit orders the results by the weekly_request_limit field.
+func ByWeeklyRequestLimit(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWeeklyRequestLimit, opts...).ToFunc()
+}
+
+// ByMonthlyRequestLimit orders the results by the monthly_request_limit field.
+func ByMonthlyRequestLimit(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMonthlyRequestLimit, opts...).ToFunc()
 }
 
 // ByDefaultValidityDays orders the results by the default_validity_days field.

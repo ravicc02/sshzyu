@@ -74,6 +74,12 @@ func (UserSubscription) Fields() []ent.Field {
 			Default(0),
 		field.Int64("monthly_usage_tokens").
 			Default(0),
+		field.Int64("daily_usage_requests").
+			Default(0),
+		field.Int64("weekly_usage_requests").
+			Default(0),
+		field.Int64("monthly_usage_requests").
+			Default(0),
 
 		field.Int64("assigned_by").
 			Optional().

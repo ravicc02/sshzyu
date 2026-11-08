@@ -158,6 +158,48 @@
                     }}
                   </span>
                 </div>
+
+                <div v-if="subscription.group?.daily_request_limit" class="flex items-center gap-2">
+                  <span class="w-8 flex-shrink-0 text-[10px] text-gray-500">{{ requestWindowLabel('daily') }}</span>
+                  <div class="h-1.5 min-w-0 flex-1 rounded-full bg-gray-200 dark:bg-dark-600">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="getProgressBarClass(subscription.daily_usage_requests, subscription.group.daily_request_limit)"
+                      :style="{ width: getProgressWidth(subscription.daily_usage_requests, subscription.group.daily_request_limit) }"
+                    ></div>
+                  </div>
+                  <span class="w-24 flex-shrink-0 text-right text-[10px] text-gray-500">
+                    {{ formatRequestUsage(subscription.daily_usage_requests, subscription.group.daily_request_limit) }}
+                  </span>
+                </div>
+
+                <div v-if="subscription.group?.weekly_request_limit" class="flex items-center gap-2">
+                  <span class="w-8 flex-shrink-0 text-[10px] text-gray-500">{{ requestWindowLabel('weekly') }}</span>
+                  <div class="h-1.5 min-w-0 flex-1 rounded-full bg-gray-200 dark:bg-dark-600">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="getProgressBarClass(subscription.weekly_usage_requests, subscription.group.weekly_request_limit)"
+                      :style="{ width: getProgressWidth(subscription.weekly_usage_requests, subscription.group.weekly_request_limit) }"
+                    ></div>
+                  </div>
+                  <span class="w-24 flex-shrink-0 text-right text-[10px] text-gray-500">
+                    {{ formatRequestUsage(subscription.weekly_usage_requests, subscription.group.weekly_request_limit) }}
+                  </span>
+                </div>
+
+                <div v-if="subscription.group?.monthly_request_limit" class="flex items-center gap-2">
+                  <span class="w-8 flex-shrink-0 text-[10px] text-gray-500">{{ requestWindowLabel('monthly') }}</span>
+                  <div class="h-1.5 min-w-0 flex-1 rounded-full bg-gray-200 dark:bg-dark-600">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="getProgressBarClass(subscription.monthly_usage_requests, subscription.group.monthly_request_limit)"
+                      :style="{ width: getProgressWidth(subscription.monthly_usage_requests, subscription.group.monthly_request_limit) }"
+                    ></div>
+                  </div>
+                  <span class="w-24 flex-shrink-0 text-right text-[10px] text-gray-500">
+                    {{ formatRequestUsage(subscription.monthly_usage_requests, subscription.group.monthly_request_limit) }}
+                  </span>
+                </div>
               </template>
             </div>
           </div>
@@ -184,7 +226,7 @@ import Icon from '@/components/icons/Icon.vue'
 import { useSubscriptionStore } from '@/stores'
 import type { UserSubscription } from '@/types'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const subscriptionStore = useSubscriptionStore()
 
@@ -215,6 +257,15 @@ function getMaxUsagePercentage(sub: UserSubscription): number {
   if (sub.group?.monthly_limit_usd) {
     percentages.push(((sub.monthly_usage_usd || 0) / sub.group.monthly_limit_usd) * 100)
   }
+  if (sub.group?.daily_request_limit) {
+    percentages.push(((sub.daily_usage_requests || 0) / sub.group.daily_request_limit) * 100)
+  }
+  if (sub.group?.weekly_request_limit) {
+    percentages.push(((sub.weekly_usage_requests || 0) / sub.group.weekly_request_limit) * 100)
+  }
+  if (sub.group?.monthly_request_limit) {
+    percentages.push(((sub.monthly_usage_requests || 0) / sub.group.monthly_request_limit) * 100)
+  }
   return percentages.length > 0 ? Math.max(...percentages) : 0
 }
 
@@ -222,7 +273,13 @@ function isUnlimited(sub: UserSubscription): boolean {
   return (
     !sub.group?.daily_limit_usd &&
     !sub.group?.weekly_limit_usd &&
-    !sub.group?.monthly_limit_usd
+    !sub.group?.monthly_limit_usd &&
+    !sub.group?.daily_token_limit &&
+    !sub.group?.weekly_token_limit &&
+    !sub.group?.monthly_token_limit &&
+    !sub.group?.daily_request_limit &&
+    !sub.group?.weekly_request_limit &&
+    !sub.group?.monthly_request_limit
   )
 }
 
@@ -255,6 +312,17 @@ function formatUsage(used: number | undefined, limit: number | null | undefined)
   const usedValue = (used || 0).toFixed(2)
   const limitValue = limit?.toFixed(2) || '∞'
   return `$${usedValue}/$${limitValue}`
+}
+
+function formatRequestUsage(used: number | undefined, limit: number | null | undefined): string {
+  return `${(used || 0).toLocaleString()}/${limit?.toLocaleString() || '∞'}`
+}
+
+function requestWindowLabel(window: 'daily' | 'weekly' | 'monthly'): string {
+  if (locale.value === 'zh') {
+    return { daily: '日#', weekly: '周#', monthly: '月#' }[window]
+  }
+  return { daily: 'D#', weekly: 'W#', monthly: 'M#' }[window]
 }
 
 function getDaysRemaining(expiresAt: string): number {

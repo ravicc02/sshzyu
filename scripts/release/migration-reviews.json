@@ -123,5 +123,10 @@
     "checksum": "e82ea75dd70906f3e217e8759ab82766a9a385fb894ba9831ad682c8261145df",
     "risk": "backward-compatible",
     "description": "Add an empty-by-default per-key allowed-models JSON array and extend the existing auth-cache invalidation trigger to cover allowed-model edits and quota fields. Existing keys remain unrestricted until an administrator configures a model policy."
+  },
+  "273_subscription_request_quota_limits.sql": {
+    "checksum": "77f2f72f302fd6f8b45d17b5964c3a60cd23c1306976bd8993a2edc35b512bcf",
+    "risk": "backward-compatible",
+    "description": "Add nullable subscription-group request limits and zero-default per-window request counters. Existing groups remain unlimited until an administrator selects request quotas."
   }
 }

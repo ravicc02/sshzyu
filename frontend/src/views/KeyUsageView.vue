@@ -647,6 +647,22 @@ const ringItems = computed<RingItem[]>(() => {
           items.push({ title: l.label, pct, amount: `${usd(l.usage)} / ${usd(l.limit)}`, iconType: 'calendar' })
         }
       }
+      const requestLimits = [
+        { label: t('keyUsage.limitDailyRequests'), usage: sub.daily_usage_requests, limit: sub.daily_request_limit },
+        { label: t('keyUsage.limitWeeklyRequests'), usage: sub.weekly_usage_requests, limit: sub.weekly_request_limit },
+        { label: t('keyUsage.limitMonthlyRequests'), usage: sub.monthly_usage_requests, limit: sub.monthly_request_limit },
+      ]
+      for (const l of requestLimits) {
+        if (l.limit != null && l.limit > 0) {
+          const pct = Math.min(Math.round(((l.usage || 0) / l.limit) * 100), 100)
+          items.push({
+            title: l.label,
+            pct,
+            amount: `${(l.usage || 0).toLocaleString()} / ${l.limit.toLocaleString()}`,
+            iconType: 'calendar',
+          })
+        }
+      }
     }
     if (!data.subscription && data.balance != null) {
       items.push({ title: t('keyUsage.walletBalance'), pct: 0, amount: usd(data.balance), isBalance: true, iconType: 'dollar' })
@@ -755,6 +771,23 @@ const detailRows = computed<DetailRow[]>(() => {
           label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '月' : 'M'})`, value: `${usd(sub.monthly_usage_usd)} / ${usd(sub.monthly_limit_usd)}`, valueClass: getUsageColor(pct),
         })
       }
+      const requestLimits = [
+        { label: t('keyUsage.limitDailyRequests'), usage: sub.daily_usage_requests || 0, limit: sub.daily_request_limit },
+        { label: t('keyUsage.limitWeeklyRequests'), usage: sub.weekly_usage_requests || 0, limit: sub.weekly_request_limit },
+        { label: t('keyUsage.limitMonthlyRequests'), usage: sub.monthly_usage_requests || 0, limit: sub.monthly_request_limit },
+      ]
+      for (const limit of requestLimits) {
+        if (limit.limit > 0) {
+          rows.push({
+            iconBg: 'bg-primary-500/10',
+            iconColor: 'text-primary-500',
+            iconSvg: ICON_CALENDAR,
+            label: limit.label,
+            value: `${limit.usage.toLocaleString()} / ${limit.limit.toLocaleString()}`,
+            valueClass: getUsageColor((limit.usage / limit.limit) * 100),
+          })
+        }
+      }
       if (sub.expires_at) {
         rows.push({
           iconBg: 'bg-amber-500/10', iconColor: 'text-amber-500', iconSvg: ICON_CALENDAR,
@@ -768,7 +801,11 @@ const detailRows = computed<DetailRow[]>(() => {
       : ''
     rows.push({
       iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_SHIELD,
-      label: t('keyUsage.remainingQuota'), value: data.remaining != null ? usd(data.remaining) : '-', valueClass: remainColor,
+      label: t('keyUsage.remainingQuota'),
+      value: data.remaining != null
+        ? (data.unit === 'REQUESTS' ? Math.max(0, Math.floor(data.remaining)).toLocaleString() : usd(data.remaining))
+        : '-',
+      valueClass: remainColor,
     })
   }
 

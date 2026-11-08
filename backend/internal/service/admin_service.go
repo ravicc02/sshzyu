@@ -278,6 +278,9 @@ type CreateGroupInput struct {
 	DailyTokenLimit           *int64   // 日限额 (tokens)
 	WeeklyTokenLimit          *int64   // 周限额 (tokens)
 	MonthlyTokenLimit         *int64   // 月限额 (tokens)
+	DailyRequestLimit         *int64   // 日限额 (requests)
+	WeeklyRequestLimit        *int64   // 周限额 (requests)
+	MonthlyRequestLimit       *int64   // 月限额 (requests)
 	LongContextPricingEnabled bool
 	ModelPricing              []ChannelModelPricing
 	// 图片生成计费配置（仅 antigravity 平台使用）
@@ -364,6 +367,9 @@ type UpdateGroupInput struct {
 	DailyTokenLimit           *int64   // 日限额 (tokens)
 	WeeklyTokenLimit          *int64   // 周限额 (tokens)
 	MonthlyTokenLimit         *int64   // 月限额 (tokens)
+	DailyRequestLimit         *int64   // 日限额 (requests)
+	WeeklyRequestLimit        *int64   // 周限额 (requests)
+	MonthlyRequestLimit       *int64   // 月限额 (requests)
 	LongContextPricingEnabled *bool
 	ModelPricing              *[]ChannelModelPricing
 	// 图片生成计费配置（仅 antigravity 平台使用）

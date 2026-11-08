@@ -64,6 +64,12 @@ type Group struct {
 	WeeklyTokenLimit *int64 `json:"weekly_token_limit,omitempty"`
 	// Monthly token limit for subscription groups; nil = unlimited
 	MonthlyTokenLimit *int64 `json:"monthly_token_limit,omitempty"`
+	// Daily request limit for subscription groups; nil/0 = unlimited
+	DailyRequestLimit *int64 `json:"daily_request_limit,omitempty"`
+	// Weekly request limit for subscription groups; nil/0 = unlimited
+	WeeklyRequestLimit *int64 `json:"weekly_request_limit,omitempty"`
+	// Monthly request limit for subscription groups; nil/0 = unlimited
+	MonthlyRequestLimit *int64 `json:"monthly_request_limit,omitempty"`
 	// DefaultValidityDays holds the value of the "default_validity_days" field.
 	DefaultValidityDays int `json:"default_validity_days,omitempty"`
 	// 是否允许该分组使用图片生成能力
@@ -274,7 +280,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case group.FieldRateMultiplier, group.FieldPeakRateMultiplier, group.FieldDailyLimitUsd, group.FieldWeeklyLimitUsd, group.FieldMonthlyLimitUsd, group.FieldImageRateMultiplier, group.FieldImagePrice1k, group.FieldImagePrice2k, group.FieldImagePrice4k, group.FieldBatchImageDiscountMultiplier, group.FieldBatchImageHoldMultiplier, group.FieldVideoRateMultiplier, group.FieldVideoPrice480p, group.FieldVideoPrice720p, group.FieldVideoPrice1080p, group.FieldWebSearchPricePerCall, group.FieldSearchPricePer1k, group.FieldAudioRealtimePricePerMin, group.FieldAudioTtsPricePerMillionChars, group.FieldAudioSttPricePerHour, group.FieldProfitMinMargin, group.FieldProfitSafetyBuffer:
 			values[i] = new(sql.NullFloat64)
-		case group.FieldID, group.FieldDailyTokenLimit, group.FieldWeeklyTokenLimit, group.FieldMonthlyTokenLimit, group.FieldDefaultValidityDays, group.FieldFallbackGroupID, group.FieldFallbackGroupIDOnInvalidRequest, group.FieldSortOrder, group.FieldRpmLimit:
+		case group.FieldID, group.FieldDailyTokenLimit, group.FieldWeeklyTokenLimit, group.FieldMonthlyTokenLimit, group.FieldDailyRequestLimit, group.FieldWeeklyRequestLimit, group.FieldMonthlyRequestLimit, group.FieldDefaultValidityDays, group.FieldFallbackGroupID, group.FieldFallbackGroupIDOnInvalidRequest, group.FieldSortOrder, group.FieldRpmLimit:
 			values[i] = new(sql.NullInt64)
 		case group.FieldName, group.FieldDescription, group.FieldPeakStart, group.FieldPeakEnd, group.FieldStatus, group.FieldDuplicateOperationID, group.FieldPlatform, group.FieldSubscriptionType, group.FieldDefaultMappedModel, group.FieldMaxReasoningEffort, group.FieldMaxReasoningEffortOverLimit:
 			values[i] = new(sql.NullString)
@@ -443,6 +449,27 @@ func (_m *Group) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.MonthlyTokenLimit = new(int64)
 				*_m.MonthlyTokenLimit = value.Int64
+			}
+		case group.FieldDailyRequestLimit:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field daily_request_limit", values[i])
+			} else if value.Valid {
+				_m.DailyRequestLimit = new(int64)
+				*_m.DailyRequestLimit = value.Int64
+			}
+		case group.FieldWeeklyRequestLimit:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field weekly_request_limit", values[i])
+			} else if value.Valid {
+				_m.WeeklyRequestLimit = new(int64)
+				*_m.WeeklyRequestLimit = value.Int64
+			}
+		case group.FieldMonthlyRequestLimit:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field monthly_request_limit", values[i])
+			} else if value.Valid {
+				_m.MonthlyRequestLimit = new(int64)
+				*_m.MonthlyRequestLimit = value.Int64
 			}
 		case group.FieldDefaultValidityDays:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -924,6 +951,21 @@ func (_m *Group) String() string {
 	builder.WriteString(", ")
 	if v := _m.MonthlyTokenLimit; v != nil {
 		builder.WriteString("monthly_token_limit=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.DailyRequestLimit; v != nil {
+		builder.WriteString("daily_request_limit=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.WeeklyRequestLimit; v != nil {
+		builder.WriteString("weekly_request_limit=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.MonthlyRequestLimit; v != nil {
+		builder.WriteString("monthly_request_limit=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

@@ -22,7 +22,7 @@ import (
 
 func TestMigrationsOfficial016KeepCustomLedgerAndSchema(t *testing.T) {
 	ctx := context.Background()
-	names := []string{"242_lottery.sql", "242_drop_platform_check_constraints.sql", "242_group_i18n.sql", "243_lottery_tier.sql", "243_gemini_cached_contents.sql", "244_lottery_activity_tier_config.sql", "244_gemini_cached_contents_channel_usage.sql", "245_lottery_dynamic_tiers.sql", "245_gemini_cached_contents_mutation_lease.sql", "249_mcp_oauth.sql", "249_multi_use_redeem_codes.sql", "272_api_key_allowed_models.sql"}
+	names := []string{"242_lottery.sql", "242_drop_platform_check_constraints.sql", "242_group_i18n.sql", "243_lottery_tier.sql", "243_gemini_cached_contents.sql", "244_lottery_activity_tier_config.sql", "244_gemini_cached_contents_channel_usage.sql", "245_lottery_dynamic_tiers.sql", "245_gemini_cached_contents_mutation_lease.sql", "249_mcp_oauth.sql", "249_multi_use_redeem_codes.sql", "272_api_key_allowed_models.sql", "273_subscription_request_quota_limits.sql"}
 	for _, name := range names {
 		content, err := dbmigrations.FS.ReadFile(name)
 		require.NoError(t, err)
@@ -42,6 +42,12 @@ func TestMigrationsOfficial016KeepCustomLedgerAndSchema(t *testing.T) {
 	requireIndex(t, tx, "mcp_oauth_grants", "idx_mcp_oauth_grants_expiry")
 	requireColumn(t, tx, "api_keys", "allowed_models", "jsonb", 0, false)
 	requireColumnDefaultContains(t, tx, "api_keys", "allowed_models", "'[]'::jsonb")
+	requireColumn(t, tx, "groups", "daily_request_limit", "bigint", 0, true)
+	requireColumn(t, tx, "groups", "weekly_request_limit", "bigint", 0, true)
+	requireColumn(t, tx, "groups", "monthly_request_limit", "bigint", 0, true)
+	requireColumn(t, tx, "user_subscriptions", "daily_usage_requests", "bigint", 0, false)
+	requireColumn(t, tx, "user_subscriptions", "weekly_usage_requests", "bigint", 0, false)
+	requireColumn(t, tx, "user_subscriptions", "monthly_usage_requests", "bigint", 0, false)
 	var authCacheTriggerFunction string
 	require.NoError(t, tx.QueryRowContext(ctx, `SELECT pg_get_functiondef('enqueue_api_key_auth_cache_invalidation()'::regprocedure)`).Scan(&authCacheTriggerFunction))
 	require.Contains(t, authCacheTriggerFunction, "allowed_models")
@@ -89,6 +95,7 @@ func TestMigrationsUpgradeOfficial016From015PreservesCustomData(t *testing.T) {
 		"270_hosted_account_identity_and_models.sql":         true,
 		"271_channel_monitor_provider_models.sql":            true,
 		"272_api_key_allowed_models.sql":                     true,
+		"273_subscription_request_quota_limits.sql":          true,
 		"249_mcp_oauth.sql":                                  true,
 	}
 	files, err := fs.Glob(dbmigrations.FS, "*.sql")

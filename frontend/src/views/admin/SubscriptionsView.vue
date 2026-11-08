@@ -346,12 +346,78 @@
                 </div>
               </div>
 
+              <div v-if="row.group?.daily_request_limit" class="usage-row">
+                <div class="flex items-center gap-2">
+                  <span class="usage-label">{{ t('admin.subscriptions.dailyRequests') }}</span>
+                  <div class="h-1.5 flex-1 rounded-full bg-gray-200 dark:bg-dark-600">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="getProgressClass(row.daily_usage_requests, row.group?.daily_request_limit)"
+                      :style="{
+                        width: getProgressWidth(row.daily_usage_requests, row.group?.daily_request_limit)
+                      }"
+                    ></div>
+                  </div>
+                  <span class="usage-amount">
+                    {{ (row.daily_usage_requests || 0).toLocaleString() }}
+                    <span class="text-gray-400">/</span>
+                    {{ row.group.daily_request_limit.toLocaleString() }}
+                  </span>
+                </div>
+              </div>
+
+              <div v-if="row.group?.weekly_request_limit" class="usage-row">
+                <div class="flex items-center gap-2">
+                  <span class="usage-label">{{ t('admin.subscriptions.weeklyRequests') }}</span>
+                  <div class="h-1.5 flex-1 rounded-full bg-gray-200 dark:bg-dark-600">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="getProgressClass(row.weekly_usage_requests, row.group?.weekly_request_limit)"
+                      :style="{
+                        width: getProgressWidth(row.weekly_usage_requests, row.group?.weekly_request_limit)
+                      }"
+                    ></div>
+                  </div>
+                  <span class="usage-amount">
+                    {{ (row.weekly_usage_requests || 0).toLocaleString() }}
+                    <span class="text-gray-400">/</span>
+                    {{ row.group.weekly_request_limit.toLocaleString() }}
+                  </span>
+                </div>
+              </div>
+
+              <div v-if="row.group?.monthly_request_limit" class="usage-row">
+                <div class="flex items-center gap-2">
+                  <span class="usage-label">{{ t('admin.subscriptions.monthlyRequests') }}</span>
+                  <div class="h-1.5 flex-1 rounded-full bg-gray-200 dark:bg-dark-600">
+                    <div
+                      class="h-1.5 rounded-full transition-all"
+                      :class="getProgressClass(row.monthly_usage_requests, row.group?.monthly_request_limit)"
+                      :style="{
+                        width: getProgressWidth(row.monthly_usage_requests, row.group?.monthly_request_limit)
+                      }"
+                    ></div>
+                  </div>
+                  <span class="usage-amount">
+                    {{ (row.monthly_usage_requests || 0).toLocaleString() }}
+                    <span class="text-gray-400">/</span>
+                    {{ row.group.monthly_request_limit.toLocaleString() }}
+                  </span>
+                </div>
+              </div>
+
               <!-- No Limits - Unlimited badge -->
               <div
                 v-if="
                   !row.group?.daily_limit_usd &&
                   !row.group?.weekly_limit_usd &&
-                  !row.group?.monthly_limit_usd
+                  !row.group?.monthly_limit_usd &&
+                  !row.group?.daily_token_limit &&
+                  !row.group?.weekly_token_limit &&
+                  !row.group?.monthly_token_limit &&
+                  !row.group?.daily_request_limit &&
+                  !row.group?.weekly_request_limit &&
+                  !row.group?.monthly_request_limit
                 "
                 class="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 px-3 py-2 dark:from-emerald-900/20 dark:to-teal-900/20"
               >

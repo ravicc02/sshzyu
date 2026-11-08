@@ -155,6 +155,9 @@ export default {
     limit7d: '7-Day Limit',
     limitWeekly: 'Weekly Limit',
     limitMonthly: 'Monthly Limit',
+    limitDailyRequests: 'Daily Requests',
+    limitWeeklyRequests: 'Weekly Requests',
+    limitMonthlyRequests: 'Monthly Requests',
     // Detail rows
     remainingQuota: 'Remaining Quota',
     expiresAt: 'Expires At',

@@ -1804,11 +1804,17 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, usageData gin.H, dailyUsage any, modelStats any) {
 	// 订阅模式
 	if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() {
+		unit := "USD"
+		if apiKey.Group.HasAnyTokenLimit() {
+			unit = "TOKENS"
+		} else if apiKey.Group.HasAnyRequestLimit() {
+			unit = "REQUESTS"
+		}
 		resp := gin.H{
 			"mode":     "unrestricted",
 			"isValid":  true,
 			"planName": apiKey.Group.Name,
-			"unit":     "USD",
+			"unit":     unit,
 		}
 
 		// 订阅信息可能不在 context 中（/v1/usage 路径跳过了中间件的计费检查）
@@ -1817,14 +1823,20 @@ func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, 
 			remaining := h.calculateSubscriptionRemaining(apiKey.Group, subscription)
 			resp["remaining"] = remaining
 			resp["subscription"] = gin.H{
-				"daily_usage_usd":     subscription.DailyUsageUSD,
-				"weekly_usage_usd":    subscription.WeeklyUsageUSD,
-				"monthly_usage_usd":   subscription.MonthlyUsageUSD,
-				"daily_limit_usd":     apiKey.Group.DailyLimitUSD,
-				"weekly_limit_usd":    apiKey.Group.WeeklyLimitUSD,
-				"monthly_limit_usd":   apiKey.Group.MonthlyLimitUSD,
-				"weekly_window_start": subscription.WeeklyWindowStart,
-				"expires_at":          subscription.ExpiresAt,
+				"daily_usage_usd":        subscription.DailyUsageUSD,
+				"weekly_usage_usd":       subscription.WeeklyUsageUSD,
+				"monthly_usage_usd":      subscription.MonthlyUsageUSD,
+				"daily_limit_usd":        apiKey.Group.DailyLimitUSD,
+				"weekly_limit_usd":       apiKey.Group.WeeklyLimitUSD,
+				"monthly_limit_usd":      apiKey.Group.MonthlyLimitUSD,
+				"daily_usage_requests":   subscription.DailyUsageRequests,
+				"weekly_usage_requests":  subscription.WeeklyUsageRequests,
+				"monthly_usage_requests": subscription.MonthlyUsageRequests,
+				"daily_request_limit":    apiKey.Group.DailyRequestLimit,
+				"weekly_request_limit":   apiKey.Group.WeeklyRequestLimit,
+				"monthly_request_limit":  apiKey.Group.MonthlyRequestLimit,
+				"weekly_window_start":    subscription.WeeklyWindowStart,
+				"expires_at":             subscription.ExpiresAt,
 			}
 		}
 
@@ -1896,6 +1908,27 @@ func (h *GatewayHandler) calculateSubscriptionRemaining(group *service.Group, su
 	// 检查月限额
 	if group.HasMonthlyLimit() {
 		remaining := *group.MonthlyLimitUSD - sub.MonthlyUsageUSD
+		if remaining <= 0 {
+			return 0
+		}
+		remainingValues = append(remainingValues, remaining)
+	}
+	if group.HasDailyRequestLimit() {
+		remaining := float64(*group.DailyRequestLimit - sub.DailyUsageRequests)
+		if remaining <= 0 {
+			return 0
+		}
+		remainingValues = append(remainingValues, remaining)
+	}
+	if group.HasWeeklyRequestLimit() {
+		remaining := float64(*group.WeeklyRequestLimit - sub.WeeklyUsageRequests)
+		if remaining <= 0 {
+			return 0
+		}
+		remainingValues = append(remainingValues, remaining)
+	}
+	if group.HasMonthlyRequestLimit() {
+		remaining := float64(*group.MonthlyRequestLimit - sub.MonthlyUsageRequests)
 		if remaining <= 0 {
 			return 0
 		}

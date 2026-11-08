@@ -41,6 +41,9 @@ func (r *userSubscriptionRepository) Create(ctx context.Context, sub *service.Us
 		SetDailyUsageTokens(sub.DailyUsageTokens).
 		SetWeeklyUsageTokens(sub.WeeklyUsageTokens).
 		SetMonthlyUsageTokens(sub.MonthlyUsageTokens).
+		SetDailyUsageRequests(sub.DailyUsageRequests).
+		SetWeeklyUsageRequests(sub.WeeklyUsageRequests).
+		SetMonthlyUsageRequests(sub.MonthlyUsageRequests).
 		SetNillableAssignedBy(sub.AssignedBy)
 
 	if sub.StartsAt.IsZero() {
@@ -155,6 +158,9 @@ func (r *userSubscriptionRepository) Update(ctx context.Context, sub *service.Us
 		SetDailyUsageTokens(sub.DailyUsageTokens).
 		SetWeeklyUsageTokens(sub.WeeklyUsageTokens).
 		SetMonthlyUsageTokens(sub.MonthlyUsageTokens).
+		SetDailyUsageRequests(sub.DailyUsageRequests).
+		SetWeeklyUsageRequests(sub.WeeklyUsageRequests).
+		SetMonthlyUsageRequests(sub.MonthlyUsageRequests).
 		SetNillableAssignedBy(sub.AssignedBy).
 		SetAssignedAt(sub.AssignedAt).
 		SetNotes(sub.Notes)
@@ -394,13 +400,13 @@ func (r *userSubscriptionRepository) ResetUsageWindows(ctx context.Context, id i
 	client := clientFromContext(ctx, r.client)
 	update := client.UserSubscription.UpdateOneID(id)
 	if resetDaily {
-		update.SetDailyUsageUsd(0).SetDailyUsageTokens(0).SetDailyWindowStart(dailyStart)
+		update.SetDailyUsageUsd(0).SetDailyUsageTokens(0).SetDailyUsageRequests(0).SetDailyWindowStart(dailyStart)
 	}
 	if resetWeekly {
-		update.SetWeeklyUsageUsd(0).SetWeeklyUsageTokens(0).SetWeeklyWindowStart(periodicStart)
+		update.SetWeeklyUsageUsd(0).SetWeeklyUsageTokens(0).SetWeeklyUsageRequests(0).SetWeeklyWindowStart(periodicStart)
 	}
 	if resetMonthly {
-		update.SetMonthlyUsageUsd(0).SetMonthlyUsageTokens(0).SetMonthlyWindowStart(periodicStart)
+		update.SetMonthlyUsageUsd(0).SetMonthlyUsageTokens(0).SetMonthlyUsageRequests(0).SetMonthlyWindowStart(periodicStart)
 	}
 	_, err := update.Save(ctx)
 	return translatePersistenceError(err, service.ErrSubscriptionNotFound, nil)
@@ -417,6 +423,7 @@ func (r *userSubscriptionRepository) ResetDailyUsage(ctx context.Context, id int
 	n, err := query.
 		SetDailyUsageUsd(0).
 		SetDailyUsageTokens(0).
+		SetDailyUsageRequests(0).
 		SetDailyWindowStart(newWindowStart).
 		Save(ctx)
 	return r.translateConditionalWindowReset(ctx, client, id, n, err)
@@ -433,6 +440,7 @@ func (r *userSubscriptionRepository) ResetWeeklyUsage(ctx context.Context, id in
 	n, err := query.
 		SetWeeklyUsageUsd(0).
 		SetWeeklyUsageTokens(0).
+		SetWeeklyUsageRequests(0).
 		SetWeeklyWindowStart(newWindowStart).
 		Save(ctx)
 	return r.translateConditionalWindowReset(ctx, client, id, n, err)
@@ -449,6 +457,7 @@ func (r *userSubscriptionRepository) ResetMonthlyUsage(ctx context.Context, id i
 	n, err := query.
 		SetMonthlyUsageUsd(0).
 		SetMonthlyUsageTokens(0).
+		SetMonthlyUsageRequests(0).
 		SetMonthlyWindowStart(newWindowStart).
 		Save(ctx)
 	return r.translateConditionalWindowReset(ctx, client, id, n, err)
@@ -530,6 +539,38 @@ func (r *userSubscriptionRepository) IncrementTokenUsage(ctx context.Context, id
 	`
 	client := clientFromContext(ctx, r.client)
 	result, err := client.ExecContext(ctx, updateSQL, tokens, id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return service.ErrSubscriptionNotFound
+	}
+	return nil
+}
+
+func (r *userSubscriptionRepository) IncrementRequestUsage(ctx context.Context, id int64, requests int64) error {
+	if requests <= 0 {
+		return nil
+	}
+	const updateSQL = `
+		UPDATE user_subscriptions us
+		SET
+			daily_usage_requests = us.daily_usage_requests + $1,
+			weekly_usage_requests = us.weekly_usage_requests + $1,
+			monthly_usage_requests = us.monthly_usage_requests + $1,
+			updated_at = NOW()
+		FROM groups g
+		WHERE us.id = $2
+			AND us.deleted_at IS NULL
+			AND us.group_id = g.id
+			AND g.deleted_at IS NULL
+	`
+	client := clientFromContext(ctx, r.client)
+	result, err := client.ExecContext(ctx, updateSQL, requests, id)
 	if err != nil {
 		return err
 	}
@@ -682,27 +723,30 @@ func userSubscriptionEntityToServiceWithStatusMapping(m *dbent.UserSubscription,
 		status = service.SubscriptionStatusRevoked
 	}
 	out := &service.UserSubscription{
-		ID:                 m.ID,
-		UserID:             m.UserID,
-		GroupID:            m.GroupID,
-		StartsAt:           m.StartsAt,
-		ExpiresAt:          m.ExpiresAt,
-		Status:             status,
-		DailyWindowStart:   m.DailyWindowStart,
-		WeeklyWindowStart:  m.WeeklyWindowStart,
-		MonthlyWindowStart: m.MonthlyWindowStart,
-		DailyUsageUSD:      m.DailyUsageUsd,
-		WeeklyUsageUSD:     m.WeeklyUsageUsd,
-		MonthlyUsageUSD:    m.MonthlyUsageUsd,
-		DailyUsageTokens:   m.DailyUsageTokens,
-		WeeklyUsageTokens:  m.WeeklyUsageTokens,
-		MonthlyUsageTokens: m.MonthlyUsageTokens,
-		AssignedBy:         m.AssignedBy,
-		AssignedAt:         m.AssignedAt,
-		Notes:              derefString(m.Notes),
-		CreatedAt:          m.CreatedAt,
-		UpdatedAt:          m.UpdatedAt,
-		DeletedAt:          m.DeletedAt,
+		ID:                   m.ID,
+		UserID:               m.UserID,
+		GroupID:              m.GroupID,
+		StartsAt:             m.StartsAt,
+		ExpiresAt:            m.ExpiresAt,
+		Status:               status,
+		DailyWindowStart:     m.DailyWindowStart,
+		WeeklyWindowStart:    m.WeeklyWindowStart,
+		MonthlyWindowStart:   m.MonthlyWindowStart,
+		DailyUsageUSD:        m.DailyUsageUsd,
+		WeeklyUsageUSD:       m.WeeklyUsageUsd,
+		MonthlyUsageUSD:      m.MonthlyUsageUsd,
+		DailyUsageTokens:     m.DailyUsageTokens,
+		WeeklyUsageTokens:    m.WeeklyUsageTokens,
+		MonthlyUsageTokens:   m.MonthlyUsageTokens,
+		DailyUsageRequests:   m.DailyUsageRequests,
+		WeeklyUsageRequests:  m.WeeklyUsageRequests,
+		MonthlyUsageRequests: m.MonthlyUsageRequests,
+		AssignedBy:           m.AssignedBy,
+		AssignedAt:           m.AssignedAt,
+		Notes:                derefString(m.Notes),
+		CreatedAt:            m.CreatedAt,
+		UpdatedAt:            m.UpdatedAt,
+		DeletedAt:            m.DeletedAt,
 	}
 	if m.Edges.User != nil {
 		out.User = userEntityToService(m.Edges.User)
