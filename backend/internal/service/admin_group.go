@@ -446,6 +446,13 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	dailyTokenLimit := normalizeTokenLimit(input.DailyTokenLimit)
 	weeklyTokenLimit := normalizeTokenLimit(input.WeeklyTokenLimit)
 	monthlyTokenLimit := normalizeTokenLimit(input.MonthlyTokenLimit)
+	if err := validateGroupSubscriptionQuotaUnits(
+		subscriptionType,
+		dailyLimit, weeklyLimit, monthlyLimit,
+		dailyTokenLimit, weeklyTokenLimit, monthlyTokenLimit,
+	); err != nil {
+		return nil, err
+	}
 
 	// 图片价格：负数表示清除（使用默认价格），0 保留（表示免费）
 	imagePrice1K := normalizePrice(input.ImagePrice1K)
@@ -708,6 +715,34 @@ func normalizeTokenLimit(limit *int64) *int64 {
 	return limit
 }
 
+func updateGroupQuotaUnitsProvided(input *UpdateGroupInput) bool {
+	return input != nil && (input.DailyLimitUSD != nil ||
+		input.WeeklyLimitUSD != nil ||
+		input.MonthlyLimitUSD != nil ||
+		input.DailyTokenLimit != nil ||
+		input.WeeklyTokenLimit != nil ||
+		input.MonthlyTokenLimit != nil)
+}
+
+func validateGroupSubscriptionQuotaUnits(
+	subscriptionType string,
+	dailyUSD, weeklyUSD, monthlyUSD *float64,
+	dailyTokens, weeklyTokens, monthlyTokens *int64,
+) error {
+	if subscriptionType != SubscriptionTypeSubscription {
+		return nil
+	}
+	hasUSD := dailyUSD != nil || weeklyUSD != nil || monthlyUSD != nil
+	hasTokens := dailyTokens != nil || weeklyTokens != nil || monthlyTokens != nil
+	if hasUSD && hasTokens {
+		return infraerrors.BadRequest(
+			"GROUP_QUOTA_UNIT_CONFLICT",
+			"choose either USD limits or token limits for a subscription group",
+		)
+	}
+	return nil
+}
+
 // normalizePrice 将负数转换为 nil（表示使用默认价格），0 保留（表示免费）
 func normalizePrice(price *float64) *float64 {
 	if price == nil || *price < 0 {
@@ -864,6 +899,15 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	if input.MonthlyTokenLimit != nil {
 		group.MonthlyTokenLimit = normalizeTokenLimit(input.MonthlyTokenLimit)
+	}
+	if updateGroupQuotaUnitsProvided(input) {
+		if err := validateGroupSubscriptionQuotaUnits(
+			group.SubscriptionType,
+			group.DailyLimitUSD, group.WeeklyLimitUSD, group.MonthlyLimitUSD,
+			group.DailyTokenLimit, group.WeeklyTokenLimit, group.MonthlyTokenLimit,
+		); err != nil {
+			return nil, err
+		}
 	}
 	// 图片生成计费配置：负数表示清除（使用默认价格）
 	if input.AllowImageGeneration != nil {

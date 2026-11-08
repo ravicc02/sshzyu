@@ -726,55 +726,151 @@
             v-if="createForm.subscription_type === 'subscription'"
             class="space-y-4 border-l-2 border-primary-200 pl-4 dark:border-primary-800"
           >
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.subscription.dailyLimit")
-              }}</label>
-              <input
-                v-model.number="createForm.daily_limit_usd"
-                type="number"
-                step="0.01"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.subscription.noLimit')"
-              />
-              <div class="mt-2 flex gap-2">
-                <input v-model.number="createForm.daily_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
-                <Select v-model="createForm.daily_token_unit" :options="tokenUnitOptions" class="w-24" />
+            <fieldset>
+              <legend class="input-label">
+                {{ t("admin.groups.subscription.quotaMode") }}
+              </legend>
+              <div class="grid grid-cols-2 gap-2">
+                <label
+                  class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm"
+                  :class="
+                    createForm.subscription_quota_mode === 'usd'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300'
+                      : 'border-gray-300 text-gray-600 dark:border-dark-600 dark:text-gray-300'
+                  "
+                >
+                  <input
+                    v-model="createForm.subscription_quota_mode"
+                    type="radio"
+                    value="usd"
+                    class="h-4 w-4 accent-primary-600"
+                  />
+                  {{ t("admin.groups.subscription.usdQuota") }}
+                </label>
+                <label
+                  class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm"
+                  :class="
+                    createForm.subscription_quota_mode === 'tokens'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300'
+                      : 'border-gray-300 text-gray-600 dark:border-dark-600 dark:text-gray-300'
+                  "
+                >
+                  <input
+                    v-model="createForm.subscription_quota_mode"
+                    type="radio"
+                    value="tokens"
+                    class="h-4 w-4 accent-primary-600"
+                  />
+                  {{ t("admin.groups.subscription.tokenQuota") }}
+                </label>
+              </div>
+            </fieldset>
+
+            <div
+              v-if="createForm.subscription_quota_mode === 'usd'"
+              class="space-y-4"
+            >
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.dailyLimit")
+                }}</label>
+                <input
+                  v-model.number="createForm.daily_limit_usd"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input"
+                  :placeholder="t('admin.groups.subscription.noLimit')"
+                />
+              </div>
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.weeklyLimit")
+                }}</label>
+                <input
+                  v-model.number="createForm.weekly_limit_usd"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input"
+                  :placeholder="t('admin.groups.subscription.noLimit')"
+                />
+              </div>
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.monthlyLimit")
+                }}</label>
+                <input
+                  v-model.number="createForm.monthly_limit_usd"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input"
+                  :placeholder="t('admin.groups.subscription.noLimit')"
+                />
               </div>
             </div>
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.subscription.weeklyLimit")
-              }}</label>
-              <input
-                v-model.number="createForm.weekly_limit_usd"
-                type="number"
-                step="0.01"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.subscription.noLimit')"
-              />
-              <div class="mt-2 flex gap-2">
-                <input v-model.number="createForm.weekly_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
-                <Select v-model="createForm.weekly_token_unit" :options="tokenUnitOptions" class="w-24" />
+
+            <div v-else class="space-y-4">
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.dailyTokenLimit")
+                }}</label>
+                <div class="flex gap-2">
+                  <input
+                    v-model.number="createForm.daily_token_amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    class="input"
+                    :placeholder="t('admin.groups.subscription.noLimit')"
+                  />
+                  <Select
+                    v-model="createForm.daily_token_unit"
+                    :options="tokenUnitOptions"
+                    class="w-24"
+                  />
+                </div>
               </div>
-            </div>
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.subscription.monthlyLimit")
-              }}</label>
-              <input
-                v-model.number="createForm.monthly_limit_usd"
-                type="number"
-                step="0.01"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.subscription.noLimit')"
-              />
-              <div class="mt-2 flex gap-2">
-                <input v-model.number="createForm.monthly_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
-                <Select v-model="createForm.monthly_token_unit" :options="tokenUnitOptions" class="w-24" />
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.weeklyTokenLimit")
+                }}</label>
+                <div class="flex gap-2">
+                  <input
+                    v-model.number="createForm.weekly_token_amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    class="input"
+                    :placeholder="t('admin.groups.subscription.noLimit')"
+                  />
+                  <Select
+                    v-model="createForm.weekly_token_unit"
+                    :options="tokenUnitOptions"
+                    class="w-24"
+                  />
+                </div>
+              </div>
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.monthlyTokenLimit")
+                }}</label>
+                <div class="flex gap-2">
+                  <input
+                    v-model.number="createForm.monthly_token_amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    class="input"
+                    :placeholder="t('admin.groups.subscription.noLimit')"
+                  />
+                  <Select
+                    v-model="createForm.monthly_token_unit"
+                    :options="tokenUnitOptions"
+                    class="w-24"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -2398,55 +2494,151 @@
             v-if="editForm.subscription_type === 'subscription'"
             class="space-y-4 border-l-2 border-primary-200 pl-4 dark:border-primary-800"
           >
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.subscription.dailyLimit")
-              }}</label>
-              <input
-                v-model.number="editForm.daily_limit_usd"
-                type="number"
-                step="0.01"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.subscription.noLimit')"
-              />
-              <div class="mt-2 flex gap-2">
-                <input v-model.number="editForm.daily_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
-                <Select v-model="editForm.daily_token_unit" :options="tokenUnitOptions" class="w-24" />
+            <fieldset>
+              <legend class="input-label">
+                {{ t("admin.groups.subscription.quotaMode") }}
+              </legend>
+              <div class="grid grid-cols-2 gap-2">
+                <label
+                  class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm"
+                  :class="
+                    editForm.subscription_quota_mode === 'usd'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300'
+                      : 'border-gray-300 text-gray-600 dark:border-dark-600 dark:text-gray-300'
+                  "
+                >
+                  <input
+                    v-model="editForm.subscription_quota_mode"
+                    type="radio"
+                    value="usd"
+                    class="h-4 w-4 accent-primary-600"
+                  />
+                  {{ t("admin.groups.subscription.usdQuota") }}
+                </label>
+                <label
+                  class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm"
+                  :class="
+                    editForm.subscription_quota_mode === 'tokens'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300'
+                      : 'border-gray-300 text-gray-600 dark:border-dark-600 dark:text-gray-300'
+                  "
+                >
+                  <input
+                    v-model="editForm.subscription_quota_mode"
+                    type="radio"
+                    value="tokens"
+                    class="h-4 w-4 accent-primary-600"
+                  />
+                  {{ t("admin.groups.subscription.tokenQuota") }}
+                </label>
+              </div>
+            </fieldset>
+
+            <div
+              v-if="editForm.subscription_quota_mode === 'usd'"
+              class="space-y-4"
+            >
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.dailyLimit")
+                }}</label>
+                <input
+                  v-model.number="editForm.daily_limit_usd"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input"
+                  :placeholder="t('admin.groups.subscription.noLimit')"
+                />
+              </div>
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.weeklyLimit")
+                }}</label>
+                <input
+                  v-model.number="editForm.weekly_limit_usd"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input"
+                  :placeholder="t('admin.groups.subscription.noLimit')"
+                />
+              </div>
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.monthlyLimit")
+                }}</label>
+                <input
+                  v-model.number="editForm.monthly_limit_usd"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input"
+                  :placeholder="t('admin.groups.subscription.noLimit')"
+                />
               </div>
             </div>
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.subscription.weeklyLimit")
-              }}</label>
-              <input
-                v-model.number="editForm.weekly_limit_usd"
-                type="number"
-                step="0.01"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.subscription.noLimit')"
-              />
-              <div class="mt-2 flex gap-2">
-                <input v-model.number="editForm.weekly_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
-                <Select v-model="editForm.weekly_token_unit" :options="tokenUnitOptions" class="w-24" />
+
+            <div v-else class="space-y-4">
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.dailyTokenLimit")
+                }}</label>
+                <div class="flex gap-2">
+                  <input
+                    v-model.number="editForm.daily_token_amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    class="input"
+                    :placeholder="t('admin.groups.subscription.noLimit')"
+                  />
+                  <Select
+                    v-model="editForm.daily_token_unit"
+                    :options="tokenUnitOptions"
+                    class="w-24"
+                  />
+                </div>
               </div>
-            </div>
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.subscription.monthlyLimit")
-              }}</label>
-              <input
-                v-model.number="editForm.monthly_limit_usd"
-                type="number"
-                step="0.01"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.subscription.noLimit')"
-              />
-              <div class="mt-2 flex gap-2">
-                <input v-model.number="editForm.monthly_token_amount" type="number" step="0.01" min="0" class="input" placeholder="Token 限额" />
-                <Select v-model="editForm.monthly_token_unit" :options="tokenUnitOptions" class="w-24" />
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.weeklyTokenLimit")
+                }}</label>
+                <div class="flex gap-2">
+                  <input
+                    v-model.number="editForm.weekly_token_amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    class="input"
+                    :placeholder="t('admin.groups.subscription.noLimit')"
+                  />
+                  <Select
+                    v-model="editForm.weekly_token_unit"
+                    :options="tokenUnitOptions"
+                    class="w-24"
+                  />
+                </div>
+              </div>
+              <div>
+                <label class="input-label">{{
+                  t("admin.groups.subscription.monthlyTokenLimit")
+                }}</label>
+                <div class="flex gap-2">
+                  <input
+                    v-model.number="editForm.monthly_token_amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    class="input"
+                    :placeholder="t('admin.groups.subscription.noLimit')"
+                  />
+                  <Select
+                    v-model="editForm.monthly_token_unit"
+                    :options="tokenUnitOptions"
+                    class="w-24"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -5016,6 +5208,8 @@ const submitEditAllowlistCustomEntry = () => {
   }
 };
 
+type SubscriptionQuotaMode = "usd" | "tokens";
+
 const createForm = reactive({
   name: "",
   description: "",
@@ -5024,6 +5218,7 @@ const createForm = reactive({
   rate_multiplier: 1.0,
   is_exclusive: false,
   subscription_type: "standard" as SubscriptionType,
+  subscription_quota_mode: "usd" as SubscriptionQuotaMode,
   daily_limit_usd: null as number | null,
   weekly_limit_usd: null as number | null,
   monthly_limit_usd: null as number | null,
@@ -5400,6 +5595,7 @@ const editForm = reactive({
   is_exclusive: false,
   status: "active" as "active" | "inactive",
   subscription_type: "standard" as SubscriptionType,
+  subscription_quota_mode: "usd" as SubscriptionQuotaMode,
   daily_limit_usd: null as number | null,
   weekly_limit_usd: null as number | null,
   monthly_limit_usd: null as number | null,
@@ -5888,6 +6084,7 @@ const closeCreateModal = () => {
   createForm.rate_multiplier = 1.0;
   createForm.is_exclusive = false;
   createForm.subscription_type = "standard";
+  createForm.subscription_quota_mode = "usd";
   createForm.daily_limit_usd = null;
   createForm.weekly_limit_usd = null;
   createForm.monthly_limit_usd = null;
@@ -5975,6 +6172,30 @@ const normalizeOptionalTokenLimit = (
   return tokens > 0 ? tokens : null;
 };
 
+const inferSubscriptionQuotaMode = (
+  group: Pick<
+    AdminGroup,
+    | "daily_limit_usd"
+    | "weekly_limit_usd"
+    | "monthly_limit_usd"
+    | "daily_token_limit"
+    | "weekly_token_limit"
+    | "monthly_token_limit"
+  >,
+): SubscriptionQuotaMode => {
+  const hasUSD = [
+    group.daily_limit_usd,
+    group.weekly_limit_usd,
+    group.monthly_limit_usd,
+  ].some((value) => value !== null && value !== undefined);
+  const hasTokens = [
+    group.daily_token_limit,
+    group.weekly_token_limit,
+    group.monthly_token_limit,
+  ].some((value) => value !== null && value !== undefined);
+  return hasTokens && !hasUSD ? "tokens" : "usd";
+};
+
 const normalizeRateMultiplier = (
   value: number | string | null | undefined,
 ): number => {
@@ -6037,6 +6258,7 @@ const handleCreateGroup = async () => {
   try {
     const {
       video_model_prices: _createFormVideoModelPrices,
+      subscription_quota_mode: _subscriptionQuotaMode,
       daily_token_amount: _dailyTokenAmount,
       weekly_token_amount: _weeklyTokenAmount,
       monthly_token_amount: _monthlyTokenAmount,
@@ -6045,6 +6267,7 @@ const handleCreateGroup = async () => {
       monthly_token_unit: _monthlyTokenUnit,
       ...createGroupForm
     } = createForm;
+    const useUSDQuota = createForm.subscription_quota_mode === "usd";
     const videoModelPrices = serializeVideoModelPrices(
       createForm.video_model_prices,
     );
@@ -6063,27 +6286,39 @@ const handleCreateGroup = async () => {
         createForm.model_pricing,
         createForm.platform,
       ),
-      daily_limit_usd: normalizeOptionalLimit(
-        createForm.daily_limit_usd as number | string | null,
-      ),
-      weekly_limit_usd: normalizeOptionalLimit(
-        createForm.weekly_limit_usd as number | string | null,
-      ),
-      monthly_limit_usd: normalizeOptionalLimit(
-        createForm.monthly_limit_usd as number | string | null,
-      ),
-      daily_token_limit: normalizeOptionalTokenLimit(
-        createForm.daily_token_amount,
-        createForm.daily_token_unit,
-      ),
-      weekly_token_limit: normalizeOptionalTokenLimit(
-        createForm.weekly_token_amount,
-        createForm.weekly_token_unit,
-      ),
-      monthly_token_limit: normalizeOptionalTokenLimit(
-        createForm.monthly_token_amount,
-        createForm.monthly_token_unit,
-      ),
+      daily_limit_usd: useUSDQuota
+        ? normalizeOptionalLimit(
+            createForm.daily_limit_usd as number | string | null,
+          )
+        : null,
+      weekly_limit_usd: useUSDQuota
+        ? normalizeOptionalLimit(
+            createForm.weekly_limit_usd as number | string | null,
+          )
+        : null,
+      monthly_limit_usd: useUSDQuota
+        ? normalizeOptionalLimit(
+            createForm.monthly_limit_usd as number | string | null,
+          )
+        : null,
+      daily_token_limit: useUSDQuota
+        ? null
+        : normalizeOptionalTokenLimit(
+            createForm.daily_token_amount,
+            createForm.daily_token_unit,
+          ),
+      weekly_token_limit: useUSDQuota
+        ? null
+        : normalizeOptionalTokenLimit(
+            createForm.weekly_token_amount,
+            createForm.weekly_token_unit,
+          ),
+      monthly_token_limit: useUSDQuota
+        ? null
+        : normalizeOptionalTokenLimit(
+            createForm.monthly_token_amount,
+            createForm.monthly_token_unit,
+          ),
       ...(Object.keys(videoModelPrices).length > 0
         ? { video_model_prices: videoModelPrices }
         : {}),
@@ -6210,6 +6445,7 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.is_exclusive = group.is_exclusive;
   editForm.status = group.status;
   editForm.subscription_type = group.subscription_type || "standard";
+  editForm.subscription_quota_mode = inferSubscriptionQuotaMode(group);
   editForm.daily_limit_usd = group.daily_limit_usd;
   editForm.weekly_limit_usd = group.weekly_limit_usd;
   editForm.monthly_limit_usd = group.monthly_limit_usd;
@@ -6410,9 +6646,20 @@ const handleUpdateGroup = async () => {
 
   submitting.value = true;
   try {
+    const {
+      subscription_quota_mode: _subscriptionQuotaMode,
+      daily_token_amount: _dailyTokenAmount,
+      weekly_token_amount: _weeklyTokenAmount,
+      monthly_token_amount: _monthlyTokenAmount,
+      daily_token_unit: _dailyTokenUnit,
+      weekly_token_unit: _weeklyTokenUnit,
+      monthly_token_unit: _monthlyTokenUnit,
+      ...editGroupForm
+    } = editForm;
+    const useUSDQuota = editForm.subscription_quota_mode === "usd";
     // 转换 fallback_group_id: null -> 0 (后端使用 0 表示清除)
     const payload = {
-      ...editForm,
+      ...editGroupForm,
       force_openai_fast: normalizeGroupOpenAIFast(
         editForm.platform,
         editForm.force_openai_fast,
@@ -6425,27 +6672,39 @@ const handleUpdateGroup = async () => {
         editForm.model_pricing,
         editForm.platform,
       ),
-      daily_limit_usd: normalizeOptionalLimit(
-        editForm.daily_limit_usd as number | string | null,
-      ),
-      weekly_limit_usd: normalizeOptionalLimit(
-        editForm.weekly_limit_usd as number | string | null,
-      ),
-      monthly_limit_usd: normalizeOptionalLimit(
-        editForm.monthly_limit_usd as number | string | null,
-      ),
-      daily_token_limit: normalizeOptionalTokenLimit(
-        editForm.daily_token_amount,
-        editForm.daily_token_unit,
-      ),
-      weekly_token_limit: normalizeOptionalTokenLimit(
-        editForm.weekly_token_amount,
-        editForm.weekly_token_unit,
-      ),
-      monthly_token_limit: normalizeOptionalTokenLimit(
-        editForm.monthly_token_amount,
-        editForm.monthly_token_unit,
-      ),
+      daily_limit_usd: useUSDQuota
+        ? normalizeOptionalLimit(
+            editForm.daily_limit_usd as number | string | null,
+          )
+        : null,
+      weekly_limit_usd: useUSDQuota
+        ? normalizeOptionalLimit(
+            editForm.weekly_limit_usd as number | string | null,
+          )
+        : null,
+      monthly_limit_usd: useUSDQuota
+        ? normalizeOptionalLimit(
+            editForm.monthly_limit_usd as number | string | null,
+          )
+        : null,
+      daily_token_limit: useUSDQuota
+        ? null
+        : normalizeOptionalTokenLimit(
+            editForm.daily_token_amount,
+            editForm.daily_token_unit,
+          ),
+      weekly_token_limit: useUSDQuota
+        ? null
+        : normalizeOptionalTokenLimit(
+            editForm.weekly_token_amount,
+            editForm.weekly_token_unit,
+          ),
+      monthly_token_limit: useUSDQuota
+        ? null
+        : normalizeOptionalTokenLimit(
+            editForm.monthly_token_amount,
+            editForm.monthly_token_unit,
+          ),
       video_model_prices: serializeVideoModelPrices(
         editForm.video_model_prices,
       ),
