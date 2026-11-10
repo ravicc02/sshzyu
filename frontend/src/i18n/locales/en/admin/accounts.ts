@@ -668,8 +668,8 @@ export default {
       baseUrlHint: 'Leave default for official Anthropic API',
       videoApiConfig: {
         title: 'Video API protocol config',
-        placeholder: '{\n  "create_path": "/v1/videos",\n  "status_path": "/v1/videos/{id}",\n  "content_path": "/v1/videos/{id}/content"\n}',
-        hint: 'Optional JSON. Customize create/status/content paths, auth header, and response paths for task IDs, status, tokens, duration, resolution, and video URLs. Leave empty for the standard /v1/videos protocol.',
+        placeholder: 'create_path=/v1/videos\nstatus_path=/v1/videos/:id\ncontent_path=/v1/videos/:id/content',
+        hint: 'Optional JSON. Customize create/status/content paths, auth header, and response paths for task IDs, status, tokens, duration, resolution, and video URLs. Use :id as the task ID placeholder. Leave empty for the standard /v1/videos protocol.',
         invalid: 'Video API protocol config must be a valid JSON object',
       },
       apiKeyRequired: 'API Key *',

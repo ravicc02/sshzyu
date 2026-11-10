@@ -427,6 +427,7 @@ func buildVideoAPIURL(account *Account, cfg VideoAPIAccountConfig, endpoint Grok
 	}
 	requestID = strings.Trim(strings.TrimSpace(requestID), "/")
 	endpointPath = strings.ReplaceAll(endpointPath, "{id}", url.PathEscape(requestID))
+	endpointPath = strings.ReplaceAll(endpointPath, ":id", url.PathEscape(requestID))
 	if strings.HasSuffix(parsedBase.Path, "/v1") && strings.HasPrefix(endpointPath, "/v1/") {
 		endpointPath = strings.TrimPrefix(endpointPath, "/v1")
 	}

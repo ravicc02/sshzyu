@@ -759,8 +759,8 @@ export default {
       baseUrlHint: '留空使用官方 Anthropic API',
       videoApiConfig: {
         title: 'Video API 协议配置',
-        placeholder: '{\n  "create_path": "/v1/videos",\n  "status_path": "/v1/videos/{id}",\n  "content_path": "/v1/videos/{id}/content"\n}',
-        hint: '可选 JSON。可自定义创建、查询、下载路径，鉴权头，任务 ID/状态/Token/时长/分辨率/视频地址字段；留空使用标准 /v1/videos 协议。',
+        placeholder: 'create_path=/v1/videos\nstatus_path=/v1/videos/:id\ncontent_path=/v1/videos/:id/content',
+        hint: '可选 JSON。可自定义创建、查询、下载路径，鉴权头，任务 ID/状态/Token/时长/分辨率/视频地址字段；路径中的任务 ID 用 :id 占位。留空使用标准 /v1/videos 协议。',
         invalid: 'Video API 协议配置必须是合法的 JSON 对象',
       },
       apiKeyRequired: 'API Key *',
