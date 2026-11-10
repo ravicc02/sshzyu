@@ -3,10 +3,10 @@
   "upstream_release": "v0.2.20",
   "upstream_commit": "dab829a4e9b7d1cc307189aea8b0319eb29e29d0",
   "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.20",
-  "local_build_version": "0.2.20-r2",
+  "local_build_version": "0.2.20-r3",
   "integration_commit": "dfc1a02542535a0a5df4a8660c03e919c844b334",
   "integrated_at": "2026-11-08",
-  "verified_at": "2026-11-08",
+  "verified_at": "2026-11-11",
   "note": "Integrates the remaining unpublished editable batch-Key and per-key allowed-model work, strict balance-versus-token quota selection, the bounded scheduler usage cache, cached timezone parsing, scheduler backoff, bounded daily usage rollups, moderation runtime cache invalidation, completed-window aggregation skips, bounded system-log payloads, local CPU reproduction tools, and the Windows entrypoint/migration compatibility fix. The official baseline remains v0.2.20. The new 272_api_key_allowed_models.sql migration is backward-compatible and additive; production migration and activation remain manual.",
   "integration_status": "committed"
 }
