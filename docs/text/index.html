@@ -1,0 +1,1204 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SSHZYU 普通文本与多模态大模型文档：模型清单、Chat Completions、Responses、Anthropic Messages 与调用示例。">
+  <meta name="theme-color" content="#fafaf8">
+  <title>普通文本与多模态文档 · SSHZYU</title>
+  <link rel="icon" type="image/svg+xml" href="../iamge/sshzyu-mark.svg">
+  <link rel="stylesheet" href="/docs/docs-category.css">
+  <script>
+    (() => {
+      const saved = localStorage.getItem("theme");
+      const dark = saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.classList.toggle("dark", dark);
+    })();
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #fafaf8;
+      --surface: #ffffff;
+      --surface-soft: #f5f5f7;
+      --surface-raised: #ffffff;
+      --ink: #1d1d1f;
+      --muted: #6e6e73;
+      --muted-strong: #4f4f54;
+      --line: #e5e5e7;
+      --line-strong: #d7d7da;
+      --accent: #0071e3;
+      --accent-hover: #0062c6;
+      --accent-soft: #eaf3fe;
+      --warning: #9a6700;
+      --warning-soft: #fff8e6;
+      --code: #111113;
+      --code-line: #2c2c2f;
+      --code-ink: #f2f2f4;
+      --shadow: 0 18px 45px rgba(20, 20, 22, 0.07);
+      --radius: 18px;
+      --font-sans: "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, "Songti SC", serif;
+      --font-mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    html.dark {
+      color-scheme: dark;
+      --canvas: #18181a;
+      --surface: #1e1e20;
+      --surface-soft: #252528;
+      --surface-raised: #232326;
+      --ink: #f5f5f7;
+      --muted: #a1a1a6;
+      --muted-strong: #c3c3c8;
+      --line: #343437;
+      --line-strong: #46464b;
+      --accent: #2997ff;
+      --accent-hover: #62b1ff;
+      --accent-soft: #19314d;
+      --warning: #f3c969;
+      --warning-soft: #322917;
+      --shadow: 0 18px 45px rgba(0, 0, 0, 0.24);
+      --code: #101012;
+      --code-line: #303034;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 138px;
+    }
+
+    body {
+      min-width: 320px;
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font: 15px/1.75 var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      text-underline-offset: 3px;
+    }
+
+    a:hover {
+      color: var(--accent-hover);
+      text-decoration: underline;
+    }
+
+    button,
+    a {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      border-bottom: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+      background: color-mix(in srgb, var(--canvas) 88%, transparent);
+      backdrop-filter: blur(18px);
+    }
+
+    .topbar-inner {
+      width: min(1400px, calc(100% - 48px));
+      min-height: 68px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      min-width: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--ink);
+      font-size: 17px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+
+    .brand:hover {
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      flex: none;
+    }
+
+    .brand-docs {
+      padding-left: 11px;
+      border-left: 1px solid var(--line-strong);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .top-link,
+    .icon-button {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 10px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      transition: color 150ms ease, background 150ms ease;
+    }
+
+    .top-link:hover,
+    .icon-button:hover {
+      color: var(--ink);
+      background: var(--surface-soft);
+      text-decoration: none;
+    }
+
+    .icon-button {
+      width: 38px;
+      padding: 0;
+    }
+
+    .console-button {
+      min-height: 38px;
+      margin-left: 5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 14px;
+      border-radius: 10px;
+      color: var(--canvas);
+      background: var(--ink);
+      font-size: 12px;
+      font-weight: 550;
+      transition: opacity 150ms ease;
+    }
+
+    .console-button:hover {
+      color: var(--canvas);
+      opacity: 0.82;
+      text-decoration: none;
+    }
+
+    .mobile-toc-toggle {
+      display: none;
+    }
+
+    .docs-layout {
+      width: min(1320px, calc(100% - 64px));
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 238px minmax(0, 1fr);
+      gap: 70px;
+      align-items: start;
+    }
+
+    .docs-sidebar {
+      position: sticky;
+      top: 90px;
+      max-height: calc(100vh - 116px);
+      overflow: auto;
+      padding: 44px 4px 40px 0;
+      scrollbar-width: thin;
+    }
+
+    .sidebar-label {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .toc-search {
+      position: relative;
+      margin-bottom: 18px;
+    }
+
+    .toc-search svg {
+      position: absolute;
+      top: 50%;
+      left: 12px;
+      color: var(--muted);
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+
+    .toc-search input {
+      width: 100%;
+      height: 40px;
+      padding: 0 12px 0 36px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      color: var(--ink);
+      background: var(--surface);
+      outline: none;
+      font-size: 13px;
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .toc-search input::placeholder {
+      color: var(--muted);
+    }
+
+    .toc-search input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+    }
+
+    .side-nav {
+      display: grid;
+      gap: 2px;
+    }
+
+    .side-nav a {
+      padding: 8px 10px;
+      border-left: 2px solid transparent;
+      border-radius: 0 8px 8px 0;
+      color: var(--muted-strong);
+      font-size: 13px;
+      line-height: 1.45;
+      transition: color 150ms ease, background 150ms ease, border-color 150ms ease;
+    }
+
+    .side-nav a:hover {
+      color: var(--ink);
+      background: var(--surface-soft);
+      text-decoration: none;
+    }
+
+    .side-nav a.active {
+      border-left-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .side-nav a[hidden] {
+      display: none;
+    }
+
+    .document {
+      min-width: 0;
+      max-width: 900px;
+      padding: 0 0 104px;
+    }
+
+    .doc-hero {
+      position: relative;
+      padding: 58px 0 42px;
+      border-bottom: 1px solid var(--line);
+      isolation: isolate;
+    }
+
+    .doc-hero::before {
+      position: absolute;
+      z-index: -1;
+      inset: 18px -28px 4px;
+      content: "";
+      background-image:
+        linear-gradient(color-mix(in srgb, var(--ink) 3.8%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--ink) 3.8%, transparent) 1px, transparent 1px);
+      background-size: 28px 28px;
+      mask-image: linear-gradient(to bottom, black, transparent 92%);
+    }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .doc-hero h1 {
+      max-width: 760px;
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: clamp(42px, 6vw, 66px);
+      font-weight: 500;
+      line-height: 1.06;
+      letter-spacing: -0.045em;
+    }
+
+    .doc-lead {
+      max-width: 690px;
+      margin: 20px 0 0;
+      color: var(--muted-strong);
+      font-size: 16px;
+      line-height: 1.8;
+    }
+
+    .doc-meta {
+      margin-top: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .meta-item {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 11px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      color: var(--muted-strong);
+      background: var(--surface);
+      font-size: 12px;
+    }
+
+    .meta-item strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .meta-item code {
+      color: var(--accent);
+      background: transparent;
+      font-size: 12px;
+    }
+
+    .markdown-body {
+      color: var(--muted-strong);
+    }
+
+    .markdown-body > p:first-child {
+      margin-top: 36px;
+      color: var(--ink);
+      font-size: 16px;
+    }
+
+    .markdown-body h2 {
+      margin: 68px 0 20px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      color: var(--ink);
+      font-size: 26px;
+      font-weight: 650;
+      line-height: 1.28;
+      letter-spacing: -0.035em;
+    }
+
+    .markdown-body h3 {
+      margin: 34px 0 12px;
+      color: var(--ink);
+      font-size: 18px;
+      font-weight: 650;
+      line-height: 1.42;
+      letter-spacing: -0.02em;
+    }
+
+    .markdown-body p {
+      margin: 13px 0;
+    }
+
+    .markdown-body strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .markdown-body ul,
+    .markdown-body ol {
+      margin: 14px 0;
+      padding-left: 1.55em;
+    }
+
+    .markdown-body li {
+      margin: 8px 0;
+      padding-left: 2px;
+    }
+
+    .markdown-body li::marker {
+      color: var(--accent);
+      font-weight: 650;
+    }
+
+    .markdown-body code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      color: var(--accent);
+      background: var(--accent-soft);
+      font: 0.92em/1.5 var(--font-mono);
+      overflow-wrap: anywhere;
+    }
+
+    .code-wrap {
+      position: relative;
+      margin: 18px 0 24px;
+      overflow: hidden;
+      border: 1px solid var(--code-line);
+      border-radius: 14px;
+      background: var(--code);
+      box-shadow: var(--shadow);
+    }
+
+    .code-wrap pre {
+      margin: 0;
+      padding: 20px;
+      overflow: auto;
+      color: var(--code-ink);
+      background: transparent;
+      font: 13px/1.7 var(--font-mono);
+      tab-size: 2;
+    }
+
+    .code-wrap pre code {
+      padding: 0;
+      color: inherit;
+      background: transparent;
+      font: inherit;
+      overflow-wrap: normal;
+    }
+
+    .copy-button {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 8px;
+      border: 1px solid #45454a;
+      border-radius: 7px;
+      color: #d9d9df;
+      background: #202023;
+      cursor: pointer;
+      font-size: 11px;
+      transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+    }
+
+    .copy-button:hover {
+      color: #ffffff;
+      border-color: #73737a;
+      background: #29292d;
+    }
+
+    .table-scroll {
+      margin: 20px 0 26px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: var(--surface);
+    }
+
+    .markdown-body table {
+      width: 100%;
+      min-width: 560px;
+      border-collapse: collapse;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .markdown-body th,
+    .markdown-body td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .markdown-body th {
+      color: var(--ink);
+      background: var(--surface-soft);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .markdown-body tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .markdown-body blockquote {
+      margin: 22px 0;
+      padding: 15px 17px;
+      border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--accent-soft) 68%, var(--surface));
+    }
+
+    .markdown-body blockquote:has(strong:first-child) {
+      border-color: color-mix(in srgb, var(--warning) 25%, var(--line));
+      background: var(--warning-soft);
+    }
+
+    .markdown-body blockquote p {
+      margin: 0;
+      color: var(--muted-strong);
+    }
+
+    .markdown-body img {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      height: auto;
+      margin: 22px auto 10px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      cursor: zoom-in;
+    }
+
+    .markdown-body img[alt*="QQ 群"],
+    .markdown-body img[alt*="二维码"] {
+      width: min(300px, 100%);
+    }
+
+    .markdown-body .image-caption {
+      margin: 0 0 24px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    .markdown-body hr {
+      margin: 44px 0;
+      border: 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .doc-footer {
+      margin-top: 74px;
+      padding-top: 22px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .doc-footer a {
+      color: var(--muted-strong);
+    }
+
+    .lightbox {
+      position: fixed;
+      z-index: 80;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background: rgba(8, 8, 10, 0.88);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 180ms ease, visibility 180ms ease;
+    }
+
+    .lightbox.open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .lightbox img {
+      max-width: min(1200px, 94vw);
+      max-height: 88vh;
+      border-radius: 14px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+    }
+
+    .lightbox-close {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 50%;
+      color: #ffffff;
+      background: rgba(0, 0, 0, 0.28);
+      cursor: pointer;
+    }
+
+    .loading,
+    .load-error {
+      margin: 38px 0;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      color: var(--muted);
+      background: var(--surface);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1020px) {
+      .docs-layout {
+        width: min(100% - 40px, 900px);
+        display: block;
+      }
+
+      .docs-sidebar {
+        position: static;
+        max-height: none;
+        margin-top: 24px;
+        padding: 0;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+        overflow: hidden;
+      }
+
+      .sidebar-label {
+        margin: 0;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .toc-search {
+        margin: 12px 12px 8px;
+      }
+
+      .side-nav {
+        max-height: 360px;
+        padding: 0 10px 12px;
+        overflow: auto;
+      }
+
+      .doc-hero {
+        padding-top: 46px;
+      }
+    }
+
+    @media (max-width: 720px) {
+      html {
+        scroll-padding-top: 76px;
+      }
+
+      .topbar-inner {
+        width: calc(100% - 28px);
+        min-height: 62px;
+      }
+
+      .brand-docs,
+      .top-link {
+        display: none;
+      }
+
+      .mobile-toc-toggle {
+        display: inline-flex;
+      }
+
+      .console-button {
+        min-height: 36px;
+        padding: 0 11px;
+      }
+
+      .console-button svg {
+        display: none;
+      }
+
+      .docs-layout {
+        width: calc(100% - 28px);
+      }
+
+      .docs-sidebar {
+        display: none;
+        margin-top: 16px;
+      }
+
+      .docs-sidebar.open {
+        display: block;
+      }
+
+      .document {
+        padding-bottom: 76px;
+      }
+
+      .doc-hero {
+        padding: 36px 0 30px;
+      }
+
+      .doc-hero h1 {
+        font-size: clamp(38px, 13vw, 52px);
+      }
+
+      .doc-lead {
+        margin-top: 16px;
+        font-size: 15px;
+      }
+
+      .doc-meta {
+        margin-top: 20px;
+      }
+
+      .meta-item {
+        max-width: 100%;
+      }
+
+      .meta-item code {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .markdown-body h2 {
+        margin-top: 54px;
+        font-size: 23px;
+      }
+
+      .markdown-body h3 {
+        margin-top: 30px;
+        font-size: 17px;
+      }
+
+      .code-wrap pre {
+        padding: 17px 14px;
+        padding-top: 46px;
+        font-size: 12px;
+      }
+
+      .doc-footer {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .lightbox {
+        padding: 14px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/" aria-label="返回 SSHZYU 首页">
+        <svg class="brand-mark" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+          <rect width="64" height="64" rx="18" fill="#1d1d1f"/>
+          <path d="M44 19H28a9 9 0 0 0 0 18h8a4 4 0 0 1 0 8H20" stroke="white" stroke-width="4.5" stroke-linecap="round"/>
+          <path d="M20 45h16a9 9 0 0 0 0-18h-8a4 4 0 0 1 0-8h16" stroke="white" stroke-opacity=".45" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="46" cy="19" r="3" fill="#4c9aff"/>
+        </svg>
+        <span>SSHZYU</span>
+        <span class="brand-docs">普通文本与多模态</span>
+      </a>
+
+      <nav class="top-actions" aria-label="页面导航">
+        <a class="top-link" href="/">首页</a>
+        <a class="top-link" href="/docs/">使用文档</a>
+        <a class="top-link" href="/model-plaza">模型广场</a>
+        <a class="top-link" href="/keys">API 密钥</a>
+        <button class="icon-button" id="theme-toggle" type="button" aria-label="切换深色模式" title="切换深色模式">
+          <svg id="theme-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+          </svg>
+        </button>
+        <button class="icon-button mobile-toc-toggle" id="mobile-toc-toggle" type="button" aria-expanded="false" aria-controls="docs-sidebar" aria-label="打开文档目录" title="打开文档目录">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        <a class="console-button" href="/login">
+          控制台
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14M13 6l6 6-6 6"/>
+          </svg>
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <nav class="docs-category-nav" aria-label="模型文档分类">
+    <div class="docs-category-inner">
+      <span class="docs-category-label">模型文档</span>
+      <a class="docs-category-link active" href="/docs/text/">普通文本与多模态</a>
+      <a class="docs-category-link" href="/docs/image/">生图模型</a>
+      <a class="docs-category-link" href="/docs/vedio/">视频模型</a>
+    </div>
+  </nav>
+
+  <div class="docs-layout">
+    <aside class="docs-sidebar" id="docs-sidebar" aria-label="文档目录">
+      <p class="sidebar-label">文本模型目录</p>
+      <label class="toc-search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/>
+          <path d="m20 20-4-4"/>
+        </svg>
+        <input id="toc-search" type="search" placeholder="搜索章节" autocomplete="off" aria-label="搜索章节">
+      </label>
+      <nav class="side-nav" id="side-nav"></nav>
+    </aside>
+
+    <main class="document">
+      <header class="doc-hero">
+        <p class="eyebrow">SSHZYU Language Models</p>
+        <h1>普通文本与多模态</h1>
+        <p class="doc-lead">通过 OpenAI、Anthropic 和 Responses 兼容接口调用普通文本与多模态大模型，包含模型清单、协议差异和首次调用示例。</p>
+        <div class="doc-meta">
+          <span class="meta-item"><strong>Base URL</strong><code>https://sshzyu.com/v1</code></span>
+          <span class="meta-item"><strong>模型协议</strong><code>Chat / Responses / Messages</code></span>
+          <span class="meta-item">模型权限以当前 Key 为准</span>
+        </div>
+      </header>
+
+      <div id="doc-content">
+        <p class="loading">正在载入教程内容...</p>
+      </div>
+
+      <footer class="doc-footer">
+        <span>SSHZYU 普通文本与多模态文档</span>
+        <a href="/docs/">返回使用文档</a>
+      </footer>
+    </main>
+  </div>
+
+  <div class="lightbox" id="lightbox" aria-hidden="true">
+    <button class="lightbox-close" id="lightbox-close" type="button" aria-label="关闭图片预览" title="关闭图片预览">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <path d="M18 6 6 18M6 6l12 12"/>
+      </svg>
+    </button>
+    <img id="lightbox-image" alt="教程大图预览">
+  </div>
+
+  <script>
+    const sidebar = document.getElementById("docs-sidebar");
+    const sideNav = document.getElementById("side-nav");
+    const tocSearch = document.getElementById("toc-search");
+    const mobileTocToggle = document.getElementById("mobile-toc-toggle");
+    const themeToggle = document.getElementById("theme-toggle");
+    const themeIcon = document.getElementById("theme-icon");
+    const lightbox = document.getElementById("lightbox");
+    const lightboxImage = document.getElementById("lightbox-image");
+    let scrollObserver = null;
+
+    function escapeHtml(value) {
+      return value.replace(/[&<>"']/g, (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;",
+      }[character]));
+    }
+
+    function slugify(value, index) {
+      return value
+        .toLowerCase()
+        .replace(/[^\w\u4e00-\u9fff]+/g, "-")
+        .replace(/^-|-$/g, "") || `section-${index + 1}`;
+    }
+
+    function inlineMarkdown(value) {
+      const tokens = [];
+      const stash = (html) => {
+        tokens.push(html);
+        return `\u0000${tokens.length - 1}\u0000`;
+      };
+
+      let text = escapeHtml(value);
+      text = text.replace(/`([^`]+)`/g, (_, code) => stash(`<code>${code}</code>`));
+      text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_, alt, url) => stash(
+        `<img src="${url}" alt="${alt}" loading="lazy">`,
+      ));
+      text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]*)\)/g, (_, label, url) => {
+        const external = /^https?:\/\//.test(url);
+        return stash(`<a href="${url}"${external ? ' target="_blank" rel="noopener noreferrer"' : ""}>${label}</a>`);
+      });
+      text = text.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      text = text.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+      text = text.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+      return text.replace(/\u0000(\d+)\u0000/g, (_, index) => tokens[Number(index)]);
+    }
+
+    function renderMarkdown(markdown) {
+      const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+      const html = [];
+      let index = 0;
+      let headingIndex = 0;
+      const isBlank = (line) => /^\s*$/.test(line);
+
+      while (index < lines.length) {
+        const line = lines[index];
+        if (isBlank(line)) {
+          index += 1;
+          continue;
+        }
+
+        const fence = line.match(/^\s*```\s*([\w+-]*)\s*$/);
+        if (fence) {
+          const language = fence[1] || "text";
+          const code = [];
+          index += 1;
+          while (index < lines.length && !/^\s*```\s*$/.test(lines[index])) {
+            code.push(lines[index]);
+            index += 1;
+          }
+          if (index < lines.length) index += 1;
+          html.push(
+            `<div class="code-wrap"><button class="copy-button" type="button" aria-label="复制代码" title="复制代码">` +
+            `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>` +
+            `<span>复制</span></button><pre><code class="language-${language}">${escapeHtml(code.join("\n"))}</code></pre></div>`,
+          );
+          continue;
+        }
+
+        const heading = line.match(/^\s*(#{1,6})\s+(.+?)\s*#*\s*$/);
+        if (heading) {
+          const level = heading[1].length;
+          const text = heading[2].trim();
+          const id = slugify(text, headingIndex);
+          headingIndex += 1;
+          html.push(`<h${level} id="${id}">${inlineMarkdown(text)}</h${level}>`);
+          index += 1;
+          continue;
+        }
+
+        if (/^\s*(---+|\*\*\*+)\s*$/.test(line)) {
+          html.push("<hr>");
+          index += 1;
+          continue;
+        }
+
+        const caption = line.match(/^\*((?:图|表)\s*\d+[：:].*)\*$/);
+        if (caption) {
+          html.push(`<p class="image-caption">${inlineMarkdown(caption[1])}</p>`);
+          index += 1;
+          continue;
+        }
+
+        if (/^\s*>/.test(line)) {
+          const quote = [];
+          while (index < lines.length && /^\s*>/.test(lines[index])) {
+            quote.push(lines[index].replace(/^\s*>\s?/, ""));
+            index += 1;
+          }
+          html.push(`<blockquote>${renderMarkdown(quote.join("\n"))}</blockquote>`);
+          continue;
+        }
+
+        if (/^\s*\|/.test(line) && index + 1 < lines.length && /^\s*\|?\s*:?-{3,}/.test(lines[index + 1])) {
+          const cells = (row) => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+          const headers = cells(line);
+          index += 2;
+          const rows = [];
+          while (index < lines.length && /^\s*\|/.test(lines[index])) {
+            rows.push(cells(lines[index]));
+            index += 1;
+          }
+          html.push(
+            `<div class="table-scroll"><table><thead><tr>${headers.map((cell) => `<th>${inlineMarkdown(cell)}</th>`).join("")}</tr></thead>` +
+            `<tbody>${rows.map((row) => `<tr>${headers.map((_, cellIndex) => `<td>${inlineMarkdown(row[cellIndex] || "")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`,
+          );
+          continue;
+        }
+
+        const unordered = line.match(/^\s*[-*+]\s+(.+)$/);
+        const ordered = line.match(/^\s*\d+[.)]\s+(.+)$/);
+        if (unordered || ordered) {
+          const tag = unordered ? "ul" : "ol";
+          const items = [];
+          while (index < lines.length) {
+            const match = lines[index].match(unordered ? /^\s*[-*+]\s+(.+)$/ : /^\s*\d+[.)]\s+(.+)$/);
+            if (!match) break;
+            items.push(`<li>${inlineMarkdown(match[1])}</li>`);
+            index += 1;
+          }
+          html.push(`<${tag}>${items.join("")}</${tag}>`);
+          continue;
+        }
+
+        const paragraph = [line];
+        index += 1;
+        while (
+          index < lines.length &&
+          !isBlank(lines[index]) &&
+          !/^\s*(#{1,6})\s+/.test(lines[index]) &&
+          !/^\s*```/.test(lines[index]) &&
+          !/^\s*[-*+]\s+/.test(lines[index]) &&
+          !/^\s*\d+[.)]\s+/.test(lines[index]) &&
+          !/^\s*>/.test(lines[index]) &&
+          !/^\s*\|/.test(lines[index])
+        ) {
+          paragraph.push(lines[index]);
+          index += 1;
+        }
+        html.push(`<p>${inlineMarkdown(paragraph.join("\n").replace(/\n/g, " "))}</p>`);
+      }
+
+      return html.join("\n");
+    }
+
+    function closeLightbox() {
+      lightbox.classList.remove("open");
+      lightbox.setAttribute("aria-hidden", "true");
+      lightboxImage.removeAttribute("src");
+      document.body.style.overflow = "";
+    }
+
+    function bindInteractions() {
+      document.querySelectorAll(".copy-button").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const code = button.nextElementSibling.innerText;
+          const label = button.querySelector("span");
+          try {
+            await navigator.clipboard.writeText(code);
+            const original = label.textContent;
+            label.textContent = "已复制";
+            setTimeout(() => {
+              label.textContent = original;
+            }, 1200);
+          } catch (_) {
+            label.textContent = "复制失败";
+            setTimeout(() => {
+              label.textContent = "复制";
+            }, 1200);
+          }
+        });
+      });
+
+      document.querySelectorAll(".markdown-body img").forEach((image) => {
+        image.addEventListener("click", () => {
+          lightboxImage.src = image.currentSrc || image.src;
+          lightboxImage.alt = image.alt || "教程大图预览";
+          lightbox.classList.add("open");
+          lightbox.setAttribute("aria-hidden", "false");
+          document.body.style.overflow = "hidden";
+        });
+      });
+
+      const links = [...sideNav.querySelectorAll("a")];
+      const sections = links
+        .map((link) => document.getElementById(link.getAttribute("href").slice(1)))
+        .filter(Boolean);
+
+      if (scrollObserver) scrollObserver.disconnect();
+      scrollObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          links.forEach((link) => {
+            link.classList.toggle("active", link.getAttribute("href") === `#${entry.target.id}`);
+          });
+        });
+      }, { rootMargin: "-92px 0px -66% 0px", threshold: 0 });
+      sections.forEach((section) => scrollObserver.observe(section));
+    }
+
+    function buildToc() {
+      const headings = [...document.querySelectorAll("#doc-content h2")];
+      sideNav.innerHTML = headings
+        .map((heading) => `<a href="#${heading.id}">${heading.textContent}</a>`)
+        .join("");
+    }
+
+    async function loadMarkdownDocs() {
+      const response = await fetch("content.md", { cache: "no-store" });
+      if (!response.ok) throw new Error(`Markdown fetch failed: ${response.status}`);
+      const markdown = await response.text();
+      document.getElementById("doc-content").innerHTML = `<div class="markdown-body">${renderMarkdown(markdown)}</div>`;
+      buildToc();
+      bindInteractions();
+    }
+
+    function updateThemeIcon() {
+      const dark = document.documentElement.classList.contains("dark");
+      themeToggle.setAttribute("aria-label", dark ? "切换浅色模式" : "切换深色模式");
+      themeToggle.setAttribute("title", dark ? "切换浅色模式" : "切换深色模式");
+      themeIcon.innerHTML = dark
+        ? '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/>'
+        : '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>';
+    }
+
+    themeToggle.addEventListener("click", () => {
+      const dark = document.documentElement.classList.toggle("dark");
+      localStorage.setItem("theme", dark ? "dark" : "light");
+      updateThemeIcon();
+    });
+
+    mobileTocToggle.addEventListener("click", () => {
+      const open = sidebar.classList.toggle("open");
+      mobileTocToggle.setAttribute("aria-expanded", String(open));
+      mobileTocToggle.setAttribute("aria-label", open ? "关闭文档目录" : "打开文档目录");
+      mobileTocToggle.setAttribute("title", open ? "关闭文档目录" : "打开文档目录");
+    });
+
+    tocSearch.addEventListener("input", () => {
+      const query = tocSearch.value.trim().toLowerCase();
+      sideNav.querySelectorAll("a").forEach((link) => {
+        link.hidden = query && !link.textContent.toLowerCase().includes(query);
+      });
+    });
+
+    sideNav.addEventListener("click", (event) => {
+      if (!event.target.closest("a")) return;
+      sidebar.classList.remove("open");
+      mobileTocToggle.setAttribute("aria-expanded", "false");
+      mobileTocToggle.setAttribute("aria-label", "打开文档目录");
+      mobileTocToggle.setAttribute("title", "打开文档目录");
+    });
+
+    document.getElementById("lightbox-close").addEventListener("click", closeLightbox);
+    lightbox.addEventListener("click", (event) => {
+      if (event.target === lightbox) closeLightbox();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && lightbox.classList.contains("open")) closeLightbox();
+    });
+
+    updateThemeIcon();
+    loadMarkdownDocs().catch((error) => {
+      console.error(error);
+      document.getElementById("doc-content").innerHTML =
+        '<p class="load-error">文本模型文档加载失败，请刷新页面后重试。</p>';
+    });
+  </script>
+</body>
+</html>
