@@ -1587,6 +1587,18 @@
           <p v-if="apiKeyHint" class="input-hint">{{ apiKeyHint }}</p>
         </div>
 
+        <div v-if="form.platform === 'video'">
+          <label class="input-label">{{ t('admin.accounts.videoApiConfig.title') }}</label>
+          <textarea
+            v-model="videoAPIConfigText"
+            rows="8"
+            class="input font-mono text-xs"
+            spellcheck="false"
+            :placeholder="t('admin.accounts.videoApiConfig.placeholder')"
+          ></textarea>
+          <p class="input-hint">{{ t('admin.accounts.videoApiConfig.hint') }}</p>
+        </div>
+
         <!-- 上游倍率自动探测：全部 API-key 平台可用（所在区块已限定 apikey 类型） -->
         <div
           class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
@@ -4194,6 +4206,7 @@ import Toggle from '@/components/common/Toggle.vue'
 import GrokBaseUrlPresets from '@/components/account/GrokBaseUrlPresets.vue'
 import CnBaseUrlPresets from '@/components/account/CnBaseUrlPresets.vue'
 import { applyExplicitCacheUpstreamCredentials, isOfficialGeminiBaseUrl } from '@/utils/geminiExplicitCache'
+import { parseVideoAPIConfig } from '@/utils/videoAPIConfig'
 import OpenCodeGoProtocolRulesEditor from '@/components/account/OpenCodeGoProtocolRulesEditor.vue'
 import HeaderOverrideEditor from '@/components/account/HeaderOverrideEditor.vue'
 import { allSelectedGroupsEnableLongContextPricing } from '@/components/account/longContextBilling'
@@ -4438,6 +4451,7 @@ const accountCategory = ref<'oauth-based' | 'apikey' | 'bedrock' | 'service_acco
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
 const apiKeyValue = ref('')
+const videoAPIConfigText = ref('')
 const upstreamBillingAutoProbeEnabled = ref(true)
 
 // ── 国产供应商（Kimi / Zhipu / DeepSeek）账号类型、API 协议与端点 ──
@@ -4577,6 +4591,7 @@ function selectVideoPlatform() {
   form.type = 'apikey'
   accountCategory.value = 'apikey'
   apiKeyBaseUrl.value = ''
+  videoAPIConfigText.value = ''
   modelRestrictionMode.value = 'whitelist'
   allowedModels.value = [...getModelsByPlatform('video')]
   modelMappings.value = []
@@ -5218,6 +5233,7 @@ watch(
       allowedModels.value = [...getModelsByPlatform('video')]
       upstreamBillingAutoProbeEnabled.value = false
     } else {
+      videoAPIConfigText.value = ''
       upstreamBillingAutoProbeEnabled.value = true
     }
     if (newPlatform === 'typesafe') {
@@ -5697,6 +5713,7 @@ const resetForm = () => {
   adaptiveBaseUrls.value = { chat_completions: '', anthropic: '', responses: '' }
   apiKeyBaseUrl.value = 'https://api.anthropic.com'
   apiKeyValue.value = ''
+  videoAPIConfigText.value = ''
   upstreamRequestIdHeader.value = ''
   upstreamBillingAutoProbeEnabled.value = true
   editQuotaLimit.value = null
@@ -6177,6 +6194,15 @@ const handleSubmit = async () => {
     appStore.showError(t('admin.accounts.upstream.pleaseEnterBaseUrl'))
     return
   }
+  let videoAPIConfig: Record<string, unknown> | null = null
+  if (form.platform === 'video') {
+    try {
+      videoAPIConfig = parseVideoAPIConfig(videoAPIConfigText.value)
+    } catch {
+      appStore.showError(t('admin.accounts.videoApiConfig.invalid'))
+      return
+    }
+  }
 
   // Determine default base URL based on platform
   const defaultBaseUrl =
@@ -6196,6 +6222,9 @@ const handleSubmit = async () => {
   const credentials: Record<string, unknown> = {
     base_url: apiKeyBaseUrl.value.trim() || defaultBaseUrl,
     api_key: apiKeyValue.value.trim()
+  }
+  if (videoAPIConfig) {
+    credentials.video_api_config = videoAPIConfig
   }
   if (form.platform === 'gemini' && isOfficialGeminiBaseUrl(apiKeyBaseUrl.value)) {
     credentials.tier_id = geminiTierAIStudio.value

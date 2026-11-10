@@ -494,6 +494,9 @@ func validateVideoAPIAccount(account *Account) error {
 	if strings.TrimSpace(account.GetCredential("api_key")) == "" {
 		return errors.New("video API accounts require api_key")
 	}
+	if err := ValidateVideoAPIAccountConfig(account.Credentials["video_api_config"]); err != nil {
+		return err
+	}
 	return nil
 }
 

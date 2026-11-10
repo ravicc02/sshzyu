@@ -96,6 +96,9 @@ func RegisterGatewayRoutes(
 		if platform := getGroupPlatform(c); platform == service.PlatformGrok || platform == service.PlatformComposite {
 			h.OpenAIGateway.GrokVideoGeneration(c)
 			return
+		} else if platform == service.PlatformVideo {
+			h.OpenAIGateway.VideoAPIGeneration(c)
+			return
 		}
 		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 		c.JSON(http.StatusNotFound, gin.H{
@@ -113,6 +116,10 @@ func RegisterGatewayRoutes(
 			h.OpenAIGateway.GrokVideoStatus(c)
 			return
 		}
+		if getGroupPlatform(c) == service.PlatformVideo {
+			h.OpenAIGateway.VideoAPIStatus(c)
+			return
+		}
 		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": gin.H{
@@ -127,6 +134,10 @@ func RegisterGatewayRoutes(
 		// the Grok handler just like video status lookups.
 		if getGroupPlatform(c) == service.PlatformGrok || getGroupPlatform(c) == service.PlatformComposite {
 			h.OpenAIGateway.GrokVideoContent(c)
+			return
+		}
+		if getGroupPlatform(c) == service.PlatformVideo {
+			h.OpenAIGateway.VideoAPIContent(c)
 			return
 		}
 		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)

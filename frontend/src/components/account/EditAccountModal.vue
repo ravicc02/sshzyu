@@ -265,6 +265,18 @@
           <p class="input-hint">{{ t('admin.accounts.leaveEmptyToKeep') }}</p>
         </div>
 
+        <div v-if="account.platform === 'video'">
+          <label class="input-label">{{ t('admin.accounts.videoApiConfig.title') }}</label>
+          <textarea
+            v-model="editVideoAPIConfigText"
+            rows="8"
+            class="input font-mono text-xs"
+            spellcheck="false"
+            :placeholder="t('admin.accounts.videoApiConfig.placeholder')"
+          ></textarea>
+          <p class="input-hint">{{ t('admin.accounts.videoApiConfig.hint') }}</p>
+        </div>
+
         <!-- Model Restriction Section (不适用于 Antigravity) -->
         <div
           v-if="account.platform !== 'antigravity'"
@@ -3424,6 +3436,7 @@ import {
   isOfficialGeminiBaseUrl,
   normalizeExplicitCacheUpstreamMaxTTL
 } from '@/utils/geminiExplicitCache'
+import { formatVideoAPIConfig, parseVideoAPIConfig } from '@/utils/videoAPIConfig'
 import OpenCodeGoProtocolRulesEditor from '@/components/account/OpenCodeGoProtocolRulesEditor.vue'
 import HeaderOverrideEditor from '@/components/account/HeaderOverrideEditor.vue'
 import OllamaCloudUsageSettings from '@/components/account/OllamaCloudUsageSettings.vue'
@@ -3646,6 +3659,7 @@ interface TempUnschedRuleForm {
 const submitting = ref(false)
 const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
+const editVideoAPIConfigText = ref('')
 
 // ── 国产供应商（Kimi / Zhipu / DeepSeek）account_mode / api_protocol 编辑 ──
 // account_mode 决定额度/余额监控路径，api_protocol 决定转发端点与格式；
@@ -4887,6 +4901,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     editBaseUrl.value = isCNApiKeyAccount.value && editApiProtocol.value === 'adaptive'
       ? editAdaptiveBaseUrls.value.chat_completions
       : (credentials.base_url as string) || platformDefaultUrl
+    editVideoAPIConfigText.value =
+      newAccount.platform === 'video' ? formatVideoAPIConfig(credentials.video_api_config) : ''
 
     // Load model mappings and detect mode
     loadModelRestrictionFromMapping(credentials.model_mapping as Record<string, unknown> | undefined)
@@ -4984,6 +5000,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     selectedErrorCodes.value = []
   }
   editApiKey.value = ''
+  editVideoAPIConfigText.value = ''
 }
 
 async function loadTLSProfiles() {
@@ -5652,12 +5669,26 @@ const handleSubmit = async () => {
         appStore.showError(t('admin.accounts.upstream.pleaseEnterBaseUrl'))
         return
       }
+      let videoAPIConfig: Record<string, unknown> | null = null
+      if (props.account.platform === 'video') {
+        try {
+          videoAPIConfig = parseVideoAPIConfig(editVideoAPIConfigText.value)
+        } catch {
+          appStore.showError(t('admin.accounts.videoApiConfig.invalid'))
+          return
+        }
+      }
       const shouldApplyModelMapping = !(props.account.platform === 'openai' && openaiPassthroughEnabled.value)
 
       // Always update credentials for apikey type to handle model mapping changes
       const newCredentials: Record<string, unknown> = {
         ...currentCredentials,
         base_url: newBaseUrl
+      }
+      if (videoAPIConfig) {
+        newCredentials.video_api_config = videoAPIConfig
+      } else {
+        delete newCredentials.video_api_config
       }
 
       // 国产供应商：模式与协议写入凭据（决定额度/余额探测与转发端点/格式）。

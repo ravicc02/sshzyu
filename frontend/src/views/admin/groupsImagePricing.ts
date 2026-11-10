@@ -16,7 +16,7 @@ export const defaultAllowImageGenerationForPlatform = (platform: string): boolea
   imageGenerationDefaultPlatforms.has(platform);
 
 export const supportsVideoPricingPlatform = (platform: string): boolean =>
-  platform === "grok";
+  platform === "grok" || platform === "video";
 
 export const imagePricingI18nKey = (_platform: string, key: string): string =>
   `admin.groups.imagePricing.${key}`;
@@ -56,6 +56,11 @@ const defaultVideoPricePlaceholders: Record<
     video_price_480p: "0.05",
     video_price_720p: "0.07",
     video_price_1080p: "0.25",
+  },
+  video: {
+    video_price_480p: "0.056",
+    video_price_720p: "0.1008",
+    video_price_1080p: "0.1568",
   },
 };
 

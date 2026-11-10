@@ -1360,7 +1360,7 @@
             </p>
             <div class="mt-3 space-y-3">
               <div
-                v-for="family in videoModelPriceFamilyRows(createForm.video_model_prices)"
+                v-for="family in videoModelPriceFamilyRows(createForm.video_model_prices, createForm.platform)"
                 :key="family.key"
                 class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,7rem))] sm:items-end"
               >
@@ -1368,7 +1368,7 @@
                   {{ family.label }}
                 </div>
                 <label
-                  v-for="resolution in grokVideoPriceResolutions"
+                  v-for="resolution in videoPriceResolutionsForPlatform(createForm.platform)"
                   :key="resolution.key"
                   class="block"
                 >
@@ -3189,7 +3189,7 @@
             </p>
             <div class="mt-3 space-y-3">
               <div
-                v-for="family in videoModelPriceFamilyRows(editForm.video_model_prices)"
+                v-for="family in videoModelPriceFamilyRows(editForm.video_model_prices, editForm.platform)"
                 :key="family.key"
                 class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,7rem))] sm:items-end"
               >
@@ -3197,7 +3197,7 @@
                   {{ family.label }}
                 </div>
                 <label
-                  v-for="resolution in grokVideoPriceResolutions"
+                  v-for="resolution in videoPriceResolutionsForPlatform(editForm.platform)"
                   :key="resolution.key"
                   class="block"
                 >
@@ -4804,9 +4804,9 @@ import {
 } from "./groupsImagePricing";
 import {
   createVideoModelPricesForm,
-  grokVideoPriceResolutions,
   serializeVideoModelPrices,
   videoModelPriceFamilyRows,
+  videoPriceResolutionsForPlatform,
 } from "./groupsVideoModelPricing";
 
 const supportsLivePlatform = (platform: string): boolean =>
@@ -6686,6 +6686,7 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.video_price_1080p = group.video_price_1080p;
   editForm.video_model_prices = createVideoModelPricesForm(
     group.video_model_prices,
+    group.platform,
   );
   editForm.web_search_price_per_call = group.web_search_price_per_call ?? null;
   editForm.search_price_per_1k = group.search_price_per_1k ?? null;
@@ -7367,6 +7368,12 @@ watch(
       createForm.require_privacy_set = false;
     }
     createForm.allow_image_generation = defaultAllowImageGenerationForPlatform(newVal);
+    if (supportsVideoPricingPlatform(newVal)) {
+      createForm.video_model_prices = createVideoModelPricesForm(
+        serializeVideoModelPrices(createForm.video_model_prices),
+        newVal,
+      );
+    }
     resetDisabledBatchImagePricing(createForm);
     resetModelAllowlistState(createModelAllowlistState);
     loadModelAllowlistCandidates("create", 0, newVal);
@@ -7423,6 +7430,12 @@ watch(
     if (!["openai", "antigravity", "anthropic", "gemini"].includes(newVal)) {
       editForm.require_oauth_only = false;
       editForm.require_privacy_set = false;
+    }
+    if (supportsVideoPricingPlatform(newVal)) {
+      editForm.video_model_prices = createVideoModelPricesForm(
+        serializeVideoModelPrices(editForm.video_model_prices),
+        newVal,
+      );
     }
     resetDisabledBatchImagePricing(editForm);
     if (editingGroup.value) {

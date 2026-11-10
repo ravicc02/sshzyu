@@ -31,6 +31,9 @@ const (
 	GrokMediaEndpointVideosExtensions  GrokMediaEndpoint = "videos_extensions"
 	GrokMediaEndpointVideoStatus       GrokMediaEndpoint = "video_status"
 	GrokMediaEndpointVideoContent      GrokMediaEndpoint = "video_content"
+	VideoAPIEndpointCreate             GrokMediaEndpoint = "video_api_create"
+	VideoAPIEndpointStatus             GrokMediaEndpoint = "video_api_status"
+	VideoAPIEndpointContent            GrokMediaEndpoint = "video_api_content"
 
 	// Official xAI Imagine image-edit limit.
 	grokMediaMaxEditSourceImages = 3
@@ -41,7 +44,13 @@ func (e GrokMediaEndpoint) RequiresRequestBody() bool {
 }
 
 func (e GrokMediaEndpoint) IsVideoLookupRequest() bool {
-	return e == GrokMediaEndpointVideoStatus || e == GrokMediaEndpointVideoContent || e == SeedanceEndpointStatus || e == SeedanceEndpointDelete
+	return e == GrokMediaEndpointVideoStatus || e == GrokMediaEndpointVideoContent ||
+		e == VideoAPIEndpointStatus || e == VideoAPIEndpointContent ||
+		e == SeedanceEndpointStatus || e == SeedanceEndpointDelete
+}
+
+func (e GrokMediaEndpoint) IsVideoAPI() bool {
+	return e == VideoAPIEndpointCreate || e == VideoAPIEndpointStatus || e == VideoAPIEndpointContent
 }
 
 func (e GrokMediaEndpoint) IsGenerationRequest() bool {
@@ -50,6 +59,8 @@ func (e GrokMediaEndpoint) IsGenerationRequest() bool {
 	}
 	switch e {
 	case GrokMediaEndpointImagesGenerations, GrokMediaEndpointImagesEdits, GrokMediaEndpointVideosGenerations, GrokMediaEndpointVideosEdits, GrokMediaEndpointVideosExtensions:
+		return true
+	case VideoAPIEndpointCreate:
 		return true
 	default:
 		return false
@@ -382,6 +393,7 @@ type GrokVideoPendingBilling struct {
 	UpstreamModel        string `json:"upstream_model,omitempty"`
 	VideoResolution      string `json:"video_resolution,omitempty"`
 	VideoDurationSeconds int    `json:"video_duration_seconds,omitempty"`
+	HasReferenceVideo    bool   `json:"has_reference_video,omitempty"`
 	OriginalModel        string `json:"original_model,omitempty"`
 	// CreatedAt is when the gateway accepted the async create (RFC3339Nano UTC).
 	// duration_ms for deferred billing is measured from this instant until the
@@ -460,10 +472,10 @@ func (s *OpenAIGatewayService) StoreGrokVideoPendingBilling(
 	pending.UpstreamModel = strings.TrimSpace(pending.UpstreamModel)
 	pending.OriginalModel = strings.TrimSpace(pending.OriginalModel)
 	if pending.VideoResolution != "" {
-		pending.VideoResolution = NormalizeVideoBillingResolutionOrDefault(pending.VideoResolution)
+		pending.VideoResolution = normalizeVideoAPIResolution(pending.VideoResolution)
 	}
 	if pending.VideoDurationSeconds > 0 {
-		pending.VideoDurationSeconds = NormalizeVideoBillingDurationSecondsOrDefault(pending.VideoDurationSeconds)
+		pending.VideoDurationSeconds = normalizeVideoAPIDurationSeconds(pending.VideoDurationSeconds)
 	}
 	// Always stamp create-accept time when missing so deferred duration_ms is E2E.
 	if strings.TrimSpace(pending.CreatedAt) == "" {
