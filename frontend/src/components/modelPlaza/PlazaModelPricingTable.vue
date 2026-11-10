@@ -121,7 +121,24 @@
 
           <!-- token 计费:输入 / 输出 / 缓存(写/读),有阶梯时每档一行;档位标签只放输入列,其余列按行对齐 -->
           <template v-if="billingMode(m) === BILLING_MODE_TOKEN">
-            <td class="pz-cell px-3 py-2.5 align-middle font-mono font-semibold text-gray-900 dark:text-gray-50">
+            <td
+              v-if="videoTokenIntervals(m).length"
+              colspan="3"
+              class="pz-cell px-3 py-2.5 align-middle"
+            >
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span
+                  v-for="iv in videoTokenIntervals(m)"
+                  :key="iv.tier_label"
+                  class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-800 dark:bg-dark-700/60 dark:text-gray-200"
+                >
+                  <span class="font-sans text-gray-400 dark:text-dark-500">{{ videoTokenTierLabel(iv.tier_label) }}</span>
+                  {{ paidPerMillion(iv.output_price, period, m) }}
+                  <span class="font-sans text-gray-400 dark:text-dark-500">{{ t('modelPlaza.table.unitPerMillionShort') }}</span>
+                </span>
+              </div>
+            </td>
+            <td v-else class="pz-cell px-3 py-2.5 align-middle font-mono font-semibold text-gray-900 dark:text-gray-50">
               <template v-if="tokenIntervals(m).length">
                 <div
                   v-for="(iv, idx) in tokenIntervals(m)"
@@ -134,7 +151,7 @@
               </template>
               <template v-else>{{ paidPerMillion(m.pricing?.input_price, period, m) }}</template>
             </td>
-            <td class="pz-cell px-3 py-2.5 align-middle font-mono font-semibold text-gray-900 dark:text-gray-50">
+            <td v-if="!videoTokenIntervals(m).length" class="pz-cell px-3 py-2.5 align-middle font-mono font-semibold text-gray-900 dark:text-gray-50">
               <template v-if="tokenIntervals(m).length">
                 <div
                   v-for="(iv, idx) in tokenIntervals(m)"
@@ -147,7 +164,7 @@
               </template>
               <template v-else>{{ paidPerMillion(m.pricing?.output_price, period, m) }}</template>
             </td>
-            <td class="pz-cell px-3 py-2.5 align-middle">
+            <td v-if="!videoTokenIntervals(m).length" class="pz-cell px-3 py-2.5 align-middle">
               <template v-if="hasTierCachePricing(tokenIntervals(m))">
                 <div
                   v-for="(iv, idx) in tokenIntervals(m)"
@@ -322,6 +339,9 @@ import {
   BILLING_MODE_TOKEN,
   BILLING_MODE_IMAGE,
   BILLING_MODE_VIDEO,
+  VIDEO_TOKEN_NO_REFERENCE_LABEL,
+  VIDEO_TOKEN_WITH_REFERENCE_LABEL,
+  isVideoTokenReferenceLabel,
   type BillingMode
 } from '@/constants/channel'
 import type { PlazaModel, PlazaTimePricingPeriod } from '@/api/modelPlaza'
@@ -386,6 +406,9 @@ const isCompositeGroup = computed(() => props.platform === 'composite')
 
 /** 渠道倍率优先于分组/用户倍率；不存在时回落到生效分组倍率。 */
 function modelRate(m: PlazaModel): number {
+  if ((billingMode(m) === BILLING_MODE_VIDEO || isVideoTokenPricing(m)) && props.videoRateIndependent === true) {
+    return props.videoRateMultiplier ?? 1
+  }
   return (isCompositeGroup.value ? props.channelRateMultipliers?.[m.platform] : undefined) ?? effectiveRate.value
 }
 
@@ -460,7 +483,7 @@ function paidPerMillion(
 /** 图片计费模型且分组开启生图独立倍率:实付倍率取独立倍率,与计费口径一致。 */
 function usesIndependentMediaRate(m: PlazaModel): boolean {
   return (billingMode(m) === BILLING_MODE_IMAGE && props.imageRateIndependent === true) ||
-    (billingMode(m) === BILLING_MODE_VIDEO && props.videoRateIndependent === true)
+    ((billingMode(m) === BILLING_MODE_VIDEO || isVideoTokenPricing(m)) && props.videoRateIndependent === true)
 }
 
 /** 按次/按图片行的生效倍率。 */
@@ -538,6 +561,25 @@ function sortByContext(intervals: UserPricingInterval[]): UserPricingInterval[] 
 /** token 模式的阶梯定价(内联进输入/输出/缓存列)。 */
 function tokenIntervals(m: PlazaModel): UserPricingInterval[] {
   return sortByContext(m.pricing?.intervals ?? [])
+}
+
+function videoTokenIntervals(m: PlazaModel): UserPricingInterval[] {
+  return (m.pricing?.intervals ?? [])
+    .filter((iv) => isVideoTokenReferenceLabel(iv.tier_label) && iv.output_price != null)
+    .sort((a, b) => {
+      if (a.tier_label === b.tier_label) return 0
+      return a.tier_label === VIDEO_TOKEN_NO_REFERENCE_LABEL ? -1 : 1
+    })
+}
+
+function isVideoTokenPricing(m: PlazaModel): boolean {
+  return billingMode(m) === BILLING_MODE_TOKEN && videoTokenIntervals(m).length > 0
+}
+
+function videoTokenTierLabel(label: string | undefined): string {
+  return label === VIDEO_TOKEN_WITH_REFERENCE_LABEL
+    ? t('modelPlaza.table.videoWithReference')
+    : t('modelPlaza.table.videoNoReference')
 }
 
 /** 官方阶梯(后端按目录规则合成,不受分组开关影响)。 */

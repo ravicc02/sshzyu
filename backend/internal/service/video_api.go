@@ -570,6 +570,7 @@ func ExtractVideoAPICompletion(body []byte, cfg VideoAPIAccountConfig, pending *
 		VideoCount:           1,
 		VideoResolution:      meta.Resolution,
 		VideoDurationSeconds: meta.DurationSeconds,
+		HasReferenceVideo:    pending != nil && pending.HasReferenceVideo,
 	}
 }
 
@@ -703,13 +704,14 @@ func (s *OpenAIGatewayService) ForwardVideoAPI(
 	writeGrokMediaResponse(c, resp, respBody, s.responseHeaderFilter)
 
 	result := &OpenAIForwardResult{
-		RequestID:       firstNonEmpty(resp.Header.Get("x-request-id"), resp.Header.Get("request-id")),
-		UpstreamHeaders: resp.Header,
-		ResponseHeaders: resp.Header.Clone(),
-		Duration:        time.Since(startTime),
-		Model:           requestInfo.Model,
-		BillingModel:    requestInfo.Model,
-		UpstreamModel:   strings.TrimSpace(account.GetMappedModel(requestInfo.Model)),
+		RequestID:         firstNonEmpty(resp.Header.Get("x-request-id"), resp.Header.Get("request-id")),
+		UpstreamHeaders:   resp.Header,
+		ResponseHeaders:   resp.Header.Clone(),
+		Duration:          time.Since(startTime),
+		Model:             requestInfo.Model,
+		BillingModel:      requestInfo.Model,
+		UpstreamModel:     strings.TrimSpace(account.GetMappedModel(requestInfo.Model)),
+		HasReferenceVideo: requestInfo.HasReferenceVideo,
 	}
 	if result.UpstreamModel == "" {
 		result.UpstreamModel = requestInfo.Model

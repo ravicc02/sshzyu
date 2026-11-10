@@ -1,5 +1,5 @@
 import type { BillingMode, ChannelTimePricing, PricingInterval } from '@/api/admin/channels'
-import { REASONING_EFFORT_LEVELS } from '@/constants/channel'
+import { isVideoTokenReferenceLabel, REASONING_EFFORT_LEVELS } from '@/constants/channel'
 
 type TranslateFn = (key: string, params?: Record<string, unknown>) => string
 
@@ -48,6 +48,12 @@ export interface TimePricingFormEntry {
   timezone: string
   weekdays_only: boolean
   periods: TimePricingPeriodFormEntry[]
+}
+
+export function isVideoTokenReferenceInterval(
+  interval: Pick<IntervalFormEntry, 'tier_label'> | Pick<PricingInterval, 'tier_label'>,
+): boolean {
+  return isVideoTokenReferenceLabel(interval.tier_label)
 }
 
 export const DEFAULT_TIME_PRICING_TIMEZONE = 'Asia/Shanghai'
@@ -321,8 +327,9 @@ export function validateIntervals(
     if (err) return err
   }
 
-  // per_request / image 模式按 tier_label 匹配，不做 token 区间重叠校验
-  if (mode !== 'token') return null
+  // per_request / image 模式按 tier_label 匹配；Token 视频按有无参考视频分档，
+  // 同样不参与上下文档位重叠校验。
+  if (mode !== 'token' || sorted.some(isVideoTokenReferenceInterval)) return null
   return checkIntervalOverlap(sorted, t)
 }
 

@@ -56,6 +56,7 @@ func prepareSeedanceCompletionBilling(ctx context.Context, h *OpenAIGatewayHandl
 	merged.Model = pending.Model
 	merged.BillingModel = firstNonEmptyString(pending.BillingModel, pending.Model)
 	merged.UpstreamModel = firstNonEmptyString(pending.UpstreamModel, result.UpstreamModel)
+	merged.HasReferenceVideo = pending.HasReferenceVideo
 	merged.RequestID = service.StableGrokVideoBillingRequestID(taskID)
 	merged.ResponseID = taskID
 	merged.Duration = service.GrokVideoE2EDuration(pending.CreatedAt, time.Now())

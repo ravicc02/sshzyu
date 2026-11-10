@@ -76,7 +76,11 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 		// Long-context ladders come from official presets, gated by the checkbox.
 		if groupPricing.BillingMode == "" || groupPricing.BillingMode == BillingModeToken {
 			stripped := groupPricing.Clone()
-			stripped.Intervals = nil
+			if HasVideoTokenPriceIntervals(groupPricing.Intervals) {
+				stripped.Intervals = filterVideoTokenPriceIntervals(groupPricing.Intervals)
+			} else {
+				stripped.Intervals = nil
+			}
 			groupPricing = &stripped
 		}
 		// 仅含非价格配置（如模型级 rate_multiplier）的条目不应短路价格解析，
@@ -307,7 +311,11 @@ func (r *ModelPricingResolver) applyTokenOverrides(chPricing *ChannelModelPricin
 	applyChannelImagePriceOverrides(chPricing, resolved.BasePricing)
 
 	// 区间未命中时回退到上面已经应用渠道覆盖的基础价。
-	resolved.Intervals = filterValidIntervals(chPricing.Intervals)
+	if HasVideoTokenPriceIntervals(chPricing.Intervals) {
+		resolved.Intervals = filterVideoTokenPriceIntervals(chPricing.Intervals)
+	} else {
+		resolved.Intervals = filterValidIntervals(chPricing.Intervals)
+	}
 }
 
 // applyChannelImagePriceOverrides 应用渠道图片输入/输出价，规则与其他 token 字段一致：
@@ -353,6 +361,16 @@ func filterValidIntervals(intervals []PricingInterval) []PricingInterval {
 		}
 	}
 	return valid
+}
+
+func filterVideoTokenPriceIntervals(intervals []PricingInterval) []PricingInterval {
+	filtered := make([]PricingInterval, 0, 2)
+	for _, iv := range intervals {
+		if IsVideoTokenPriceTier(iv.TierLabel) {
+			filtered = append(filtered, iv)
+		}
+	}
+	return filtered
 }
 
 // GetIntervalPricing 根据 context token 数获取区间定价。

@@ -96,12 +96,50 @@
 
         <!-- Token mode -->
         <div v-if="entry.billing_mode === 'token'">
+          <div v-if="isTokenVideoPricing" class="mt-3">
+            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400">
+              {{ t('admin.channels.form.videoTokenPrices') }}
+              <span class="ml-1 font-normal text-gray-400">$/1M Token</span>
+            </label>
+            <p class="mt-1 text-xs text-gray-400">
+              {{ t('admin.channels.form.videoTokenPriceHint') }}
+            </p>
+            <div class="mt-2 grid gap-2 sm:grid-cols-2">
+              <div>
+                <label class="text-xs text-gray-400">{{ t('admin.channels.form.videoNoReferencePrice') }}</label>
+                <input
+                  :value="videoTokenReferencePrice(false)"
+                  data-testid="video-token-no-reference-price"
+                  @input="updateVideoTokenReferencePrice(false, ($event.target as HTMLInputElement).value)"
+                  type="number"
+                  step="any"
+                  min="0"
+                  class="input mt-0.5 text-sm"
+                  :placeholder="t('admin.channels.form.pricePlaceholder')"
+                />
+              </div>
+              <div>
+                <label class="text-xs text-gray-400">{{ t('admin.channels.form.videoWithReferencePrice') }}</label>
+                <input
+                  :value="videoTokenReferencePrice(true)"
+                  data-testid="video-token-with-reference-price"
+                  @input="updateVideoTokenReferencePrice(true, ($event.target as HTMLInputElement).value)"
+                  type="number"
+                  step="any"
+                  min="0"
+                  class="input mt-0.5 text-sm"
+                  :placeholder="t('admin.channels.form.pricePlaceholder')"
+                />
+              </div>
+            </div>
+          </div>
+
           <!-- Default prices (fallback when no interval matches) -->
-          <label class="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
+          <label v-if="!isTokenVideoPricing" class="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
             {{ t('admin.channels.form.defaultPrices') }}
             <span class="ml-1 font-normal text-gray-400">$/MTok</span>
           </label>
-          <div class="pricing-default-grid mt-1 grid gap-2">
+          <div v-if="!isTokenVideoPricing" class="pricing-default-grid mt-1 grid gap-2">
             <div>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.inputPrice') }}</label>
               <input :value="entry.input_price" @input="emitField('input_price', ($event.target as HTMLInputElement).value)"
@@ -139,7 +177,7 @@
             </div>
           </div>
 
-          <div v-if="enableTierMultipliers" class="mt-3 grid max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
+          <div v-if="enableTierMultipliers && !isTokenVideoPricing" class="mt-3 grid max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
             <div>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.fastMultiplier') }}</label>
               <input :value="entry.fast_multiplier" @input="emitField('fast_multiplier', ($event.target as HTMLInputElement).value)"
@@ -153,7 +191,7 @@
           </div>
 
           <!-- Channel token intervals; the group long-context toggle controls whether tiers apply. -->
-          <div v-if="!hideTokenIntervals" class="mt-3">
+          <div v-if="!hideTokenIntervals && !isTokenVideoPricing" class="mt-3">
             <div class="flex items-center justify-between">
               <label class="text-xs font-medium text-gray-500 dark:text-gray-400">
                 {{ t('admin.channels.form.intervals') }}
@@ -334,8 +372,19 @@ import IntervalRow from './IntervalRow.vue'
 import ModelTagInput from './ModelTagInput.vue'
 import TimePricingSection from './TimePricingSection.vue'
 import type { PricingFormEntry, IntervalFormEntry } from './types'
-import { perTokenToMTok, getPlatformTagClass, isValidPositiveMultiplier, validateReasoningEffortMultipliers } from './types'
-import { REASONING_EFFORT_LEVELS, type ReasoningEffortLevel } from '@/constants/channel'
+import {
+  perTokenToMTok,
+  getPlatformTagClass,
+  isValidPositiveMultiplier,
+  validateReasoningEffortMultipliers,
+  isVideoTokenReferenceInterval,
+} from './types'
+import {
+  REASONING_EFFORT_LEVELS,
+  VIDEO_TOKEN_NO_REFERENCE_LABEL,
+  VIDEO_TOKEN_WITH_REFERENCE_LABEL,
+  type ReasoningEffortLevel,
+} from '@/constants/channel'
 import type { BillingMode } from '@/api/admin/channels'
 import channelsAPI from '@/api/admin/channels'
 
@@ -390,6 +439,10 @@ const billingModeLabel = computed(() => {
   return opt ? opt.label : props.entry.billing_mode
 })
 
+const isTokenVideoPricing = computed(() =>
+  props.platform === 'video' && props.entry.billing_mode === 'token',
+)
+
 const reasoningEffortMultiplierError = computed(() =>
   validateReasoningEffortMultipliers(props.entry.reasoning_effort_multipliers, t)
 )
@@ -420,6 +473,59 @@ function updateBillingMode(mode: BillingMode) {
 
 function normalizeVideoResolution(value: string) {
   return value.trim().toLowerCase()
+}
+
+function videoTokenReferenceLabel(hasReference: boolean) {
+  return hasReference ? VIDEO_TOKEN_WITH_REFERENCE_LABEL : VIDEO_TOKEN_NO_REFERENCE_LABEL
+}
+
+function videoTokenReferencePrice(hasReference: boolean) {
+  const label = videoTokenReferenceLabel(hasReference)
+  return (props.entry.intervals || []).find(
+    interval => isVideoTokenReferenceInterval(interval) &&
+      interval.tier_label.trim().toLowerCase() === label,
+  )?.output_price ?? null
+}
+
+function createVideoTokenReferenceInterval(hasReference: boolean, price: string | null): IntervalFormEntry {
+  const intervals = props.entry.intervals || []
+  return {
+    min_tokens: 0,
+    max_tokens: null,
+    tier_label: videoTokenReferenceLabel(hasReference),
+    input_price: null,
+    output_price: price,
+    cache_write_price: null,
+    cache_write_1h_price: null,
+    cache_read_price: null,
+    input_multiplier: null,
+    output_multiplier: null,
+    cache_write_multiplier: null,
+    cache_read_multiplier: null,
+    per_request_price: null,
+    sort_order: intervals.length,
+  }
+}
+
+function updateVideoTokenReferencePrice(hasReference: boolean, value: string) {
+  const label = videoTokenReferenceLabel(hasReference)
+  const intervals = [...(props.entry.intervals || [])]
+  const index = intervals.findIndex(
+    interval => isVideoTokenReferenceInterval(interval) &&
+      interval.tier_label.trim().toLowerCase() === label,
+  )
+  const price = value === '' ? null : value
+  if (index >= 0) {
+    intervals[index] = {
+      ...intervals[index],
+      tier_label: label,
+      output_price: price,
+      per_request_price: null,
+    }
+  } else if (price !== null) {
+    intervals.push(createVideoTokenReferenceInterval(hasReference, price))
+  }
+  emit('update', { ...props.entry, intervals })
 }
 
 function videoResolutionIntervalIndex(resolution: string) {

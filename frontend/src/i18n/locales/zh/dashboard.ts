@@ -828,7 +828,9 @@ export default {
       perUnitSecond: '/ 秒',
       perRequest: '按次计费',
       perImage: '按图片计费',
-      perSecond: '按秒计费'
+      perSecond: '按秒计费',
+      videoNoReference: '无参考视频',
+      videoWithReference: '有参考视频'
     },
     nav: {
       login: '登录',

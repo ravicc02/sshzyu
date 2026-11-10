@@ -14,6 +14,15 @@ export type BillingMode =
   | typeof BILLING_MODE_IMAGE
   | typeof BILLING_MODE_VIDEO
 
+/** Token video pricing labels (must match service.VideoTokenPrice* constants in Go). */
+export const VIDEO_TOKEN_NO_REFERENCE_LABEL = 'video_no_reference' as const
+export const VIDEO_TOKEN_WITH_REFERENCE_LABEL = 'video_with_reference' as const
+
+export function isVideoTokenReferenceLabel(label: string | null | undefined): boolean {
+  const normalized = label?.trim().toLowerCase()
+  return normalized === VIDEO_TOKEN_NO_REFERENCE_LABEL || normalized === VIDEO_TOKEN_WITH_REFERENCE_LABEL
+}
+
 /** Supported request reasoning effort levels, ordered from lowest to highest. */
 export const REASONING_EFFORT_LEVELS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
 export type ReasoningEffortLevel = typeof REASONING_EFFORT_LEVELS[number]

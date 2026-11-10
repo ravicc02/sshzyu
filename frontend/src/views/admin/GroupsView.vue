@@ -4667,6 +4667,7 @@ import {
   createDefaultTimePricingForm,
   formIntervalsToAPI,
   formReasoningEffortMultipliersToAPI,
+  isVideoTokenReferenceInterval,
   mTokToPerToken,
   perTokenToMTok,
   toNullableNumber,
@@ -4805,7 +4806,11 @@ const groupPricingToAPI = (
       per_request_price: toNullableNumber(entry.per_request_price),
       intervals:
         entry.billing_mode === "token"
-          ? []
+          ? platform === "video"
+            ? formIntervalsToAPI(
+                (entry.intervals || []).filter(isVideoTokenReferenceInterval),
+              )
+            : []
           : formIntervalsToAPI(entry.intervals || []),
       time_pricing: null,
     }));

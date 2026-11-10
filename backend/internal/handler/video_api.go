@@ -59,6 +59,7 @@ func prepareVideoAPICompletionBilling(
 	merged.Model = model
 	merged.BillingModel = model
 	if pending != nil {
+		merged.HasReferenceVideo = pending.HasReferenceVideo
 		if strings.TrimSpace(merged.UpstreamModel) == "" {
 			merged.UpstreamModel = pending.UpstreamModel
 		}

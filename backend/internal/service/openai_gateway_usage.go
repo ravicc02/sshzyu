@@ -619,7 +619,8 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 		//（用户专属 > 分组 rate_multiplier > 系统默认），与分组表单的价格预览承诺一致。
 		return s.billingService.CalculateWebSearchCost(result.WebSearchCalls, webSearchPricePerCallFromAPIKey(apiKey), webSearchMultiplier), nil
 	}
-	if isGrokVideoUsageResult(result, billingModels) {
+	videoTokenBilling := isGrokVideoUsageResult(result, billingModels)
+	if videoTokenBilling {
 		if resolved := s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey); resolved == nil || resolved.Mode != BillingModeToken {
 			return s.calculateOpenAIVideoCost(ctx, billingModel, apiKey, result, videoMultiplier), nil
 		}
@@ -670,6 +671,8 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 				optionalStringValue(result.ReasoningEffort),
 				longContextBillingGate,
 				modelLongContextExempt,
+				videoTokenBilling,
+				result != nil && result.HasReferenceVideo,
 			)
 			if err == nil {
 				tokenCost = cost
@@ -765,6 +768,8 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageTokenCost(
 	reasoningEffort string,
 	longContextBillingGate *bool,
 	modelLongContextExempt bool,
+	videoTokenBilling bool,
+	videoHasReference bool,
 ) (*CostBreakdown, error) {
 	if s.resolver != nil && apiKey.Group != nil {
 		gid := apiKey.Group.ID
@@ -774,6 +779,8 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageTokenCost(
 			ServiceTier: serviceTier, ReasoningEffort: reasoningEffort, Resolver: s.resolver,
 			LongContextBillingEnabled:      longContextBillingGate,
 			DisableModelLongContextPricing: modelLongContextExempt,
+			VideoTokenBilling:              videoTokenBilling,
+			VideoHasReference:              videoHasReference,
 		})
 	}
 	return s.billingService.calculateCostWithServiceTierPolicy(

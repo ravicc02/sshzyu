@@ -824,7 +824,9 @@ export default {
       perUnitSecond: '/ second',
       perRequest: 'Per request',
       perImage: 'Per image',
-      perSecond: 'Per second'
+      perSecond: 'Per second',
+      videoNoReference: 'Without reference',
+      videoWithReference: 'With reference'
     },
     nav: {
       login: 'Sign In',

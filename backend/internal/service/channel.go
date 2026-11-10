@@ -18,6 +18,12 @@ const (
 	BillingModeVideo      BillingMode = "video"       // 视频生成计费（按视频生成次数）
 )
 
+const (
+	// Token 视频按请求是否携带参考视频使用不同输出 token 单价。
+	VideoTokenPriceNoReference   = "video_no_reference"
+	VideoTokenPriceWithReference = "video_with_reference"
+)
+
 // IsValid 检查 BillingMode 是否为合法值
 func (m BillingMode) IsValid() bool {
 	switch m {
@@ -212,6 +218,46 @@ func (p *ChannelModelPricing) GetTierByLabel(label string) *PricingInterval {
 	return nil
 }
 
+// IsVideoTokenPriceTier 判断区间标签是否为 Token 视频的条件价格档。
+func IsVideoTokenPriceTier(label string) bool {
+	switch strings.ToLower(strings.TrimSpace(label)) {
+	case VideoTokenPriceNoReference, VideoTokenPriceWithReference:
+		return true
+	default:
+		return false
+	}
+}
+
+// HasVideoTokenPriceIntervals 判断区间列表是否包含 Token 视频条件价格。
+func HasVideoTokenPriceIntervals(intervals []PricingInterval) bool {
+	for i := range intervals {
+		if IsVideoTokenPriceTier(intervals[i].TierLabel) {
+			return true
+		}
+	}
+	return false
+}
+
+// VideoTokenPriceInterval 根据是否携带参考视频选择输出 Token 单价档。
+// 配置缺一档时回退到另一档，避免已选择条件价格后整次计费无价可用。
+func VideoTokenPriceInterval(intervals []PricingInterval, hasReferenceVideo bool) *PricingInterval {
+	wanted := VideoTokenPriceNoReference
+	fallback := VideoTokenPriceWithReference
+	if hasReferenceVideo {
+		wanted, fallback = fallback, wanted
+	}
+	var fallbackInterval *PricingInterval
+	for i := range intervals {
+		switch strings.ToLower(strings.TrimSpace(intervals[i].TierLabel)) {
+		case wanted:
+			return &intervals[i]
+		case fallback:
+			fallbackInterval = &intervals[i]
+		}
+	}
+	return fallbackInterval
+}
+
 // Clone 返回 ChannelModelPricing 的拷贝（切片和映射独立，价格指针字段共享，调用方只读安全）
 func (p ChannelModelPricing) Clone() ChannelModelPricing {
 	cp := p
@@ -352,8 +398,10 @@ func ValidateIntervals(intervals []PricingInterval, mode BillingMode) error {
 		}
 	}
 
-	// per_request / image 模式按 tier_label 匹配，不做 token 区间重叠校验
-	if mode == BillingModePerRequest || mode == BillingModeImage || mode == BillingModeVideo {
+	// per_request / image / video 模式按 tier_label 匹配；Token 视频的
+	// 有无参考视频条件价格同样是标签分档，不做上下文区间重叠校验。
+	if mode == BillingModePerRequest || mode == BillingModeImage || mode == BillingModeVideo ||
+		(mode == BillingModeToken && HasVideoTokenPriceIntervals(sorted)) {
 		return nil
 	}
 	return validateIntervalOverlap(sorted)

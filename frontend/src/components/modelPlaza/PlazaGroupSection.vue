@@ -171,7 +171,15 @@ import type { ModelPlazaGroup } from '@/api/modelPlaza'
 import type { GroupPlatform, SubscriptionType } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { formatScaled, type PriceCurrency } from '@/utils/pricing'
-import { BILLING_MODE_IMAGE, BILLING_MODE_TOKEN, BILLING_MODE_VIDEO, type BillingMode } from '@/constants/channel'
+import {
+  BILLING_MODE_IMAGE,
+  BILLING_MODE_TOKEN,
+  BILLING_MODE_VIDEO,
+  VIDEO_TOKEN_NO_REFERENCE_LABEL,
+  VIDEO_TOKEN_WITH_REFERENCE_LABEL,
+  isVideoTokenReferenceLabel,
+  type BillingMode,
+} from '@/constants/channel'
 import { platformAccentBarClass, platformBorderStrongClass, platformLabel } from '@/utils/platformColors'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import { useAppStore } from '@/stores/app'
@@ -238,6 +246,22 @@ function previewPrice(model: ModelPlazaGroup['models'][number]): PreviewPrice | 
   const unit = t(billingMode(model) === BILLING_MODE_TOKEN ? 'modelPlaza.table.unitPerMillionShort' : modelUnitKey(model))
 
   if (pricing.billing_mode === BILLING_MODE_TOKEN) {
+    const videoTokenIntervals = videoTokenReferenceIntervals(model)
+    if (videoTokenIntervals.length > 0) {
+      const describe = (scalePrice: boolean) => videoTokenIntervals
+        .map((interval) => {
+          const label = interval.tier_label === VIDEO_TOKEN_WITH_REFERENCE_LABEL
+            ? t('modelPlaza.table.videoWithReference')
+            : t('modelPlaza.table.videoNoReference')
+          const raw = interval.output_price ?? 0
+          return `${label} ${formatPrice(scalePrice ? raw * rate : raw, scale, model)}`
+        })
+        .join(' · ')
+      return {
+        standard: `${describe(false)} ${unit}`,
+        paid: `${describe(true)} ${unit}`,
+      }
+    }
     if (pricing.input_price == null && pricing.output_price == null) return null
     const values = [
       [t('modelPlaza.table.inputShort'), pricing.input_price],
@@ -293,7 +317,7 @@ function modelUnitKey(model: ModelPlazaGroup['models'][number]): string {
 function hasIndependentRate(model: ModelPlazaGroup['models'][number]): boolean {
   const mode = billingMode(model)
   return (mode === BILLING_MODE_IMAGE && props.group.image_rate_independent) ||
-    (mode === BILLING_MODE_VIDEO && props.group.video_rate_independent === true)
+    ((mode === BILLING_MODE_VIDEO || isVideoTokenPricing(model)) && props.group.video_rate_independent === true)
 }
 
 function discountFor(model: ModelPlazaGroup['models'][number]): string {
@@ -335,8 +359,25 @@ function billingMode(model: ModelPlazaGroup['models'][number]): BillingMode {
 function modelRate(model: ModelPlazaGroup['models'][number]): number {
   const mode = billingMode(model)
   if (mode === BILLING_MODE_IMAGE && props.group.image_rate_independent) return props.group.image_rate_multiplier ?? 1
-  if (mode === BILLING_MODE_VIDEO && props.group.video_rate_independent) return props.group.video_rate_multiplier ?? 1
+  if ((mode === BILLING_MODE_VIDEO || isVideoTokenPricing(model)) && props.group.video_rate_independent) {
+    return props.group.video_rate_multiplier ?? 1
+  }
   return (isCompositeGroup.value ? props.group.channel_rate_multipliers?.[model.platform] : undefined) ?? effectiveRate.value
+}
+
+function videoTokenReferenceIntervals(model: ModelPlazaGroup['models'][number]) {
+  return (model.pricing?.intervals ?? [])
+    .filter(interval =>
+      isVideoTokenReferenceLabel(interval.tier_label) && interval.output_price != null
+    )
+    .sort((a, b) => {
+      if (a.tier_label === b.tier_label) return 0
+      return a.tier_label === VIDEO_TOKEN_NO_REFERENCE_LABEL ? -1 : 1
+    })
+}
+
+function isVideoTokenPricing(model: ModelPlazaGroup['models'][number]): boolean {
+  return billingMode(model) === BILLING_MODE_TOKEN && videoTokenReferenceIntervals(model).length > 0
 }
 
 /** 高峰窗口描述(含倍率与服务器时区标注);分组未启用高峰为空串。 */
