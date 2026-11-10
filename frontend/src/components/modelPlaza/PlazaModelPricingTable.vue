@@ -24,7 +24,13 @@
           <th colspan="3" class="pz-bg pt-2 text-center">
             <div class="pz-title border-b pb-2 font-semibold">
               {{ t('modelPlaza.table.paidPrice') }}
-              <span class="pz-unit ml-1 normal-case font-normal">{{ t(imageOnly ? 'modelPlaza.table.perUnitImage' : 'modelPlaza.table.unitPerMillion') }}</span>
+              <span class="pz-unit ml-1 normal-case font-normal">
+                {{ t(imageOnly
+                  ? 'modelPlaza.table.perUnitImage'
+                  : videoOnly
+                    ? 'modelPlaza.table.unitPerSecond'
+                    : 'modelPlaza.table.unitPerMillion') }}
+              </span>
             </div>
           </th>
           <th
@@ -47,6 +53,7 @@
           class="border-b border-gray-200 text-left text-[11px] font-medium uppercase leading-4 tracking-wide text-gray-400 dark:border-dark-700 dark:text-dark-500"
         >
           <th v-if="imageOnly" colspan="3" class="pz-bg px-3 py-2 text-center font-medium">{{ t('modelPlaza.table.perImage') }}</th>
+          <th v-else-if="videoOnly" colspan="3" class="pz-bg px-3 py-2 text-center font-medium">{{ t('modelPlaza.table.perSecond') }}</th>
           <template v-else>
             <th class="pz-bg px-3 py-2 font-medium">{{ t('modelPlaza.table.input') }}</th>
             <th class="pz-bg px-3 py-2 font-medium">{{ t('modelPlaza.table.output') }}</th>
@@ -290,7 +297,7 @@
               >{{ periodRate(period, m) }}x</span
             >
             <span
-              v-else-if="usesIndependentImageRate(m)"
+              v-else-if="usesIndependentMediaRate(m)"
               class="font-bold text-gray-700 dark:text-gray-300"
               >{{ requestRate(m) }}x</span
             >
@@ -314,6 +321,7 @@ import { platformAccentColor, platformBadgeLightClass, platformLabel } from '@/u
 import {
   BILLING_MODE_TOKEN,
   BILLING_MODE_IMAGE,
+  BILLING_MODE_VIDEO,
   type BillingMode
 } from '@/constants/channel'
 import type { PlazaModel, PlazaTimePricingPeriod } from '@/api/modelPlaza'
@@ -332,6 +340,9 @@ const props = defineProps<{
   /** 生图独立倍率:true 时图片计费模型的实付倍率取 imageRateMultiplier,不取分组/专属倍率。 */
   imageRateIndependent?: boolean
   imageRateMultiplier?: number | null
+  /** 视频独立倍率：true 时视频计费模型的实付倍率取 videoRateMultiplier。 */
+  videoRateIndependent?: boolean
+  videoRateMultiplier?: number | null
   /**
    * 高峰窗口描述(含倍率与服务器时区标注),空串/缺省 = 分组未启用高峰。
    * 表格所有价格均为不含高峰因子的口径,该窗口仅用于分时时段行的 tooltip 披露:
@@ -348,6 +359,7 @@ const accentStyle = computed(() => ({ '--plaza-accent': platformAccentColor(prop
 
 const PER_MILLION = 1_000_000
 const imageOnly = computed(() => props.models.length > 0 && props.models.every((model) => billingMode(model) === BILLING_MODE_IMAGE))
+const videoOnly = computed(() => props.models.length > 0 && props.models.every((model) => billingMode(model) === BILLING_MODE_VIDEO))
 
 /**
  * 展示顺序:
@@ -391,9 +403,9 @@ function billingMode(m: PlazaModel): BillingMode {
 }
 
 function billingModeLabel(m: PlazaModel): string {
-  return billingMode(m) === BILLING_MODE_IMAGE
-    ? t('modelPlaza.table.perImage')
-    : t('modelPlaza.table.perRequest')
+  if (billingMode(m) === BILLING_MODE_IMAGE) return t('modelPlaza.table.perImage')
+  if (billingMode(m) === BILLING_MODE_VIDEO) return t('modelPlaza.table.perSecond')
+  return t('modelPlaza.table.perRequest')
 }
 
 /** 价格统一保底 2 位小数,更长的有效小数原样保留。 */
@@ -446,13 +458,20 @@ function paidPerMillion(
 }
 
 /** 图片计费模型且分组开启生图独立倍率:实付倍率取独立倍率,与计费口径一致。 */
-function usesIndependentImageRate(m: PlazaModel): boolean {
-  return billingMode(m) === BILLING_MODE_IMAGE && props.imageRateIndependent === true
+function usesIndependentMediaRate(m: PlazaModel): boolean {
+  return (billingMode(m) === BILLING_MODE_IMAGE && props.imageRateIndependent === true) ||
+    (billingMode(m) === BILLING_MODE_VIDEO && props.videoRateIndependent === true)
 }
 
 /** 按次/按图片行的生效倍率。 */
 function requestRate(m: PlazaModel): number {
-  return usesIndependentImageRate(m) ? (props.imageRateMultiplier ?? 1) : modelRate(m)
+  if (billingMode(m) === BILLING_MODE_IMAGE && props.imageRateIndependent === true) {
+    return props.imageRateMultiplier ?? 1
+  }
+  if (billingMode(m) === BILLING_MODE_VIDEO && props.videoRateIndependent === true) {
+    return props.videoRateMultiplier ?? 1
+  }
+  return modelRate(m)
 }
 
 /** 按次 / 按图片单价(乘该行生效倍率,不换算 1M)。 */
@@ -469,9 +488,9 @@ function official(value: number | null | undefined, m: PlazaModel | null = null)
 
 /** 非 token 计费的单位后缀:按图片 → “/ 张”,按次 → “/ 次”。 */
 function perUnitSuffix(m: PlazaModel): string {
-  return billingMode(m) === BILLING_MODE_IMAGE
-    ? t('modelPlaza.table.perUnitImage')
-    : t('modelPlaza.table.perUnitRequest')
+  if (billingMode(m) === BILLING_MODE_IMAGE) return t('modelPlaza.table.perUnitImage')
+  if (billingMode(m) === BILLING_MODE_VIDEO) return t('modelPlaza.table.perUnitSecond')
+  return t('modelPlaza.table.perUnitRequest')
 }
 
 function hasCachePricing(m: PlazaModel): boolean {
@@ -541,7 +560,14 @@ function tierHint(m: PlazaModel): string {
 
 /** 按次/按图模式的阶梯定价(仅保留配了按次价的档位)。 */
 function requestIntervals(m: PlazaModel): UserPricingInterval[] {
-  return (m.pricing?.intervals ?? []).filter((iv) => iv.per_request_price != null)
+  const intervals = (m.pricing?.intervals ?? []).filter((iv) => iv.per_request_price != null)
+  if (billingMode(m) !== BILLING_MODE_VIDEO) return intervals
+  const order = ['480p', '720p', '768p', '1080p', '2k', '4k']
+  const rank = (label?: string) => {
+    const index = order.indexOf((label ?? '').trim().toLowerCase())
+    return index === -1 ? order.length : index
+  }
+  return [...intervals].sort((a, b) => rank(a.tier_label) - rank(b.tier_label))
 }
 
 /**

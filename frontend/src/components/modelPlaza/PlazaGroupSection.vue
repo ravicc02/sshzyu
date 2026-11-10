@@ -107,10 +107,10 @@
                 </span>
                 <span v-if="previewPrice(model)" class="mt-2 grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1 pl-5">
                   <span class="text-[10px] text-gray-400 dark:text-dark-500">{{ t('modelPlaza.card.basePrice') }}</span>
-                  <span class="truncate font-mono text-[11px] text-gray-400 dark:text-dark-500" :class="previewRate(model) === 1 ? '' : 'line-through'">{{ previewPrice(model)!.standard }}</span>
+                  <span class="break-words font-mono text-[11px] text-gray-400 dark:text-dark-500" :class="previewRate(model) === 1 ? '' : 'line-through'">{{ previewPrice(model)!.standard }}</span>
                   <span class="text-[10px] font-semibold text-gray-500 dark:text-dark-400">{{ t('modelPlaza.card.paidPrice') }}</span>
                   <span class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-                    <strong class="font-mono text-sm font-bold" :class="previewRate(model) < 1 ? 'text-emerald-600 dark:text-emerald-400' : previewRate(model) > 1 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-dark-200'">{{ previewPrice(model)!.paid }}</strong>
+                    <strong class="break-words font-mono text-sm font-bold" :class="previewRate(model) < 1 ? 'text-emerald-600 dark:text-emerald-400' : previewRate(model) > 1 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-dark-200'">{{ previewPrice(model)!.paid }}</strong>
                     <span v-if="previewRate(model) !== 1" class="rounded-md px-1.5 py-0.5 text-[10px] font-semibold" :class="previewRate(model) < 1 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'">{{ discountFor(model) }}</span>
                   </span>
                 </span>
@@ -140,6 +140,8 @@
             :channel-rate-multipliers="group.channel_rate_multipliers ?? {}"
             :image-rate-independent="group.image_rate_independent"
             :image-rate-multiplier="group.image_rate_multiplier"
+            :video-rate-independent="group.video_rate_independent === true"
+            :video-rate-multiplier="group.video_rate_multiplier ?? 1"
             :peak-window="peakWindow"
             :peak-rate-multiplier="group.peak_rate_multiplier"
           />
@@ -247,7 +249,32 @@ function previewPrice(model: ModelPlazaGroup['models'][number]): PreviewPrice | 
     }
   }
 
-  if (pricing.billing_mode === BILLING_MODE_VIDEO) return null
+  if (pricing.billing_mode === BILLING_MODE_VIDEO) {
+    const intervals = (pricing.intervals ?? []).filter(
+      interval => interval.per_request_price != null
+    )
+    if (intervals.length > 0) {
+      const order = ['480p', '720p', '768p', '1080p', '2k', '4k']
+      const rank = (label?: string) => {
+        const index = order.indexOf((label ?? '').trim().toLowerCase())
+        return index === -1 ? order.length : index
+      }
+      intervals.sort((a, b) => rank(a.tier_label) - rank(b.tier_label))
+      return {
+        standard: `${intervals
+          .map(interval => `${interval.tier_label || '—'} ${formatPrice(interval.per_request_price ?? 0, 1, model)}`)
+          .join(' · ')} ${unit}`,
+        paid: `${intervals
+          .map(interval => `${interval.tier_label || '—'} ${formatPrice((interval.per_request_price ?? 0) * rate, 1, model)}`)
+          .join(' · ')} ${unit}`
+      }
+    }
+    if (pricing.per_request_price == null) return null
+    return {
+      standard: `${formatPrice(pricing.per_request_price, 1, model)} ${unit}`,
+      paid: `${formatPrice(pricing.per_request_price * rate, 1, model)} ${unit}`
+    }
+  }
   const raw = pricing.intervals?.find((interval) => interval.per_request_price != null)?.per_request_price ?? pricing.per_request_price
   if (raw == null) return null
   return {
@@ -259,6 +286,7 @@ function previewPrice(model: ModelPlazaGroup['models'][number]): PreviewPrice | 
 function modelUnitKey(model: ModelPlazaGroup['models'][number]): string {
   const mode = billingMode(model)
   if (mode === BILLING_MODE_IMAGE) return 'modelPlaza.table.perUnitImage'
+  if (mode === BILLING_MODE_VIDEO) return 'modelPlaza.table.perUnitSecond'
   return 'modelPlaza.table.perUnitRequest'
 }
 

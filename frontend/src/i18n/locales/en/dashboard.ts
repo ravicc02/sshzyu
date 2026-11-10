@@ -820,8 +820,11 @@ export default {
       unitPerMillionShort: '/ 1M tokens',
       perUnitRequest: '/ request',
       perUnitImage: '/ image',
+      unitPerSecond: '$ / second',
+      perUnitSecond: '/ second',
       perRequest: 'Per request',
-      perImage: 'Per image'
+      perImage: 'Per image',
+      perSecond: 'Per second'
     },
     nav: {
       login: 'Sign In',
