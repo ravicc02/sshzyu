@@ -87,12 +87,7 @@
             </label>
             <Select
               :modelValue="entry.billing_mode"
-              @update:modelValue="emit('update', {
-                ...entry,
-                billing_mode: $event as BillingMode,
-                intervals: [],
-                time_pricing: { ...entry.time_pricing, periods: [] },
-              })"
+              @update:modelValue="updateBillingMode($event as BillingMode)"
               :options="billingModeOptions"
               class="mt-1"
             />
@@ -224,11 +219,11 @@
           </div>
         </div>
 
-        <!-- Image/video mode -->
-        <div v-else-if="entry.billing_mode === 'image' || entry.billing_mode === 'video'">
+        <!-- Image mode -->
+        <div v-else-if="entry.billing_mode === 'image'">
           <!-- Default image price (per-request, same as per_request mode) -->
           <label class="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
-            {{ entry.billing_mode === 'video' ? t('admin.channels.form.defaultVideoPrice') : t('admin.channels.form.defaultImagePrice') }}
+            {{ t('admin.channels.form.defaultImagePrice') }}
             <span class="ml-1 font-normal text-gray-400">$</span>
           </label>
           <div class="mt-1 w-48">
@@ -239,7 +234,7 @@
           <!-- Image tiers -->
           <div class="mt-3 flex items-center justify-between">
             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">
-              {{ entry.billing_mode === 'video' ? t('admin.channels.form.videoTiers') : t('admin.channels.form.imageTiers') }}
+              {{ t('admin.channels.form.imageTiers') }}
             </label>
             <button type="button" @click="addMediaTier" class="text-xs text-primary-600 hover:text-primary-700">
               + {{ t('admin.channels.form.addTier') }}
@@ -250,10 +245,42 @@
               v-for="(iv, idx) in entry.intervals"
               :key="idx"
               :interval="iv"
-              :mode="entry.billing_mode"
+              mode="image"
               @update="updateInterval(idx, $event)"
               @remove="removeInterval(idx)"
             />
+          </div>
+        </div>
+
+        <!-- Video mode: one per-second price per explicit resolution tier. -->
+        <div v-else-if="entry.billing_mode === 'video'">
+          <label class="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
+            {{ t('admin.channels.form.videoResolutionPrices') }}
+          </label>
+          <p class="mt-1 text-xs text-gray-400">
+            {{ t('admin.channels.form.videoResolutionPriceHint') }}
+          </p>
+          <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <label
+              v-for="resolution in videoResolutionOptions"
+              :key="resolution.key"
+              class="rounded border border-gray-200 bg-white p-2 dark:border-dark-500 dark:bg-dark-700"
+            >
+              <span class="block text-xs font-medium text-gray-600 dark:text-gray-300">
+                {{ resolution.label }}
+                <span class="font-normal text-gray-400">$/s</span>
+              </span>
+              <input
+                :value="videoResolutionPrice(resolution.key)"
+                :data-testid="`video-resolution-price-${resolution.key}`"
+                @input="updateVideoResolutionPrice(resolution.key, ($event.target as HTMLInputElement).value)"
+                type="number"
+                step="0.0001"
+                min="0"
+                class="input mt-1 text-sm"
+                :placeholder="t('admin.channels.form.pricePlaceholder')"
+              />
+            </label>
           </div>
         </div>
 
@@ -341,6 +368,23 @@ const billingModeOptions = computed(() => [
   { value: 'video', label: t('admin.channels.billingMode.video') }
 ])
 
+const VIDEO_RESOLUTION_OPTIONS = [
+  { key: '480p', label: '480p' },
+  { key: '720p', label: '720p' },
+  { key: '768p', label: '768p' },
+  { key: '1080p', label: '1080p' },
+  { key: '2k', label: '2K' },
+  { key: '4k', label: '4K' },
+] as const
+
+const videoResolutionOptions = computed(() =>
+  props.platform === 'video'
+    ? VIDEO_RESOLUTION_OPTIONS
+    : VIDEO_RESOLUTION_OPTIONS.filter(({ key }) =>
+        key === '480p' || key === '720p' || key === '1080p',
+      ),
+)
+
 const billingModeLabel = computed(() => {
   const opt = billingModeOptions.value.find(o => o.value === props.entry.billing_mode)
   return opt ? opt.label : props.entry.billing_mode
@@ -364,6 +408,68 @@ function emitField(field: keyof PricingFormEntry, value: string) {
   emit('update', { ...props.entry, [field]: value === '' ? null : value })
 }
 
+function updateBillingMode(mode: BillingMode) {
+  emit('update', {
+    ...props.entry,
+    billing_mode: mode,
+    per_request_price: mode === 'video' ? null : props.entry.per_request_price,
+    intervals: [],
+    time_pricing: { ...props.entry.time_pricing, periods: [] },
+  })
+}
+
+function normalizeVideoResolution(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function videoResolutionIntervalIndex(resolution: string) {
+  const normalized = normalizeVideoResolution(resolution)
+  return (props.entry.intervals || []).findIndex(
+    interval => normalizeVideoResolution(interval.tier_label) === normalized,
+  )
+}
+
+function videoResolutionPrice(resolution: string) {
+  const index = videoResolutionIntervalIndex(resolution)
+  return index >= 0 ? props.entry.intervals[index].per_request_price : null
+}
+
+function createVideoResolutionInterval(resolution: string, price: string | null): IntervalFormEntry {
+  const intervals = props.entry.intervals || []
+  return {
+    min_tokens: 0,
+    max_tokens: null,
+    tier_label: resolution,
+    input_price: null,
+    output_price: null,
+    cache_write_price: null,
+    cache_write_1h_price: null,
+    cache_read_price: null,
+    input_multiplier: null,
+    output_multiplier: null,
+    cache_write_multiplier: null,
+    cache_read_multiplier: null,
+    per_request_price: price,
+    sort_order: intervals.length,
+  }
+}
+
+function updateVideoResolutionPrice(resolution: string, value: string) {
+  const intervals = [...(props.entry.intervals || [])]
+  const index = videoResolutionIntervalIndex(resolution)
+  const price = value === '' ? null : value
+  if (index >= 0) {
+    intervals[index] = {
+      ...intervals[index],
+      tier_label: resolution,
+      per_request_price: price,
+    }
+  } else if (price !== null) {
+    intervals.push(createVideoResolutionInterval(resolution, price))
+  }
+  emit('update', { ...props.entry, per_request_price: null, intervals })
+}
+
 function addInterval() {
   const intervals = [...(props.entry.intervals || [])]
   intervals.push({
@@ -380,9 +486,7 @@ function addInterval() {
 
 function addMediaTier() {
   const intervals = [...(props.entry.intervals || [])]
-  const labels = props.entry.billing_mode === 'video'
-    ? ['480p', '720p', '768p', '1080p', '2k', '4k']
-    : ['1K', '2K', '4K', 'HD']
+  const labels = ['1K', '2K', '4K', 'HD']
   intervals.push({
     min_tokens: 0, max_tokens: null, tier_label: labels[intervals.length] || '',
     input_price: null, output_price: null, cache_write_price: null,

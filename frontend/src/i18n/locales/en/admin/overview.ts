@@ -1126,7 +1126,7 @@ export default {
       videoPricing: {
         title: 'Video Generation Pricing',
         description:
-          'Configure per-second video prices in USD. Grok can use built-in defaults; Video API uses the model/resolution prices below or the per-model pricing section with token, per-request, or per-second modes.',
+          'Configure the independent video multiplier. For Video API, set per-second prices in "Model Pricing" below by choosing Video (Per Second), then fill each resolution. Grok can keep using the built-in flat prices.',
         modelOverridesTitle: 'Per-model video price overrides',
         modelOverridesDescription: 'Each populated cell overrides the flat resolution price for that model family. Preview and legacy aliases for video-1.5 use the same family; empty cells fall back to the flat resolution price.',
         independentMultiplier: 'Use independent video multiplier',

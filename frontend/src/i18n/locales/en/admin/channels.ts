@@ -173,6 +173,8 @@ export default {
         requestTiers: 'Request Tiers',
         imageTiers: 'Image Tiers (Per Request)',
         videoTiers: 'Video Resolution Tiers (Per Second)',
+        videoResolutionPrices: 'Per-second price by resolution',
+        videoResolutionPriceHint: 'Fill only the resolutions you want to bill. Unfilled tiers stay unconfigured.',
         addTier: 'Add Tier',
         noTiersYet: 'No tiers yet. Click add to configure per-request pricing.',
         noPricingRules: 'No pricing rules yet. Click "Add" to create one.',

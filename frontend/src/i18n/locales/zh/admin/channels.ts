@@ -173,6 +173,8 @@ export default {
         requestTiers: '按次计费层级',
         imageTiers: '图片计费层级（按次）',
         videoTiers: '视频分辨率层级（按秒）',
+        videoResolutionPrices: '按分辨率设置每秒价格',
+        videoResolutionPriceHint: '只填需要计费的分辨率。未填写的档位不会配置价格。',
         addTier: '添加层级',
         noTiersYet: '暂无层级，点击添加配置按次计费价格',
         noPricingRules: '暂无定价规则，点击"添加"创建',
