@@ -294,10 +294,27 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 		group := groupEnt[gid]
 		pg := byGroup[gid]
 		merged := make(map[modelKey]SupportedModel)
-		for _, ch := range channelsByGroup[gid] {
+		groupChannels := channelsByGroup[gid]
+		for _, ch := range groupChannels {
 			models, err := groupSupportedModels(ctx, s.accountRepo, s.routeRepo, s.pricingService, ch, group)
 			if err != nil {
 				return nil, fmt.Errorf("list group %d models: %w", gid, err)
+			}
+			for _, model := range models {
+				merged[modelKey{platform: model.Platform, name: model.Name}] = model
+			}
+		}
+		if len(merged) == 0 && len(groupChannels) == 0 && len(group.ModelPricing) > 0 {
+			// Some groups, notably dedicated video groups, keep their model catalog
+			// and pricing on the group/account configuration without a channel
+			// binding. Treat the group pricing rows as a read-only catalog source
+			// so the model plaza does not silently hide the whole group.
+			catalogChannel := &Channel{
+				ModelPricing: group.ModelPricing,
+			}
+			models, err := groupSupportedModels(ctx, s.accountRepo, s.routeRepo, s.pricingService, catalogChannel, group)
+			if err != nil {
+				return nil, fmt.Errorf("list group %d fallback models: %w", gid, err)
 			}
 			for _, model := range models {
 				merged[modelKey{platform: model.Platform, name: model.Name}] = model
@@ -356,7 +373,7 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 		m.Pricing = groupPricing
 		// 分组模型级固定价就是实收价，不能再被分组图片兜底档位覆盖。
 		// 否则模型广场会显示 image_price_1k/2k/4k，而实际按 model_pricing 扣费。
-		if groupPricing.BillingMode == BillingModeImage || groupPricing.BillingMode == BillingModePerRequest {
+		if groupPricing.BillingMode == BillingModeImage || groupPricing.BillingMode == BillingModePerRequest || groupPricing.BillingMode == BillingModeVideo {
 			return
 		}
 	}
