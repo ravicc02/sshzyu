@@ -1319,7 +1319,7 @@
               <input
                 v-model.number="createForm.video_price_480p"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
                 :placeholder="getVideoPricePlaceholder(createForm.platform, 'video_price_480p')"
@@ -1330,7 +1330,7 @@
               <input
                 v-model.number="createForm.video_price_720p"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
                 :placeholder="getVideoPricePlaceholder(createForm.platform, 'video_price_720p')"
@@ -1341,7 +1341,7 @@
               <input
                 v-model.number="createForm.video_price_1080p"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
                 :placeholder="getVideoPricePlaceholder(createForm.platform, 'video_price_1080p')"
@@ -1378,7 +1378,7 @@
                   <input
                     v-model.number="createForm.video_model_prices[family.key][resolution.key]"
                     type="number"
-                    step="0.001"
+                    step="0.0001"
                     min="0"
                     class="input"
                     :data-testid="`create-grok-video-price-${family.key}-${resolution.key}`"
@@ -3148,7 +3148,7 @@
               <input
                 v-model.number="editForm.video_price_480p"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
                 :placeholder="getVideoPricePlaceholder(editForm.platform, 'video_price_480p')"
@@ -3159,7 +3159,7 @@
               <input
                 v-model.number="editForm.video_price_720p"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
                 :placeholder="getVideoPricePlaceholder(editForm.platform, 'video_price_720p')"
@@ -3170,7 +3170,7 @@
               <input
                 v-model.number="editForm.video_price_1080p"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
                 :placeholder="getVideoPricePlaceholder(editForm.platform, 'video_price_1080p')"
@@ -3207,7 +3207,7 @@
                   <input
                     v-model.number="editForm.video_model_prices[family.key][resolution.key]"
                     type="number"
-                    step="0.001"
+                    step="0.0001"
                     min="0"
                     class="input"
                     :data-testid="`edit-grok-video-price-${family.key}-${resolution.key}`"
