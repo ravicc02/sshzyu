@@ -492,12 +492,12 @@ func extractVideoAPIStatusMetadata(body []byte, cfg VideoAPIAccountConfig, pendi
 		if meta.DurationSeconds <= 0 {
 			meta.DurationSeconds = pending.VideoDurationSeconds
 		}
-	}
-	if meta.Resolution == "" {
-		meta.Resolution = cfg.DefaultResolution
-	}
-	if meta.DurationSeconds <= 0 {
-		meta.DurationSeconds = cfg.DefaultDurationSeconds
+		if meta.Resolution == "" {
+			meta.Resolution = cfg.DefaultResolution
+		}
+		if meta.DurationSeconds <= 0 {
+			meta.DurationSeconds = cfg.DefaultDurationSeconds
+		}
 	}
 	if strings.TrimSpace(meta.Model) == "" {
 		meta.Model = strings.TrimSpace(requestID)
