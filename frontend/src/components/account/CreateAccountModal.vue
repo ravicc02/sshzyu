@@ -1519,11 +1519,16 @@
           <label class="input-label">{{ t('admin.accounts.baseUrl') }}</label>
           <input
             v-model="apiKeyBaseUrl"
-            type="url"
+            type="text"
+            inputmode="url"
             class="input"
-            autocomplete="off"
+            name="account-api-base-url"
+            autocomplete="new-password"
             autocapitalize="none"
             spellcheck="false"
+            readonly
+            @focus="unlockBaseUrlInput"
+            @blur="lockBaseUrlInput"
             data-1p-ignore
             data-lpignore="true"
             data-bwignore="true"
@@ -4283,6 +4288,16 @@ const baseUrlHint = computed(() => {
   if (form.platform === 'grok' || form.platform === 'video') return ''
   return t('admin.accounts.baseUrlHint')
 })
+
+function unlockBaseUrlInput(event: FocusEvent) {
+  const input = event.currentTarget as HTMLInputElement | null
+  input?.removeAttribute('readonly')
+}
+
+function lockBaseUrlInput(event: FocusEvent) {
+  const input = event.currentTarget as HTMLInputElement | null
+  input?.setAttribute('readonly', '')
+}
 
 const apiKeyHint = computed(() => {
   if (form.platform === 'openai') return t('admin.accounts.openai.apiKeyHint')
