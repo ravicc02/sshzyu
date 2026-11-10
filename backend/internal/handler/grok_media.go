@@ -124,7 +124,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 	contentType := c.GetHeader("Content-Type")
 	requestInfo := service.ParseGrokMediaRequest(contentType, body)
 	var videoAPIRequest service.VideoAPIRequestInfo
-	if endpoint.IsVideoAPI() {
+	if endpoint == service.VideoAPIEndpointCreate {
 		videoAPIRequest, err = service.ParseVideoAPIRequest(body)
 		if err != nil {
 			h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())
