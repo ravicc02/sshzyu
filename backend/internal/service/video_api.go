@@ -37,8 +37,8 @@ var (
 	defaultVideoAPICompletedValues = []string{"completed", "complete", "succeeded", "success", "done"}
 	defaultVideoAPIFailedValues    = []string{"failed", "failure", "error", "cancelled", "canceled", "expired"}
 	defaultVideoAPIContentURLPaths = []string{
-		"video.url", "url", "video_url", "output_url",
-		"data.video.url", "data.url", "data.video_url", "data.output_url",
+		"video.url", "url", "video_url", "output_url", "download_url",
+		"data.video.url", "data.url", "data.video_url", "data.output_url", "data.download_url",
 	}
 	defaultVideoAPITokenPaths = []string{
 		"usage.total_tokens", "usage.output_tokens", "total_tokens", "output_tokens",
