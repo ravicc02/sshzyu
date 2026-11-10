@@ -50,17 +50,17 @@ func TestNormalizeAndLookupVideoModelPrices(t *testing.T) {
 
 func TestNormalizeVideoModelPricesDropsUnknownResolutions(t *testing.T) {
 	t.Parallel()
-	// "4k" and "1080i" are not billable tiers. Collapsing them into 480p would
+	// "8k" and "1080i" are not billable tiers. Collapsing them into 480p would
 	// charge a 480p request at the operator's high-resolution price.
 	norm := NormalizeVideoModelPrices(map[string]map[string]float64{
-		"grok-imagine-video": {"480p": 0.05, "4k": 0.50, "1080i": 0.30},
+		"grok-imagine-video": {"480p": 0.05, "8k": 0.50, "1080i": 0.30},
 	})
 	require.NotNil(t, norm)
 	require.Equal(t, map[string]float64{VideoBillingResolution480P: 0.05}, norm[VideoPriceFamilyGrokImagineVideo])
 
 	// A model whose tiers are all unrecognized contributes no family at all.
 	require.Nil(t, NormalizeVideoModelPrices(map[string]map[string]float64{
-		"grok-imagine-video": {"4k": 0.50},
+		"grok-imagine-video": {"8k": 0.50},
 	}))
 }
 
@@ -93,18 +93,18 @@ func TestNormalizeVideoModelPricesIsDeterministicAcrossAliasConflicts(t *testing
 
 func TestLookupVideoBillingResolutionReportsUnknownTiers(t *testing.T) {
 	t.Parallel()
-	for _, in := range []string{"480", "480p", "SD", "720", "hd", "1080", "full-hd", " fhd "} {
+	for _, in := range []string{"480", "480p", "SD", "720", "hd", "1080", "full-hd", " fhd ", "4k", "2160p"} {
 		normalized, ok := LookupVideoBillingResolution(in)
 		require.True(t, ok, "input=%q", in)
 		require.NotEmpty(t, normalized)
 	}
-	for _, in := range []string{"", "4k", "1080i", "2160p", "potato"} {
+	for _, in := range []string{"", "8k", "1080i", "potato"} {
 		normalized, ok := LookupVideoBillingResolution(in)
 		require.False(t, ok, "input=%q", in)
 		require.Empty(t, normalized)
 	}
 	// Runtime billing still needs a tier for unrecognized upstream values.
-	require.Equal(t, VideoBillingResolution480P, NormalizeVideoBillingResolutionOrDefault("4k"))
+	require.Equal(t, VideoBillingResolution4K, NormalizeVideoBillingResolutionOrDefault("4k"))
 	require.Equal(t, VideoBillingResolution1080P, NormalizeVideoBillingResolutionOrDefault("full_hd"))
 }
 

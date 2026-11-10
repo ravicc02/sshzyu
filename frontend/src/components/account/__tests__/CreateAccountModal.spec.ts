@@ -438,7 +438,7 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     const wrapper = mountModal()
     await wrapper.get('[data-testid="platform-button-video"]').trigger('click')
     await wrapper.get('form#create-account-form input[type="text"]').setValue('video-api')
-    await wrapper.get('form#create-account-form input[type="url"]').setValue('https://video.example.test/v1')
+    await wrapper.get('form#create-account-form input[name="account-api-base-url"]').setValue('https://video.example.test/v1')
     await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-video')
 
     await wrapper.get('form#create-account-form').trigger('submit.prevent')
