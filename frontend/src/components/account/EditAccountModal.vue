@@ -32,8 +32,14 @@
           <label class="input-label">{{ t('admin.accounts.baseUrl') }}</label>
           <input
             v-model="editBaseUrl"
-            type="text"
+            type="url"
             class="input"
+            autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
+            data-1p-ignore
+            data-lpignore="true"
+            data-bwignore="true"
             :placeholder="
               account.platform === 'openai'
                 ? 'https://api.openai.com'
@@ -44,7 +50,7 @@
                     : account.platform === 'grok'
                       ? 'https://api.x.ai/v1'
                       : account.platform === 'video'
-                        ? 'https://newapi.foxfoxiiix.xyz/v1'
+                        ? 'https://api.example.com/v1'
                       : 'https://api.anthropic.com'
             "
           />
@@ -4413,7 +4419,7 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'openai') return 'https://api.openai.com'
   if (props.account?.platform === 'gemini') return 'https://generativelanguage.googleapis.com'
   if (props.account?.platform === 'grok') return 'https://api.x.ai/v1'
-  if (props.account?.platform === 'video') return 'https://newapi.foxfoxiiix.xyz/v1'
+  if (props.account?.platform === 'video') return ''
   if (props.account?.platform === 'typesafe') return 'https://api.typesafe.ai'
   // CN 供应商：按当前模式/协议回落到官方预设（清空输入框提交时使用），
   // 不能落到 anthropic 默认值（会被当 CC base 拼出错误端点）。
@@ -4857,7 +4863,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
           : newAccount.platform === 'grok'
             ? 'https://api.x.ai/v1'
             : newAccount.platform === 'video'
-              ? 'https://newapi.foxfoxiiix.xyz/v1'
+              ? ''
             : newAccount.platform === 'typesafe'
               ? 'https://api.typesafe.ai'
             : isMultiProtocolApiKeyPlatform(newAccount.platform)
@@ -4941,7 +4947,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
           : newAccount.platform === 'grok'
             ? 'https://api.x.ai/v1'
             : newAccount.platform === 'video'
-              ? 'https://newapi.foxfoxiiix.xyz/v1'
+              ? ''
             : 'https://api.anthropic.com'
     editBaseUrl.value = platformDefaultUrl
 
@@ -5627,6 +5633,10 @@ const handleSubmit = async () => {
     if (props.account.type === 'apikey') {
       const currentCredentials = (props.account.credentials as Record<string, unknown>) || {}
       const newBaseUrl = editBaseUrl.value.trim() || defaultBaseUrl.value
+      if (props.account.platform === 'video' && !newBaseUrl) {
+        appStore.showError(t('admin.accounts.upstream.pleaseEnterBaseUrl'))
+        return
+      }
       const shouldApplyModelMapping = !(props.account.platform === 'openai' && openaiPassthroughEnabled.value)
 
       // Always update credentials for apikey type to handle model mapping changes

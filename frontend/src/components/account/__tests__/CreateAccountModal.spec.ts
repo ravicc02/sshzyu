@@ -438,6 +438,7 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     const wrapper = mountModal()
     await wrapper.get('[data-testid="platform-button-video"]').trigger('click')
     await wrapper.get('form#create-account-form input[type="text"]').setValue('video-api')
+    await wrapper.get('form#create-account-form input[type="url"]').setValue('https://video.example.test/v1')
     await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-video')
 
     await wrapper.get('form#create-account-form').trigger('submit.prevent')
@@ -449,7 +450,7 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     expect(payload?.type).toBe('apikey')
     expect(payload?.upstream_billing_probe_enabled).toBe(false)
     expect(payload?.credentials).toMatchObject({
-      base_url: 'https://newapi.foxfoxiiix.xyz/v1',
+      base_url: 'https://video.example.test/v1',
       api_key: 'sk-video',
       model_mapping: {
         'doubao-seedance-2-5': 'doubao-seedance-2-5',

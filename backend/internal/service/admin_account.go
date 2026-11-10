@@ -475,7 +475,26 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 		}
 		account.LoadFactor = input.LoadFactor
 	}
+	if err := validateVideoAPIAccount(account); err != nil {
+		return nil, err
+	}
 	return account, nil
+}
+
+func validateVideoAPIAccount(account *Account) error {
+	if account == nil || account.Platform != PlatformVideo {
+		return nil
+	}
+	if account.Type != AccountTypeAPIKey {
+		return errors.New("video API accounts only support apikey credentials")
+	}
+	if strings.TrimSpace(account.GetCredential("base_url")) == "" {
+		return errors.New("video API accounts require base_url")
+	}
+	if strings.TrimSpace(account.GetCredential("api_key")) == "" {
+		return errors.New("video API accounts require api_key")
+	}
+	return nil
 }
 
 func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error) {
@@ -662,6 +681,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		}
 		// Strip SSO/password residue that must never sit next to OAuth tokens.
 		account.Credentials = SanitizeStoredCredentials(account.Platform, account.Credentials)
+	}
+	if err := validateVideoAPIAccount(account); err != nil {
+		return nil, err
 	}
 	// Extra 使用 map：需要区分“未提供(nil)”与“显式清空({})”。
 	// 关闭配额限制时前端会删除 quota_* 键并提交 extra:{}，此时也必须落库。

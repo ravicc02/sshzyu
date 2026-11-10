@@ -1519,8 +1519,14 @@
           <label class="input-label">{{ t('admin.accounts.baseUrl') }}</label>
           <input
             v-model="apiKeyBaseUrl"
-            type="text"
+            type="url"
             class="input"
+            autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
+            data-1p-ignore
+            data-lpignore="true"
+            data-bwignore="true"
             :placeholder="apiKeyBaseUrlPlaceholder"
           />
           <p v-if="baseUrlHint" class="input-hint">{{ baseUrlHint }}</p>
@@ -4300,7 +4306,7 @@ const apiKeyBaseUrlPlaceholder = computed(() => {
     case 'grok':
       return 'https://api.x.ai/v1'
     case 'video':
-      return 'https://newapi.foxfoxiiix.xyz/v1'
+      return 'https://api.example.com/v1'
     case 'typesafe':
       return 'https://api.typesafe.ai'
     default:
@@ -4555,7 +4561,7 @@ function selectVideoPlatform() {
   form.platform = 'video'
   form.type = 'apikey'
   accountCategory.value = 'apikey'
-  apiKeyBaseUrl.value = 'https://newapi.foxfoxiiix.xyz/v1'
+  apiKeyBaseUrl.value = ''
   modelRestrictionMode.value = 'whitelist'
   allowedModels.value = [...getModelsByPlatform('video')]
   modelMappings.value = []
@@ -4636,6 +4642,7 @@ const syncPreviewCredentials = computed(() => {
   const baseUrl = isMultiProtocolPlatform.value && apiProtocol.value === 'adaptive'
     ? adaptiveBaseUrls.value.chat_completions.trim() || apiKeyBaseUrl.value.trim()
     : apiKeyBaseUrl.value.trim()
+  if (form.platform === 'video' && !baseUrl) return undefined
   const modelMapping = buildModelMappingObject(
     modelRestrictionMode.value,
     allowedModels.value,
@@ -5180,7 +5187,7 @@ watch(
             : newPlatform === 'grok'
               ? 'https://api.x.ai/v1'
               : newPlatform === 'video'
-                ? 'https://newapi.foxfoxiiix.xyz/v1'
+                ? ''
               : newPlatform === 'typesafe'
                 ? 'https://api.typesafe.ai'
               : 'https://api.anthropic.com'
@@ -5192,6 +5199,7 @@ watch(
     if (newPlatform === 'video') {
       accountCategory.value = 'apikey'
       modelRestrictionMode.value = 'whitelist'
+      apiKeyBaseUrl.value = ''
       allowedModels.value = [...getModelsByPlatform('video')]
       upstreamBillingAutoProbeEnabled.value = false
     } else {
@@ -6150,6 +6158,10 @@ const handleSubmit = async () => {
     appStore.showError(t('admin.accounts.pleaseEnterApiKey'))
     return
   }
+  if (form.platform === 'video' && !apiKeyBaseUrl.value.trim()) {
+    appStore.showError(t('admin.accounts.upstream.pleaseEnterBaseUrl'))
+    return
+  }
 
   // Determine default base URL based on platform
   const defaultBaseUrl =
@@ -6160,7 +6172,7 @@ const handleSubmit = async () => {
         : form.platform === 'grok'
           ? 'https://api.x.ai/v1'
           : form.platform === 'video'
-            ? 'https://newapi.foxfoxiiix.xyz/v1'
+            ? ''
           : form.platform === 'typesafe'
             ? 'https://api.typesafe.ai'
           : 'https://api.anthropic.com'
