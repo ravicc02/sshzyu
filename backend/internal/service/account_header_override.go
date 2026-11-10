@@ -9,7 +9,7 @@ import (
 	"golang.org/x/net/http/httpguts"
 )
 
-// 请求头覆写（header override）：对 Anthropic / OpenAI / Kimi / Zhipu / DeepSeek
+// 请求头覆写（header override）：对 Anthropic / OpenAI / Video API / Kimi / Zhipu / DeepSeek
 // 平台的 api_key 账号，以及 Grok 平台的 api_key / oauth 账号生效。
 // 管理员在账号上配置一组 header name -> value，转发到上游前用配置值覆盖同名请求头
 // （匹配不区分大小写）；value 为空的条目视为"未填写"，不参与覆盖。
@@ -78,7 +78,7 @@ func (a *Account) IsHeaderOverrideEligible() bool {
 		return false
 	}
 	switch {
-	case a.Platform == PlatformAnthropic, a.Platform == PlatformOpenAI, IsMultiProtocolAPIKeyProvider(a.Platform):
+	case a.Platform == PlatformAnthropic, a.Platform == PlatformOpenAI, a.Platform == PlatformVideo, IsMultiProtocolAPIKeyProvider(a.Platform):
 		return a.Type == AccountTypeAPIKey
 	case a.Platform == PlatformGrok:
 		return a.Type == AccountTypeAPIKey || a.Type == AccountTypeOAuth

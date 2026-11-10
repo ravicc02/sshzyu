@@ -1668,6 +1668,13 @@ export default {
       selectTestModel: 'Select Test Model',
       testModel: 'Test model',
       testPrompt: 'Prompt: "hi"',
+      videoApi: {
+        modelListHint: 'Video API accounts only inspect the upstream model list and never create paid video tasks.',
+        modelListMode: 'Mode: upstream model list check',
+        checkingModels: 'Reading upstream /v1/models...',
+        modelsFound: 'Model list check succeeded with {count} model(s):',
+        modelsEmpty: 'The upstream model list is empty'
+      },
       imagePromptLabel: 'Image prompt',
       imagePromptPlaceholder: 'Example: Generate an orange cat astronaut sticker in pixel-art style on a solid background.',
       imagePromptDefault: 'Generate a cute orange cat astronaut sticker on a clean pastel background.',

@@ -56,6 +56,13 @@
         </p>
       </div>
 
+      <div
+        v-if="isVideoAccount"
+        class="rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-xs text-cyan-800 dark:border-cyan-900/50 dark:bg-cyan-900/20 dark:text-cyan-200"
+      >
+        {{ t('admin.accounts.videoApi.modelListHint') }}
+      </div>
+
       <div v-if="showModelSelect" class="space-y-1.5">
         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
           {{ t('admin.accounts.selectTestModel') }}
@@ -375,6 +382,7 @@ import { useClipboard } from '@/composables/useClipboard'
 import { buildApiUrl } from '@/api/client'
 import { ADMIN_UI_REQUEST_HEADER } from '@/api/adminUIRequest'
 import { adminAPI } from '@/api/admin'
+import { isKnownVideoApiModel } from '@/composables/useModelWhitelist'
 import type { Account, ClaudeModel } from '@/types'
 
 const { t } = useI18n()
@@ -424,6 +432,7 @@ const imageFileInput = ref<HTMLInputElement | null>(null)
 const audioFileInput = ref<HTMLInputElement | null>(null)
 const isOpenAIAccount = computed(() => props.account?.platform === 'openai')
 const isGrokAccount = computed(() => props.account?.platform === 'grok')
+const isVideoAccount = computed(() => props.account?.platform === 'video')
 const openAITestModeOptions = computed(() => [
   { value: 'default', label: t('admin.accounts.openai.testModeDefault') },
   { value: 'compact', label: t('admin.accounts.openai.testModeCompact') }
@@ -478,6 +487,7 @@ const supportsImageTest = computed(
 
 // Model select only when the mode needs a model.
 const showModelSelect = computed(() => {
+  if (isVideoAccount.value) return false
   if (!isGrokAccount.value) return true
   return grokTestMode.value === 'text' || grokTestMode.value === 'image' || grokTestMode.value === 'video'
 })
@@ -497,6 +507,7 @@ const modelOptionsForMode = computed(() => {
 })
 
 const supportsPromptInput = computed(() => {
+  if (isVideoAccount.value) return false
   if (!isGrokAccount.value) {
     return supportsImageTest.value
   }
@@ -651,6 +662,7 @@ const promptInputHint = computed(() => {
 })
 
 const testModeSummary = computed(() => {
+  if (isVideoAccount.value) return t('admin.accounts.videoApi.modelListMode')
   if (isGrokAccount.value) {
     switch (grokTestMode.value) {
       case 'video':
@@ -675,6 +687,7 @@ const testModeSummary = computed(() => {
 
 const canStartTest = computed(() => {
   if (status.value === 'connecting') return false
+  if (isVideoAccount.value) return true
   if (isGrokAccount.value) {
     if (
       grokTestMode.value === 'search' ||
@@ -741,7 +754,9 @@ watch(
       testMode.value = 'default'
       grokTestMode.value = 'text'
       resetState()
-      await loadAvailableModels()
+      if (!isVideoAccount.value) {
+        await loadAvailableModels()
+      }
       if (isGrokAccount.value) {
         pickDefaultModelForMode()
         applyDefaultPromptForMode()
@@ -827,6 +842,11 @@ const scrollToBottom = async () => {
 
 const startTest = async () => {
   if (!props.account || !canStartTest.value) return
+
+  if (isVideoAccount.value) {
+    await startVideoModelListTest()
+    return
+  }
 
   resetState()
   status.value = 'connecting'
@@ -935,6 +955,36 @@ const startTest = async () => {
     const msg = error instanceof Error ? error.message : t('common.unknownError')
     errorMessage.value = msg
     addLine(t('admin.accounts.errorPrefix', { message: msg }), 'text-red-400')
+  }
+}
+
+const startVideoModelListTest = async () => {
+  if (!props.account) return
+
+  resetState()
+  status.value = 'connecting'
+  addLine(t('admin.accounts.startingTestForAccount', { name: props.account.name }), 'text-blue-400')
+  addLine(t('admin.accounts.videoApi.checkingModels'), 'text-cyan-300')
+  addLine('', 'text-gray-300')
+
+  try {
+    const result = await adminAPI.accounts.syncUpstreamModels(props.account.id)
+    const models = result.models
+      .map(model => model.trim())
+      .filter(model => Boolean(model) && isKnownVideoApiModel(model))
+    if (models.length === 0) {
+      throw new Error(t('admin.accounts.videoApi.modelsEmpty'))
+    }
+    addLine(t('admin.accounts.videoApi.modelsFound', { count: models.length }), 'text-green-400')
+    for (const model of models) {
+      addLine(`- ${model}`)
+    }
+    status.value = 'success'
+  } catch (error) {
+    status.value = 'error'
+    const message = error instanceof Error ? error.message : t('common.unknownError')
+    errorMessage.value = message
+    addLine(t('admin.accounts.errorPrefix', { message }), 'text-red-400')
   }
 }
 

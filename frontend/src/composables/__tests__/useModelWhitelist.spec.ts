@@ -122,6 +122,16 @@ describe('useModelWhitelist', () => {
     expect(models).toContain('grok-imagine-video-1.5')
   })
 
+  it('Video API 默认模型和预设映射包含首批视频型号', () => {
+    const models = getModelsByPlatform('video')
+
+    expect(models).toEqual(['doubao-seedance-2-5', 'minimax_h3'])
+    expect(getPresetMappingsByPlatform('video')).toEqual([
+      expect.objectContaining({ from: 'doubao-seedance-2-5', to: 'doubao-seedance-2-5' }),
+      expect.objectContaining({ from: 'minimax_h3', to: 'minimax_h3' })
+    ])
+  })
+
   it('combined 模式支持 Grok 4.5 官方别名映射', () => {
     const mapping = buildModelMappingObject(
       'combined',

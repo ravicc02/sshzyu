@@ -262,6 +262,25 @@ func TestBuildUpstreamModelsRequestSupportsOpenAIOAuth(t *testing.T) {
 	require.NotEmpty(t, req.Header.Get("Version"))
 }
 
+func TestBuildUpstreamModelsRequestSupportsVideoAPI(t *testing.T) {
+	svc := &AccountTestService{cfg: upstreamModelSyncTestConfig()}
+	account := &Account{
+		ID:       12,
+		Platform: PlatformVideo,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"base_url": "https://newapi.example.test/v1",
+			"api_key":  "sk-video",
+		},
+	}
+
+	req, err := svc.buildUpstreamModelsRequest(context.Background(), account)
+	require.NoError(t, err)
+	require.Equal(t, "https://newapi.example.test/v1/models", req.URL.String())
+	require.Equal(t, "Bearer sk-video", req.Header.Get("Authorization"))
+	require.Equal(t, "application/json", req.Header.Get("Accept"))
+}
+
 func TestFetchUpstreamSupportedModelsParsesOpenAIOAuthManifest(t *testing.T) {
 	upstream := &httpUpstreamRecorder{resp: &http.Response{
 		StatusCode: http.StatusOK,

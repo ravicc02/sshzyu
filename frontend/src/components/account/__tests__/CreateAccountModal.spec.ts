@@ -434,6 +434,30 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     }
   })
 
+  it('creates a Video API account with the first batch models', async () => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="platform-button-video"]').trigger('click')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('video-api')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-video')
+
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    const payload = createAccountMock.mock.calls[0]?.[0]
+    expect(payload?.platform).toBe('video')
+    expect(payload?.type).toBe('apikey')
+    expect(payload?.upstream_billing_probe_enabled).toBe(false)
+    expect(payload?.credentials).toMatchObject({
+      base_url: 'https://newapi.foxfoxiiix.xyz/v1',
+      api_key: 'sk-video',
+      model_mapping: {
+        'doubao-seedance-2-5': 'doubao-seedance-2-5',
+        minimax_h3: 'minimax_h3'
+      }
+    })
+  })
+
   it('submits OpenCode Zen default protocol rules with adaptive endpoints', async () => {
     const wrapper = mountModal()
     await selectButtonByText(wrapper, 'OpenCode')

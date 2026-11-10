@@ -80,6 +80,21 @@ func TestGetBaseURL(t *testing.T) {
 	}
 }
 
+func TestVideoAPIUsesOpenAIProtocolCredentials(t *testing.T) {
+	account := &Account{
+		Platform: PlatformVideo,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"base_url": "https://newapi.example.test/v1",
+			"api_key":  "sk-video",
+		},
+	}
+
+	require.Equal(t, "https://newapi.example.test/v1", account.GetOpenAIBaseURL())
+	require.Equal(t, "sk-video", account.GetOpenAIProtocolAPIKey())
+	require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityVideo))
+}
+
 func TestGetGeminiBaseURL(t *testing.T) {
 	const defaultGeminiURL = "https://generativelanguage.googleapis.com"
 

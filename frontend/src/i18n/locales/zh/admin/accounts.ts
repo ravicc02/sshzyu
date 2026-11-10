@@ -1731,6 +1731,13 @@ export default {
       selectTestModel: '选择测试模型',
       testModel: '测试模型',
       testPrompt: '提示词："hi"',
+      videoApi: {
+        modelListHint: 'Video API 账号只检查上游模型列表，不会创建付费视频任务。',
+        modelListMode: '模式：上游模型列表检查',
+        checkingModels: '正在读取上游 /v1/models...',
+        modelsFound: '模型列表检查成功，共 {count} 个模型：',
+        modelsEmpty: '上游模型列表为空'
+      },
       imagePromptLabel: '生图提示词',
       imagePromptPlaceholder: '例如：生成一只戴宇航员头盔的橘猫，像素插画风格，纯色背景。',
       imagePromptDefault: 'Generate a cute orange cat astronaut sticker on a clean pastel background.',

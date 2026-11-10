@@ -208,6 +208,35 @@ const xaiModels = [
   'grok-imagine-video-1.5'
 ]
 
+// OpenAI 风格视频 API 渠道首批默认模型。
+const videoModels = [
+  'doubao-seedance-2-5',
+  'minimax_h3'
+]
+
+// 上游公开目录中已确认的视频模型。模型同步只自动加入这些型号。
+export const videoApiModelCatalog = [
+  'doubao-seedance-2-5',
+  'minimax_h3',
+  'sd-2.0-满血',
+  'sd-2.5-满血',
+  'sd-903-特稳',
+  'sd2-v',
+  'sd2-满血-新',
+  'sd2.5-y',
+  'sd2.5720按次稳定不烧心',
+  'sd25-满血-新',
+  'sd25官转',
+  'sd2官转',
+  'seedance2.5反直链',
+  'videopipe-dola-2.0',
+  'videopipe-doubao-2.0'
+]
+
+export function isKnownVideoApiModel(model: string): boolean {
+  return videoApiModelCatalog.includes(model.trim())
+}
+
 // Cohere
 const cohereModels = [
   'command-a-03-2025',
@@ -291,6 +320,7 @@ const allModelsList: string[] = Array.from(new Set([
   ...mistralModels,
   ...metaModels,
   ...xaiModels,
+  ...videoApiModelCatalog,
   ...cohereModels,
   ...yiModels,
   ...moonshotModels,
@@ -376,6 +406,11 @@ const grokPresetMappings = [
   { label: 'Imagine Image', from: 'grok-imagine', to: 'grok-imagine-image-quality', color: 'bg-sky-100 text-sky-700 hover:bg-sky-200 dark:bg-sky-900/30 dark:text-sky-400' },
   { label: 'Imagine Edit', from: 'grok-imagine-edit', to: 'grok-imagine-image-quality', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-400' },
   { label: 'Imagine Video', from: 'grok-imagine-video-1.5', to: 'grok-imagine-video-1.5', color: 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400' }
+]
+
+const videoPresetMappings = [
+  { label: 'Seedance 2.5', from: 'doubao-seedance-2-5', to: 'doubao-seedance-2-5', color: 'bg-cyan-100 text-cyan-700 hover:bg-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400' },
+  { label: 'MiniMax H3', from: 'minimax_h3', to: 'minimax_h3', color: 'bg-sky-100 text-sky-700 hover:bg-sky-200 dark:bg-sky-900/30 dark:text-sky-400' }
 ]
 
 // Antigravity 预设映射（支持通配符）
@@ -503,6 +538,7 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'meta': return metaModels
     case 'xai':
     case 'grok': return xaiModels
+    case 'video': return videoModels
     case 'cohere': return cohereModels
     case 'yi': return yiModels
     case 'moonshot':
@@ -538,6 +574,7 @@ export function getPresetMappingsByPlatform(platform: string) {
   if (platform === 'openai') return openaiPresetMappings
   if (platform === 'gemini') return geminiPresetMappings
   if (platform === 'grok' || platform === 'xai') return grokPresetMappings
+  if (platform === 'video') return videoPresetMappings
   if (platform === 'antigravity') return antigravityPresetMappings
   if (platform === 'bedrock') return bedrockPresetMappings
   return anthropicPresetMappings
