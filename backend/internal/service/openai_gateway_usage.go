@@ -360,11 +360,16 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	// share one bill). Context-local client/local IDs would otherwise create a new row
 	// per poll if Redis claim is lost.
 	if result.VideoCount > 0 {
-		if stable := StableGrokVideoBillingRequestID(firstNonEmpty(
-			strings.TrimPrefix(strings.TrimSpace(result.RequestID), "grok-video:"),
+		taskID := firstNonEmpty(
+			strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(result.RequestID), "grok-video:"), "video-api:"),
 			strings.TrimSpace(result.ResponseID),
-			strings.TrimPrefix(strings.TrimSpace(requestID), "grok-video:"),
-		)); stable != "" {
+			strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(requestID), "grok-video:"), "video-api:"),
+		)
+		stable := StableGrokVideoBillingRequestID(taskID)
+		if account.Platform == PlatformVideo {
+			stable = StableVideoAPIBillingRequestID(taskID)
+		}
+		if stable != "" {
 			requestID = stable
 		}
 	}

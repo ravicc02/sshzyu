@@ -257,6 +257,8 @@ type VideoAPIRequestInfo struct {
 	Prompt            string
 	Resolution        string
 	DurationSeconds   int
+	HasResolution     bool
+	HasDuration       bool
 	HasReferenceVideo bool
 }
 
@@ -272,15 +274,18 @@ func ParseVideoAPIRequest(body []byte) (VideoAPIRequestInfo, error) {
 	if prompt == "" {
 		return VideoAPIRequestInfo{}, fmt.Errorf("prompt is required")
 	}
-	duration, err := videoAPIRequestDurationSeconds(body)
+	duration, hasDuration, err := videoAPIRequestDurationSeconds(body)
 	if err != nil {
 		return VideoAPIRequestInfo{}, err
 	}
+	resolution := normalizeVideoAPIResolution(gjson.GetBytes(body, "resolution").String())
 	return VideoAPIRequestInfo{
 		Model:             model,
 		Prompt:            prompt,
-		Resolution:        normalizeVideoAPIResolution(gjson.GetBytes(body, "resolution").String()),
+		Resolution:        resolution,
 		DurationSeconds:   duration,
+		HasResolution:     resolution != "",
+		HasDuration:       hasDuration,
 		HasReferenceVideo: videoAPIRequestHasReferenceVideo(body),
 	}, nil
 }
@@ -307,7 +312,7 @@ func (r VideoAPIRequestInfo) ModerationBody() []byte {
 	return out
 }
 
-func videoAPIRequestDurationSeconds(body []byte) (int, error) {
+func videoAPIRequestDurationSeconds(body []byte) (int, bool, error) {
 	seconds := int64(0)
 	duration := int64(0)
 	for _, path := range []string{"seconds", "duration"} {
@@ -317,7 +322,7 @@ func videoAPIRequestDurationSeconds(body []byte) (int, error) {
 		}
 		parsed, ok := videoAPIResultInt(value)
 		if !ok {
-			return 0, fmt.Errorf("%s must be a positive integer", path)
+			return 0, false, fmt.Errorf("%s must be a positive integer", path)
 		}
 		if path == "seconds" {
 			seconds = parsed
@@ -326,16 +331,16 @@ func videoAPIRequestDurationSeconds(body []byte) (int, error) {
 		}
 	}
 	if seconds > 0 && duration > 0 && seconds != duration {
-		return 0, fmt.Errorf("seconds and duration must match when both are provided")
+		return 0, false, fmt.Errorf("seconds and duration must match when both are provided")
 	}
 	value := seconds
 	if value <= 0 {
 		value = duration
 	}
 	if value <= 0 {
-		return DefaultVideoAPIDurationSeconds, nil
+		return DefaultVideoAPIDurationSeconds, false, nil
 	}
-	return normalizeVideoAPIDurationSeconds(int(value)), nil
+	return normalizeVideoAPIDurationSeconds(int(value)), true, nil
 }
 
 func videoAPIRequestHasReferenceVideo(body []byte) bool {
@@ -627,6 +632,20 @@ func (s *OpenAIGatewayService) ForwardVideoAPI(
 		requestInfo, err = ParseVideoAPIRequest(body)
 		if err != nil {
 			return nil, err
+		}
+		if !requestInfo.HasResolution {
+			requestInfo.Resolution = cfg.DefaultResolution
+			body, err = sjson.SetBytes(body, "resolution", requestInfo.Resolution)
+			if err != nil {
+				return nil, fmt.Errorf("set video API default resolution: %w", err)
+			}
+		}
+		if !requestInfo.HasDuration {
+			requestInfo.DurationSeconds = normalizeVideoAPIDurationSeconds(cfg.DefaultDurationSeconds)
+			body, err = sjson.SetBytes(body, "seconds", requestInfo.DurationSeconds)
+			if err != nil {
+				return nil, fmt.Errorf("set video API default duration: %w", err)
+			}
 		}
 		if upstreamModel := strings.TrimSpace(account.GetMappedModel(requestInfo.Model)); upstreamModel != "" && upstreamModel != requestInfo.Model {
 			body, err = sjson.SetBytes(body, "model", upstreamModel)

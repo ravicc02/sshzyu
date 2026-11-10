@@ -246,6 +246,7 @@ func isForcedUsageBillingRequestID(requestID string) bool {
 	id := strings.TrimSpace(requestID)
 	return strings.HasPrefix(id, "web_search:") ||
 		strings.HasPrefix(id, "grok-video:") ||
+		strings.HasPrefix(id, "video-api:") ||
 		strings.HasPrefix(id, "grok_audio:") ||
 		strings.HasPrefix(id, "grok_realtime:") ||
 		strings.HasPrefix(id, GeminiCachedContentUsageRequestIDPrefix)
