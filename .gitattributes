@@ -20,3 +20,8 @@
 # 生图工作台构建产物：GitHub 语言统计忽略、diff 默认折叠（不改行尾，行尾由 core.autocrlf 统一）
 /playground/** linguist-generated=true
 /image-playground/dist/** linguist-generated=true
+
+# Standalone documentation release scripts use LF on every platform.
+/scripts/docs-release.py text eol=lf
+/scripts/tests/test_docs_release.py text eol=lf
+/deploy/docs/README.md text eol=lf

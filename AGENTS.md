@@ -157,12 +157,32 @@ rsync -a --partial --info=progress2 ui/current/ "us-server:/opt/sshzyu-ui/releas
 
 ### 3.2 修改文档站（docs/）
 
+`docs/` 是 nginx 直接读取的公开静态文件，无需编译。
+线上目录为 `/opt/sshzyu-docs/`。主站 UI、后端与文档分别发布。
+**升级主站版本不会同步文档。** 完整流程见 `deploy/docs/README.md`。
+
+- 修改正文时，同步导航、分类页、图片和下载链接；新增文件必须纳入 Git。
+- 发布范围是 Git 跟踪的完整 `docs/`，包含 `image/`、`vedio/`、`iamge/`、`install/`、样式和其他文档。不得只上传首页和正文。
+- 本地预览直接使用 Compose 的 `docs/` 挂载。仅改独立文档无需重建后端或主站 UI；重启受影响的本地服务并检查 `/health`。`docs/legal/` 被主站前端在构建时读取，修改它时仍须重建并装配主站 UI。
+- 只有用户授权发布或部署后，才执行下面的发布检查和线上同步。
+
 ```bash
-# docs/ 直接是构建产物且无构建链，改完上传即可
-rsync -a --partial --info=progress2 docs/index.html docs/content.md us-server:/opt/sshzyu-docs/
-rsync -a --partial --info=progress2 docs/install/ us-server:/opt/sshzyu-docs/install/
-rsync -a --partial --info=progress2 docs/iamge/ us-server:/opt/sshzyu-docs/iamge/
+python -m unittest discover -s scripts/tests -p test_docs_release.py -v
+python scripts/docs-release.py check
+# 完成本地提交后再部署；脚本拒绝未提交的 docs/ 修改。
+python scripts/docs-release.py deploy
 ```
+
+脚本固定连接 `us-server`。流程为完整暂存、检查链接、rsync 上传、SHA256 校验、完整备份、资源及子页面同步、首页原子替换，再做逐文件公网验收。
+Windows 缺少原生 rsync 时，使用 WSL Ubuntu 的 rsync，并复用 Windows 本机 SSH 配置。
+脚本不使用 `--delete`，保留所有历史资源和备份；不重启生产 nginx 或后端。
+
+**主站上线的文档门槛**：比较服务器 `/opt/sshzyu-docs-deployed.json` 的 `docs_tree` 与 `git rev-parse HEAD:docs`。不一致或没有部署记录时，文档为待发布状态。
+同次授权的站点部署包含文档改动时，须一并发布文档；授权范围不含文档时，明确报告“文档待发布”。
+验收分别报告主站、文档、生图工作台状态，不得用主站版本号或健康检查代替文档验收。
+
+发布后必须确认 `/docs/`、`/docs/image/`、`/docs/vedio/`、动态正文及引用资源正常，并对全部发布文件做公网 SHA256 比对。
+GitHub `verify.yml` 的 `docs` job 只执行校验，不连接或部署生产服务器。
 
 ### 3.3 修改后端 → 构建镜像 → 线上部署
 

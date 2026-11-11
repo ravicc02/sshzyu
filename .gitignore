@@ -69,6 +69,7 @@ scripts
 !scripts/
 !scripts/package-sshzyu-image-skill.py
 !scripts/probe-account-models.py
+!scripts/docs-release.py
 !scripts/tests/
 !scripts/tests/**
 scripts/tests/__pycache__/

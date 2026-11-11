@@ -77,6 +77,20 @@ sshzy/
 └── scripts/rebuild.sh     ← 本地 UI 重建脚本
 ```
 
+## 文档站发布
+
+文档站由 nginx 从 `docs/` 直接读取。主站 UI 和后端的版本更新，不会同步线上文档。
+修改文档后先提交；获得发布授权后，执行完整发布和逐文件验收：
+
+```bash
+python -m unittest discover -s scripts/tests -p test_docs_release.py -v
+python scripts/docs-release.py check
+python scripts/docs-release.py deploy
+```
+
+发布脚本包含完整目录同步、链接检查、备份和公网 SHA256 校验。
+本地预览、Windows rsync、主站联动及回退步骤见 [文档站发布流程](deploy/docs/README.md)。
+
 ## 镜像策略
 
 | 镜像 | 来源 | 说明 |
