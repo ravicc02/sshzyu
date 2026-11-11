@@ -71,6 +71,7 @@ python scripts/docs-release.py deploy
 脚本会输出本地暂存路径和远端备份路径。
 本地 `deployment.json` 记录提交 SHA、`docs/` 的 Git tree 和文件清单。
 `verification.json` 记录公网验收结果。
+本地或其他预览地址的验收另存为 `verification-preview.json`，保留公网记录。
 发布目录与备份均保留，不自动清理。
 
 | 服务器路径 | 用途 |

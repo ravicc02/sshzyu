@@ -8,6 +8,7 @@ import io
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -106,7 +107,7 @@ class DocsReleaseTests(unittest.TestCase):
         with site(bundle / "docs") as base, redirect_stdout(io.StringIO()):
             result = docs.verify(bundle, base)
         self.assertEqual(result["files_verified"], len(docs.REQUIRED))
-        self.assertTrue((bundle / "verification.json").is_file())
+        self.assertTrue((bundle / "verification-preview.json").is_file())
 
     def test_http_200_with_old_content_is_not_success(self):
         bundle = self.stage()
@@ -114,7 +115,25 @@ class DocsReleaseTests(unittest.TestCase):
         with site(bundle / "docs") as base, redirect_stdout(io.StringIO()):
             with self.assertRaisesRegex(ValueError, "HTTP content differs"):
                 docs.verify(bundle, base)
-        self.assertFalse((bundle / "verification.json").exists())
+        self.assertFalse((bundle / "verification-preview.json").exists())
+
+    def test_local_verification_preserves_public_receipt(self):
+        bundle = self.stage()
+        public = bundle / "verification.json"
+        public.write_text("previous public receipt", encoding="utf-8")
+        with site(bundle / "docs") as base, redirect_stdout(io.StringIO()):
+            docs.verify(bundle, base)
+        self.assertEqual(public.read_text(encoding="utf-8"), "previous public receipt")
+        self.assertTrue((bundle / "verification-preview.json").is_file())
+
+    def test_remote_shell_receives_lf_bytes_on_every_platform(self):
+        received = Path(self.temp.name) / "ssh-stdin"
+        shim = [sys.executable, "-c", "import pathlib,sys; pathlib.Path(sys.argv[1]).write_bytes(sys.stdin.buffer.read())", str(received)]
+        with patch.object(docs, "SSH", shim):
+            docs.run_remote(docs.ACTIVATE, "test-release")
+        payload = received.read_bytes()
+        self.assertTrue(payload.startswith(b"set -euo pipefail\n"))
+        self.assertNotIn(b"\r", payload)
 
     def test_manifest_cannot_request_a_path_outside_docs(self):
         bundle = self.stage()

@@ -62,7 +62,16 @@ flock -n 9
 stage="/opt/sshzyu-docs-releases/$release"
 cd /opt/sshzyu-docs
 sha256sum -c "$stage/SHA256SUMS"
-test -s "$stage/verification.json"
+python3 - "$stage" <<'PYVERIFY'
+import json, pathlib, sys
+stage = pathlib.Path(sys.argv[1])
+manifest = json.loads((stage / "deployment.json").read_text(encoding="utf-8"))
+receipt = json.loads((stage / "verification.json").read_text(encoding="utf-8"))
+assert receipt["base_url"] == "https://sshzyu.com/docs/"
+assert receipt["release"] == manifest["release"]
+assert receipt["source_sha"] == manifest["source_sha"]
+assert receipt["files_verified"] == len(manifest["files"])
+PYVERIFY
 install -m 644 "$stage/deployment.json" "/opt/.sshzyu-docs-deployed.$release.json"
 mv -f "/opt/.sshzyu-docs-deployed.$release.json" /opt/sshzyu-docs-deployed.json
 '''
@@ -174,7 +183,7 @@ def stage(output):
     manifest = {"release": release, "source_sha": sha, "docs_tree": git("rev-parse", "HEAD:docs").decode().strip(), "file_count": summary["files"], "links_checked": summary["links_checked"], "files": files}
     (output / "deployment.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (output / "SHA256SUMS").write_text("".join(f"{f['sha256']}  {f['path']}\n" for f in files), encoding="utf-8", newline="\n")
-    print(json.dumps({"stage": str(output), "release": release, **summary}, ensure_ascii=False))
+    print(json.dumps({"stage": str(output), "release": release, **summary}), flush=True)
     return output
 
 
@@ -215,7 +224,8 @@ def verify(bundle, base_url):
             fetch({**item, "path": item["path"][:-len("index.html")]})
     result = {"release": manifest["release"], "source_sha": manifest["source_sha"], "base_url": base_url,
               "files_verified": len(manifest["files"]), "verified_at": datetime.now(timezone.utc).isoformat()}
-    (Path(bundle) / "verification.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    record = "verification.json" if base_url == "https://sshzyu.com/docs/" else "verification-preview.json"
+    (Path(bundle) / record).write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result))
     return result
 
@@ -240,6 +250,11 @@ def rsync_command(source, destination):
     return ["wsl", "-d", "Ubuntu", "--exec", "rsync", *options, "-e", remote_shell, wsl_path(source) + "/", destination]
 
 
+def run_remote(script, release):
+    # Binary stdin prevents Windows from turning LF into CRLF for remote bash.
+    return subprocess.run([*SSH, "bash -s -- " + shlex.quote(release)], input=script.encode("utf-8"), check=True)
+
+
 def deploy(output):
     bundle = stage(output)
     manifest = load_manifest(bundle)
@@ -247,10 +262,10 @@ def deploy(output):
     remote = "/opt/sshzyu-docs-releases/" + release
     subprocess.run([*SSH, f"test ! -e {remote} && mkdir -p {remote}"], check=True)
     subprocess.run(rsync_command(bundle, "us-server:" + remote + "/"), check=True)
-    subprocess.run([*SSH, "bash -s -- " + shlex.quote(release)], input=ACTIVATE, text=True, check=True)
+    run_remote(ACTIVATE, release)
     verify(bundle, "https://sshzyu.com/docs/")
     subprocess.run(rsync_command(bundle, "us-server:" + remote + "/"), check=True)
-    subprocess.run([*SSH, "bash -s -- " + shlex.quote(release)], input=FINALIZE, text=True, check=True)
+    run_remote(FINALIZE, release)
     print("Docs deployed. Backup: /opt/sshzyu-docs-backups/" + release)
 
 
