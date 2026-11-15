@@ -7,7 +7,7 @@ description: "通过 sshzyu.com 完成 AI 生图、图片编辑、异步视频�
 
 使用 `scripts/sshzyu_media.py` 统一处理图片、视频和短剧。脚本只依赖 Python 标准库；成片拼接可选依赖 `ffmpeg` 和 `ffprobe`。
 
-## 强制 Preflight
+## 🔴 CHECKPOINT · 强制 Preflight
 
 任何真实图片或视频请求都会产生费用。提交前必须明确用户意图，并复述最终计划。
 
@@ -31,14 +31,27 @@ description: "通过 sshzyu.com 完成 AI 生图、图片编辑、异步视频�
 - 是否顺序执行、是否继续执行失败后的镜头。
 - 最终画幅、帧率和外部配音文件。
 
-以下任一情况停止，不提交真实任务：
+### 🛑 STOP · 参数不全时禁止提交
+
+以下任一情况必须停止，不提交真实任务：
 
 - 缺少模型、时长、分辨率、画幅或关键动作。
 - 参考素材仍是本地路径、内网地址或需要登录的 URL。
 - 用户未确认费用，或没有明确确认本次测试计划。
 - API Key 缺失。
 
-用户一次性给出完整参数并明确授权执行时，视为 preflight 已确认。执行前仍先运行 `--dry-run` 展示计划。
+参数不全时，只向用户追问缺失项，不自行补默认模型、尺寸或时长。用户一次性给出完整参数并明确授权执行时，视为 preflight 已确认。执行前仍先运行 `--dry-run` 展示计划；`--dry-run` 不读取 Key、不联网、不计费。
+
+### 🔴 CHECKPOINT · 真实提交前
+
+真实任务只允许按以下顺序开始：
+
+1. 复述最终计划。
+2. 执行 `--dry-run` 并展示输出。
+3. 用户明确确认费用和任务数量。
+4. 真实命令加入 `--confirm`。
+
+用户没有明确确认本次计划时，命令停在 dry-run。
 
 ## 路由
 
@@ -181,7 +194,22 @@ py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" drama run `
   "drama.json" --out "TASK_OUTPUT_DIR" --dry-run
 ```
 
-真实执行时默认逐镜头提交。全部完成或需要续跑时：
+### 🔴 CHECKPOINT · 成片拼接前
+
+真实执行时默认逐镜头提交。先检查 `drama-summary.json`：
+
+```powershell
+Get-Content "RUN_DIR/drama-summary.json" -Raw
+```
+
+只有全部镜头状态为 `success`，或 `partial` 已经人工验收，才允许拼接。镜头未完成时先续跑：
+
+```powershell
+py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" drama run `
+  "drama.json" --out "OUTPUT_DIR" --resume-run "RUN_DIR" --confirm
+```
+
+续跑默认跳过状态为 `success` 或 `partial` 且视频文件仍存在的镜头，不重建已完成任务。全部镜头可用后再拼接：
 
 ```powershell
 py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" drama assemble `
