@@ -75,6 +75,8 @@ py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" doctor
 py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" models --kind video
 ```
 
+示例使用 PowerShell。macOS、Linux 或使用 POSIX shell 的 runtime 将 `py -3.12` 替换为 `python3`，并将行尾反引号替换为反斜杠续行。
+
 模型可见性由 Key 所属分组决定。图像与视频可能属于不同分组；商品图可用不代表视频可用。
 
 `/models` 可能随分组和上游账号切换而变化。模型不在某一次列表中时，将其视为警告，不自动换模型；最终以创建接口返回的 `400/403/422` 为准。
@@ -253,6 +255,23 @@ py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" drama assemble `
 | `partial` | 保留有效文件，报告差异，不自动补发 |
 
 ## 输出契约
+
+dry-run 必须报告：
+
+1. 路由：`image`、`video` 或 `drama`。
+2. 模型、关键参数、任务数和预计输出数量。
+3. 完整命令。
+4. 明确“未读取 Key、未联网、未计费、未执行”。
+
+真实执行必须报告：
+
+1. 实际运行的命令或等价的脱敏参数摘要。
+2. `run_dir`、视频任务 `id` 和任务状态。
+3. 已保存文件、有效张数或秒数。
+4. warnings、`partial` 原因和退出码。
+5. 失败时的 HTTP 状态、下一步查询命令，以及“不自动重试”声明。
+
+不要在汇报中打印 Key、Authorization、签名下载 URL 或完整私密素材地址。
 
 - `success`：任务完成，文件校验通过，退出码 `0`。
 - `partial`：保留有效结果，但存在素材短缺、时长/画幅差异或 FFprobe 警告，退出码 `2`。
