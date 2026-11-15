@@ -75,7 +75,7 @@ py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" doctor
 py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" models --kind video
 ```
 
-示例使用 PowerShell。macOS、Linux 或使用 POSIX shell 的 runtime 将 `py -3.12` 替换为 `python3`，并将行尾反引号替换为反斜杠续行。
+示例使用 PowerShell。macOS、Linux 或使用 POSIX shell 的 runtime 将 `py -3.12` 替换为 `python3`，将行尾反引号替换为反斜杠续行，并将 `Get-Content` 替换为 `cat`。
 
 模型可见性由 Key 所属分组决定。图像与视频可能属于不同分组；商品图可用不代表视频可用。
 
@@ -226,8 +226,6 @@ py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" drama assemble `
 - `drama-summary.json`
 - 每镜头目录与 `job-result.json`
 
-再次运行同一 `--resume-run` 目录时，只跳过已经成功且文件仍存在的镜头。
-
 漫剧设计与镜头拆分见 [短剧工作流](references/drama/workflow.md)。
 
 ## 凭据与网络边界
@@ -269,7 +267,7 @@ dry-run 必须报告：
 2. `run_dir`、视频任务 `id` 和任务状态。
 3. 已保存文件、有效张数或秒数。
 4. warnings、`partial` 原因和退出码。
-5. 失败时的 HTTP 状态、下一步查询命令，以及“不自动重试”声明。
+5. 失败原因；请求已到达 API 时报告 HTTP 状态，本地校验失败时报告具体校验项。同时给出下一步查询命令和“不自动重试”声明。
 
 不要在汇报中打印 Key、Authorization、签名下载 URL 或完整私密素材地址。
 
