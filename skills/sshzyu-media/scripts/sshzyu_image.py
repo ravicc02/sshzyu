@@ -22,12 +22,19 @@ import urllib.request
 import uuid
 import xml.etree.ElementTree as ET
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from media_common import MediaError, redact_secret
+
 BASE_URL = "https://sshzyu.com/v1"
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_ENV_FILE = SKILL_ROOT / ".env"
 ENV_KEY = "SSHZYU_API_KEY"
-CREDENTIAL_TARGET = "ClaudeCode/sshzyu-image/SSHZYU_API_KEY"
-DEFAULT_MODEL = "gpt-image-2.6"
+CREDENTIAL_TARGETS = (
+    "ClaudeCode/sshzyu-media/SSHZYU_API_KEY",
+    "ClaudeCode/sshzyu-image/SSHZYU_API_KEY",
+)
+DEFAULT_MODEL = "gpt-image-2.6-sunburst"
 DEFAULT_SIZE = "1024x1024"
 DEFAULT_QUALITY = "auto"
 DEFAULT_FORMAT = "png"
@@ -39,7 +46,7 @@ PRINT_LOCK = threading.Lock()
 HTTP_HINTS = {
     401: "Key 无效或认证失败，请检查本技能目录中的 .env。",
     402: "余额不足，请检查服务商控制台；脚本不会自动充值。",
-    403: "Key 所在分组未开通图片生成权限，请检查服务商控制台。",
+    403: "Key 所在分组未开通当前图片或视频模型权限，请检查服务商控制台。",
     413: "请求体过大，请减少参考图数量或单图体积。",
     422: "参数不受支持，请核对模型、尺寸、质量和输出格式。",
     429: "限流，请稍后重试；本次没有自动重复提交。",
@@ -85,8 +92,7 @@ UNKNOWN_GPT_IMAGE_CAPABILITIES = {
 }
 
 
-class ImageError(Exception):
-    pass
+ImageError = MediaError
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -139,12 +145,7 @@ def emit(message, error=False):
 
 
 def redact(value, key=None):
-    text = str(value)
-    if key:
-        text = text.replace(key, "[REDACTED]")
-    text = re.sub(r"sk-[A-Za-z0-9_-]+", "[REDACTED]", text)
-    text = re.sub(r"(?i)Bearer\s+\S+", "Bearer [REDACTED]", text)
-    return text[:2000]
+    return redact_secret(value, key)
 
 
 def credential_api():
@@ -188,19 +189,21 @@ def read_credential():
     if os.name != "nt":
         return None
     api, credential, ctypes = credential_api()
-    ptr = ctypes.POINTER(credential)()
-    if not api.CredReadW(CREDENTIAL_TARGET, 1, 0, ctypes.byref(ptr)):
-        error = ctypes.get_last_error()
-        if error == 1168:
-            return None
-        raise ImageError(f"Windows 凭据读取失败，系统错误码 {error}。")
-    try:
-        return ctypes.string_at(
-            ptr.contents.CredentialBlob,
-            ptr.contents.CredentialBlobSize,
-        ).decode("utf-8")
-    finally:
-        api.CredFree(ptr)
+    for target in CREDENTIAL_TARGETS:
+        ptr = ctypes.POINTER(credential)()
+        if not api.CredReadW(target, 1, 0, ctypes.byref(ptr)):
+            error = ctypes.get_last_error()
+            if error == 1168:
+                continue
+            raise ImageError(f"Windows 凭据读取失败，系统错误码 {error}。")
+        try:
+            return ctypes.string_at(
+                ptr.contents.CredentialBlob,
+                ptr.contents.CredentialBlobSize,
+            ).decode("utf-8")
+        finally:
+            api.CredFree(ptr)
+    return None
 
 
 def clean_key(value):
@@ -308,21 +311,47 @@ def load_key(env_file):
     )
 
 
-def request_json(path, key, payload=None, content_type="application/json", timeout=300):
-    if path not in ("/models", "/images/generations", "/images/edits"):
+def allowed_api_path(path):
+    if path in (
+        "/models",
+        "/images/generations",
+        "/images/edits",
+        "/videos",
+        "/videos/generations",
+    ):
+        return True
+    return bool(
+        re.fullmatch(
+            r"/videos/[A-Za-z0-9._~%-]+(?:/content)?",
+            path,
+        )
+    )
+
+
+def request_json(
+    path,
+    key,
+    payload=None,
+    content_type="application/json",
+    timeout=300,
+    method=None,
+):
+    if not allowed_api_path(path):
         raise ImageError("不允许调用未列入规范的接口。")
     headers = {
         "Authorization": f"Bearer {key}",
         "Accept": "application/json",
-        "User-Agent": "sshzyu-image-skill/1.1",
+        "User-Agent": "sshzyu-media-skill/2.0",
     }
     if payload is not None:
         headers["Content-Type"] = content_type
+    if method is None:
+        method = "POST" if payload is not None else "GET"
     req = urllib.request.Request(
         BASE_URL + path,
         data=payload,
         headers=headers,
-        method="POST" if payload is not None else "GET",
+        method=method,
     )
     opener = urllib.request.build_opener(NoRedirect())
     try:
@@ -1016,7 +1045,7 @@ def run_jobs(jobs, key, out_dir, workers):
     if len(jobs) == 1:
         results.append(execute_job(1, jobs[0], key, run_dir))
     else:
-        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="sshzyu-image") as executor:
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="sshzyu-media-image") as executor:
             for index, job in enumerate(jobs, 1):
                 future_map[executor.submit(execute_job, index, job, key, run_dir)] = (index, job)
             for future in as_completed(future_map):
@@ -1105,7 +1134,7 @@ def parser():
         choices=["png", "jpeg", "webp", "gif", "svg"],
     )
     p.add_argument("--n", type=int, help="每个任务的图片数，1-10")
-    p.add_argument("--model", help="默认 gpt-image-2.6；以 --models 返回为准")
+    p.add_argument("--model", help="默认 gpt-image-2.6-sunburst；以 models 返回为准")
     p.add_argument("--complexity", choices=["low", "medium", "high"])
     p.add_argument("--frame-count", type=int)
     p.add_argument("--frame-duration-ms", type=int)

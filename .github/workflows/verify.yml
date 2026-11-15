@@ -90,7 +90,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Test and verify sshzyu-image skill package
+      - name: Test and verify sshzyu-media skill package
         run: |
-          python3 -m unittest discover -s scripts/tests -p 'test_sshzyu_image_skill.py' -v
-          python3 scripts/package-sshzyu-image-skill.py --check
+          python3 -m unittest discover -s scripts/tests -p 'test_sshzyu_media_skill.py' -v
+          python3 -m unittest discover -s skills/sshzyu-media/tests -v
+          python3 scripts/package-sshzyu-media-skill.py --check

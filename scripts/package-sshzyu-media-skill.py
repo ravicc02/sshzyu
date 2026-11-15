@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the installable sshzyu-image ZIP without local secrets."""
+"""Build the installable sshzyu-media ZIP without local secrets."""
 
 import argparse
 import hashlib
@@ -11,17 +11,26 @@ import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "skills" / "sshzyu-image"
-DEFAULT_OUTPUT = ROOT / "docs" / "install" / "sshzyu-image.zip"
+SOURCE = ROOT / "skills" / "sshzyu-media"
+DEFAULT_OUTPUT = ROOT / "docs" / "install" / "sshzyu-media.zip"
 REQUIRED = {
     "SKILL.md",
+    "scripts/sshzyu_media.py",
     "scripts/sshzyu_image.py",
-    "references/api_reference.md",
-    "references/parameter-matrix.md",
-    "references/models/README.md",
-    "references/models/gpt-image-2.md",
-    "references/models/gpt-image-2.5.md",
-    "references/models/gpt-image-2.6.md",
+    "scripts/sshzyu_video.py",
+    "scripts/sshzyu_drama.py",
+    "scripts/media_common.py",
+    "references/image/api_reference.md",
+    "references/image/parameter-matrix.md",
+    "references/image/models/README.md",
+    "references/image/models/gpt-image-2.md",
+    "references/image/models/gpt-image-2.5.md",
+    "references/image/models/gpt-image-2.6.md",
+    "references/video/api_reference.md",
+    "references/video/parameter-matrix.md",
+    "references/drama/workflow.md",
+    "sshzyu_media.py",
+    "sshzyu_image.py",
     ".env.example",
 }
 EXCLUDED_PARTS = {".env", "key.txt", "__pycache__", "tests"}
@@ -44,8 +53,8 @@ def validate_source():
     if not frontmatter_match:
         raise PackageError("SKILL.md 缺少有效 frontmatter。")
     frontmatter = frontmatter_match.group(1)
-    if not re.search(r"^name:\s*sshzyu-image\s*$", frontmatter, re.MULTILINE):
-        raise PackageError("SKILL.md 的 name 必须是 sshzyu-image。")
+    if not re.search(r"^name:\s*sshzyu-media\s*$", frontmatter, re.MULTILINE):
+        raise PackageError("SKILL.md 的 name 必须是 sshzyu-media。")
     description_match = re.search(
         r'^description:\s*"((?:[^"\\]|\\.)*)"\s*$',
         frontmatter,
@@ -82,8 +91,8 @@ def build_package():
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for relative, data in source_files():
             info = zipfile.ZipInfo(
-                filename=f"sshzyu-image/{relative.as_posix()}",
-                date_time=(2026, 11, 6, 0, 0, 0),
+                filename=f"sshzyu-media/{relative.as_posix()}",
+                date_time=(2026, 11, 15, 0, 0, 0),
             )
             info.compress_type = zipfile.ZIP_DEFLATED
             info.create_system = 3

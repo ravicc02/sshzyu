@@ -58,14 +58,20 @@ batch test/
 # ===================
 # 其他
 # ===================
+.coverage
+htmlcov/
 tests
 !deploy/tests/
 !deploy/tests/**
+!skills/*/tests/
+!skills/*/tests/**
 CLAUDE.md
 .claude
 scripts
 !backend/scripts/
 !backend/scripts/resolve-version.sh
+!skills/*/scripts/
+!skills/*/scripts/**
 !scripts/
 !scripts/package-sshzyu-image-skill.py
 !scripts/probe-account-models.py

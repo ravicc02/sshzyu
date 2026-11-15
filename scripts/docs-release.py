@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = (
     "index.html", "content.md", "docs-category.css",
     "image/index.html", "image/content.md", "vedio/index.html", "vedio/content.md",
-    "install/sshzyu-image.zip",
+    "install/sshzyu-media.zip",
 )
 SSH = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", "us-server"]
 

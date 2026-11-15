@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility entry point. Prefer scripts/sshzyu_image.py."""
+"""Compatibility entry point for the former image-only skill."""
 
 from pathlib import Path
 import sys

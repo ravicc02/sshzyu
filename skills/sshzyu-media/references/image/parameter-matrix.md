@@ -27,7 +27,8 @@
 
 | 模型 | 定位 | quality | 生成格式 | 编辑格式 | 2.6 专属 |
 | --- | --- | --- | --- | --- | --- |
-| `gpt-image-2.6` | 新模型，精细制作 | auto/low/medium/high/xhigh/max | PNG/JPEG/WebP/GIF/SVG | PNG/JPEG/WebP | complexity、GIF、SVG、markup |
+| `gpt-image-2.6-sunburst` | 2.6 精细视觉与编辑 | auto/low/medium/high/xhigh/max | PNG/JPEG/WebP/GIF/SVG | PNG/JPEG/WebP | complexity、GIF、SVG、markup |
+| `gpt-image-2.6-flare` | 2.6 快速迭代 | auto/low/medium/high/xhigh/max | PNG/JPEG/WebP/GIF/SVG | PNG/JPEG/WebP | complexity、GIF、SVG、markup |
 | `gpt-image-2.5-sunburst` | 精细构图与编辑 | auto/low/medium/high/xhigh/max | PNG/JPEG/WebP | PNG/JPEG/WebP | 无 |
 | `gpt-image-2.5-flare` | 快速迭代 | auto/low/medium/high/xhigh/max | PNG/JPEG/WebP | PNG/JPEG/WebP | 无 |
 | `gpt-image-2.5` | 2.5 通用别名 | auto/low/medium/high/xhigh/max | PNG/JPEG/WebP | PNG/JPEG/WebP | 无 |
@@ -50,7 +51,7 @@
 ```json
 {
   "defaults": {
-    "model": "gpt-image-2.6",
+    "model": "gpt-image-2.6-sunburst",
     "size": "1024x1024",
     "quality": "high",
     "output_format": "png",

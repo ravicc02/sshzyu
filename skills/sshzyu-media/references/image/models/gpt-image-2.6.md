@@ -1,8 +1,8 @@
 # GPT Image 2.6
 
-2026-11-06 实测 sshzyu 模型列表提供通用 ID `gpt-image-2.6`。不要擅自替换成 `gpt-image-2`；以实时模型列表为准。
+2026-11-15 实测 sshzyu 模型列表提供 `gpt-image-2.6-sunburst` 和 `gpt-image-2.6-flare`。不要擅自替换成 `gpt-image-2`；以实时模型列表为准。
 
-上游 OpenAI 还将 2.6 分为 Sunburst（精细视觉）和 Flare（快速迭代）。当前 sshzyu 列表未暴露这两个 2.6 子 ID，因此脚本路由使用 `gpt-image-2.6`，执行前仍应核对 `--models`。
+Sunburst 用于精细视觉和编辑，Flare 用于快速迭代。脚本按 `gpt-image-2.6` 前缀统一校验两者能力，执行前仍应核对 `models`。
 
 ## 生图要点
 

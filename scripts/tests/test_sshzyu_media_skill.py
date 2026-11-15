@@ -1,4 +1,4 @@
-"""Behavior tests for the sshzyu-image batch status contract."""
+"""Behavior and package tests for the sshzyu-media skill."""
 
 import json
 import importlib.util
@@ -11,12 +11,12 @@ from unittest import mock
 import zipfile
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = REPO_ROOT / "skills" / "sshzyu-image"
+SKILL_ROOT = REPO_ROOT / "skills" / "sshzyu-media"
 sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 
 import sshzyu_image as cli
 
-PACKAGE_SCRIPT = REPO_ROOT / "scripts" / "package-sshzyu-image-skill.py"
+PACKAGE_SCRIPT = REPO_ROOT / "scripts" / "package-sshzyu-media-skill.py"
 package_spec = importlib.util.spec_from_file_location("sshzyu_image_package", PACKAGE_SCRIPT)
 if package_spec is None or package_spec.loader is None:
     raise RuntimeError("cannot load skill package builder")
@@ -88,9 +88,15 @@ class PackageContractTests(unittest.TestCase):
         self.assertEqual(first, second)
 
         with zipfile.ZipFile(io.BytesIO(first)) as archive:
-            skill_md = archive.read("sshzyu-image/SKILL.md")
+            skill_md = archive.read("sshzyu-media/SKILL.md")
             self.assertNotIn(b"\r\n", skill_md)
             self.assertNotIn(b"\r", skill_md)
+            names = set(archive.namelist())
+            self.assertIn("sshzyu-media/scripts/sshzyu_media.py", names)
+            self.assertIn("sshzyu-media/scripts/sshzyu_video.py", names)
+            self.assertIn("sshzyu-media/scripts/sshzyu_drama.py", names)
+            self.assertIn("sshzyu-media/references/video/api_reference.md", names)
+            self.assertFalse(any("/tests/" in name for name in names))
             for info in archive.infolist():
                 self.assertEqual(3, info.create_system)
 

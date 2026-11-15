@@ -6,7 +6,7 @@
 
 - Base URL：`https://sshzyu.com/v1`
 - 认证：`Authorization: Bearer` 加运行时读取的 API Key。
-- User-Agent：`sshzyu-image-skill/1.1`
+- User-Agent：`sshzyu-media-skill/2.0`
 - 模型列表：`GET /models`
 - 文生图：`POST /images/generations`，JSON。
 - 编辑：`POST /images/edits`，multipart，`image[]` 最多 16 张。
@@ -16,7 +16,7 @@
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `model` | string | `gpt-image-` 家族，默认 `gpt-image-2.6` |
+| `model` | string | `gpt-image-` 家族，默认 `gpt-image-2.6-sunburst` |
 | `prompt` | string | 必填，最多 32000 字符 |
 | `size` | string | `auto` 或 `宽x高` |
 | `quality` | string | `auto/low/medium/high`；2.5、2.6 还支持 `xhigh/max` |
