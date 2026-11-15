@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "prompt": "用 sshzyu-media 生成一张 1:1 的咖啡海报：gpt-image-2.6-sunburst、1024x1024、high、PNG、1 张。先给我完整计划和 dry-run 命令，不要真实生成。",
+    "expected": "路由到 image，输出准确的 dry-run 命令、明确不读取 Key 或联网，并说明真实执行仍需 --confirm。"
+  },
+  {
+    "id": 2,
+    "prompt": "我想做一条 9:16 的 AI 猫视频，越快越好，你直接开始生成。",
+    "expected": "停止未确认的视频提交，指出缺少模型、秒数、分辨率和费用确认，并给出需要补齐的最小参数清单。"
+  },
+  {
+    "id": 3,
+    "prompt": "我有一份 12 个镜头的 AI 短剧 manifest，前 5 个镜头已经成功生成，现在要续跑剩余镜头并最终拼接成片。给出完整命令，避免重复创建已完成任务。",
+    "expected": "路由到 drama，先 dry-run，再使用 --resume-run 和 --confirm；说明默认顺序执行、不会重试或重建成功镜头，全部完成后用 drama assemble，并检查 FFmpeg/FFprobe。"
+  }
+]
