@@ -233,7 +233,7 @@
                 >
                   {{
                     site.threshold !== null
-                      ? "低于 " + site.threshold + " 预警"
+                      ? "低于 " + site.threshold + (site.currency ? " " + site.currency : "") + " 预警"
                       : "设置预警阈值"
                   }}
                 </button>
@@ -241,7 +241,7 @@
               <td class="state-cell">
                 <span class="status-pill" :class="statusTone(site)"
                   ><span />{{ stateLabel(site) }}</span
-                ><small>{{ time(site.last_success_at) }}</small
+                ><small>{{ queryTime(site) }}</small
                 ><small
                   v-if="site.error_code"
                   class="text-danger"
@@ -1067,10 +1067,21 @@ function isStale(site: MonitorSite) {
     Date.now() - Date.parse(site.last_success_at) > 600000
   );
 }
+function queryTime(site: MonitorSite) {
+  if (site.last_success_at) return "最近成功：" + time(site.last_success_at);
+  if (site.last_attempt_at) return "最近尝试：" + time(site.last_attempt_at);
+  return "尚未查询";
+}
 function stateLabel(site: MonitorSite) {
   if (!site.enabled) return "已暂停";
   if (site.status === "needs_configuration") return "待配置凭证";
-  if (site.status === "unsupported") return "总余额未开放";
+  if (site.status === "unsupported") {
+    if (site.error_code === "MONITOR_CURRENCY_TOKENS_ONLY") return "仅显示 Tokens";
+    if (["MONITOR_QUOTA_CONVERSION_INVALID", "MONITOR_CURRENCY_RATE_INVALID"].includes(site.error_code)) return "换算参数异常";
+    if (site.error_code.startsWith("MONITOR_CURRENCY_")) return "币种待确认";
+    if (site.error_code === "MONITOR_ACCOUNT_BALANCE_NOT_EXPOSED") return "总余额未开放";
+    return "查询不支持";
+  }
   if (site.status === "error") return "查询异常";
   if (site.alert_active) return "低余额预警";
   return site.status === "ok" ? "正常" : "待查询";

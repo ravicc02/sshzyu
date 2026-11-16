@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 func responseJSON(response *http.Response) (map[string]json.RawMessage, error) {
@@ -90,11 +92,11 @@ func number(raw json.RawMessage) (string, error) {
 	return amount, nil
 }
 func safeCurrency(raw string) (string, error) {
-	if len(raw) < 1 || len(raw) > 16 {
+	if !utf8.ValidString(raw) || utf8.RuneCountInString(raw) < 1 || utf8.RuneCountInString(raw) > 16 {
 		return "", Fail("MONITOR_CURRENCY_MISSING")
 	}
 	for _, r := range raw {
-		if !(r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r == '_') {
+		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.Is(unicode.Sc, r) || r == '_' || r == '-' || r == '.') {
 			return "", Fail("MONITOR_CURRENCY_MISSING")
 		}
 	}
@@ -123,6 +125,56 @@ func ParseSub2(data map[string]json.RawMessage) (Reading, error) {
 	}
 	return Reading{Amount: amount, Currency: unit}, nil
 }
+
+func parseNewAPIBalance(rawQuota json.RawMessage, settings map[string]json.RawMessage) (Reading, error) {
+	quota, e := number(rawQuota)
+	if e != nil {
+		return Reading{}, e
+	}
+	factor, e := positiveConversion(settings["quota_per_unit"], "MONITOR_QUOTA_CONVERSION_INVALID")
+	if e != nil {
+		return Reading{}, e
+	}
+	unit := strings.ToUpper(strings.TrimSpace(str(settings["quota_display_type"])))
+	rate := decimal.NewFromInt(1)
+	switch unit {
+	case "USD":
+	case "CNY":
+		rate, e = positiveConversion(settings["usd_exchange_rate"], "MONITOR_CURRENCY_RATE_INVALID")
+	case "CUSTOM":
+		unit, e = safeCurrency(strings.TrimSpace(str(settings["custom_currency_symbol"])))
+		if e != nil {
+			return Reading{}, Fail("MONITOR_CURRENCY_SYMBOL_INVALID")
+		}
+		rate, e = positiveConversion(settings["custom_currency_exchange_rate"], "MONITOR_CURRENCY_RATE_INVALID")
+	case "TOKENS":
+		return Reading{}, Fail("MONITOR_CURRENCY_TOKENS_ONLY")
+	default:
+		return Reading{}, Fail("MONITOR_CURRENCY_UNCONFIRMED")
+	}
+	if e != nil {
+		return Reading{}, e
+	}
+	q, _ := decimal.NewFromString(quota)
+	// Apply the upstream display rate before the single final rounding.
+	amount, e := ParseAmount(q.Mul(rate).DivRound(factor, 12).String())
+	if e != nil {
+		return Reading{}, Fail("MONITOR_BALANCE_MISSING")
+	}
+	return Reading{Amount: amount, Currency: unit}, nil
+}
+
+func positiveConversion(raw json.RawMessage, code string) (decimal.Decimal, error) {
+	value, e := number(raw)
+	if e == nil {
+		factor, _ := decimal.NewFromString(value)
+		if factor.IsPositive() {
+			return factor, nil
+		}
+	}
+	return decimal.Decimal{}, Fail(code)
+}
+
 func (s *Service) get(ctx context.Context, site Site, path string, credential Credential) (map[string]json.RawMessage, error) {
 	if s.Fetcher == nil {
 		return nil, Fail("MONITOR_TRANSPORT_UNAVAILABLE")
@@ -167,29 +219,11 @@ func (s *Service) fetch(ctx context.Context, site Site) (Reading, error) {
 			return Reading{}, Fail("MONITOR_ACCOUNT_CREDENTIAL_REQUIRED")
 		}
 	}
-	quota, e := number(rawQuota)
-	if e != nil {
-		return Reading{}, e
-	}
 	public, e := s.get(ctx, site, "/api/status", Credential{})
 	if e != nil {
 		return Reading{}, e
 	}
-	settings := obj(public["data"])
-	factor, e := number(settings["quota_per_unit"])
-	if e != nil {
-		return Reading{}, Fail("MONITOR_CURRENCY_MISSING")
-	}
-	f, _ := decimal.NewFromString(factor)
-	if !f.IsPositive() {
-		return Reading{}, Fail("MONITOR_CURRENCY_MISSING")
-	}
-	unit := str(settings["quota_display_type"])
-	if unit != "USD" {
-		return Reading{}, Fail("MONITOR_CURRENCY_UNCONFIRMED")
-	}
-	q, _ := decimal.NewFromString(quota)
-	return Reading{Amount: q.Div(f).Round(12).String(), Currency: unit}, nil
+	return parseNewAPIBalance(rawQuota, obj(public["data"]))
 }
 func (s *Service) Discover(ctx context.Context, ids []string) ([]Candidate, error) {
 	if len(ids) > 10 {

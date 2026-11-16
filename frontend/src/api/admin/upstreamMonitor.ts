@@ -25,6 +25,33 @@ export const upstreamMonitorAPI={
 export function monitorError(error:unknown):string {
  const e=error as {response?:{data?:{message?:string}};message?:string}
  const code=e.response?.data?.message||e.message||''
- const messages:Record<string,string>={MONITOR_UNAVAILABLE:'监控服务尚未启用。',MONITOR_AUTH_REQUIRED:'查询凭证未通过上游鉴权。',MONITOR_ACCOUNT_CREDENTIAL_REQUIRED:'需配置 New API 账户访问令牌；当前 key 未开放总余额读取。',MONITOR_API_REJECTED:'上游拒绝了查询，请检查账户访问令牌与用户 ID。',MONITOR_ACCOUNT_BALANCE_NOT_EXPOSED:'上游返回的不是账户总余额，未纳入预警。',MONITOR_ENDPOINT_UNAVAILABLE:'该类型的余额接口未找到。',MONITOR_BALANCE_MISSING:'响应中缺少有效总余额字段。',MONITOR_CURRENCY_UNCONFIRMED:'尚未确认上游额度的金额换算规则。',MONITOR_CURRENCY_MISSING:'上游没有返回可确认的余额币种。',MONITOR_CONFIG_CHANGED:'配置已发生变化，请刷新后再操作。',MONITOR_ALREADY_ADDED:'该上游已加入监控。',MONITOR_THRESHOLD_REQUIRED:'开启预警前请填写阈值。',MONITOR_INVALID_AMOUNT:'请输入有效金额，最多保留 12 位小数。',MONITOR_QUERY_BUSY:'该上游正在查询，请稍后刷新。',MONITOR_FEISHU_SECRET_REQUIRED:'首次配置或更换应用时需填写 App Secret。',MONITOR_INVALID_FEISHU_CONFIG:'请检查 App ID、群 ID 和应用密钥格式。',MONITOR_BALANCE_STALE:'请先成功刷新该上游的总余额。',MONITOR_NETWORK_ERROR:'连接上游失败，将按退避策略重试。',MONITOR_INVALID_RECHARGE_URL:'请输入有效的站点或充值地址，链接中不可携带密钥。',MONITOR_PROXY_UNAVAILABLE:'账号代理配置不可用。',MONITOR_FEISHU_NOT_CONFIGURED:'请先完成飞书通知设置。',MONITOR_ACCOUNT_BINDING_CHANGED:'账号或 Base URL 已变化，请重新选择查询凭证。'}
+ const messages:Record<string,string>={
+  MONITOR_UNAVAILABLE:'监控服务尚未启用。',
+  MONITOR_AUTH_REQUIRED:'查询凭证未通过上游鉴权。',
+  MONITOR_ACCOUNT_CREDENTIAL_REQUIRED:'需配置 New API 账户访问令牌；当前 key 未开放总余额读取。',
+  MONITOR_API_REJECTED:'上游拒绝了查询，请检查账户访问令牌与用户 ID。',
+  MONITOR_ACCOUNT_BALANCE_NOT_EXPOSED:'上游返回的不是账户总余额，未纳入预警。',
+  MONITOR_ENDPOINT_UNAVAILABLE:'该类型的余额接口未找到。',
+  MONITOR_BALANCE_MISSING:'响应中缺少有效总余额字段。',
+  MONITOR_CURRENCY_UNCONFIRMED:'上游未声明支持的余额币种；目前支持 USD、CNY 和 CUSTOM 自定义币种。',
+  MONITOR_CURRENCY_MISSING:'上游没有返回可确认的余额币种。',
+  MONITOR_QUOTA_CONVERSION_INVALID:'上游未返回有效的额度换算基数 quota_per_unit。',
+  MONITOR_CURRENCY_RATE_INVALID:'上游未返回当前币种所需的有效汇率，无法换算总余额。',
+  MONITOR_CURRENCY_SYMBOL_INVALID:'上游自定义币种符号缺失或格式无效，无法确认预警单位。',
+  MONITOR_CURRENCY_TOKENS_ONLY:'上游仅显示 Tokens，未将其作为金额余额进行预警。',
+  MONITOR_CONFIG_CHANGED:'配置已发生变化，请刷新后再操作。',
+  MONITOR_ALREADY_ADDED:'该上游已加入监控。',
+  MONITOR_THRESHOLD_REQUIRED:'开启预警前请填写阈值。',
+  MONITOR_INVALID_AMOUNT:'请输入有效金额，最多保留 12 位小数。',
+  MONITOR_QUERY_BUSY:'该上游正在查询，请稍后刷新。',
+  MONITOR_FEISHU_SECRET_REQUIRED:'首次配置或更换应用时需填写 App Secret。',
+  MONITOR_INVALID_FEISHU_CONFIG:'请检查 App ID、群 ID 和应用密钥格式。',
+  MONITOR_BALANCE_STALE:'请先成功刷新该上游的总余额。',
+  MONITOR_NETWORK_ERROR:'连接上游失败，将按退避策略重试。',
+  MONITOR_INVALID_RECHARGE_URL:'请输入有效的站点或充值地址，链接中不可携带密钥。',
+  MONITOR_PROXY_UNAVAILABLE:'账号代理配置不可用。',
+  MONITOR_FEISHU_NOT_CONFIGURED:'请先完成飞书通知设置。',
+  MONITOR_ACCOUNT_BINDING_CHANGED:'账号或 Base URL 已变化，请重新选择查询凭证。',
+ }
  return messages[code]||(code.startsWith('FEISHU_API_')?'飞书拒绝请求：'+code:code.startsWith('MONITOR_')?'操作未完成：'+code:'操作未完成，请稍后重试。')
 }
