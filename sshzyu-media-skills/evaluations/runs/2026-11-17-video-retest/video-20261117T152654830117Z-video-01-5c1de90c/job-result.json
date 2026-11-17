@@ -1,0 +1,42 @@
+{
+  "id": "video-01",
+  "status": "success",
+  "endpoint": "https://sshzyu.com/v1/videos",
+  "model": "minimax_h3",
+  "prompt_sha256": "074cb2c0c33c16660ba20f0780038c93f4f9293a6e51c71346b98c3c2714a04a",
+  "seconds_requested": 5,
+  "resolution_requested": "480p",
+  "aspect_ratio_requested": "9:16",
+  "task_id": "task_sHjUx40oXMCOlsRhIzAB7b2K4fKdNnM1",
+  "task": {
+    "id": "task_sHjUx40oXMCOlsRhIzAB7b2K4fKdNnM1",
+    "object": "video",
+    "model": "minimax_h3",
+    "status": "completed",
+    "progress": 100,
+    "created_at": 1794929218,
+    "completed_at": 1794929371
+  },
+  "usage": null,
+  "video": {
+    "path": "F:\\中转站运营\\sshzy\\sshzyu-media-skills\\evaluations\\runs\\2026-11-17-video-retest\\video-20261117T152654830117Z-video-01-5c1de90c\\video.mp4",
+    "bytes": 768837,
+    "sha256": "6dd657039402fbdb016658d7f9dbd64ff43669c23123d374a50cde7db10e1142",
+    "content_type": "application/octet-stream",
+    "kind": "video",
+    "container": "mp4",
+    "media": {
+      "duration": 5.166667,
+      "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+      "size": 768837,
+      "width": 480,
+      "height": 864,
+      "video_codec": "h264",
+      "frame_rate": "24/1",
+      "has_audio": true
+    }
+  },
+  "warnings": [],
+  "error": null,
+  "output_dir": "F:\\中转站运营\\sshzy\\sshzyu-media-skills\\evaluations\\runs\\2026-11-17-video-retest\\video-20261117T152654830117Z-video-01-5c1de90c"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "video-01",
+  "status": "error",
+  "endpoint": "https://sshzyu.com/v1/videos",
+  "model": "minimax_h3",
+  "prompt_sha256": "074cb2c0c33c16660ba20f0780038c93f4f9293a6e51c71346b98c3c2714a04a",
+  "seconds_requested": 5,
+  "resolution_requested": "480p",
+  "aspect_ratio_requested": "9:16",
+  "task_id": null,
+  "task": null,
+  "usage": null,
+  "video": null,
+  "warnings": [],
+  "error": "网络请求失败: <urlopen error [WinError 10061] 由于目标计算机积极拒绝，无法连接。>。未自动重试；超时后服务端可能仍在生成，请先核对用量。",
+  "output_dir": "F:\\中转站运营\\sshzy\\sshzyu-media-skills\\evaluations\\runs\\2026-11-17-video-retest\\video-20261117T152644728040Z-video-01-44e5f294"
+}

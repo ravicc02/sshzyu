@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import time
@@ -40,10 +41,17 @@ from sshzyu_image import (
     DEFAULT_ENV_FILE,
     ENV_KEY,
     ImageError,
+    clean_key,
     load_key,
     request_json,
 )
 
+
+# 视频与图片分属不同的平台分组：/v1/videos 只接受 grok/composite/video 组，
+# /v1/images/generations 只接受 openai/grok 组。同一把 Key 无法同时满足两者，
+# 因此视频优先读取独立凭据，仅在缺失时回退到通用 SSHZYU_API_KEY。
+VIDEO_ENV_KEY = "SSHZYU_VIDEO_API_KEY"
+VIDEO_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 MAX_PROMPT = 32000
 MAX_SECONDS = 60
@@ -51,6 +59,46 @@ MAX_POLL_SECONDS = 6 * 60 * 60
 TERMINAL_SUCCESS = {"completed", "complete", "succeeded", "success", "done"}
 TERMINAL_FAILURE = {"failed", "failure", "error", "cancelled", "canceled", "expired"}
 PENDING_STATUSES = {"queued", "pending", "in_progress", "processing", "running"}
+
+
+def _read_env_value(env_file, name):
+    path = Path(env_file).expanduser()
+    if not path.exists():
+        return None
+    value = None
+    for raw_line in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        if "=" not in line:
+            continue
+        key_name, raw_value = line.split("=", 1)
+        if key_name.strip() != name:
+            continue
+        raw_value = raw_value.strip()
+        if len(raw_value) >= 2 and raw_value[0] == raw_value[-1] and raw_value[0] in ("'", '"'):
+            raw_value = raw_value[1:-1]
+        value = clean_key(raw_value)
+    return value
+
+
+def load_video_key(env_file):
+    """加载视频专用凭据，返回 (key, source, used_generic_fallback)。
+
+    视频组与生图组平台不同，通用 Key 通常属于 openai 生图组，
+    用它调 /v1/videos 会被网关判为不支持并返回 404。
+    """
+    env_path = Path(env_file).expanduser() if env_file else VIDEO_ENV_FILE
+    from_env_file = _read_env_value(env_path, VIDEO_ENV_KEY)
+    if from_env_file:
+        return from_env_file, f"env:{env_path}", False
+    from_process = os.environ.get(VIDEO_ENV_KEY)
+    if from_process:
+        return clean_key(from_process), f"process environment ({VIDEO_ENV_KEY})", False
+    key, source = load_key(DEFAULT_ENV_FILE)
+    return key, source, True
 
 
 class VideoError(MediaError):
@@ -645,7 +693,7 @@ def _add_job_arguments(parser):
     parser.add_argument("--poll-interval", type=float, default=5)
     parser.add_argument("--poll-timeout", type=float, default=1800)
     parser.add_argument("--out", default="./sshzyu-video")
-    parser.add_argument("--env-file", default=str(DEFAULT_ENV_FILE))
+    parser.add_argument("--env-file", default=str(VIDEO_ENV_FILE))
     parser.add_argument("--dry-run", action="store_true", help="只校验计划，不读 Key、不联网")
     parser.add_argument("--confirm", action="store_true", help="用户已明确确认视频计划")
     parser.add_argument(
@@ -745,7 +793,13 @@ def main(argv=None):
                 raise VideoError(
                     "真实视频任务会产生费用；完成 preflight 并取得用户确认后加 --confirm。"
                 )
-            key, source = load_key(args.env_file)
+            key, source, generic = load_video_key(args.env_file)
+            if generic:
+                emit(
+                    "WARNING: 未配置 SSHZYU_VIDEO_API_KEY，回退到通用 SSHZYU_API_KEY。"
+                    "该 Key 通常属于生图分组（openai），/v1/videos 会返回 404。",
+                    error=True,
+                )
             emit(f"CREDENTIAL: {source}; no automatic retry")
             if args.command == "run":
                 result = execute_video_job(
@@ -775,7 +829,13 @@ def main(argv=None):
             emit(f"TASK: {task_id}")
             emit(f"RECORD: {directory / 'job-result.json'}")
             return 0
-        key, source = load_key(args.env_file)
+        key, source, generic = load_video_key(args.env_file)
+        if generic:
+            emit(
+                "WARNING: 未配置 SSHZYU_VIDEO_API_KEY，回退到通用 SSHZYU_API_KEY。"
+                "该 Key 通常属于生图分组（openai），/v1/videos 会返回 404。",
+                error=True,
+            )
         emit(f"CREDENTIAL: {source}; no automatic retry")
         if args.command == "get":
             result = get_video_task(args.task_id, key)

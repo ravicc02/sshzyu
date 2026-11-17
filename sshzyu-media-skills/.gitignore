@@ -1,0 +1,9 @@
+# 评估实跑的媒体与完整导出体积大，不入版本库；
+# 证据以 RUN-LOG.md、REPORT.md、evidence/*.json、SHA256SUMS.txt 为准。
+evaluations/runs/*/project/剧集/*/制作成果/
+evaluations/runs/*/export/
+evaluations/runs/*/evidence/frames/
+
+# 重测产生的视频与音频产物不入库，保留同目录 JSON 记录
+evaluations/runs/*/video-*/*.mp4
+evaluations/runs/*/video-*/*.wav

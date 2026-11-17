@@ -127,7 +127,7 @@ python3 {技能目录}/scripts/project_tool.py verify <project> --episode EP001
 
 `scripts/sshzyu_media.py` 保留旧版 `image`、`video`、`drama`、`doctor`、`models` 命令；其运行需要并列安装 `sshzyu-image` 与 `sshzyu-video`，并非本技能目录下的子技能。旧 `drama run` 是镜头 manifest 兼容命令，**不是**短剧生产任务单适配器（清单流程见 [AI 漫剧与短剧工作流](references/sshzyu-workflow.md)）。
 
-凭据统一由 `sshzyu-image` 读取：本技能目录的 `.env` **不会**被使用，请把 `SSHZYU_API_KEY` 配置在并列的 `sshzyu-image/.env`、进程环境变量或系统凭据库。
+凭据按能力分离：图片由 `sshzyu-image` 读取 `SSHZYU_API_KEY`；视频由 `sshzyu-video` 读取 `SSHZYU_VIDEO_API_KEY`（本技能目录的 `.env` 不会被使用）。两者平台分组不同，不能共用同一把 Key。
 
 ```bash
 python3 -I {技能目录}/scripts/sshzyu_media.py doctor

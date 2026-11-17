@@ -1,0 +1,9 @@
+{
+  "id": "task_sHjUx40oXMCOlsRhIzAB7b2K4fKdNnM1",
+  "object": "video",
+  "model": "minimax_h3",
+  "status": "completed",
+  "progress": 100,
+  "created_at": 1794929218,
+  "completed_at": 1794929371
+}

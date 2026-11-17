@@ -5,10 +5,24 @@ description: "通过 SSHZYU 提交异步视频任务，查询、等待和下载�
 
 # SSHZYU 视频
 
-本技能负责视频请求、查询、等待、下载及结果校验，唯一实现为 `scripts/sshzyu_video.py`。运行时依赖同一安装根下的 `sshzyu-image`（请求和凭据模块）；如需旧版统一 CLI，再并列安装 `sshzyu-media`。缺少图片依赖时停止，不自行加载未知脚本。
+本技能负责视频请求、查询、等待、下载及结果校验，唯一实现为 `scripts/sshzyu_video.py`。运行时依赖同一安装根下的 `sshzyu-image`（HTTP 请求模块）；如需旧版统一 CLI，再并列安装 `sshzyu-media`。缺少图片依赖时停止，不自行加载未知脚本。
 
 - [视频 API](references/api_reference.md)
 - [视频参数矩阵](references/parameter-matrix.md)
+
+## 凭据
+
+视频与图片属于**不同的平台分组**：`/v1/videos` 只接受 `grok`、`composite`、`video` 组，`/v1/images/generations` 只接受 `openai`、`grok` 组。同一把 Key 无法同时满足两者，因此本技能读取**视频专用**凭据，按顺序：
+
+1. 本技能目录 `.env` 中的 `SSHZYU_VIDEO_API_KEY`
+2. 进程环境变量 `SSHZYU_VIDEO_API_KEY`
+3. 回退到 `sshzyu-image` 的通用 `SSHZYU_API_KEY`（运行时打印警告；该 Key 通常属于 openai 生图组，调 `/v1/videos` 会返回 404）
+
+把视频组 Key 写入本目录 `.env`（不入版本库）：
+
+```bash
+SSHZYU_VIDEO_API_KEY=<视频组 Key>
+```
 
 ## 付费提交门槛
 

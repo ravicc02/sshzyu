@@ -1,0 +1,45 @@
+{
+  "created_at": "2026-11-17T10:32:24.322905Z",
+  "episode": "EP001",
+  "files": [
+    {
+      "artifact_id": "direct:剧集/EP001/分镜.md",
+      "path": "artifacts/剧集/EP001/分镜.md",
+      "sha256": "eb3d3ca209650b18203b558058a162dd0de08b8878cc89367cfe1572dbc638e7",
+      "source": "剧集/EP001/分镜.md"
+    },
+    {
+      "artifact_id": "direct:剧集/EP001/剧本.md",
+      "path": "artifacts/剧集/EP001/剧本.md",
+      "sha256": "b33265658582983798c672f22495d2c6db14b6277528e7b96800e206e5fbfc64",
+      "source": "剧集/EP001/剧本.md"
+    },
+    {
+      "artifact_id": "direct:剧集/EP001/剪辑单.md",
+      "path": "artifacts/剧集/EP001/剪辑单.md",
+      "sha256": "999166cfe39ea8cfcae53fa861964494ecae000d97a0ce4439d4a977bae6c56d",
+      "source": "剧集/EP001/剪辑单.md"
+    },
+    {
+      "artifact_id": "direct:剧集/EP001/图片提示词.md",
+      "path": "artifacts/剧集/EP001/图片提示词.md",
+      "sha256": "8b9cb5147b9c45c158d07ac89bcbb0f30aab856242aa7d505f7d1a65e6c47718",
+      "source": "剧集/EP001/图片提示词.md"
+    },
+    {
+      "artifact_id": "direct:剧集/EP001/视觉设定.md",
+      "path": "artifacts/剧集/EP001/视觉设定.md",
+      "sha256": "a3ddabb87a9db62d9d34ebd48328e0f9aa5fe4af9589aa67f51f781b5ce9f319",
+      "source": "剧集/EP001/视觉设定.md"
+    },
+    {
+      "artifact_id": "direct:剧集/EP001/视频提示词.md",
+      "path": "artifacts/剧集/EP001/视频提示词.md",
+      "sha256": "843fb0a6608d6d2b05811ec20421fe6853f1efc21bfe0fa96a50b4c7d0224f10",
+      "source": "剧集/EP001/视频提示词.md"
+    }
+  ],
+  "omitted": [],
+  "project_id": "SD-B06E57451CAF",
+  "schema_version": "1.0"
+}
