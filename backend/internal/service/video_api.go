@@ -286,7 +286,7 @@ func ParseVideoAPIRequest(body []byte) (VideoAPIRequestInfo, error) {
 		DurationSeconds:   duration,
 		HasResolution:     resolution != "",
 		HasDuration:       hasDuration,
-		HasReferenceVideo: videoAPIRequestHasReferenceVideo(body),
+		HasReferenceVideo: videoAPIRequestHasReferenceMaterial(body),
 	}, nil
 }
 
@@ -343,9 +343,22 @@ func videoAPIRequestDurationSeconds(body []byte) (int, bool, error) {
 	return normalizeVideoAPIDurationSeconds(int(value)), true, nil
 }
 
-func videoAPIRequestHasReferenceVideo(body []byte) bool {
+// videoAPIRequestHasReferenceMaterial 判断请求是否携带参考素材。
+//
+// 字段名保留 HasReferenceVideo 的历史命名，但语义已扩展到图片参考：
+// 计费档 video_no_reference / video_with_reference 区分的是「有没有参考」，
+// 不只针对视频。此前只识别视频字段，导致图生视频按 no_reference 计价
+// （sd25官转 0.0000421 vs with_reference 0.0000253，用户多付约 66%）。
+//
+// 风险：若上游实际不区分图片参考，则本站会少收钱。这是 2026-11-18 经确认的
+// 业务决定，改动前请重新核对上游价目。
+func videoAPIRequestHasReferenceMaterial(body []byte) bool {
 	for _, path := range []string{
+		// 视频参考
 		"video", "video_url", "video_urls", "reference_video", "reference_videos", "references.video",
+		// 图片参考：不同上游用不同字段名，逐个覆盖
+		"image", "image_url", "image_urls", "reference_image", "reference_images", "references.image",
+		"first_frame_image", "last_frame_image", "input_reference", "input_references",
 	} {
 		value := gjson.GetBytes(body, path)
 		if !value.Exists() {

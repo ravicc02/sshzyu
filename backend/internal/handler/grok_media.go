@@ -313,7 +313,15 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 				return
 			}
 			if boundLookupAccountID > 0 && errors.Is(err, service.ErrNoAvailableAccounts) {
-				h.errorResponse(c, http.StatusNotFound, "not_found_error", "Video request not found")
+				// 任务存在且已绑定账号，只是该账号当前不可调度（熔断、限流、
+				// 临时下线）。返回 404 会让客户端误判任务丢失并重复提交付费任务，
+				// 必须给出可重试的明确原因。
+				reqLog.Warn("grok_media.video_lookup_bound_account_unavailable",
+					zap.Int64("bound_account_id", boundLookupAccountID),
+					zap.Error(err),
+				)
+				h.errorResponse(c, http.StatusServiceUnavailable, noAccountCode,
+					"任务绑定的视频账号当前不可调度，任务本身未丢失；请稍后重试查询，不要重新提交。")
 				return
 			}
 			reqLog.Warn("grok_media.account_select_failed",
