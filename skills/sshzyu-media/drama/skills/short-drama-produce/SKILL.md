@@ -6,9 +6,11 @@ license: MIT
 
 # 确认后生产
 
-本技能负责把定稿提示词与生成参数发往运行环境配置好的生成接口（adapter）。图片提示词归 `$short-drama-image-prompts`，视频提示词归 `$short-drama-video-prompts`，台词归 `$short-drama-write`，角色音色设定归 `$short-drama-assets`。
+本技能负责把定稿提示词与生成参数整理成任务单，并在确认后交回 SSHZYU 媒体路由。图片提示词归 `$short-drama-image-prompts`，视频提示词归 `$short-drama-video-prompts`，台词归 `$short-drama-write`，角色音色设定归 `$short-drama-assets`。
 
-图片任务的实际生成统一路由到独立 `$sshzyu-co-image` 技能；本技能只负责任务单、确认、恢复、结果归档和与视频流程的衔接，不再新增图片 API、Key 读取或图片输出校验实现。视频任务中的首帧、尾帧和角色参考图也必须先由 `$sshzyu-co-image` 生成或引用其已有产物。
+图片任务的实际生成统一路由到独立 `$sshzyu-co-image` 技能；本技能只负责任务单、确认、恢复、结果归档和与视频流程的衔接，不再新增图片 API、Key 读取或图片输出校验实现。视频任务中的首帧、尾帧和角色参考图也必须先由 `$sshzyu-co-image` 生成或引用其已有产物；镜头视频必须交给 `sshzyu-media` 的 `video` 路由，调用 `https://sshzyu.com/v1/videos`。
+
+`provider_adapters.py` 中保留的原项目供应商直连实现仅用于历史任务兼容和离线合同测试，不是本项目的新生产入口。新任务不得选择 `gpt-image-2`、`seedance`、`minimax-h3` 等直连 profile；应使用外部 adapter 配置把图片转发到 `$sshzyu-co-image`，把视频转发到 `sshzyu-media video`。
 
 ## 快速开始
 

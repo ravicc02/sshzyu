@@ -22,13 +22,27 @@ description: "SSHZYU 短剧与漫剧创作工作流：从原著分析、分集�
 
 ## 媒体能力边界
 
+短剧工作流不改变源 `drama skills` 的阶段顺序，但所有付费媒体任务统一回到 SSHZYU 路由：
+
+```text
+$short-drama-image-prompts / $short-drama-storyboard
+  → 图片需求
+  → $sshzyu-co-image
+  → https://sshzyu.com/v1/images/*
+
+$short-drama-video-prompts
+  → 视频需求
+  → sshzyu-media video
+  → https://sshzyu.com/v1/videos
+```
+
 图片生成统一由独立技能 `$sshzyu-co-image` 负责，入口为：
 
 ```text
 ${SSHZYU_SKILLS_ROOT}/sshzyu-co-image/scripts/sshzyu_image.py
 ```
 
-短剧技能只产生提示词、参考图绑定和任务单；视频技能只产生视频提示词和视频任务。不得在短剧或视频技能中复制图片 API、模型能力、Key 读取或图片校验逻辑。
+短剧技能只产生提示词、参考图绑定和任务单；不得在短剧或视频技能中复制图片 API、模型能力、Key 读取或图片校验逻辑。短剧生产中的旧供应商直连 adapter 不是 SSHZYU 路由，不能用于新任务。
 
 生产时仍遵守 `sshzyu-media` 的 preflight：先预览、再取得本次明确确认，最后才提交付费任务。图片结果可作为视频的公网参考素材，但本地文件、内网地址和需要登录的 URL 不得自动上传。
 

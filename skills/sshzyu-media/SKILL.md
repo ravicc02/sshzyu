@@ -5,7 +5,7 @@ description: "通过 sshzyu.com 完成 AI 生图、图片编辑、异步视频�
 
 # SSHZYU 通用媒体
 
-使用 `scripts/sshzyu_media.py` 统一处理视频和短剧；图片能力由独立技能 `$sshzyu-co-image` 提供，兼容入口会转发到该技能。脚本只依赖 Python 标准库；成片拼接可选依赖 `ffmpeg` 和 `ffprobe`。
+使用 `scripts/sshzyu_media.py` 统一处理用户的媒体入口和短剧；图片能力由独立技能 `$sshzyu-co-image` 提供，兼容入口会转发到该技能。直接视频统一由 `scripts/sshzyu_video.py` 调用 `https://sshzyu.com/v1/videos`。完整闭环见 [媒体路由契约](ROUTING.md)。脚本只依赖 Python 标准库；成片拼接可选依赖 `ffmpeg` 和 `ffprobe`。
 
 内置短剧套件位于 `drama/`，入口为 `drama/SKILL.md`，原有 `$short-drama-*` 调用名称、Markdown 项目事实源和 Dashboard 目录结构保持不变。
 
@@ -57,16 +57,17 @@ description: "通过 sshzyu.com 完成 AI 生图、图片编辑、异步视频�
 
 ## 路由
 
-| 用户需求 | 命令 |
-| --- | --- |
-| 单提示词生图、多图、改图 | `image` |
-| 文生视频、图生视频、参考素材视频 | `video run` |
-| 查询已有视频任务 | `video get`、`video wait` |
-| 下载已有视频 | `video download` |
-| 漫剧/短剧按镜头批量生成 | `drama run` |
-| 将已生成镜头拼成成片 | `drama assemble` |
-| 查看当前 Key 可用模型 | `models` |
-| 检查 Python、Key 来源和 FFmpeg | `doctor` |
+先按用户意图选择唯一入口，再进入对应子技能；不要跨过总入口直接调用旧适配器。
+
+| 用户需求 | 路由结果 | 命令 |
+| 单提示词生图、多图、改图 | `$sshzyu-co-image` 子技能 | `image` |
+| 文生视频、图生视频、参考素材视频 | SSHZYU 视频路由 | `video run` |
+| 查询已有视频任务 | SSHZYU 视频路由 | `video get`、`video wait` |
+| 下载已有视频 | SSHZYU 视频路由 | `video download` |
+| 漫剧/短剧按镜头批量生成 | `drama` → 源 `drama skills` | `drama run` |
+| 将已生成镜头拼成成片 | `short-drama-edit` | `drama assemble` |
+| 查看当前 Key 可用模型 | SSHZYU 服务 | `models` |
+| 检查 Python、Key 来源和 FFmpeg | 本地运行时 | `doctor` |
 
 旧版生图参数可以不带 `image` 子命令，脚本会自动兼容。
 
