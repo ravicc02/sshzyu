@@ -50,3 +50,13 @@ sub2api 网关的 `/v1/videos` 只接受 platform ∈ {`grok`, `composite`, `vid
 
 - `short-drama-produce` 尚未内置 SSHZYU 视频适配器；本次验证的是 `sshzyu-video` CLI 直连，不等于短剧生产任务单已自动接通。
 - 宿主侧 Seedance 403（`Seedance requires an OpenAI or composite group`）与套件无关，是宿主自身配置的 key 分组问题。
+
+## short-drama-produce 适配器实测（同日）
+
+- 新增 `short-drama-produce/scripts/sshzyu_adapter.py`：按 adapter 协议从 stdin 读任务单，复用同根 `sshzyu-video` 的提交、轮询、下载函数。
+- 修复两个真实缺陷：
+  1. Windows 下适配器 stdout 默认 cp936，`production_tool` 按 UTF-8 解析失败，只剩无信息的 `adapter_exit_1`；已在入口把 stdin/stdout 重设为 UTF-8。
+  2. `collect` 未等待终态就下载，远端未完成时返回 HTTP 400；已改为首次执行与收集都先轮询到终态。
+- 完整链路：`prepare → confirm → run` 成功，`state=succeeded`，产出 `剧集/EP001/制作成果/video/SHOT-EP001-001.mp4`（736,739 B，480×864，5.17s，SHA256 `7ee1716927db5c6ebf60e57e70f9277fd5a920b0d50c2ef39c4c14d6d0933617`）。
+- 首次 run 因网络 SSL 断连失败，但任务已提交（`task_dgOQZ7VzLOwhpsxdz9K4kIdTw4chVHaQ`）；该 attempt 被 `production_tool` 标记 `collected=true` 后拒绝再次 collect，属其状态语义，未改。
+- 本地参考素材尚未公网化，适配器会以 `local_reference_unsupported` 拒绝，不产生提交。

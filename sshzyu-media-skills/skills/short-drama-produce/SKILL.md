@@ -10,7 +10,9 @@ license: MIT
 
 图片生成由独立 `$sshzyu-image` 负责，视频生成由独立 `$sshzyu-video` 负责。本技能只管理短剧任务单、批次预览、确认、状态、原任务收集和结果归档；不能用媒体 CLI `--confirm` 代替本次任务单确认。
 
-`provider_adapters.py` 中保留的原项目供应商直连实现仅用于历史任务兼容和离线合同测试，不是本项目的新生产入口。**目前尚无已实现的 SSHZYU 任务单 adapter**：不能把 `production_tool.py` 的确认回执直接交给图片或视频 CLI 当作第二道确认。新任务不得选择 `gpt-image-2`、`seedance`、`minimax-h3` 等直连 profile；在单独实现并验收适配器之前，准备和预览可做，SSHZYU 生产提交必须停在 adapter 配置门槛。
+`sshzyu_adapter.py` 是已实现的 SSHZYU **视频**适配器：按本技能的 adapter 协议从 stdin 读取任务单、向 stdout 返回结果，内部复用同根 `sshzyu-video` 的提交、轮询与下载函数，不复制 HTTP 实现。使用前需在 `sshzyu-video/.env` 配置视频组 `SSHZYU_VIDEO_API_KEY`，并在项目外提供 adapter 配置（示例见 [生成接口协议规范](references/adapter-contract.md#sshzyu-视频适配器)）。未配置视频凭据时适配器直接拒绝，不回退生图 Key；图片仍走 `$sshzyu-image`，本适配器只处理 `video`。
+
+`provider_adapters.py` 中保留的原项目供应商直连实现仅用于历史任务兼容和离线合同测试，不是新生产入口。新任务不得选择 `gpt-image-2`、`seedance`、`minimax-h3` 等直连 profile。
 
 ## 快速开始
 
@@ -54,7 +56,7 @@ python3 {技能目录}/scripts/production_tool.py audit <project>
 
 ## 输入选择
 
-> 本节描述任务单如何提取素材与参数，不构成新任务的供应商授权。新任务的图片与视频分别归 `$sshzyu-image`、`$sshzyu-video`；SSHZYU adapter 未接通前，新任务停在 adapter 配置门槛，不得改用下列直连 profile。
+> 本节描述任务单如何提取素材与参数，不构成新任务的供应商授权。新任务的图片与视频分别归 `$sshzyu-image`、`$sshzyu-video`；视频可经 `sshzyu_adapter.py` 提交，图片仍需 `$sshzyu-image`。不得改用下列直连 profile。
 
 - **图片（`image`）**：读取 `图片提示词.md` 的 `IMG-*`（角色/场景/道具设定图及状态图，含尾帧）或 `分镜.md` 的 `SHOT-*`（读取 `### 首帧提示词` 生成单镜首帧；历史 `gpt-image-2` profile 支持单任务产出 1–16 张候选图）。图片落入 `剧集/<EP>/制作成果/images/` 后，分镜技能可将其绑定为 `用途：起始帧` 的 `REF-...`。
 - **视频（`video`）**：读取 `视频提示词.md` 的 `MOTION-*` 或多镜合生分组 `GROUP-*`（`GROUP-*` 的组级 `输入参考图` 可选，写出时按同规则核验并拦截 `待补参考图`，同样支持可选 `参考音频`；多镜合生时直接指定 `GROUP-*`，勿拿组内单个成员 `MOTION-*` 代替整组提交）。内置文档解析器只读取参考图片与角色参考音频，因此标着“待续接、不可提交”的 `MOTION-*` 按 `short-drama.json` 中 `creator_authority.production_profile.choices.continuation_route` 分流处理：

@@ -753,18 +753,18 @@ def parser():
     _add_job_arguments(create)
     get = sub.add_parser("get", help="查询任务状态")
     get.add_argument("task_id")
-    get.add_argument("--env-file", default=str(DEFAULT_ENV_FILE))
+    get.add_argument("--env-file", default=str(VIDEO_ENV_FILE))
     wait = sub.add_parser("wait", help="等待现有任务")
     wait.add_argument("task_id")
     wait.add_argument("--poll-interval", type=float, default=5)
     wait.add_argument("--poll-timeout", type=float, default=1800)
     wait.add_argument("--download", action="store_true")
     wait.add_argument("--out", default="./sshzyu-video")
-    wait.add_argument("--env-file", default=str(DEFAULT_ENV_FILE))
+    wait.add_argument("--env-file", default=str(VIDEO_ENV_FILE))
     download = sub.add_parser("download", help="下载已完成任务")
     download.add_argument("task_id")
     download.add_argument("--out", default="./sshzyu-video")
-    download.add_argument("--env-file", default=str(DEFAULT_ENV_FILE))
+    download.add_argument("--env-file", default=str(VIDEO_ENV_FILE))
     return p
 
 

@@ -7,3 +7,6 @@ evaluations/runs/*/evidence/frames/
 # 重测产生的视频与音频产物不入库，保留同目录 JSON 记录
 evaluations/runs/*/video-*/*.mp4
 evaluations/runs/*/video-*/*.wav
+
+# 适配器配置含本机绝对路径，仅本地使用
+evaluations/runs/*/adapter-config.json

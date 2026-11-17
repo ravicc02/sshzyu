@@ -56,6 +56,32 @@
 - `command`：参数数组（直接进程调用，严禁拼成 shell 字符串）；`timeout_seconds`：允许范围 `1–3600` 秒。API 密钥只从环境变量或系统凭据库读取，严禁写进配置文件。
 - `reference_roles`（可选列表）：声明当前接口支持的参考 `role`，未列出的 `role` 会在核销确认码前拦截。当 `command` 调用内置 `provider_adapters.py` 的 `seedance` 或 `minimax-h3` 且未显式填写 `reference_roles` 时，默认放行 `first_frame`、`last_frame`、`reference_image`、`reference_video` 与 `reference_audio`；自定义外部接口若需接收 `reference_audio`，仍须在 `reference_roles` 中显式列出。
 
+## SSHZYU 视频适配器
+
+`scripts/sshzyu_adapter.py` 实现 `video` 模态，内部复用同根 `sshzyu-video` 的提交、轮询与下载函数，不复制 HTTP 逻辑。项目外配置示例：
+
+```json
+{
+  "adapters": {
+    "sshzyu-video": {
+      "command": [
+        "python3",
+        "/path/to/sshzyu-media-skills/skills/short-drama-produce/scripts/sshzyu_adapter.py",
+        "--model", "minimax_h3",
+        "--resolution", "480p"
+      ],
+      "timeout_seconds": 1800
+    }
+  }
+}
+```
+
+- **参数映射**：`parameters.duration` → 接口 `seconds`；`parameters.ratio` → `aspect_ratio`；`parameters.resolution`；`parameters.model` 优先于适配器 `--model`。缺少模型或时长会以 `submitted: false` 拒绝，不消耗远端额度。
+- **凭据**：只读 `SSHZYU_VIDEO_API_KEY`（`sshzyu-video/.env` 或进程环境变量）。未配置时返回 `video_credential_missing`，不回退生图 Key。
+- **参考素材**：视频接口只接受公网 HTTPS 参考素材。任务单存在本地 `reference_bindings` 而 `parameters.image_urls` / `video_urls` / `audio_urls` 为空时，返回 `local_reference_unsupported`，不提交。
+- **异步恢复**：拿到任务号后立即写 `handle_path`；`collect` 会先轮询到终态再下载，未完成就下载会得到 HTTP 400。
+- **已验收范围**：文生视频（`minimax_h3`，5s / 480p / 9:16）经 `prepare → confirm → run` 成功产出；本地参考素材公网化尚未实现。
+
 ## 标准输入协议（stdin）
 
 生成接口进程从 `sys.stdin.buffer` 读取 UTF-8 JSON，除已确认任务单字段外还包含：

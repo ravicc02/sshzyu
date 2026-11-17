@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "job_id": "EP001-MOTION001-video",
+  "modality": "video",
+  "adapter": "sshzyu-video",
+  "source": "剧集/EP001/视频提示词.md",
+  "source_entry": "MOTION-EP001-001",
+  "outputs": ["剧集/EP001/制作成果/video/SHOT-EP001-001.mp4"],
+  "parameters": {
+    "duration": 5,
+    "ratio": "9:16",
+    "resolution": "480p",
+    "model": "minimax_h3",
+    "prompt_language": "zh-CN"
+  },
+  "overwrite": false
+}

@@ -16,11 +16,13 @@ description: "通过 SSHZYU 提交异步视频任务，查询、等待和下载�
 
 1. 本技能目录 `.env` 中的 `SSHZYU_VIDEO_API_KEY`
 2. 进程环境变量 `SSHZYU_VIDEO_API_KEY`
-3. 回退到 `sshzyu-image` 的通用 `SSHZYU_API_KEY`（运行时打印警告；该 Key 通常属于 openai 生图组，调 `/v1/videos` 会返回 404）
+3. 回退到 `sshzyu-image` 的通用 `SSHZYU_API_KEY`，并打印平台不匹配警告。这只用于兼容旧配置，**不是正常使用路径**：新用户请按下述方式配置视频组 Key。
 
-把视频组 Key 写入本目录 `.env`（不入版本库）：
+Key 到 [sshzyu.com](https://sshzyu.com) 申请，选择 platform 为 `grok`、`composite` 或 `video` 的分组。把 Key 写入本目录 `.env`（先从 `.env.example` 复制，`.env` 不入版本库）：
 
 ```bash
+cp .env.example .env
+# 编辑 .env，填入自己的视频组 Key
 SSHZYU_VIDEO_API_KEY=<视频组 Key>
 ```
 
