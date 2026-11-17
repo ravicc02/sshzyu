@@ -60,3 +60,9 @@ sub2api 网关的 `/v1/videos` 只接受 platform ∈ {`grok`, `composite`, `vid
 - 完整链路：`prepare → confirm → run` 成功，`state=succeeded`，产出 `剧集/EP001/制作成果/video/SHOT-EP001-001.mp4`（736,739 B，480×864，5.17s，SHA256 `7ee1716927db5c6ebf60e57e70f9277fd5a920b0d50c2ef39c4c14d6d0933617`）。
 - 首次 run 因网络 SSL 断连失败，但任务已提交（`task_dgOQZ7VzLOwhpsxdz9K4kIdTw4chVHaQ`）；该 attempt 被 `production_tool` 标记 `collected=true` 后拒绝再次 collect，属其状态语义，未改。
 - 本地参考素材尚未公网化，适配器会以 `local_reference_unsupported` 拒绝，不产生提交。
+
+### 图片分支
+
+- 图片任务同样经 `prepare → confirm → run` 成功：`剧集/EP001/制作成果/images/SHOT-EP001-001.png`，2,064,393 B，1024×1536，SHA256 `65f95cad89ca00322ad7d7fee6fdc8279380fbed1d961d920b1bac184198e716`。
+- 修复两个实现错误：`execute_job` 返回 `JobResult` 数据类（不是 dict，误用 `.get` 导致崩溃）；它把图写在 `output_root/00-<slug>/` 子目录，协议要求 source 直接位于 `output_root`，已改为移动到根目录。
+- 图片适配器只做无参考文生图；带 `reference_bindings` 返回 `reference_not_supported`，因为会走 `/images/edits` 编辑接口。

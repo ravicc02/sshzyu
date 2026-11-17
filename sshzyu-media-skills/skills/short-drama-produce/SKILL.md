@@ -10,7 +10,10 @@ license: MIT
 
 图片生成由独立 `$sshzyu-image` 负责，视频生成由独立 `$sshzyu-video` 负责。本技能只管理短剧任务单、批次预览、确认、状态、原任务收集和结果归档；不能用媒体 CLI `--confirm` 代替本次任务单确认。
 
-`sshzyu_adapter.py` 是已实现的 SSHZYU **视频**适配器：按本技能的 adapter 协议从 stdin 读取任务单、向 stdout 返回结果，内部复用同根 `sshzyu-video` 的提交、轮询与下载函数，不复制 HTTP 实现。使用前需在 `sshzyu-video/.env` 配置视频组 `SSHZYU_VIDEO_API_KEY`，并在项目外提供 adapter 配置（示例见 [生成接口协议规范](references/adapter-contract.md#sshzyu-视频适配器)）。未配置视频凭据时适配器直接拒绝，不回退生图 Key；图片仍走 `$sshzyu-image`，本适配器只处理 `video`。
+`sshzyu_adapter.py` 是已实现的 SSHZYU 适配器：按本技能的 adapter 协议从 stdin 读取任务单、向 stdout 返回结果，内部复用同根 `sshzyu-video` / `sshzyu-image` 的提交、轮询与下载函数，不复制 HTTP 实现。使用前需分别配置 `sshzyu-video/.env` 的 `SSHZYU_VIDEO_API_KEY` 与 `sshzyu-image/.env` 的 `SSHZYU_API_KEY`，并在项目外提供 adapter 配置（示例见 [生成接口协议规范](references/adapter-contract.md#sshzyu-适配器)）。凭据缺失时适配器直接拒绝，不回退另一平台的 Key。
+
+- **video**：完整支持提交、轮询、下载与 `collect` 恢复。
+- **image**：当前只做**无参考文生图**。任务单带 `reference_bindings` 时返回 `reference_not_supported`，因为带参考会走 `/images/edits` 编辑接口；需要参考图的首帧仍用 `$sshzyu-image` CLI 处理。
 
 `provider_adapters.py` 中保留的原项目供应商直连实现仅用于历史任务兼容和离线合同测试，不是新生产入口。新任务不得选择 `gpt-image-2`、`seedance`、`minimax-h3` 等直连 profile。
 

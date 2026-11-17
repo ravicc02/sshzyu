@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -81,6 +82,106 @@ def _prompt_of(request, params):
     return None
 
 
+def _image_module():
+    scripts = _suite_root() / "sshzyu-image" / "scripts"
+    if not (scripts / "sshzyu_image.py").is_file():
+        return None
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    import sshzyu_image
+
+    return sshzyu_image
+
+
+def _run_image(request, params, args, outputs, output_root):
+    import contextlib
+
+    if request.get("reference_bindings"):
+        return _emit_error(
+            "invalid_request",
+            "reference_not_supported",
+            "图片适配器当前只做无参考文生图；带参考会走 /images/edits 编辑接口，请先用 sshzyu-image CLI 处理",
+        )
+
+    module = _image_module()
+    if module is None:
+        return _emit_error("configuration", "missing_image_skill", "未找到同根安装的 sshzyu-image")
+
+    try:
+        key, _source = module.load_key(module.DEFAULT_ENV_FILE)
+    except Exception:
+        return _emit_error(
+            "configuration",
+            "image_credential_missing",
+            "请复制 sshzyu-image/.env.example 为 .env 并填写 SSHZYU_API_KEY",
+        )
+
+    prompt = _prompt_of(request, params)
+    if not prompt:
+        return _emit_error("invalid_request", "missing_prompt", "任务单缺少 prompt")
+
+    model = str(params.get("model") or args.image_model or module.DEFAULT_MODEL).strip()
+    size = str(params.get("size") or args.size or module.DEFAULT_SIZE).strip()
+    quality = str(params.get("quality") or module.DEFAULT_QUALITY).strip()
+    suffix = Path(str(outputs[0])).suffix.lstrip(".").lower() or module.DEFAULT_FORMAT
+    output_format = "jpeg" if suffix in ("jpg", "jpeg") else suffix
+
+    try:
+        job = module.Job(
+            id=str(request.get("job_id") or "job"),
+            prompt=prompt,
+            model=model,
+            size=size,
+            quality=quality,
+            output_format=output_format,
+            n=1,
+        )
+    except Exception as exc:
+        return _emit_error("invalid_request", "invalid_job_parameter", str(exc))
+
+    try:
+        # execute_job 会向 stdout 打印进度；协议要求 stdout 只有最终 JSON。
+        with contextlib.redirect_stdout(sys.stderr):
+            result = module.execute_job(0, job, key, Path(output_root))
+    except Exception as exc:
+        return _emit_error(
+            "provider_response",
+            "image_request_failed",
+            module.redact(str(exc), key),
+            submitted=True,
+        )
+
+    status = str(getattr(result, "status", "") or "")
+    if status not in ("success", "partial"):
+        detail = getattr(result, "error", None) or "图片生成失败"
+        return _emit_error(
+            "provider_response",
+            "image_task_failed",
+            detail,
+            submitted=True,
+        )
+
+    images = getattr(result, "images", []) or []
+    if not images or not images[0].get("path"):
+        return _emit_error("provider_response", "missing_output", "未得到图片文件", submitted=True)
+
+    # 协议要求 source 直接位于 output_root；execute_job 会建 00-<slug>/ 子目录。
+    source = Path(images[0]["path"])
+    destination = Path(output_root) / f"{job.id}{source.suffix}"
+    if source != destination:
+        shutil.move(str(source), str(destination))
+
+    print(
+        json.dumps(
+            {
+                "outputs": [{"target": outputs[0], "source": str(destination)}],
+            },
+            ensure_ascii=False,
+        )
+    )
+    return 0
+
+
 def main(argv=None):
     # production_tool 按 UTF-8 读写适配器的 stdin/stdout；Windows 默认 cp936 会让
     # 含中文的错误 JSON 解析失败，只剩一个无信息的 adapter_exit_N。
@@ -90,7 +191,9 @@ def main(argv=None):
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default=None, help="默认视频模型；任务单 parameters.model 优先")
-    parser.add_argument("--resolution", default=None, help="默认分辨率档位")
+    parser.add_argument("--resolution", default=None, help="默认视频分辨率档位")
+    parser.add_argument("--image-model", default=None, help="默认图片模型")
+    parser.add_argument("--size", default=None, help="默认图片尺寸，如 1024x1536")
     parser.add_argument("--poll-interval", type=float, default=5.0)
     parser.add_argument("--poll-timeout", type=float, default=1800.0)
     args = parser.parse_args(argv)
@@ -103,20 +206,27 @@ def main(argv=None):
         return _emit_error("invalid_request", "invalid_stdin", "任务单必须是对象")
 
     modality = str(request.get("modality") or "").strip()
-    if modality != "video":
+    if modality not in ("video", "image"):
         return _emit_error(
             "invalid_request",
             "unsupported_modality",
-            "本适配器只处理 video；图片请使用 sshzyu-image",
+            "本适配器只处理 video 与 image",
         )
 
     outputs = request.get("outputs") or []
     if not isinstance(outputs, list) or len(outputs) != 1:
-        return _emit_error("invalid_request", "invalid_outputs", "视频任务必须且只能有一个输出路径")
+        return _emit_error("invalid_request", "invalid_outputs", "任务必须且只能有一个输出路径")
 
     output_root = request.get("output_root")
     if not output_root:
         return _emit_error("invalid_request", "missing_output_root", "缺少 output_root")
+
+    params = request.get("parameters")
+    if not isinstance(params, dict):
+        params = {}
+
+    if modality == "image":
+        return _run_image(request, params, args, outputs, output_root)
 
     module = _video_module()
     if module is None:
@@ -140,10 +250,6 @@ def main(argv=None):
             "video_credential_missing",
             "只有通用 SSHZYU_API_KEY（通常属于生图组）；请在 sshzyu-video/.env 配置视频组 Key",
         )
-
-    params = request.get("parameters")
-    if not isinstance(params, dict):
-        params = {}
 
     model = str(params.get("model") or args.model or "").strip()
     if not model:

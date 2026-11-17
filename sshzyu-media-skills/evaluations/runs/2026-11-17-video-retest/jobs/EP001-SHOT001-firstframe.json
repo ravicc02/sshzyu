@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "job_id": "EP001-SHOT001-firstframe",
+  "modality": "image",
+  "adapter": "sshzyu-image",
+  "source": "剧集/EP001/分镜.md",
+  "source_entry": "SHOT-EP001-001",
+  "outputs": ["剧集/EP001/制作成果/images/SHOT-EP001-001.png"],
+  "parameters": {
+    "size": "1024x1536",
+    "model": "gpt-image-2.6-flare",
+    "prompt_language": "zh-CN"
+  },
+  "overwrite": false
+}
