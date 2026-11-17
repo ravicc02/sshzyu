@@ -38,18 +38,14 @@ from media_common import (
 # 图片请求由独立 sshzyu-image 技能通过 sshzyu_image 兼容桥提供；本模块不实现图片 API。
 from sshzyu_image import (
     BASE_URL,
-    DEFAULT_ENV_FILE,
-    ENV_KEY,
-    ImageError,
     clean_key,
-    load_key,
     request_json,
 )
 
 
 # 视频与图片分属不同的平台分组：/v1/videos 只接受 grok/composite/video 组，
 # /v1/images/generations 只接受 openai/grok 组。同一把 Key 无法同时满足两者，
-# 因此视频优先读取独立凭据，仅在缺失时回退到通用 SSHZYU_API_KEY。
+# 因此视频只读取独立凭据；缺失时直接失败并提示换 Key，不回退到生图 Key。
 VIDEO_ENV_KEY = "SSHZYU_VIDEO_API_KEY"
 VIDEO_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
@@ -89,6 +85,8 @@ def load_video_key(env_file):
 
     视频组与生图组平台不同，通用 Key 通常属于 openai 生图组，
     用它调 /v1/videos 会被网关判为不支持并返回 404。
+    因此不回退到通用 SSHZYU_API_KEY：找不到专用 Key 时返回 (None, "", False)，
+    由调用方报错并提示用户换 Key，而不是拿生图 Key 去试。
     """
     env_path = Path(env_file).expanduser() if env_file else VIDEO_ENV_FILE
     from_env_file = _read_env_value(env_path, VIDEO_ENV_KEY)
@@ -97,8 +95,7 @@ def load_video_key(env_file):
     from_process = os.environ.get(VIDEO_ENV_KEY)
     if from_process:
         return clean_key(from_process), f"process environment ({VIDEO_ENV_KEY})", False
-    key, source = load_key(DEFAULT_ENV_FILE)
-    return key, source, True
+    return None, "", False
 
 
 class VideoError(MediaError):
@@ -428,13 +425,16 @@ def create_video_task(job, key, *, request_json_fn=None):
     body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode(
         "utf-8"
     )
-    result = request_json_fn(
-        "/videos",
-        key,
-        payload=body,
-        content_type="application/json; charset=utf-8",
-        timeout=job.timeout,
-    )
+    try:
+        result = request_json_fn(
+            "/videos",
+            key,
+            payload=body,
+            content_type="application/json; charset=utf-8",
+            timeout=job.timeout,
+        )
+    except MediaError as exc:
+        raise _with_platform_hint(exc) from None
     task_id = extract_task_id(result)
     result = dict(result)
     result["id"] = task_id
@@ -522,13 +522,70 @@ def verify_video_available(model, key, *, request_json_fn=None):
         "model": model,
         "visible": visible,
         "model_count": len(ids),
+        "models": sorted(ids),
         "warning": (
             None
             if visible
-            else "模型未出现在本次 /models 响应中；列表可能随分组或上游账号切换，"
-            "继续提交并以 /videos 返回为准。"
+            else "模型未出现在本次 /models 响应中。"
         ),
     }
+
+
+def _with_platform_hint(exc):
+    """把网关的平台/模型拒绝翻译成可操作的换 Key 或换模型提示。"""
+    text = str(exc)
+    lowered = text.lower()
+    if "not supported for this platform" in lowered:
+        return VideoError(
+            text
+            + "\n提示：当前 Key 的分组平台不提供 /v1/videos。"
+            "/v1/videos 只接受 video / composite / grok 分组，生图组（openai）会被直接拒绝。\n"
+            "处理：换用 video 分组的 Key；或换用该分组支持的视频模型。"
+        )
+    if "http 404" in lowered:
+        return VideoError(
+            text
+            + "\n提示：404 常见于 Key 分组平台不匹配，或该模型在当前分组不可用。"
+            "请核对 Key 是否为 video 分组，并确认模型名出现在 /models 列表中。"
+        )
+    return exc
+
+
+VIDEO_KEY_HELP = (
+    "未配置视频专用凭据 SSHZYU_VIDEO_API_KEY；不会回退到通用 SSHZYU_API_KEY。\n"
+    "原因：视频与图片分属不同平台分组——/v1/videos 只接受 video / composite / grok 分组，"
+    "生图组（openai）的 Key 必然被拒并返回 404。\n"
+    "处理：\n"
+    "  1) 到 https://sshzyu.com 申请一个 video 分组的 API Key；\n"
+    "  2) 复制 sshzyu-video/.env.example 为 sshzyu-video/.env，填写 SSHZYU_VIDEO_API_KEY=...；\n"
+    "  3) 或设置同名环境变量 SSHZYU_VIDEO_API_KEY。\n"
+    "已配置仍失败时，请核对 Key 所属分组是否为 video，或换用其它视频模型。"
+)
+
+
+def require_video_key(env_file):
+    """取视频专用 Key；缺失即失败，绝不回退到生图 Key。"""
+    key, source, _generic = load_video_key(env_file)
+    if not key:
+        raise VideoError(VIDEO_KEY_HELP)
+    emit(f"CREDENTIAL: {source}; no automatic retry")
+    return key
+
+
+def require_model_visible(model, key):
+    """模型不在 /models 中即停止提交，避免提交后才 404 或空跑计费。"""
+    visibility = verify_video_available(model, key)
+    if visibility.get("visible"):
+        return visibility
+    available = visibility.get("models") or []
+    raise VideoError(
+        f"模型 {model} 未出现在 /models 响应中，已停止提交，未产生费用。\n"
+        f"当前 Key 可见模型：{', '.join(available) if available else '未获取到'}。\n"
+        "处理：\n"
+        "  - 换用上面列出的视频模型（--model）；\n"
+        "  - 或换用另一个 video 分组的 Key（不同分组的模型可见范围不同）；\n"
+        "  - 确认模型确实可用时，加 --no-verify-model 跳过本检查。"
+    )
 
 
 def _task_directory(out_dir, job):
@@ -595,9 +652,7 @@ def execute_video_job(
     task = None
     try:
         if verify_model:
-            visibility = verify_video_available(job.model, key)
-            if not visibility.get("visible"):
-                emit(f"[{job.id}] MODEL WARNING: {visibility['warning']}", error=True)
+            require_model_visible(job.model, key)
         submit = create_fn(job, key)
         task_id = extract_task_id(submit)
         write_json(directory / "task-submitted.json", submit)
@@ -793,14 +848,7 @@ def main(argv=None):
                 raise VideoError(
                     "真实视频任务会产生费用；完成 preflight 并取得用户确认后加 --confirm。"
                 )
-            key, source, generic = load_video_key(args.env_file)
-            if generic:
-                emit(
-                    "WARNING: 未配置 SSHZYU_VIDEO_API_KEY，回退到通用 SSHZYU_API_KEY。"
-                    "该 Key 通常属于生图分组（openai），/v1/videos 会返回 404。",
-                    error=True,
-                )
-            emit(f"CREDENTIAL: {source}; no automatic retry")
+            key = require_video_key(args.env_file)
             if args.command == "run":
                 result = execute_video_job(
                     job,
@@ -810,7 +858,7 @@ def main(argv=None):
                 )
                 return 0 if result["status"] == "success" else 2 if result["status"] == "partial" else 1
             if not args.no_verify_model:
-                verify_video_available(job.model, key)
+                require_model_visible(job.model, key)
             directory = _task_directory(args.out, job)
             write_json(directory / "request.json", build_video_payload(job))
             submit = create_video_task(job, key)
@@ -829,14 +877,7 @@ def main(argv=None):
             emit(f"TASK: {task_id}")
             emit(f"RECORD: {directory / 'job-result.json'}")
             return 0
-        key, source, generic = load_video_key(args.env_file)
-        if generic:
-            emit(
-                "WARNING: 未配置 SSHZYU_VIDEO_API_KEY，回退到通用 SSHZYU_API_KEY。"
-                "该 Key 通常属于生图分组（openai），/v1/videos 会返回 404。",
-                error=True,
-            )
-        emit(f"CREDENTIAL: {source}; no automatic retry")
+        key = require_video_key(args.env_file)
         if args.command == "get":
             result = get_video_task(args.task_id, key)
             emit(json.dumps(result, ensure_ascii=False, indent=2))

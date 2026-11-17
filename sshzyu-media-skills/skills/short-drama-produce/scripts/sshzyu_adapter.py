@@ -237,18 +237,16 @@ def main(argv=None):
         )
 
     try:
-        key, _source, generic = module.load_video_key(None)
+        key, _source, _generic = module.load_video_key(None)
     except Exception:
+        key = None
+    if not key:
         return _emit_error(
             "configuration",
             "video_credential_missing",
-            "请复制 sshzyu-video/.env.example 为 .env 并填写 SSHZYU_VIDEO_API_KEY",
-        )
-    if generic:
-        return _emit_error(
-            "configuration",
-            "video_credential_missing",
-            "只有通用 SSHZYU_API_KEY（通常属于生图组）；请在 sshzyu-video/.env 配置视频组 Key",
+            "未配置 SSHZYU_VIDEO_API_KEY；视频只接受 video 分组 Key，不回退生图 Key。"
+            "请复制 sshzyu-video/.env.example 为 sshzyu-video/.env 并填写，"
+            "Key 到 https://sshzyu.com 申请 video 分组。",
         )
 
     model = str(params.get("model") or args.model or "").strip()

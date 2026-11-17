@@ -32,5 +32,6 @@ sshzyu-media-skills/           # 套件仓库根
 - 发布包由 `tools/package-suite.py` 生成，顶层为 `skills/<名称>/` 与套件说明文件。
 - 安装后每个 Skill 位于 `<安装根>/<名称>/SKILL.md`；同名冲突必须由用户决定，不得静默覆盖。
 - **同根约束**：`sshzyu-video` 在导入阶段要求同根存在 `sshzyu-image`；`sshzyu-media` 的兼容命令还要求 `sshzyu-video`。三者必须整体安装，`short-drama-*` 可独立安装。
-- 凭据按能力分离：图片读 `SSHZYU_API_KEY`（`sshzyu-image/.env`、进程环境变量或系统凭据库）；视频读 `SSHZYU_VIDEO_API_KEY`（`sshzyu-video/.env` 或进程环境变量），缺失时回退通用 Key 并打印警告。两者平台分组不同，同一把 Key 无法同时满足图片与视频。
+- 凭据按能力分离：图片读 `SSHZYU_API_KEY`（`sshzyu-image/.env`、进程环境变量或系统凭据库）；视频只读 `SSHZYU_VIDEO_API_KEY`（`sshzyu-video/.env` 或进程环境变量），缺失时直接失败并提示换 Key，**不回退**到通用 Key。两者平台分组不同，同一把 Key 无法同时满足图片与视频。
+- 视频模型不做静默降级：模型不在当前 Key 的 `/models` 列表中时，提交前停止并列出可用模型，提示换模型或换 Key；网关返回平台不匹配时明确指向 Key 分组问题。
 - 生产调用需要用户本次明确确认；打包与静态检查不得触发付费接口。

@@ -12,11 +12,14 @@ description: "通过 SSHZYU 提交异步视频任务，查询、等待和下载�
 
 ## 凭据
 
-视频与图片属于**不同的平台分组**：`/v1/videos` 只接受 `grok`、`composite`、`video` 组，`/v1/images/generations` 只接受 `openai`、`grok` 组。同一把 Key 无法同时满足两者，因此本技能读取**视频专用**凭据，按顺序：
+视频与图片属于**不同的平台分组**：`/v1/videos` 只接受 `grok`、`composite`、`video` 组，`/v1/images/generations` 只接受 `openai`、`grok` 组。同一把 Key 无法同时满足两者，因此本技能只读取**视频专用**凭据，按顺序：
 
 1. 本技能目录 `.env` 中的 `SSHZYU_VIDEO_API_KEY`
 2. 进程环境变量 `SSHZYU_VIDEO_API_KEY`
-3. 回退到 `sshzyu-image` 的通用 `SSHZYU_API_KEY`，并打印平台不匹配警告。这只用于兼容旧配置，**不是正常使用路径**：新用户请按下述方式配置视频组 Key。
+
+**两者都没有时直接报错并给出换 Key 指引，不会回退到 `sshzyu-image` 的 `SSHZYU_API_KEY`。** 生图组的 Key 调 `/v1/videos` 必然返回 404，回退只会把「Key 用错了」延后成一条难以定位的报错。
+
+模型同样不静默降级：`--model` 指定的模型不在当前 Key 的 `/models` 列表中时，提交前就停止并列出该 Key 可见的视频模型，提示换模型或换 Key；确认模型确实可用时可加 `--no-verify-model` 跳过该检查。若网关仍返回 `404 not supported for this platform`，CLI 会明确提示这是 Key 分组平台不匹配，而不是模型名写错。
 
 Key 到 [sshzyu.com](https://sshzyu.com) 申请，选择 platform 为 `grok`、`composite` 或 `video` 的分组。把 Key 写入本目录 `.env`（先从 `.env.example` 复制，`.env` 不入版本库）：
 
