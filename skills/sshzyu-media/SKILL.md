@@ -5,7 +5,9 @@ description: "通过 sshzyu.com 完成 AI 生图、图片编辑、异步视频�
 
 # SSHZYU 通用媒体
 
-使用 `scripts/sshzyu_media.py` 统一处理图片、视频和短剧。脚本只依赖 Python 标准库；成片拼接可选依赖 `ffmpeg` 和 `ffprobe`。
+使用 `scripts/sshzyu_media.py` 统一处理视频和短剧；图片能力由独立技能 `$sshzyu-co-image` 提供，兼容入口会转发到该技能。脚本只依赖 Python 标准库；成片拼接可选依赖 `ffmpeg` 和 `ffprobe`。
+
+内置短剧套件位于 `drama/`，入口为 `drama/SKILL.md`，原有 `$short-drama-*` 调用名称、Markdown 项目事实源和 Dashboard 目录结构保持不变。
 
 ## 🔴 CHECKPOINT · 强制 Preflight
 
@@ -83,16 +85,16 @@ py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" models --kind video
 
 ## 图片
 
-单提示词多图：
+图片能力已拆分到独立技能 `$sshzyu-co-image`。短剧和视频流程需要生图时，统一使用该技能的 CLI：
 
 ```powershell
-py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" image `
+py -3.12 -I -X utf8 "${SSHZYU_IMAGE_SKILL}/scripts/sshzyu_image.py" `
   "一只戴墨镜的橘猫，暖色调，无文字" `
   --model gpt-image-2.6-sunburst --size 1024x1024 --quality high `
   --n 2 --out "TASK_OUTPUT_DIR" --dry-run
 ```
 
-确认后加入 `--confirm`。多 prompt、编辑、mask、markup 和 JSON manifest 的完整参数见：
+`sshzyu-media/scripts/sshzyu_media.py image ...` 仅作为旧调用兼容入口，实际实现由 `$sshzyu-co-image` 提供。确认后加入 `--confirm`。多 prompt、编辑、mask、markup 和 JSON manifest 的完整参数见：
 
 - [图片 API](references/image/api_reference.md)
 - [图片参数矩阵](references/image/parameter-matrix.md)
@@ -230,7 +232,7 @@ py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" drama assemble `
 
 ## 凭据与网络边界
 
-- Key 唯一推荐位置：技能目录 `.env` 中的 `SSHZYU_API_KEY=...`。
+- Key 唯一推荐位置：`sshzyu-co-image` 技能目录 `.env` 中的 `SSHZYU_API_KEY=...`；视频与短剧沿用各自的运行配置，但图片 Key 不写入视频技能目录。
 - 读取顺序：`.env`、进程环境变量、旧 Windows 凭据、旧 `key.txt`。
 - 不使用命令行明文 Key，不打印 Key、Authorization 或签名下载 URL。
 - 请求只发往 `https://sshzyu.com/v1`。
