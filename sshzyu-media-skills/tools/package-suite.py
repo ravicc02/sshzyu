@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Package the SSHZYU media skill suite into one installable archive.
 
-The suite root is ``skills/``; installable skills live in ``skills/skills/``.
-The archive keeps that layer, so the top level is ``skills/<name>/`` plus the
-suite-level README, VERSION, LICENSE and documentation.
+The suite root is ``sshzyu-media-skills/``; installable skills live in
+``sshzyu-media-skills/skills/``. The archive keeps the ``skills/`` layer, so the
+top level is ``skills/<name>/`` plus the suite-level README, VERSION, LICENSE
+and documentation.
 """
 
 import argparse

@@ -129,7 +129,17 @@ def load_project_tool(root: Path) -> ModuleType:
     """Dynamically load the suite's canonical project status implementation."""
     root = root.resolve()
     installed_script = root / "scripts/project_tool.py"
-    repository_script = root / "skills/skills/short-drama/scripts/project_tool.py"
+    repository_script = next(
+        (
+            candidate
+            for candidate in (
+                root / "sshzyu-media-skills/skills/short-drama/scripts/project_tool.py",
+                root / "skills/short-drama/scripts/project_tool.py",
+            )
+            if candidate.is_file()
+        ),
+        root / "sshzyu-media-skills/skills/short-drama/scripts/project_tool.py",
+    )
     script = installed_script if installed_script.is_file() else repository_script
     spec = importlib.util.spec_from_file_location("dashboard_project_tool", script)
     if spec is None or spec.loader is None:

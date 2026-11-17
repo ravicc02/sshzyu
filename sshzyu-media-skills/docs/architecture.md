@@ -1,7 +1,7 @@
 # 套件架构
 
 ```text
-skills/                         # 套件根
+sshzyu-media-skills/           # 套件仓库根
 ├── skills/                     # 独立 Skill（安装入口）
 │   ├── sshzyu-media/           # 统一入口：初始化、约束、状态、路由
 │   ├── sshzyu-image/           # 图片能力（唯一权威实现）
@@ -23,10 +23,10 @@ skills/                         # 套件根
 
 ## 事实源
 
-- 图片 API、模型与参数：`skills/skills/sshzyu-image/references/`。
-- 视频 API、模型与参数：`skills/skills/sshzyu-video/references/`。
+- 图片 API、模型与参数：`sshzyu-media-skills/skills/sshzyu-image/references/`。
+- 视频 API、模型与参数：`sshzyu-media-skills/skills/sshzyu-video/references/`。
 - 短剧阶段规则：各 `short-drama*` Skill 自身。
-- 跨能力入口规则与状态约定：`skills/skills/sshzyu-media/`。
+- 跨能力入口规则与状态约定：`sshzyu-media-skills/skills/sshzyu-media/`。
 
 ## 分发
 
