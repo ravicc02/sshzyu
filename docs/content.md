@@ -267,32 +267,13 @@ curl https://sshzyu.com/v1/chat/completions \
 
 ### 安装 SSHZYU 媒体 Skill
 
-把下面这段提示词完整发给 Agent。Agent 会安装预构建 Skill、执行安装检查并报告结果；你不需要手工下载、编写脚本或提供 API Key。
+本地源码位于仓库套件根 `skills/`，各技能在 `skills/skills/<名称>/SKILL.md` 并列存放；公开发行包计划使用 [sshzyu-media.zip](/docs/install/sshzyu-media.zip)。**该链接只有在独立文档发布后才会对应本次新包；本地生成不等于线上已更新。** ZIP 顶层为 `skills/<名称>/` 并列技能目录，并包含套件级 `README.md`、`VERSION`、`LICENSE` 等说明文件。
 
-```text
-请安装 SSHZYU 媒体 Skill。
+独立入口为 `sshzyu-media`、`sshzyu-image`、`sshzyu-video`，以及 `short-drama`、`short-drama-assets`、`short-drama-breakdown`、`short-drama-develop`、`short-drama-edit`、`short-drama-image-prompts`、`short-drama-novel-analyze`、`short-drama-produce`、`short-drama-review`、`short-drama-storyboard`、`short-drama-video-prompts`、`short-drama-write`。总入口负责跨媒体路由，短剧入口负责短剧项目和 Dashboard；可以直接调用专业技能。原 `sshzyu-drama` 包装入口已取消。视频 CLI 独立运行需与 `sshzyu-image` 并列安装；使用旧版媒体统一 CLI 时，再并列安装 `sshzyu-media`。
 
-下载：
-https://sshzyu.com/docs/install/sshzyu-media.zip
+**安装方式不能混用推断**：手动安装须先校验 ZIP，检查目标目录是否已有同名 Skill；如有任何冲突，停止并由用户选择保留原版还是改用本套件，不得静默覆盖。确认无冲突后把 ZIP 的每个顶层目录放在同一安装根，验收 `<安装根>/<名称>/SKILL.md`。NewMax 请使用应用内正式 Skill 安装器安装该 ZIP，并以安装器报告的全部入口为准，不要手动复制到兼容目录冒充正式安装。`npx skills` 对此多目录 ZIP 的支持尚未实测，不能宣称一键可用；若使用该渠道需按其实际支持的仓库安装方式分别验收。上述安装验收和生产调用都不需要输出真实 API Key。
 
-安装后：
-1. 解压后应得到 sshzyu-media/ 目录。
-2. 将整个 sshzyu-media/ 目录安装到当前 Agent 的全局 Skill 目录。Codex 默认使用 ~/.codex/skills/sshzyu-media。
-3. 使用 Python 3 运行安装目录下的 scripts/sshzyu_media.py doctor。
-4. 确认 SKILL.md、scripts/sshzyu_media.py、图片/视频/短剧模块和 references/ 均已安装。
-5. 报告安装目录和 doctor 结果。
-
-约束：
-- 不要生成图片或视频。
-- 不要读取、输出或保存真实 API Key。
-- 不要修改 Skill 文件。
-- 不要使用 npx，也不要访问 GitHub。
-- 安装失败时停止并报告完整错误，不要自行改写脚本。
-```
-
-> 安装 Skill 不需要 API Key。需要生图、生视频或短剧制作时，再按 Skill 的提示在本地录入密钥。
->
-> 生图和视频请求只依赖 Python 标准库；短剧成片拼接还需要本机可执行的 `ffmpeg` 与 `ffprobe`。可运行 `scripts/sshzyu_media.py doctor` 检查。
+本地离线打包检查：`python skills/tools/package-suite.py --check`。安装后可用 Python 3.9+ 调用 `sshzyu-media/scripts/sshzyu_media.py doctor`（纯本地检查，不联网）。短剧剪辑另需 `ffmpeg` 和 `ffprobe`。`short-drama-produce` 的 SSHZYU adapter **尚未接通**，不可把任务单预览或 CLI `--confirm` 当成已能自动投产；任何付费请求仍需本次明确授权。
 
 ## 九、查看 Token 和扣费
 

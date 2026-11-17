@@ -92,6 +92,8 @@ jobs:
           persist-credentials: false
       - name: Test and verify sshzyu-media skill package
         run: |
-          python3 -m unittest discover -s scripts/tests -p 'test_sshzyu_media_skill.py' -v
-          python3 -m unittest discover -s skills/sshzyu-media/tests -v
-          python3 scripts/package-sshzyu-media-skill.py --check
+          python3 -m unittest discover -s skills/tests -p 'test_media_skill.py' -v
+          python3 -m unittest discover -s skills/skills/sshzyu-media/tests -v
+          python3 -m unittest discover -s skills/skills/sshzyu-image -p 'test_*.py' -v
+          python3 -m unittest discover -s skills/skills/sshzyu-video -p 'test_*.py' -v
+          python3 skills/tools/package-suite.py --check

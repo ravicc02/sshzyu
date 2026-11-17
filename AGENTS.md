@@ -39,7 +39,7 @@
 | `docs/`                   | **线上文档站**（前端 nginx 挂到 `/docs/`）                                     | 对外公开                     |
 | `image-playground/`       | 生图工作台源码（React + TS + Vite，`npm run build` 产出 `dist`）                | 生图工作台源码（唯一源）              |
 | `playground/`             | 生图工作台构建产物（由 `image-playground/` 生成，nginx 挂到 `/image/`）            | 生图工作台产物，nginx 直读         |
-| `skills/sshzyu-image/`    | 对外发布的 SSHZYU 生图 Skill 源码（不含真实 `.env`）                             | `npx skills` 安装源               |
+| `skills/`                 | SSHZYU 媒体技能套件根；可安装技能并列在 `skills/skills/<名称>/`（不含真实 `.env`） | 套件打包与安装源 |
 | `scripts/`                | `rebuild.sh` + 构建/校验脚本                                              | 本地重建                     |
 | `scripts/release/`        | 发布准入、migration 审阅记录                                                 | GitHub 发布辅助              |
 | `backend/pkg/release/`    | 共享发布契约、版本比较和验签                                                      | 后端/执行器共用                 |
