@@ -31,4 +31,6 @@ sshzyu-media-skills/           # 套件仓库根
 
 - 发布包由 `tools/package-suite.py` 生成，顶层为 `skills/<名称>/` 与套件说明文件。
 - 安装后每个 Skill 位于 `<安装根>/<名称>/SKILL.md`；同名冲突必须由用户决定，不得静默覆盖。
+- **同根约束**：`sshzyu-video` 在导入阶段要求同根存在 `sshzyu-image`；`sshzyu-media` 的兼容命令还要求 `sshzyu-video`。三者必须整体安装，`short-drama-*` 可独立安装。
+- 凭据单一来源：`SSHZYU_API_KEY` 只从 `sshzyu-image/.env`、进程环境变量或系统凭据库读取，其它技能不保存副本。
 - 生产调用需要用户本次明确确认；打包与静态检查不得触发付费接口。

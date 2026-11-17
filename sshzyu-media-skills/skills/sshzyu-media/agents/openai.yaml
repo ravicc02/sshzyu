@@ -1,4 +1,4 @@
 interface:
-  display_name: "短剧创作"
-  short_description: "创建或继续本地短剧项目，衔接各创作环节，打开短剧创作台并导出成果"
-  default_prompt: "使用 $short-drama 创建或继续我的本地短剧项目，查看当前进度或打开短剧创作台。"
+  display_name: "SSHZYU 媒体统筹"
+  short_description: "创建或继续本地短剧项目，衔接各创作环节，打开创作台、导出成果，并把图片/视频任务分发到专业技能"
+  default_prompt: "使用 $sshzyu-media 创建或继续我的本地短剧项目，查看当前进度或打开短剧创作台；图片和视频任务请分发到对应专业技能。"

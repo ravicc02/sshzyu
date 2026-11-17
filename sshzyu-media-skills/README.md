@@ -50,6 +50,7 @@ python sshzyu-media-skills/tools/package-suite.py --check  # 校验现有 ZIP �
 - NewMax 使用应用内正式 Skill 安装器安装套件源目录或发布 ZIP，以安装器报告的全部入口为准。
 - 安装前检查目标安装根是否已有同名 Skill；出现冲突时停止，由用户选择保留原版或替换，不得静默覆盖。
 - 安装后预期每个 Skill 分别位于 `<安装根>/<名称>/SKILL.md`。
+- **必须整体同根安装**：`sshzyu-video` 在导入阶段就要求同一安装根下存在 `sshzyu-image`（复用其凭据与请求实现），缺失时会直接退出；`sshzyu-media` 的兼容命令还要求 `sshzyu-video`。只安装其中一部分会导致该技能不可用。`short-drama-*` 阶段技能可独立安装。
 - 不提供 API Key 也可先做离线检查（在仓库根执行）：`python sshzyu-media-skills/skills/sshzyu-media/scripts/sshzyu_media.py doctor`。
 
 ## 版本

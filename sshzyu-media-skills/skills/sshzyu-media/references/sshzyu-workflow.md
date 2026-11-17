@@ -2,9 +2,7 @@
 
 适用：AI 视频、AI 漫剧、AI 真人感短剧，以及 AI 与实拍混合的微短剧。
 
-完整调研见仓库文件：
-
-`plan_docs/2026-11-15/ai-video-comic-drama-production-workflow.md`
+本文件描述**旧版镜头清单（manifest）流程**，对应 `scripts/sshzyu_media.py drama run|assemble`。它不是短剧阶段化创作流程（后者见 `$short-drama-*`），也不是 `short-drama-produce` 的生产任务单 adapter。新项目请优先使用阶段技能与生产任务单。
 
 ## 总体流程
 

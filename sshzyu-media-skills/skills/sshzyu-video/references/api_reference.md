@@ -150,20 +150,22 @@ Authorization: Bearer <API Key>
 先查询原任务：
 
 ```powershell
-py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" video wait "TASK_ID"
+py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_video.py" wait "TASK_ID"
 ```
 
 只有用户明确授权新任务后，才能重新创建。
 
 ## 常用命令
 
+`SKILL_DIR` 指本技能目录（`sshzyu-video/`）。`sshzyu-media` 的 `sshzyu_media.py video ...` 是等价的旧版统一入口，需要并列安装 `sshzyu-media` 才可用。
+
 ```powershell
 # 只查询
-py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" video get "TASK_ID"
+py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_video.py" get "TASK_ID"
 
 # 等待并下载
-py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" video wait "TASK_ID" --download
+py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_video.py" wait "TASK_ID" --download
 
 # 直接下载已完成任务
-py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_media.py" video download "TASK_ID" --out "OUTPUT.mp4"
+py -3.12 -I -X utf8 "${SKILL_DIR}/scripts/sshzyu_video.py" download "TASK_ID" --out "OUTPUT.mp4"
 ```

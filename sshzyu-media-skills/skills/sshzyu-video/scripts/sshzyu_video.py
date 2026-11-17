@@ -695,7 +695,7 @@ def _job_from_args(args):
 
 def parser():
     p = argparse.ArgumentParser(
-        prog="sshzyu_media.py video",
+        prog="sshzyu_video.py",
         description="SSHZYU 异步视频任务：创建、查询、等待和下载。",
     )
     sub = p.add_subparsers(dest="command", required=True)

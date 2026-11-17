@@ -125,7 +125,9 @@ python3 {技能目录}/scripts/project_tool.py verify <project> --episode EP001
 
 ## 兼容入口
 
-`scripts/sshzyu_media.py` 保留旧版 `image`、`video`、`drama`、`doctor`、`models` 命令；其运行需要并列安装 `sshzyu-image` 与 `sshzyu-video`，并非本技能目录下的子技能。旧 `drama run` 是镜头 manifest 兼容命令，**不是**短剧生产任务单适配器。
+`scripts/sshzyu_media.py` 保留旧版 `image`、`video`、`drama`、`doctor`、`models` 命令；其运行需要并列安装 `sshzyu-image` 与 `sshzyu-video`，并非本技能目录下的子技能。旧 `drama run` 是镜头 manifest 兼容命令，**不是**短剧生产任务单适配器（清单流程见 [AI 漫剧与短剧工作流](references/sshzyu-workflow.md)）。
+
+凭据统一由 `sshzyu-image` 读取：本技能目录的 `.env` **不会**被使用，请把 `SSHZYU_API_KEY` 配置在并列的 `sshzyu-image/.env`、进程环境变量或系统凭据库。
 
 ```bash
 python3 -I {技能目录}/scripts/sshzyu_media.py doctor
@@ -135,11 +137,12 @@ python3 -I {技能目录}/scripts/sshzyu_media.py doctor
 
 ## 按问题查阅参考文档
 
-- 阶段问题路由与四级规则说明：规则与路由索引
-- 五份文档格式、文档归属与输出语言：五份创作文档
-- 六种制作形态差异与视觉风格定调（Look Development）试片：制作形态
-- 参考图十种用途（含原生多模态 `主体` 参考）与控制边界：参考图用途
-- 按悬念类型交代遮挡与揭晓动作：信息揭晓时机
-- 母版、局部补拍与替代版的返工归属：母版、补拍与替代版
+- 阶段问题路由与四级规则说明：[规则与路由索引](references/knowhow-index.md)
+- 五份文档格式、文档归属与输出语言：[五份创作文档](references/creator-documents.md)
+- 六种制作形态差异与视觉风格定调（Look Development）试片：[制作形态](references/production-form-profiles.md)
+- 参考图十种用途（含原生多模态 `主体` 参考）与控制边界：[参考图用途](references/reference-roles.md)
+- 按悬念类型交代遮挡与揭晓动作：[信息揭晓时机](references/audience-reveal.md)
+- 母版、局部补拍与替代版的返工归属：[母版、补拍与替代版](references/pickup-and-alternate.md)
+- 旧版镜头清单与成片装配（兼容用）：[AI 漫剧与短剧工作流](references/sshzyu-workflow.md)
 
 &nbsp;

@@ -17,6 +17,10 @@
 | 独立审稿、节奏核对与出片问题归因 | `$short-drama-review` |
 | 项目初始化与全局配置、制作形态选型、创作台与交付打包 | `$sshzyu-media` |
 
+## 旧版镜头清单流程
+
+`scripts/sshzyu_media.py drama run|assemble` 使用的 manifest 流程、镜头字段、批量执行与成片装配规则见 [AI 漫剧与短剧工作流](sshzyu-workflow.md)。该流程只用于历史任务兼容，新项目走阶段技能 + 生产任务单。
+
 ## 规则分级与优先级
 
 - **四级规则**：`structural_invariant`（编号、跨文件引用、时长算术等确定性结构，由脚本核对）、`reviewed_invariant`（需结合剧情上下文核实的内容底线，归 `$short-drama-review`）、`craft_default`（成熟创作经验，说明用意即可突破）、`taste_option`（审美与风格取向，不作打回理由）。各环节细则见对应技能的 `references/stage-contract.md`。
