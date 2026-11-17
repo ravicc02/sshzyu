@@ -2,7 +2,7 @@
 
 > 本文件仅保留历史 adapter 的合同与离线测试说明。它们不属于 SSHZYU 新生产路由，不得用于新任务。
 >
-> 新任务的图片必须通过 `$sshzyu-image` 调用 `https://sshzyu.com/v1/images/*`；视频必须通过 `sshzyu-media video` 调用 `https://sshzyu.com/v1/videos`。完整路由见上级 [媒体路由契约](../../../../ROUTING.md)。
+> 新任务的图片必须通过 `本包 `image/` 子技能` 调用 `https://sshzyu.com/v1/images/*`；视频必须通过 `sshzyu-media video` 调用 `https://sshzyu.com/v1/videos`。完整路由见上级 [媒体路由契约](../../../../ROUTING.md)。
 
 内置脚本 `scripts/provider_adapters.py` 仅用于兼容旧任务和合同测试；通用输入输出与参考素材体积限制见 [生成接口协议规范](adapter-contract.md)。
 

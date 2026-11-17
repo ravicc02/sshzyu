@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility bridge to the independent sshzyu-image skill."""
+"""Compatibility bridge to the bundled sshzyu-image child skill."""
 
 from __future__ import annotations
 
@@ -11,7 +11,9 @@ import sys
 
 def _candidate_roots():
     here = Path(__file__).resolve()
-    yield here.parents[2] / "sshzyu-image"
+    # First resolve the child skill shipped inside this single bundle.
+    yield here.parents[1] / "image"
+    # Keep an optional external fallback for older installations.
     yield Path.home() / ".newmax" / "skills" / "sshzyu-image"
     custom = os.environ.get("NEWMAX_SKILLS_DIR")
     if custom:
@@ -33,8 +35,8 @@ def _load_image_module():
         spec.loader.exec_module(module)
         return module
     raise ImportError(
-        "未找到独立生图技能 sshzyu-image，请先安装 "
-        "skills/sshzyu-image。"
+        "未找到随 sshzyu-media 分发的 image 子技能，也未找到旧版外置 "
+        "sshzyu-image 安装。请检查技能包是否完整。"
     )
 
 

@@ -5,7 +5,7 @@ description: "SSHZYU 短剧与漫剧创作工作流：从原著分析、分集�
 
 # SSHZYU 短剧创作工作流
 
-这是 `sshzyu-media` 内置的短剧技能套件。原有阶段技能保留在 `skills/` 下，调用名称和项目文档格式保持不变：
+这是 `sshzyu-media` 内置的短剧技能套件。原有阶段技能保留在 `drama/skills/` 下，调用名称和项目文档格式保持不变：
 
 - `$short-drama`：项目初始化、阶段路由与 Dashboard
 - `$short-drama-novel-analyze`：原著抽样与改编评估
@@ -27,7 +27,7 @@ description: "SSHZYU 短剧与漫剧创作工作流：从原著分析、分集�
 ```text
 $short-drama-image-prompts / $short-drama-storyboard
   → 图片需求
-  → $sshzyu-image
+  → 本包 `image/` 子技能
   → https://sshzyu.com/v1/images/*
 
 $short-drama-video-prompts
@@ -36,10 +36,10 @@ $short-drama-video-prompts
   → https://sshzyu.com/v1/videos
 ```
 
-图片生成统一由独立技能 `$sshzyu-image` 负责，入口为：
+图片生成统一由本包内置的 `image/` 子技能负责，入口为：
 
 ```text
-${SSHZYU_SKILLS_ROOT}/sshzyu-image/scripts/sshzyu_image.py
+${SKILL_DIR}/image/scripts/sshzyu_image.py
 ```
 
 短剧技能只产生提示词、参考图绑定和任务单；不得在短剧或视频技能中复制图片 API、模型能力、Key 读取或图片校验逻辑。短剧生产中的旧供应商直连 adapter 不是 SSHZYU 路由，不能用于新任务。
