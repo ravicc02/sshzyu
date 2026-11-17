@@ -1,17 +1,17 @@
 [
   {
-    "id": 1,
-    "prompt": "用 sshzyu-media 生成一张 1:1 的咖啡海报：gpt-image-2.6-sunburst、1024x1024、high、PNG、1 张。先给我完整计划和 dry-run 命令，不要真实生成。",
-    "expected": "路由到 image，输出准确的 dry-run 命令、明确不读取 Key 或联网，并说明真实执行仍需 --confirm。"
+    "id": "media-image-route",
+    "prompt": "我想生成一张无文字的暖色橘猫图片，请先告诉我应该走哪个技能、还缺哪些参数，并给出不会联网和不会扣费的 dry-run 命令。不要真实提交。",
+    "expected": "路由到 sshzyu-co-image；明确询问用途、模型、尺寸、质量、数量和输出目录等参数；给出 dry-run，不读取 Key、不联网、不扣费。"
   },
   {
-    "id": 2,
-    "prompt": "我想做一条 9:16 的 AI 猫视频，越快越好，你直接开始生成。",
-    "expected": "停止未确认的视频提交，指出缺少模型、秒数、分辨率和费用确认，并给出需要补齐的最小参数清单。"
+    "id": "media-video-route",
+    "prompt": "我想做一个 4 秒、9:16、480p 的人物缓慢转身视频，使用 SSHZYU 服务。请先完成 preflight，说明缺失参数和费用确认要求，并给出 dry-run 命令，不要真实提交。",
+    "expected": "路由到 sshzyu-media video；明确模型、动作、参考素材、任务数量和费用确认；缺参时停止，不自行补默认值；只给 dry-run。"
   },
   {
-    "id": 3,
-    "prompt": "我有一份 12 个镜头的 AI 短剧 manifest，前 5 个镜头已经成功生成，现在要续跑剩余镜头并最终拼接成片。给出完整命令，避免重复创建已完成任务。",
-    "expected": "路由到 drama，先 dry-run，再使用 --resume-run 和 --confirm；说明默认顺序执行、不会重试或重建成功镜头，全部完成后用 drama assemble，并检查 FFmpeg/FFprobe。"
+    "id": "drama-closed-loop",
+    "prompt": "我要做一个两镜头竖屏短剧：先生成角色参考图和首帧，再生成两个镜头视频，最后拼成 1080x1920、25fps 成片。请按源 drama skills 的完整流程说明阶段、文件产物、图片和视频分别走哪个技能，并给出只预览不提交的执行计划。",
+    "expected": "进入 drama 完整工作流；图片需求统一路由 sshzyu-co-image，镜头视频走 sshzyu-media video，最后由 short-drama-edit/ffmpeg 拼接；列出剧本、视觉设定、分镜、图片提示词、视频提示词、剪辑单等产物，并停在 dry-run/确认前。"
   }
 ]
