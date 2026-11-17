@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
@@ -48,6 +49,11 @@ from sshzyu_image import (
 # 因此视频只读取独立凭据；缺失时直接失败并提示换 Key，不回退到生图 Key。
 VIDEO_ENV_KEY = "SSHZYU_VIDEO_API_KEY"
 VIDEO_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+# 机器可读的模型能力表：提交前用它校验分辨率档位与参考素材支持，
+# 避免把不支持的参数发到上游、等到 400 或空跑计费后才发现。
+CAPABILITIES_FILE = (
+    Path(__file__).resolve().parents[1] / "references" / "video_model_capabilities.json"
+)
 
 MAX_PROMPT = 32000
 MAX_SECONDS = 60
@@ -148,6 +154,63 @@ def _normalize_url_list(values, field_name):
     ]
 
 
+MAX_INLINE_IMAGE_BYTES = 8 * 1024 * 1024
+INLINE_IMAGE_MIME = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
+
+
+def inline_image_from_file(path):
+    """把本地图片转成 data URI。
+
+    上游的参考图字段接受 URL 或 Base64（New API 的 VideoRequest.Image 就是
+    "Image input (URL/Base64)"）。之前只允许公网 HTTPS，是本地实现的限制，
+    不是上游要求。这里补上本地文件路径，代价是请求体变大。
+    """
+    target = Path(path).expanduser().resolve()
+    if not target.is_file():
+        raise VideoError(f"参考图片不存在: {target}")
+    mime = INLINE_IMAGE_MIME.get(target.suffix.lower())
+    if mime is None:
+        raise VideoError(
+            f"不支持的参考图片格式 {target.suffix}；请使用 PNG、JPEG 或 WebP。"
+        )
+    raw = target.read_bytes()
+    if not raw:
+        raise VideoError(f"参考图片为空: {target}")
+    if len(raw) > MAX_INLINE_IMAGE_BYTES:
+        raise VideoError(
+            f"参考图片 {len(raw) / 1024 / 1024:.1f}MB 超过 {MAX_INLINE_IMAGE_BYTES // 1024 // 1024}MB 上限；"
+            "请先压缩或改用公网 HTTPS 直链。"
+        )
+    return f"data:{mime};base64," + base64.b64encode(raw).decode("ascii")
+
+
+def _is_inline_image(value):
+    return value.startswith("data:image/") and ";base64," in value[:64]
+
+
+def _normalize_video_url_list(values, field_name):
+    """视频参考素材：允许公网 HTTPS，也允许本地图片转成的 data URI。"""
+    if values is None:
+        return []
+    if isinstance(values, str):
+        values = [values]
+    if not isinstance(values, list):
+        raise VideoError(f"{field_name} 必须是字符串数组。")
+    normalized = []
+    for value in values:
+        text = str(value or "").strip()
+        if _is_inline_image(text):
+            normalized.append(text)
+            continue
+        normalized.append(validate_reference_url(text, field_name))
+    return normalized
+
+
 def validate_references(references):
     if references is None:
         return []
@@ -199,7 +262,7 @@ def validate_video_job(job):
     try:
         job.resolution = validate_resolution(job.resolution)
         job.aspect_ratio = validate_aspect_ratio(job.aspect_ratio)
-        job.image_urls = _normalize_url_list(job.image_urls, "image_urls")
+        job.image_urls = _normalize_video_url_list(job.image_urls, "image_urls")
         job.video_urls = _normalize_url_list(job.video_urls, "video_urls")
         job.audio_urls = _normalize_url_list(job.audio_urls, "audio_urls")
         job.references = validate_references(job.references)
@@ -222,6 +285,172 @@ def validate_video_job(job):
             f"{job.id}: poll_timeout 必须大于 0 且不超过 {MAX_POLL_SECONDS} 秒。"
         )
     return job
+
+
+_CAPABILITIES_CACHE = None
+
+
+def load_capabilities(path=None):
+    """读取模型能力表。文件缺失或损坏时返回空表，不阻断运行。"""
+    global _CAPABILITIES_CACHE
+    target = Path(path).expanduser() if path else CAPABILITIES_FILE
+    cache_key = str(target)
+    if _CAPABILITIES_CACHE and _CAPABILITIES_CACHE.get("_path") == cache_key:
+        return _CAPABILITIES_CACHE
+    try:
+        data = json.loads(target.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError, UnicodeError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    models = data.get("models")
+    if not isinstance(models, dict):
+        models = {}
+    data["models"] = models
+    data["_path"] = cache_key
+    _CAPABILITIES_CACHE = data
+    return data
+
+
+def model_capability(model, capabilities=None):
+    caps = capabilities if capabilities is not None else load_capabilities()
+    entry = caps.get("models", {}).get(str(model or "").strip())
+    return entry if isinstance(entry, dict) else None
+
+
+def _reference_counts(job):
+    counts = {"image": len(job.image_urls), "video": len(job.video_urls), "audio": len(job.audio_urls)}
+    for item in job.references:
+        kind = item.get("type")
+        if kind in counts:
+            counts[kind] += 1
+    return counts
+
+
+def check_capabilities(job, capabilities=None):
+    """按能力表做提交前校验。
+
+    返回 {"errors": [...], "warnings": [...], "capability": {...}|None}。
+    errors 阻断提交（参数必然被上游拒绝或不被支持）；warnings 只提示风险。
+    能力表未收录的模型不阻断——上游会新增模型，硬编码名单会让新模型无法使用。
+    """
+    caps = capabilities if capabilities is not None else load_capabilities()
+    capability = model_capability(job.model, caps)
+    errors, warnings = [], []
+    if capability is None:
+        warnings.append(
+            f"模型 {job.model} 未收录在能力表中，分辨率与参考素材不做前置校验；"
+            "参数是否被接受以提交后的上游响应为准。"
+        )
+        return {"errors": errors, "warnings": warnings, "capability": None}
+
+    resolutions = capability.get("resolutions")
+    verified = set(capability.get("resolutions_verified") or [])
+    if isinstance(resolutions, list):
+        allowed = [str(item).lower() for item in resolutions]
+        if not allowed:
+            if job.resolution:
+                warnings.append(
+                    f"{job.model} 由服务端决定输出规格，建议省略 resolution；"
+                    f"当前请求 {job.resolution} 可能被忽略。"
+                )
+        elif job.resolution:
+            if job.resolution not in allowed:
+                errors.append(
+                    f"{job.model} 不支持 resolution={job.resolution}；"
+                    f"可用档位：{', '.join(allowed)}。"
+                    "该请求会被上游以「不支持所选分辨率」拒绝。"
+                )
+            elif job.resolution not in verified:
+                warnings.append(
+                    f"{job.model} 的 {job.resolution} 档位尚未实测，"
+                    "首次提交后请核对实际输出尺寸。"
+                )
+        elif job.resolution is None:
+            warnings.append(
+                f"{job.model} 需要显式指定 resolution；"
+                f"可用档位：{', '.join(allowed)}。未指定时由服务端决定，可能与预期不符。"
+            )
+
+    counts = _reference_counts(job)
+    reference = capability.get("reference") or {}
+    labels = {"image": "图片", "video": "视频", "audio": "音频"}
+    for kind, label in labels.items():
+        if counts.get(kind) and not reference.get(kind):
+            errors.append(
+                f"{job.model} 不支持{label}参考素材；"
+                "请换用支持参考的模型（如 sd25官转 / doubao-seedance-2-5），或去掉参考。"
+            )
+
+    durations = capability.get("durations") or {}
+    minimum, maximum = durations.get("min"), durations.get("max")
+    if isinstance(minimum, int) and job.seconds < minimum:
+        errors.append(f"{job.model} 最短 {minimum} 秒，当前请求 {job.seconds} 秒。")
+    if isinstance(maximum, int) and job.seconds > maximum:
+        errors.append(f"{job.model} 最长 {maximum} 秒，当前请求 {job.seconds} 秒。")
+    allowed_seconds = capability.get("allowed_seconds")
+    if isinstance(allowed_seconds, list) and allowed_seconds and job.seconds not in allowed_seconds:
+        errors.append(
+            f"{job.model} 只接受 {', '.join(str(item) for item in allowed_seconds)} 秒，"
+            f"当前请求 {job.seconds} 秒。"
+        )
+
+    aspect_ratios = capability.get("aspect_ratios")
+    if isinstance(aspect_ratios, list) and job.aspect_ratio:
+        allowed_ratios = {str(item).lower() for item in aspect_ratios}
+        if job.aspect_ratio not in allowed_ratios:
+            warnings.append(
+                f"{job.model} 文档列出的画幅为 {', '.join(sorted(allowed_ratios))}；"
+                f"当前 {job.aspect_ratio} 未在其中，可能被上游忽略或拒绝。"
+            )
+
+    return {"errors": errors, "warnings": warnings, "capability": capability}
+
+
+def enforce_capabilities(job, capabilities=None):
+    """errors 直接抛错，warnings 打印到 stderr。返回能力条目供后续使用。"""
+    result = check_capabilities(job, capabilities)
+    for warning in result["warnings"]:
+        emit(f"CAPABILITY WARNING: {warning}", error=True)
+    if result["errors"]:
+        raise VideoError(
+            "提交前能力校验失败，未产生费用：\n  - "
+            + "\n  - ".join(result["errors"])
+        )
+    return result["capability"]
+
+
+def describe_model_capability(model, capabilities=None):
+    """把能力条目渲染成人类可读的多行文本，供 models 子命令使用。"""
+    capability = model_capability(model, capabilities)
+    if capability is None:
+        return f"{model}: 未收录在能力表中"
+    resolutions = capability.get("resolutions") or []
+    verified = capability.get("resolutions_verified") or []
+    reference = capability.get("reference") or {}
+    durations = capability.get("durations") or {}
+    outputs = capability.get("output_by_resolution") or {}
+    lines = [
+        f"{model}",
+        f"  计费: {capability.get('billing') or '未标注'}",
+        f"  分辨率档: {', '.join(resolutions) if resolutions else '省略（服务端决定）'}",
+        f"  已实测档: {', '.join(verified) if verified else '无'}",
+        # 只用 GBK 可编码的字符：Windows 控制台默认 cp936，✓/✗ 会直接抛 UnicodeEncodeError。
+        "  参考素材: "
+        + ", ".join(
+            f"{label}={'支持' if reference.get(kind) else '不支持'}"
+            for kind, label in (("image", "图片"), ("video", "视频"), ("audio", "音频"))
+        ),
+        f"  时长: {durations.get('min', '?')}~{durations.get('max', '?')} 秒",
+    ]
+    if outputs:
+        rendered = ", ".join(
+            f"{tier}→{size[0]}x{size[1]}" for tier, size in outputs.items() if len(size) == 2
+        )
+        lines.append(f"  实测输出: {rendered}")
+    if capability.get("notes"):
+        lines.append(f"  说明: {capability['notes']}")
+    return "\n".join(lines)
 
 
 def build_video_payload(job):
@@ -352,6 +581,21 @@ def print_video_plan(job):
         f"audio_refs={len(job.audio_urls) + sum(r['type'] == 'audio' for r in job.references)}; "
         f"prompt_sha256={prompt_hash}"
     )
+    capability = model_capability(job.model)
+    if capability is None:
+        emit(f"CAPABILITY: {job.model} 未收录，参数以提交后上游响应为准。", error=True)
+    else:
+        expected = (capability.get("output_by_resolution") or {}).get(job.resolution or "")
+        if expected and len(expected) == 2:
+            emit(f"EXPECTED OUTPUT: {job.resolution} 档实测为 {expected[0]}x{expected[1]}；实际以 ffprobe 为准。")
+        reference = capability.get("reference") or {}
+        unsupported = [
+            label
+            for kind, label in (("image", "图片"), ("video", "视频"), ("audio", "音频"))
+            if _reference_counts(job).get(kind) and not reference.get(kind)
+        ]
+        if unsupported:
+            emit(f"CAPABILITY: {job.model} 不保证支持{'、'.join(unsupported)}参考。", error=True)
     emit("BILLING: 视频任务受理即可能产生费用；脚本不会自动重试或重复创建。")
 
 
@@ -645,6 +889,7 @@ def execute_video_job(
     download_fn = download_fn or download_video
     probe_fn = probe_fn or probe_media
     validate_video_job(job)
+    capability = enforce_capabilities(job)
     directory = _task_directory(out_dir, job)
     payload = build_video_payload(job)
     write_json(directory / "request.json", payload)
@@ -694,6 +939,17 @@ def execute_video_job(
                 target_ratio = target_width / target_height
                 if abs(actual_ratio - target_ratio) / target_ratio > 0.03:
                     warnings.append("实际画幅与请求画幅差异超过 3%。")
+            expected = ((capability or {}).get("output_by_resolution") or {}).get(
+                job.resolution or ""
+            )
+            if isinstance(expected, list) and len(expected) == 2:
+                actual_size = [media_info.get("width"), media_info.get("height")]
+                if actual_size != expected:
+                    warnings.append(
+                        f"实际输出 {actual_size[0]}x{actual_size[1]} 与能力表记录的 "
+                        f"{expected[0]}x{expected[1]} 不一致；请更新 "
+                        "references/video_model_capabilities.json。"
+                    )
         else:
             warnings.append("未安装 ffprobe，未校验视频时长和画幅。")
         status = "partial" if warnings else "success"
@@ -741,6 +997,12 @@ def _add_job_arguments(parser):
     parser.add_argument("--resolution", help="480p/720p/768p/1080p/2k/4k")
     parser.add_argument("--aspect-ratio", help="16:9、9:16、1:1、4:3、3:4、21:9")
     parser.add_argument("--image-url", action="append", default=[], help="公网 HTTPS 参考图，可重复")
+    parser.add_argument(
+        "--image-file",
+        action="append",
+        default=[],
+        help="本地参考图（PNG/JPEG/WebP），自动转 Base64 data URI，可重复；上限 8MB",
+    )
     parser.add_argument("--video-url", action="append", default=[], help="公网 HTTPS 参考视频，可重复")
     parser.add_argument("--audio-url", action="append", default=[], help="公网 HTTPS 参考音频，可重复")
     parser.add_argument("--references-file", help="references 对象数组 JSON 文件")
@@ -769,8 +1031,10 @@ def _job_from_args(args):
         prompt = prompt_path.read_text(encoding="utf-8-sig")
     references = []
     if args.references_file:
-        if args.image_url or args.video_url or args.audio_url:
-            raise VideoError("--references-file 与 --image-url/--video-url/--audio-url 不能混用。")
+        if args.image_url or args.image_file or args.video_url or args.audio_url:
+            raise VideoError(
+                "--references-file 与 --image-url/--image-file/--video-url/--audio-url 不能混用。"
+            )
         path = Path(args.references_file).expanduser().resolve()
         try:
             references = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -778,6 +1042,8 @@ def _job_from_args(args):
             raise VideoError(f"references 文件不存在: {path}") from None
         except (ValueError, UnicodeError) as exc:
             raise VideoError(f"references JSON 无效: {redact_secret(exc)}") from None
+    image_urls = list(args.image_url or [])
+    image_urls.extend(inline_image_from_file(path) for path in (args.image_file or []))
     job = VideoJob(
         id=args.id,
         prompt=prompt,
@@ -785,7 +1051,7 @@ def _job_from_args(args):
         seconds=args.seconds,
         resolution=args.resolution,
         aspect_ratio=args.aspect_ratio,
-        image_urls=args.image_url,
+        image_urls=image_urls,
         video_urls=args.video_url,
         audio_urls=args.audio_url,
         references=references,
@@ -820,6 +1086,10 @@ def parser():
     download.add_argument("task_id")
     download.add_argument("--out", default="./sshzyu-video")
     download.add_argument("--env-file", default=str(VIDEO_ENV_FILE))
+    models = sub.add_parser("models", help="列出本地能力表里的视频模型参数")
+    models.add_argument("--model", help="只查看指定模型")
+    models.add_argument("--check-live", action="store_true", help="同时对比当前 Key 的 /models 可见模型")
+    models.add_argument("--env-file", default=str(VIDEO_ENV_FILE))
     return p
 
 
@@ -836,6 +1106,14 @@ def _download_destination(out, task_id):
 
 
 def main(argv=None):
+    # Windows 默认 cp936：不重配时中文按 GBK 输出，被 UTF-8 终端读成乱码；
+    # 特殊符号还会直接抛 UnicodeEncodeError。这里统一成 UTF-8。
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):
+                pass
     args = parser().parse_args(argv)
     key = None
     try:
@@ -843,6 +1121,9 @@ def main(argv=None):
             job = _job_from_args(args)
             print_video_plan(job)
             if args.dry_run:
+                # dry-run 也要做能力校验：参数不合法时应在花任何钱之前失败。
+                enforce_capabilities(job)
+                emit("DRY-RUN: 未读取 Key、未联网、未计费。")
                 return 0
             if not args.confirm:
                 raise VideoError(
@@ -857,6 +1138,7 @@ def main(argv=None):
                     verify_model=not args.no_verify_model,
                 )
                 return 0 if result["status"] == "success" else 2 if result["status"] == "partial" else 1
+            enforce_capabilities(job)
             if not args.no_verify_model:
                 require_model_visible(job.model, key)
             directory = _task_directory(args.out, job)
@@ -876,6 +1158,32 @@ def main(argv=None):
             )
             emit(f"TASK: {task_id}")
             emit(f"RECORD: {directory / 'job-result.json'}")
+            return 0
+        if args.command == "models":
+            capabilities = load_capabilities()
+            names = [args.model] if args.model else sorted(capabilities["models"])
+            if not names:
+                raise VideoError(
+                    f"能力表为空或未找到: {CAPABILITIES_FILE}。"
+                    "该文件随 Skill 发布，缺失说明安装不完整。"
+                )
+            for name in names:
+                emit(describe_model_capability(name, capabilities))
+                emit("")
+            if args.check_live:
+                live_key = require_video_key(args.env_file)
+                visibility = verify_video_available(names[0], live_key)
+                visible = set(visibility.get("models") or [])
+                missing = [name for name in names if name not in visible]
+                emit(f"LIVE MODELS: 当前 Key 可见 {len(visible)} 个模型。")
+                if missing:
+                    emit(
+                        "LIVE 差异: 能力表中以下模型当前 Key 不可见："
+                        + ", ".join(missing),
+                        error=True,
+                    )
+                else:
+                    emit("LIVE 差异: 能力表模型全部对当前 Key 可见。")
             return 0
         key = require_video_key(args.env_file)
         if args.command == "get":

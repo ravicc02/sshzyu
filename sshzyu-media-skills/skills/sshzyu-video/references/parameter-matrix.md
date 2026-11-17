@@ -1,6 +1,8 @@
 # SSHZYU 视频参数矩阵
 
-来源：`https://sshzyu.com/docs/vedio/content.md`，并核对测试 Key 的 `GET /v1/models`，日期为 2026-11-15。
+> **机器可读版本**：`video_model_capabilities.json`。CLI 的提交前校验只读那份文件；本页是人读说明，两者不一致时以 JSON 为准并同步修正。
+
+来源：`https://sshzyu.com/docs/vedio/content.md`，核对测试 Key 的 `GET /v1/models` 与真实提交结果，更新日期 2026-11-18。
 
 模型和价格会变化。执行前先用 `models --kind video` 核对当前 Key 分组。下表不替代实时模型列表和服务端校验。
 
@@ -27,6 +29,27 @@
 | `doubao-seedance-2-5` | 按 Token | 按服务端 | 720p |
 
 `minimax_h3` 必须明确选择 `480p`、`768p`、`1080p`、`2k` 或 `4k`。不要用 `720p` 代替 `768p`。
+
+## 实测输出尺寸
+
+提交的档位不等于输出像素，成片规格必须按实测值规划，不能按比例推算。
+
+| 模型 | 请求档位 | 实际输出 | 验证日期 | 备注 |
+| --- | --- | --- | --- | --- |
+| `minimax_h3` | 480p | 480×864 | 2026-11-17 | 9:16 |
+| `minimax_h3` | 1080p | **1088×1920** | 2026-11-18 | 宽度不是 1080 |
+| `sd25官转` | 720p | 720×1280 | 2026-11-18 | 9:16 |
+
+`minimax_h3` 的 `aspect_ratio` 字段是否生效尚未验证；画幅由分辨率档决定，建议省略该字段。
+
+## 参考素材的传法
+
+参考图支持两种形式：
+
+- 公网 HTTPS 直链（`--image-url`）
+- 本地文件转 Base64 data URI（`--image-file`，PNG/JPEG/WebP，单张上限 8MB）
+
+上游参考图字段接受 URL 或 Base64，所以「必须公网」是本地实现的旧限制，不是接口要求。本地图会显著增大请求体，线上 nginx 上限 256MB。
 
 `videopipe-*` 建议省略 `resolution`，由服务端决定实际输出规格。
 

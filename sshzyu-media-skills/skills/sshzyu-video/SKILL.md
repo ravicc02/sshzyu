@@ -29,12 +29,45 @@ cp .env.example .env
 SSHZYU_VIDEO_API_KEY=<视频组 Key>
 ```
 
-## 付费提交门槛
+## 参数必须与模型能力对齐
 
-先明确模型、时长、分辨率、画幅、任务数量、参考素材的匿名公网 HTTPS 直链和费用；先执行同参数 `--dry-run`，得到用户对本次计划的明确授权后才加 `--confirm`。命令行开关不是用户授权。dry-run 不读取 Key、不联网。任务创建只提交一次；超时、断连、未知状态不重复创建，先查询原任务。不要打印 Key、签名 URL 或敏感响应。
+不同模型支持的分辨率档位、时长范围和参考素材能力不同，**不能把一个模型的参数套到另一个模型上**。能力表在 `references/video_model_capabilities.json`，CLI 在提交前用它校验：
 
 ```bash
-python3 -I {技能目录}/scripts/sshzyu_video.py run --prompt "海边空镜，缓慢推镜" --id ocean-shot --model minimax_h3 --seconds 4 --resolution 480p --aspect-ratio 16:9 --out TASK_OUTPUT_DIR --dry-run
+# 查看全部模型能力（不联网、不读 Key）
+python3 {技能目录}/scripts/sshzyu_video.py models
+
+# 只看某个模型，并对比当前 Key 的 /models 可见性
+python3 {技能目录}/scripts/sshzyu_video.py models --model minimax_h3 --check-live
 ```
 
-下载已有任务使用 `get`、`wait`、`download` 子命令；输出需检查任务 ID、`job-result.json` 与实际文件，不把受理当成完成。图片素材由 `$sshzyu-image` 生成，本地图片不可自动充当公网 URL。短剧生产任务必须另经 `$short-drama-produce` 的本次任务单确认和适配器门槛；本技能的 `--confirm` 不能代替它。
+校验规则：分辨率不在该模型档位、时长超出范围、或模型不支持所传参考素材时，**提交前直接失败并列出可用值**，不会先花一次钱再让上游拒绝。`--dry-run` 也会执行这套校验。
+
+实测要点：
+
+- `minimax_h3` 只接受 `480p`、`768p`、`1080p`、`2k`、`4k`，**没有 `720p`**；画幅由分辨率档决定，建议省略 `--aspect-ratio`。1080p 实际输出是 **1088×1920**，不是 1080×1920。
+- `sd25官转`、`sd2官转`、`doubao-seedance-2-5` 只有 **720p** 可用，传 1080p 会被上游以「该模型不支持所选分辨率」拒绝。
+- 输出尺寸以 `ffprobe` 实测为准；与能力表记录不一致时 CLI 会给警告，提示更新能力表。
+
+## 参考素材
+
+参考图既支持公网 HTTPS 直链，也支持本地文件：
+
+```bash
+# 公网直链
+--image-url https://example.com/frame.png
+# 本地文件，自动转 Base64 data URI（PNG/JPEG/WebP，单张上限 8MB）
+--image-file ./frames/SHOT-001.png
+```
+
+上游参考图字段接受 URL 或 Base64，**「必须公网」是旧实现的限制，不是上游要求**。代价是本地图会让请求体变大（8MB 图约 10.7MB Base64），线上 nginx 上限 256MB，通常足够。
+
+## 付费提交门槛
+
+先明确模型、时长、分辨率、画幅、任务数量、参考素材和费用；先执行同参数 `--dry-run`，得到用户对本次计划的明确授权后才加 `--confirm`。命令行开关不是用户授权。dry-run 不读取 Key、不联网。任务创建只提交一次；超时、断连、未知状态不重复创建，先查询原任务。不要打印 Key、签名 URL 或敏感响应。
+
+```bash
+python3 {技能目录}/scripts/sshzyu_video.py run --prompt "海边空镜，缓慢推镜" --id ocean-shot --model minimax_h3 --seconds 4 --resolution 480p --out TASK_OUTPUT_DIR --dry-run
+```
+
+下载已有任务使用 `get`、`wait`、`download` 子命令；输出需检查任务 ID、`job-result.json` 与实际文件，不把受理当成完成。图片素材由 `$sshzyu-image` 生成，生成结果可直接用 `--image-file` 作为参考图。短剧生产任务必须另经 `$short-drama-produce` 的本次任务单确认和适配器门槛；本技能的 `--confirm` 不能代替它。

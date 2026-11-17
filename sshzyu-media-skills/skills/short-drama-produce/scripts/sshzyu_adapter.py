@@ -75,6 +75,32 @@ def _url_list(params, name):
     return [str(item) for item in values if str(item).startswith("https://")]
 
 
+def _local_reference_paths(request, params):
+    """收集需要内联成本地图片的路径。
+
+    来源有两处：parameters.image_files（显式指定）和任务单 references
+    （项目快照里的本地素材）。相对路径按 project_root 解析。
+    公网 HTTPS 直链不走这里，仍由 image_urls 原样提交。
+    """
+    root = request.get("project_root")
+    candidates = list(params.get("image_files") or [])
+    for value in request.get("references") or []:
+        if isinstance(value, str):
+            candidates.append(value)
+    paths = []
+    for value in candidates:
+        if not isinstance(value, str) or not value.strip():
+            continue
+        text = value.strip()
+        if text.startswith(("https://", "http://", "data:")):
+            continue
+        path = Path(text)
+        if not path.is_absolute() and root:
+            path = Path(str(root)) / text
+        paths.append(str(path))
+    return paths
+
+
 def _prompt_of(request, params):
     for candidate in (request.get("prompt"), params.get("prompt")):
         if isinstance(candidate, str) and candidate.strip():
@@ -268,12 +294,20 @@ def main(argv=None):
     image_urls = _url_list(params, "image_urls")
     video_urls = _url_list(params, "video_urls")
     audio_urls = _url_list(params, "audio_urls")
+    # 本地参考图转 Base64 data URI：上游参考图字段接受 URL 或 Base64，
+    # 之前只允许公网 HTTPS 是本地实现的限制。路径可相对 project_root。
+    for local_path in _local_reference_paths(request, params):
+        try:
+            image_urls.append(module.inline_image_from_file(local_path))
+        except Exception as exc:
+            return _emit_error("invalid_request", "invalid_image_file", str(exc))
     bindings = request.get("reference_bindings") or []
     if bindings and not (image_urls or video_urls or audio_urls):
         return _emit_error(
             "invalid_request",
-            "local_reference_unsupported",
-            "视频接口只接受公网 HTTPS 参考素材；本地参考需先上传或改用 parameters.image_urls",
+            "missing_reference_material",
+            "任务单声明了参考绑定，但没有可用的参考素材；"
+            "请确认 references 指向的本地文件存在，或在 parameters.image_urls 提供公网 HTTPS 直链",
         )
 
     try:
@@ -291,6 +325,9 @@ def main(argv=None):
             poll_timeout=args.poll_timeout,
         )
         module.validate_video_job(job)
+        # 与 CLI 共用同一份能力表：分辨率档位或参考素材不被模型支持时，
+        # 在提交前失败，避免产生一次注定被拒或参数被静默忽略的付费请求。
+        module.enforce_capabilities(job)
     except Exception as exc:
         return _emit_error("invalid_request", "invalid_job_parameter", str(exc))
 
