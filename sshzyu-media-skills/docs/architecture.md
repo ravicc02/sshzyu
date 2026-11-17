@@ -3,10 +3,9 @@
 ```text
 sshzyu-media-skills/           # 套件仓库根
 ├── skills/                     # 独立 Skill（安装入口）
-│   ├── sshzyu-media/           # 统一入口：初始化、约束、状态、路由
+│   ├── sshzyu-media/           # 统一入口：短剧项目生命周期 + 约束 + 状态 + 路由
 │   ├── sshzyu-image/           # 图片能力（唯一权威实现）
 │   ├── sshzyu-video/           # 视频能力（唯一权威实现）
-│   ├── short-drama/            # 短剧项目入口
 │   └── short-drama-*/          # 短剧阶段入口
 ├── docs/                       # 套件文档
 ├── tests/                      # 套件级检查
@@ -17,7 +16,7 @@ sshzyu-media-skills/           # 套件仓库根
 
 1. 用户进入 `sshzyu-media` 后，入口先识别任务类型与已有项目状态：
    - 单次图片或视频任务转交 `sshzyu-image` / `sshzyu-video`；
-   - 短剧项目转交 `short-drama`，再由其协调阶段 Skill。
+   - 短剧项目由 `sshzyu-media` 自身初始化、配置并协调阶段 Skill，不再有独立短剧总入口。
 2. 用户明确点名专业 Skill 时可直接调用，不强制经过总入口。
 3. `sshzyu-media` 不维护第二套图片/视频 API 实现，不代替阶段 Skill 写剧本、设定、分镜或提示词。
 

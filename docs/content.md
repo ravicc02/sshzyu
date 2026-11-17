@@ -269,7 +269,7 @@ curl https://sshzyu.com/v1/chat/completions \
 
 本地源码位于具名套件仓库 `sshzyu-media-skills/`，各技能在 `sshzyu-media-skills/skills/<名称>/SKILL.md` 并列存放；公开发行包计划使用 [sshzyu-media.zip](/docs/install/sshzyu-media.zip)。**该链接只有在独立文档发布后才会对应本次新包；本地生成不等于线上已更新。** ZIP 顶层为 `skills/<名称>/` 并列技能目录，并包含套件级 `README.md`、`VERSION`、`LICENSE` 等说明文件。
 
-独立入口为 `sshzyu-media`、`sshzyu-image`、`sshzyu-video`，以及 `short-drama`、`short-drama-assets`、`short-drama-breakdown`、`short-drama-develop`、`short-drama-edit`、`short-drama-image-prompts`、`short-drama-novel-analyze`、`short-drama-produce`、`short-drama-review`、`short-drama-storyboard`、`short-drama-video-prompts`、`short-drama-write`。总入口负责跨媒体路由，短剧入口负责短剧项目和 Dashboard；可以直接调用专业技能。原 `sshzyu-drama` 包装入口已取消。视频 CLI 独立运行需与 `sshzyu-image` 并列安装；使用旧版媒体统一 CLI 时，再并列安装 `sshzyu-media`。
+独立入口为 `sshzyu-media`、`sshzyu-image`、`sshzyu-video`，以及 `short-drama-assets`、`short-drama-breakdown`、`short-drama-develop`、`short-drama-edit`、`short-drama-image-prompts`、`short-drama-novel-analyze`、`short-drama-produce`、`short-drama-review`、`short-drama-storyboard`、`short-drama-video-prompts`、`short-drama-write`。`sshzyu-media` 是唯一总入口，同时承担短剧项目初始化、配置、Dashboard 与交付打包；阶段技能可直接调用。原 `sshzyu-drama` 包装入口和独立 `short-drama` 总入口均已并入 `sshzyu-media`。视频 CLI 独立运行需与 `sshzyu-image` 并列安装；使用旧版媒体统一 CLI 时，再并列安装 `sshzyu-media`。
 
 **安装方式不能混用推断**：手动安装须先校验 ZIP，检查目标目录是否已有同名 Skill；如有任何冲突，停止并由用户选择保留原版还是改用本套件，不得静默覆盖。确认无冲突后把 ZIP 的每个顶层目录放在同一安装根，验收 `<安装根>/<名称>/SKILL.md`。NewMax 请使用应用内正式 Skill 安装器安装该 ZIP，并以安装器报告的全部入口为准，不要手动复制到兼容目录冒充正式安装。`npx skills` 对此多目录 ZIP 的支持尚未实测，不能宣称一键可用；若使用该渠道需按其实际支持的仓库安装方式分别验收。上述安装验收和生产调用都不需要输出真实 API Key。
 

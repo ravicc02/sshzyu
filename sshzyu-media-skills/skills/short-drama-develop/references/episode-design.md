@@ -181,7 +181,7 @@
 
 ## 10. 节奏参考标准
 
-本阶段按项目的制作形态提出节奏参考标准初稿（写入立项简报「体裁规格与制作条件」，状态为 `proposed`）；经创作者确认或手改后，由 `$short-drama` 写入 `short-drama.json` 的 `creator_authority.rhythm_profile`（状态为 `accepted`，`craft_default · STY-26`）。后续环节只拿已确认的标准核对算术账；未设定或未确认时一律不核对。
+本阶段按项目的制作形态提出节奏参考标准初稿（写入立项简报「体裁规格与制作条件」，状态为 `proposed`）；经创作者确认或手改后，由 `$sshzyu-media` 写入 `short-drama.json` 的 `creator_authority.rhythm_profile`（状态为 `accepted`，`craft_default · STY-26`）。后续环节只拿已确认的标准核对算术账；未设定或未确认时一律不核对。
 
 | 节奏指标（配置键名） | 说明 | AI 真人短剧参考起点 | 漫剧参考起点 |
 |---|---|---|---|

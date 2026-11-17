@@ -61,4 +61,4 @@ license: MIT
 
 ## 完成标准
 
-同轮同时修改《图片提示词.md》与《分镜.md》时当场同步引用，不另建场次核对表文件。单场试拆或上下游其余文档尚未齐备时，可用 `$short-drama` 的 `creator_markdown_check.py 剧集/<EP> --project-root . --partial` 做局部校验；整集齐备后可跑完整校验。视频提示词、生成投产与独立审查只在创作者点名时启动。
+同轮同时修改《图片提示词.md》与《分镜.md》时当场同步引用，不另建场次核对表文件。单场试拆或上下游其余文档尚未齐备时，可用 `$sshzyu-media` 的 `creator_markdown_check.py 剧集/<EP> --project-root . --partial` 做局部校验；整集齐备后可跑完整校验。视频提示词、生成投产与独立审查只在创作者点名时启动。

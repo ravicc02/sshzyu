@@ -48,7 +48,7 @@ python3 {技能目录}/scripts/episode_intake.py index <多集完整剧本> --ou
 `episode-map.jsonl` 定位为**多集连载长剧的按需分集状态账**。需要排多集连载时，读 [episode-design.md](references/episode-design.md) 并复制 [episode-map.jsonl](assets/episode-map.jsonl)，每集只记本集核心推进（钩子、目标、阻力、转折动作、阶段结果、信息揭晓）与单向交接给下一集的 `handoff_state`，不重复抄写上一集状态。
 
 - 常规连载集在抛出集尾悬念前宜先落定一个本集阶段结果；单元温情剧也可在情绪落点舒缓收束。
-- 按制作形态提出节奏参考起点，经创作者确认后由 `$short-drama` 写入 `creator_authority.rhythm_profile`。写单集剧本时若发现原分集切分或节奏排布存在结构卡点，路由回 `$short-drama-develop` 更新 `episode-map.jsonl` / `adaptation-map.jsonl`，不由下游技能直接改写。
+- 按制作形态提出节奏参考起点，经创作者确认后由 `$sshzyu-media` 写入 `creator_authority.rhythm_profile`。写单集剧本时若发现原分集切分或节奏排布存在结构卡点，路由回 `$short-drama-develop` 更新 `episode-map.jsonl` / `adaptation-map.jsonl`，不由下游技能直接改写。
 
 ### 4. 自检并交接
 

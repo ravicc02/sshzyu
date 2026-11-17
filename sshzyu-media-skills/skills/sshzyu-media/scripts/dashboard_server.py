@@ -133,12 +133,12 @@ def load_project_tool(root: Path) -> ModuleType:
         (
             candidate
             for candidate in (
-                root / "sshzyu-media-skills/skills/short-drama/scripts/project_tool.py",
-                root / "skills/short-drama/scripts/project_tool.py",
+                root / "sshzyu-media-skills/skills/sshzyu-media/scripts/project_tool.py",
+                root / "skills/sshzyu-media/scripts/project_tool.py",
             )
             if candidate.is_file()
         ),
-        root / "sshzyu-media-skills/skills/short-drama/scripts/project_tool.py",
+        root / "sshzyu-media-skills/skills/sshzyu-media/scripts/project_tool.py",
     )
     script = installed_script if installed_script.is_file() else repository_script
     spec = importlib.util.spec_from_file_location("dashboard_project_tool", script)

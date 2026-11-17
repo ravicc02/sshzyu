@@ -23,16 +23,29 @@ DEFAULT_OUTPUT = REPO_ROOT / "docs" / "install" / "sshzyu-media.zip"
 SUITE_FILES = ("AGENTS.md", "CHANGELOG.md", "LICENSE", "README.md", "VERSION", "docs/architecture.md")
 SKILLS = (
     "sshzyu-media", "sshzyu-image", "sshzyu-video",
-    "short-drama", "short-drama-assets", "short-drama-breakdown",
+    "short-drama-assets", "short-drama-breakdown",
     "short-drama-develop", "short-drama-edit", "short-drama-image-prompts",
     "short-drama-novel-analyze", "short-drama-produce", "short-drama-review",
     "short-drama-storyboard", "short-drama-video-prompts", "short-drama-write",
 )
 REQUIRED = {
-    "sshzyu-media": ("ROUTING.md", "scripts/sshzyu_media.py", "scripts/sshzyu_image.py", "scripts/sshzyu_drama.py"),
+    "sshzyu-media": (
+        "ROUTING.md",
+        "scripts/sshzyu_media.py",
+        "scripts/sshzyu_image.py",
+        "scripts/sshzyu_drama.py",
+        "scripts/project_tool.py",
+        "scripts/dashboard_server.py",
+        "scripts/creator_markdown_check.py",
+        "scripts/creator_views.py",
+        "scripts/selftest.py",
+        "assets/dashboard/index.html",
+        "assets/project-template/short-drama.json",
+        "references/creator-documents.md",
+        "references/knowhow-index.md",
+    ),
     "sshzyu-image": ("scripts/sshzyu_image.py", "references/image/api_reference.md", "references/image/parameter-matrix.md"),
     "sshzyu-video": ("scripts/sshzyu_video.py", "scripts/media_common.py", "references/api_reference.md", "references/parameter-matrix.md"),
-    "short-drama": ("scripts/project_tool.py", "assets/dashboard/index.html"),
     "short-drama-produce": ("scripts/production_tool.py", "references/adapter-contract.md"),
 }
 FORBIDDEN = {".env", "key.txt", "__pycache__", "node_modules", ".git", "tests", "dist", "build"}
@@ -135,12 +148,13 @@ def build_package():
                 raise PackageError(f"未声明的套件文件: {name}")
         with tempfile.TemporaryDirectory(prefix="sshzyu-skills-check-") as tmp:
             install_root = Path(tmp)
-            # Explicitly refuse pre-existing same-name entries, including original short-drama.
-            (install_root / "skills" / "short-drama").mkdir(parents=True)
+            # Explicitly refuse pre-existing same-name entries.
+            conflict_probe = SKILLS[0]
+            (install_root / "skills" / conflict_probe).mkdir(parents=True)
             conflicts = [skill for skill in SKILLS if (install_root / "skills" / skill).exists()]
-            if conflicts != ["short-drama"]:
+            if conflicts != [conflict_probe]:
                 raise PackageError("同名技能冲突检查异常")
-            (install_root / "skills" / "short-drama").rmdir()
+            (install_root / "skills" / conflict_probe).rmdir()
             for member in archive.infolist():
                 destination = install_root.joinpath(*PurePosixPath(member.filename).parts)
                 if member.is_dir():

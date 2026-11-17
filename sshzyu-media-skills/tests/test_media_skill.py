@@ -159,10 +159,10 @@ class PackageContractTests(unittest.TestCase):
                 set(skill_package.SKILLS),
                 {p.name for p in (root / "skills").iterdir() if (p / "SKILL.md").is_file()},
             )
-            existing = root / "skills" / "short-drama" / "SKILL.md"
-            existing.write_text("原版技能，不得覆盖", encoding="utf-8")
-            self.assertEqual("原版技能，不得覆盖", existing.read_text(encoding="utf-8"))
-            self.assertTrue((root / "skills" / "short-drama").exists(), "已有原版不可静默覆盖")
+            existing = root / "skills" / "sshzyu-media" / "SKILL.md"
+            existing.write_text("已有安装，不得覆盖", encoding="utf-8")
+            self.assertEqual("已有安装，不得覆盖", existing.read_text(encoding="utf-8"))
+            self.assertTrue((root / "skills" / "sshzyu-media").exists(), "已有同名安装不可静默覆盖")
 
 
 if __name__ == "__main__":

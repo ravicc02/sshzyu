@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | 单次生图、改图 | `$sshzyu-image` | `sshzyu-media-skills/skills/sshzyu-image/` |
 | 单次生视频、查询及下载 | `$sshzyu-video` | `sshzyu-media-skills/skills/sshzyu-video/` |
-| 短剧项目创建、阶段路由和 Dashboard | `$short-drama` | 原五份 Markdown 文档和项目配置 |
+| 短剧项目创建、阶段路由和 Dashboard | `$sshzyu-media` | 原五份 Markdown 文档和项目配置 |
 | 短剧单阶段创作 | 对应 `$short-drama-*` | 当前项目文档 |
 | 短剧生产任务单和恢复 | `$short-drama-produce` | 项目内已有稳定任务 ID 和运行记录 |
 

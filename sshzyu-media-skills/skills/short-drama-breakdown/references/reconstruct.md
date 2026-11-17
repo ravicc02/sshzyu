@@ -4,7 +4,7 @@
 
 - **先登记权限、测出实参再建还原项目（`BRK-01`、`BRK-02`、`BRK-11` · `reviewed_invariant`）**：
   1. 开测前在 `输入/对标/<REF-ID>/对标登记.md`（外层已有主项目时可一并记入 `项目开发/对标拆解.md`）写明 `REF-ID`、素材路径、授权用途（`study`、`owned` 或附依据的 `licensed`）及是否允许上传外部模型服务；未确认允许外传时只跑本机离线测量脚本。
-  2. 先跑 `measure` 拿到画幅比例与片长，再在 `输入/对标/<REF-ID>/还原/` 下用 `$short-drama` 的 `project_tool.py init` 按实测 `--aspect-ratio` 初始化独立还原项目（标题写 `<REF-ID> 还原`；`owned` 或 `licensed` 作品确认后可按 `BRK-11` 整套迁出为根项目，不把单集还原文件混进外层主项目的 `剧集/` 目录）。
+  2. 先跑 `measure` 拿到画幅比例与片长，再在 `输入/对标/<REF-ID>/还原/` 下用 `$sshzyu-media` 的 `project_tool.py init` 按实测 `--aspect-ratio` 初始化独立还原项目（标题写 `<REF-ID> 还原`；`owned` 或 `licensed` 作品确认后可按 `BRK-11` 整套迁出为根项目，不把单集还原文件混进外层主项目的 `剧集/` 目录）。
 - **落盘位置**：每集按需写入 `还原/剧集/EPxxx/` 下的《剧本.md》及后续《视觉设定.md》《分镜.md》《图片提示词.md》《视频提示词.md》（`init` 生成的空 `设定集/` 等默认目录留空即可，单集设定写进《视觉设定.md》）。跨集人物对照、相邻集接缝表、台词与画面校对记录、原片穿帮和抽检结果统一放在 `还原/审查/还原核对.md`，保持《剧本.md》正文干净可演。多集连拆按集序一口气做完，不在集与集之间停下等确认。
 
 ## 按目标选做法
@@ -86,7 +86,7 @@ python3 {技能目录}/scripts/breakdown_tool.py shots <重点集.mp4> <重点�
 
 写完还原文档后运行脚本校验，并把抽检结果记入 `还原/审查/还原核对.md`：
 
-1. **格式校验与时长估算**：运行 `$short-drama` 的 `creator_markdown_check.py <剧集目录> --partial`（五份文档齐备后去掉 `--partial`）以及 `$short-drama-write` 的 `duration_estimate.py --script <剧集目录>/剧本.md`（如需跑 `screenplay_index.py`，传 `--fail-on-review --output <剧集目录外的临时路径>`，不在 `剧集/EPxxx/` 下留下临时索引文件）。
+1. **格式校验与时长估算**：运行 `$sshzyu-media` 的 `creator_markdown_check.py <剧集目录> --partial`（五份文档齐备后去掉 `--partial`）以及 `$short-drama-write` 的 `duration_estimate.py --script <剧集目录>/剧本.md`（如需跑 `screenplay_index.py`，传 `--fail-on-review --output <剧集目录外的临时路径>`，不在 `剧集/EPxxx/` 下留下临时索引文件）。
 2. **字幕时间轴挂回 `measure`**：按 `T001 台词` 或 `T005-T010 合并的长句台词`（自动取首条起点至末条终点合并跨屏/跨镜拆条，非台词事件直接省略）写一份文本映射 `EPxxx.cues.txt`，挂回 `measure.json`（也可直接在 `*.subtitles.json` 的 `events` 里填 `text` 后挂接）：
    ```bash
    python3 {技能目录}/scripts/breakdown_tool.py transcript \
@@ -95,7 +95,7 @@ python3 {技能目录}/scripts/breakdown_tool.py shots <重点集.mp4> <重点�
      --subtitles 输入/对标/<REF-ID>/subtitles/<某集>.subtitles.json
    python3 {技能目录}/scripts/breakdown_tool.py profile REF=输入/对标/<REF-ID>/measure --opening 3
    ```
-   若继续跑 `breakdown_tool.py plan 输入/对标/<REF-ID>/还原 --out 输入/对标/<REF-ID>/plan` 对比纯剧本还原项目，先用 `$short-drama` 的 `project_tool.py configure` 在 `format.pacing` 中同时填好字/词速与 `seconds_per_action_paragraph`。未建《分镜.md》时，`plan` 与 `duration_estimate.py` 把动作段与台词串行相加——无对白打斗或静默定格偏多时纸面时长偏短，`[VO]` 叠在连续动作上偏多时纸面时长偏长，不必因此删改动作描写（首集加长而后续集定长时，单集跑 `duration_estimate.py` 可传 `--target-seconds <本集实测秒数>`）。
+   若继续跑 `breakdown_tool.py plan 输入/对标/<REF-ID>/还原 --out 输入/对标/<REF-ID>/plan` 对比纯剧本还原项目，先用 `$sshzyu-media` 的 `project_tool.py configure` 在 `format.pacing` 中同时填好字/词速与 `seconds_per_action_paragraph`。未建《分镜.md》时，`plan` 与 `duration_estimate.py` 把动作段与台词串行相加——无对白打斗或静默定格偏多时纸面时长偏短，`[VO]` 叠在连续动作上偏多时纸面时长偏长，不必因此删改动作描写（首集加长而后续集定长时，单集跑 `duration_estimate.py` 可传 `--target-seconds <本集实测秒数>`）。
 
 | 核对项 | 抽检做法 | 计法说明 |
 |---|---|---|

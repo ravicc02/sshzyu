@@ -1,6 +1,6 @@
 # 导演阐述写法：拆设定与画分镜前的全剧视听总纲
 
-导演阐述由创作者在拆视觉设定与画分镜之前拍板确认，用来统一下游各环节的分镜规格、镜头调度重点、节奏把控和已知的模型制作条件。本技能在 `项目开发/director-brief.md` 中起草初稿，并写明 `visual_direction`（视觉风格方向）与 `production_profile`（制作能力配置）改了哪些具体内容；创作者确认后，由 `$short-drama` 写入 `short-drama.json#/creator_authority`。
+导演阐述由创作者在拆视觉设定与画分镜之前拍板确认，用来统一下游各环节的分镜规格、镜头调度重点、节奏把控和已知的模型制作条件。本技能在 `项目开发/director-brief.md` 中起草初稿，并写明 `visual_direction`（视觉风格方向）与 `production_profile`（制作能力配置）改了哪些具体内容；创作者确认后，由 `$sshzyu-media` 写入 `short-drama.json#/creator_authority`。
 
 ## 基础写法
 

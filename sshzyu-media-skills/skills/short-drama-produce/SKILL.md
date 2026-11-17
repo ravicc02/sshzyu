@@ -56,7 +56,7 @@ python3 {技能目录}/scripts/production_tool.py audit <project>
 
 - **图片（`image`）**：读取 `图片提示词.md` 的 `IMG-*`（角色/场景/道具设定图及状态图，含尾帧）或 `分镜.md` 的 `SHOT-*`（读取 `### 首帧提示词` 生成单镜首帧；内置 `gpt-image-2` 支持单任务产出 1–16 张候选图）。图片落入 `剧集/<EP>/制作成果/images/` 后，分镜技能可将其绑定为 `用途：起始帧` 的 `REF-...`。
 - **视频（`video`）**：读取 `视频提示词.md` 的 `MOTION-*` 或多镜合生分组 `GROUP-*`（`GROUP-*` 的组级 `输入参考图` 可选，写出时按同规则核验并拦截 `待补参考图`，同样支持可选 `参考音频`；多镜合生时直接指定 `GROUP-*`，勿拿组内单个成员 `MOTION-*` 代替整组提交）。内置文档解析器只读取参考图片与角色参考音频，因此标着“待续接、不可提交”的 `MOTION-*` 按 `short-drama.json` 中 `creator_authority.production_profile.choices.continuation_route` 分流处理：
-  - 尚未设置：请创作者在 `independent_starts`（每段从各自定稿起始帧独立生成）与 `relay_external`（后续段在支持参考视频的外部工具提交，本技能只跑第一段）之间二选一，交 `$short-drama` 写入配置。
+  - 尚未设置：请创作者在 `independent_starts`（每段从各自定稿起始帧独立生成）与 `relay_external`（后续段在支持参考视频的外部工具提交，本技能只跑第一段）之间二选一，交 `$sshzyu-media` 写入配置。
   - `independent_starts`：交 `$short-drama-storyboard` 补齐切点起始帧 → 本技能生成该图（或截取上一段尾帧）并经创作者确认 → 交 `$short-drama-video-prompts` 改写为可提交提示词 → 预览确认后生成。
   - `relay_external`：不为后续段建单，直接列出每段需上传的上一段成片与尾帧路径。
 - **配音（`tts`）**：从 `剧本.md` 读取台词原句与情绪括注，不改台词正文。支持参考录音的外部语音接口可固定角色定稿参考音频；内置 MiniMax 语音按预设 `voice_id` 与情绪/语速/音量/音高参数合成。
