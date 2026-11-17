@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility bridge to the independent sshzyu-co-image skill."""
+"""Compatibility bridge to the independent sshzyu-image skill."""
 
 from __future__ import annotations
 
@@ -11,11 +11,11 @@ import sys
 
 def _candidate_roots():
     here = Path(__file__).resolve()
-    yield here.parents[2] / "sshzyu-co-image"
-    yield Path.home() / ".newmax" / "skills" / "sshzyu-co-image"
+    yield here.parents[2] / "sshzyu-image"
+    yield Path.home() / ".newmax" / "skills" / "sshzyu-image"
     custom = os.environ.get("NEWMAX_SKILLS_DIR")
     if custom:
-        yield Path(custom).expanduser() / "sshzyu-co-image"
+        yield Path(custom).expanduser() / "sshzyu-image"
 
 
 def _load_image_module():
@@ -33,8 +33,8 @@ def _load_image_module():
         spec.loader.exec_module(module)
         return module
     raise ImportError(
-        "未找到独立生图技能 sshzyu-co-image，请先安装 "
-        "skills/sshzyu-co-image。"
+        "未找到独立生图技能 sshzyu-image，请先安装 "
+        "skills/sshzyu-image。"
     )
 
 

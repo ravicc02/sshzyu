@@ -30,7 +30,7 @@ from media_common import (
     validate_resolution,
     write_json,
 )
-# 图片请求由独立 sshzyu-co-image 技能通过 sshzyu_image 兼容桥提供；本模块不实现图片 API。
+# 图片请求由独立 sshzyu-image 技能通过 sshzyu_image 兼容桥提供；本模块不实现图片 API。
 from sshzyu_image import (
     BASE_URL,
     DEFAULT_ENV_FILE,

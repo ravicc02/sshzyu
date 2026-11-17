@@ -2,7 +2,7 @@
   {
     "id": "media-image-route",
     "prompt": "我想生成一张无文字的暖色橘猫图片，请先告诉我应该走哪个技能、还缺哪些参数，并给出不会联网和不会扣费的 dry-run 命令。不要真实提交。",
-    "expected": "路由到 sshzyu-co-image；明确询问用途、模型、尺寸、质量、数量和输出目录等参数；给出 dry-run，不读取 Key、不联网、不扣费。"
+    "expected": "路由到 sshzyu-image；明确询问用途、模型、尺寸、质量、数量和输出目录等参数；给出 dry-run，不读取 Key、不联网、不扣费。"
   },
   {
     "id": "media-video-route",
@@ -12,6 +12,6 @@
   {
     "id": "drama-closed-loop",
     "prompt": "我要做一个两镜头竖屏短剧：先生成角色参考图和首帧，再生成两个镜头视频，最后拼成 1080x1920、25fps 成片。请按源 drama skills 的完整流程说明阶段、文件产物、图片和视频分别走哪个技能，并给出只预览不提交的执行计划。",
-    "expected": "进入 drama 完整工作流；图片需求统一路由 sshzyu-co-image，镜头视频走 sshzyu-media video，最后由 short-drama-edit/ffmpeg 拼接；列出剧本、视觉设定、分镜、图片提示词、视频提示词、剪辑单等产物，并停在 dry-run/确认前。"
+    "expected": "进入 drama 完整工作流；图片需求统一路由 sshzyu-image，镜头视频走 sshzyu-media video，最后由 short-drama-edit/ffmpeg 拼接；列出剧本、视觉设定、分镜、图片提示词、视频提示词、剪辑单等产物，并停在 dry-run/确认前。"
   }
 ]

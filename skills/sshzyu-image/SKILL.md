@@ -1,5 +1,5 @@
 ---
-name: sshzyu-co-image
+name: sshzyu-image
 description: "通过 sshzyu.com 完成 AI 生图、图片编辑、多图批处理、mask、markup 与结果校验。短剧与视频流程需要图片时统一引用本技能，不在视频技能中重复实现生图逻辑。"
 ---
 
@@ -15,7 +15,7 @@ description: "通过 sshzyu.com 完成 AI 生图、图片编辑、多图批处�
 - 模型说明：`references/image/models/README.md`
 - 服务端点：`https://sshzyu.com/v1`
 
-短剧、视频和媒体编排技能只应调用本技能的 CLI 或通过 `$sshzyu-co-image` 路由图片任务，不得复制图片请求、模型能力表、凭据读取或输出校验逻辑。
+短剧、视频和媒体编排技能只应调用本技能的 CLI 或通过 `$sshzyu-image` 路由图片任务，不得复制图片请求、模型能力表、凭据读取或输出校验逻辑。
 
 ## 强制 Preflight
 
