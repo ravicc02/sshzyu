@@ -87,6 +87,7 @@ scripts/tests/**/*.pyc
 #openspec/
 code-reviews/
 AGENTS.md
+!sshzyu-media-skills/AGENTS.md
 backend/cmd/server/server
 deploy/docker-compose.override.yml
 .gocache/
