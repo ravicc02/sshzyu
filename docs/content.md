@@ -267,15 +267,15 @@ curl https://sshzyu.com/v1/chat/completions \
 
 ### 安装 SSHZYU 媒体 Skill
 
-本地源码位于具名套件仓库 `sshzyu-media-skills/`，各技能在 `sshzyu-media-skills/skills/<名称>/SKILL.md` 并列存放；公开发行包计划使用 [sshzyu-media.zip](/docs/install/sshzyu-media.zip)。**该链接只有在独立文档发布后才会对应本次新包；本地生成不等于线上已更新。** ZIP 顶层为 `skills/<名称>/` 并列技能目录，并包含套件级 `README.md`、`VERSION`、`LICENSE` 等说明文件。
+本地源码位于具名套件仓库 `sshzyu-media-skills/`，各技能在 `sshzyu-media-skills/skills/<名称>/SKILL.md` 并列存放；公开发行包为 [sshzyu-media.zip](/docs/install/sshzyu-media.zip)，取代旧的单生图技能包 `sshzyu-image.zip`。ZIP 顶层为 `skills/<名称>/` 并列技能目录，并包含套件级 `README.md`、`VERSION`、`LICENSE` 等说明文件。
 
 独立入口共 14 个：`sshzyu-media`、`sshzyu-image`、`sshzyu-video`，以及 `short-drama-assets`、`short-drama-breakdown`、`short-drama-develop`、`short-drama-edit`、`short-drama-image-prompts`、`short-drama-novel-analyze`、`short-drama-produce`、`short-drama-review`、`short-drama-storyboard`、`short-drama-video-prompts`、`short-drama-write`。`sshzyu-media` 是唯一总入口，同时承担短剧项目初始化、配置、Dashboard 与交付打包；阶段技能可直接调用。原 `sshzyu-drama` 包装入口和独立 `short-drama` 总入口均已并入 `sshzyu-media`。
 
-**`sshzyu-media`、`sshzyu-image`、`sshzyu-video` 必须整体同根安装**：`sshzyu-video` 在导入阶段就要求同一安装根下存在 `sshzyu-image`（复用其凭据与请求实现），缺失会直接退出；只装其中一部分会导致该技能不可用。`short-drama-*` 阶段技能可独立安装。凭据统一从 `sshzyu-image/.env`、进程环境变量或系统凭据库读取，`sshzyu-media` 目录下的 `.env` 不会被使用。
+**`sshzyu-media`、`sshzyu-image`、`sshzyu-video` 必须整体同根安装**：`sshzyu-video` 在导入阶段就要求同一安装根下存在 `sshzyu-image`（复用其凭据与请求实现），缺失会直接退出；只装其中一部分会导致该技能不可用。`short-drama-*` 阶段技能可独立安装。凭据按能力分离：图片读 `sshzyu-image/.env` 的 `SSHZYU_API_KEY`（也支持进程环境变量或系统凭据库），视频只读 `sshzyu-video/.env` 的 `SSHZYU_VIDEO_API_KEY`；两者必须使用不同平台分组的 Key，缺失时直接失败、不回退到另一平台的 Key。`sshzyu-media` 目录下的 `.env` 不会被使用。
 
 **安装方式不能混用推断**：手动安装须先校验 ZIP，检查目标目录是否已有同名 Skill；如有任何冲突，停止并由用户选择保留原版还是改用本套件，不得静默覆盖。确认无冲突后把 ZIP 的每个顶层目录放在同一安装根，验收 `<安装根>/<名称>/SKILL.md`。NewMax 请使用应用内正式 Skill 安装器安装该 ZIP，并以安装器报告的全部入口为准，不要手动复制到兼容目录冒充正式安装。`npx skills` 对此多目录 ZIP 的支持尚未实测，不能宣称一键可用；若使用该渠道需按其实际支持的仓库安装方式分别验收。上述安装验收和生产调用都不需要输出真实 API Key。
 
-本地离线打包检查：`python sshzyu-media-skills/tools/package-suite.py --check`。安装后可用 Python 3.9+ 调用 `sshzyu-media/scripts/sshzyu_media.py doctor`（纯本地检查，不联网）。短剧剪辑另需 `ffmpeg` 和 `ffprobe`。`short-drama-produce` 的 SSHZYU adapter **尚未接通**，不可把任务单预览或 CLI `--confirm` 当成已能自动投产；任何付费请求仍需本次明确授权。
+本地离线打包检查：`python sshzyu-media-skills/tools/package-suite.py --check`。安装后可用 Python 3.9+ 调用 `sshzyu-media/scripts/sshzyu_media.py doctor`（纯本地检查，不联网）。短剧剪辑另需 `ffmpeg` 和 `ffprobe`。`short-drama-produce` 的 SSHZYU adapter 已实现并验收（文生视频 `minimax_h3`、无参考文生图 `gpt-image-2.6-flare`），本地参考素材公网化尚未实现；任何付费请求仍需本次明确授权。
 
 ## 九、查看 Token 和扣费
 

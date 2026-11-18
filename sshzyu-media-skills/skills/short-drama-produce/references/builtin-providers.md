@@ -2,7 +2,7 @@
 
 > 本文件仅保留历史 adapter 的合同与离线测试说明。它们不属于 SSHZYU 新生产路由，不得用于新任务。
 >
-> 新任务的图片归 `$sshzyu-image`，视频归 `$sshzyu-video`；当前尚未实现连接本技能任务单与两者 CLI 的 SSHZYU adapter，不得直接投产。跨技能边界见 [媒体路由契约](../../sshzyu-media/ROUTING.md)。
+> 新任务的图片归 `$sshzyu-image`，视频归 `$sshzyu-video`；连接本技能任务单与两者 CLI 的 SSHZYU adapter 已实现并验收，付费调用仍需当次明确授权。跨技能边界见 [媒体路由契约](../../sshzyu-media/ROUTING.md)。
 
 内置脚本 `scripts/provider_adapters.py` 仅用于兼容旧任务和合同测试；通用输入输出与参考素材体积限制见 [生成接口协议规范](adapter-contract.md)。
 
