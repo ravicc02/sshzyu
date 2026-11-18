@@ -37,7 +37,6 @@ const (
 var (
 	integrationDSN       string
 	integrationDB        *sql.DB
-	integrationDSN       string
 	integrationEntClient *dbent.Client
 	integrationRedis     *redisclient.Client
 
