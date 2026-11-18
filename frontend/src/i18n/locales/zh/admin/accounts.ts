@@ -422,6 +422,7 @@ export default {
         balance: '余额 --',
         window5h: '5h',
         windowWeekly: '7d',
+        windowMonthly: '30d',
         probe: '查询',
         probeTooltip: '请求供应商额度端点，查询 5 小时 / 每周滚动窗口用量',
         balanceProbeTooltip: '请求供应商余额端点，查询账户余额',
