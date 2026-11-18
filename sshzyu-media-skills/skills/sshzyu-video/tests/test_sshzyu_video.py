@@ -222,7 +222,7 @@ class VideoTaskTests(unittest.TestCase):
             return_value={"visible": True, "warning": None},
         ):
             result = video.execute_video_job(
-                make_job(),
+                make_job(aspect_ratio="9:16"),
                 "secret-key",
                 temp,
                 create_fn=fake_create,
@@ -230,8 +230,8 @@ class VideoTaskTests(unittest.TestCase):
                 download_fn=fake_download,
                 probe_fn=lambda path: {
                     "duration": 4.0,
-                    "width": 854,
-                    "height": 480,
+                    "width": 480,
+                    "height": 864,
                 },
             )
             result_path = Path(result["output_dir"]) / "job-result.json"
@@ -283,7 +283,7 @@ class VideoTaskTests(unittest.TestCase):
 
 class VideoCliTests(unittest.TestCase):
     def test_dry_run_does_not_load_key(self):
-        with patch.object(video, "load_key") as load_key:
+        with patch.object(video, "load_video_key") as load_video_key:
             code = video.main(
                 [
                     "run",
@@ -303,7 +303,7 @@ class VideoCliTests(unittest.TestCase):
                 ]
             )
         self.assertEqual(0, code)
-        load_key.assert_not_called()
+        load_video_key.assert_not_called()
 
     def test_real_run_requires_confirm(self):
         code = video.main(
@@ -328,8 +328,8 @@ class VideoCliTests(unittest.TestCase):
     def test_get_command(self):
         with patch.object(
             video,
-            "load_key",
-            return_value=("secret-key", "test"),
+            "load_video_key",
+            return_value=("secret-key", "test", False),
         ), patch.object(
             video,
             "get_video_task",
@@ -341,8 +341,8 @@ class VideoCliTests(unittest.TestCase):
         final = {"id": "task-1", "status": "completed"}
         with patch.object(
             video,
-            "load_key",
-            return_value=("secret-key", "test"),
+            "load_video_key",
+            return_value=("secret-key", "test", False),
         ), patch.object(
             video,
             "wait_for_video",
@@ -366,8 +366,8 @@ class VideoCliTests(unittest.TestCase):
             )
         with patch.object(
             video,
-            "load_key",
-            return_value=("secret-key", "test"),
+            "load_video_key",
+            return_value=("secret-key", "test", False),
         ), patch.object(
             video,
             "download_video",
@@ -381,8 +381,8 @@ class VideoCliTests(unittest.TestCase):
     def test_error_command_returns_one(self):
         with patch.object(
             video,
-            "load_key",
-            return_value=("secret-key", "test"),
+            "load_video_key",
+            return_value=("secret-key", "test", False),
         ), patch.object(
             video,
             "get_video_task",
