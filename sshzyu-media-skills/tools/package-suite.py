@@ -168,6 +168,22 @@ def build_package():
     return payload
 
 
+
+def _archive_matches(output, payload):
+    """Compare archives entry by entry: DEFLATE bytes can differ across zlib
+    builds for identical inputs, which produced a spurious CI STALE.
+    """
+    if not output.is_file():
+        return False
+    try:
+        with zipfile.ZipFile(output) as current, zipfile.ZipFile(io.BytesIO(payload)) as expected:
+            return current.namelist() == expected.namelist() and all(
+                current.read(name) == expected.read(name) for name in expected.namelist()
+            )
+    except zipfile.BadZipFile:
+        return False
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
@@ -178,7 +194,7 @@ def main(argv=None):
         output = args.output.resolve()
         digest = hashlib.sha256(payload).hexdigest()
         if args.check:
-            if not output.is_file() or output.read_bytes() != payload:
+            if not _archive_matches(output, payload):
                 print(f"STALE: {output}", file=sys.stderr)
                 return 1
             print(f"OK: {output}; SHA256: {digest}")

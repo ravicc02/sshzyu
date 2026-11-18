@@ -111,7 +111,7 @@ func TestMigrationsUpgradeOfficial016From015PreservesCustomData(t *testing.T) {
 		baseline[file] = &fstest.MapFile{Data: body}
 		baselineNames = append(baselineNames, file)
 	}
-	require.Len(t, baseline, 301, "published r2 migrations must all be retained")
+	require.Len(t, baseline, 306, "published r2 migrations plus v0.2.21-v0.2.23 additions must all be retained")
 	require.NoError(t, applyMigrationsFS(ctx, db, baseline))
 	_, err = db.ExecContext(ctx, `INSERT INTO groups(name,description,platform,rate_multiplier) VALUES('legacy-validation-group','custom display text','anthropic',0.25)`)
 	require.NoError(t, err)
