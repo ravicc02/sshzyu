@@ -1,6 +1,6 @@
 module github.com/ravicc02/sshzyu-updater
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/Wei-Shaw/sub2api v0.0.0
