@@ -124,3 +124,22 @@ output/
 issues/
 
 /ui/releases/
+
+# ---- 外部独立仓库（各自带 .git 与 .env，绝不纳入本库） ----
+/Agent2API/
+/drama-skills/
+
+# ---- 本地产物与临时归档（保留本地，不入库） ----
+/artifacts/
+
+# ---- 评估运行产生的媒体文件（只保留文本记录，不入库） ----
+sshzyu-media-skills/evaluations/runs/**/*.mp4
+sshzyu-media-skills/evaluations/runs/**/*.mov
+sshzyu-media-skills/evaluations/runs/**/*.png
+sshzyu-media-skills/evaluations/runs/**/*.jpg
+sshzyu-media-skills/evaluations/runs/**/*.jpeg
+sshzyu-media-skills/evaluations/runs/**/*.webp
+
+# 2026-11-18 视频参数/分辨率调试运行：流水 JSON 内联 base64 参考图且含大媒体，
+# 属本地排查证据，仅保留本地不入库
+sshzyu-media-skills/evaluations/runs/2026-11-18-*/
