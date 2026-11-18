@@ -50,7 +50,9 @@ REQUIRED = {
 }
 FORBIDDEN = {".env", "key.txt", "__pycache__", "node_modules", ".git", "tests", "dist", "build"}
 SUFFIXES = {".pyc", ".zip", ".skill", ".sha256"}
-TEXT = {".example", ".gitignore", ".json", ".jsonl", ".md", ".py", ".sh", ".toml", ".txt", ".yaml", ".yml", ".js", ".css", ".html", ".tsx", ".ts"}
+TEXT = {".cjs", ".css", ".example", ".html", ".js", ".json", ".jsonl", ".md", ".mjs", ".py", ".sh", ".toml", ".ts", ".tsx", ".txt", ".yaml", ".yml"}
+# 无扩展名但确属文本的套件文件；Git 以 LF 存储，工作区可能是 CRLF。
+TEXT_NAMES = {"LICENSE", "VERSION", ".gitignore"}
 LINK = re.compile(r"\]\(([^)#]+)(?:#[^)]*)?\)")
 SECRET_NAME = re.compile(r"(?:^|[._-])(?:secret|credential|token|password|private|apikey|api_key)(?:[._-]|$)", re.IGNORECASE)
 
@@ -99,7 +101,7 @@ def validate_source():
 
 def normalized_bytes(path):
     data = path.read_bytes()
-    if path.name == ".gitignore" or path.suffix.lower() in TEXT:
+    if path.name in TEXT_NAMES or path.suffix.lower() in TEXT:
         data = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
     return data
 
