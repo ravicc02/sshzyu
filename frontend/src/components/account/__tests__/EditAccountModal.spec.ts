@@ -78,6 +78,10 @@ const ModelWhitelistSelectorStub = defineComponent({
     modelValue: {
       type: Array,
       default: () => []
+    },
+    modelMappings: {
+      type: Array,
+      default: () => []
     }
   },
   emits: ['update:modelValue'],
