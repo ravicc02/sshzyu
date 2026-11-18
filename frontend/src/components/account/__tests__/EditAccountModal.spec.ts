@@ -333,6 +333,152 @@ describe('EditAccountModal', () => {
     authIsSimpleMode.value = true
   })
 
+  afterEach(() => vi.useRealTimers())
+
+  it.each(['apikey', 'oauth'])('can opt a passthrough %s account into model filtering without changing groups', async (type) => {
+    const account = buildAccount()
+    account.type = type
+    account.extra = { openai_passthrough: true }
+    account.group_ids = [17]
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+
+    expect(wrapper.findComponent(ModelWhitelistSelectorStub).exists()).toBe(false)
+    await wrapper.get('[data-testid="edit-openai-passthrough-model-filter"]').setValue(true)
+    await wrapper.get('[data-testid="rewrite-to-snapshot"]').trigger('click')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    const payload = updateAccountMock.mock.calls[0]?.[1]
+    expect(payload.extra.openai_passthrough).toBe(true)
+    expect(payload.extra.openai_passthrough_model_filter).toBe(true)
+    expect(payload.credentials.model_mapping).toEqual({ 'gpt-5.2-2025-12-11': 'gpt-5.2-2025-12-11' })
+    expect(payload.group_ids).toEqual([17])
+    wrapper.unmount()
+  })
+
+  it('loads the saved model filter and removes it when passthrough is disabled', async () => {
+    const account = buildAccount()
+    account.extra = { openai_passthrough: true, openai_passthrough_model_filter: true }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+
+    expect(wrapper.get<HTMLInputElement>('[data-testid="edit-openai-passthrough-model-filter"]').element.checked).toBe(true)
+    expect(wrapper.findComponent(ModelWhitelistSelectorStub).exists()).toBe(true)
+    await wrapper.get('[data-testid="edit-openai-passthrough-toggle"]').trigger('click')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra).not.toHaveProperty('openai_passthrough_model_filter')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials.model_mapping).toEqual(account.credentials.model_mapping)
+    wrapper.unmount()
+  })
+
+  it('passes existing non-identity mappings to the whitelist selector and preserves them on save', async () => {
+    const account = buildAccount()
+    account.credentials.model_mapping = { 'gpt-5.2': 'gpt-5.2', 'gpt-latest': 'deepseek-chat' }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    expect(wrapper.getComponent(ModelWhitelistSelectorStub).props('modelMappings')).toEqual([
+      { from: 'gpt-latest', to: 'deepseek-chat' }
+    ])
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toEqual(account.credentials.model_mapping)
+    await wrapper.setProps({ show: false })
+    await wrapper.setProps({ show: true, account: { ...account } })
+    expect(wrapper.getComponent(ModelWhitelistSelectorStub).props('modelMappings')).toEqual([
+      { from: 'gpt-latest', to: 'deepseek-chat' }
+    ])
+  })
+
+  it('sets expiry presets from now instead of extending the saved expiry', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2028-02-29T12:34:00'))
+    const account = buildAccount()
+    account.expires_at = new Date('2030-06-15T09:00:00').getTime() / 1000
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    const input = wrapper.get<HTMLInputElement>('input[type="datetime-local"]')
+
+    for (const [label, expected] of [
+      ['payment.oneMonth', '2028-03-29T12:34'],
+      ['payment.oneYear', '2029-02-28T12:34'],
+    ]) {
+      const button = wrapper.findAll('button').find((candidate) => candidate.text() === label)!
+      expect(button.attributes('type')).toBe('button')
+      await button.trigger('click')
+      expect(input.element.value).toBe(expected)
+      expect(updateAccountMock).not.toHaveBeenCalled()
+    }
+
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.expires_at).toBe(new Date('2029-02-28T12:34:00').getTime() / 1000)
+    wrapper.unmount()
+  })
+
+  it('can clear a selected expiry preset before saving the account', async () => {
+    const account = buildAccount()
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    const button = wrapper.findAll('button').find((candidate) => candidate.text() === 'payment.oneYear')!
+    await button.trigger('click')
+    const input = wrapper.get<HTMLInputElement>('input[type="datetime-local"]')
+    expect(input.element.value).not.toBe('')
+    await input.setValue('')
+
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.expires_at).toBe(0)
+    wrapper.unmount()
+  })
+
+  it('allows removing assigned inactive groups and undoing the selection before saving', async () => {
+    authIsSimpleMode.value = false
+    const account = buildAccount()
+    const activeGroup = {
+      id: 1,
+      name: 'Active group',
+      platform: 'openai',
+      status: 'active',
+      subscription_type: 'standard',
+      rate_multiplier: 1
+    }
+    const inactiveGroup = { ...activeGroup, id: 2, name: 'Paused group', status: 'inactive' }
+    account.group_ids = [1, 2]
+    account.groups = [
+      { ...activeGroup, name: 'Outdated name' },
+      inactiveGroup,
+      inactiveGroup,
+      { ...inactiveGroup, id: 3, name: 'Unassigned paused group' }
+    ]
+    updateAccountMock.mockReset()
+    checkMixedChannelRiskMock.mockReset()
+    checkMixedChannelRiskMock.mockResolvedValue({ has_risk: false })
+    updateAccountMock.mockResolvedValue(account)
+
+    const wrapper = mountModal(account, true)
+    await wrapper.setProps({ groups: [activeGroup] as any })
+    const selector = wrapper.get('[data-tour="account-form-groups"]')
+    expect(selector.findAll('input[type="checkbox"]').map(input => input.attributes('value')))
+      .toEqual(['1', '2'])
+    expect(selector.text()).toContain('Active group')
+    expect(selector.text()).not.toContain('Outdated name')
+    const pausedCheckbox = selector.get<HTMLInputElement>('input[value="2"]')
+    expect(pausedCheckbox.element.checked).toBe(true)
+
+    await pausedCheckbox.setValue(false)
+    expect(selector.get<HTMLInputElement>('input[value="2"]').element.checked).toBe(false)
+    await pausedCheckbox.setValue(true)
+    expect(pausedCheckbox.element.checked).toBe(true)
+    await pausedCheckbox.setValue(false)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.group_ids).toEqual([1])
+    expect(account.group_ids).toEqual([1, 2])
+  })
+
   it('reopening the same account rehydrates the OpenAI whitelist from props', async () => {
     const account = buildAccount()
     updateAccountMock.mockReset()

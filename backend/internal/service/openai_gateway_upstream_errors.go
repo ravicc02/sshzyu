@@ -455,12 +455,8 @@ func (s *OpenAIGatewayService) newOpenAIAccountFailoverErrorWithClassificationHe
 		upstreamMsg,
 		retryableOnSameAccount || oauth429Retry,
 	)
-	// Gateway failures move directly to another eligible inference account,
-	// including OAuth and explicit pools. Preserve dedicated 429 policies.
-	status, healthFailure := classifyOpenAIAccountHealthFailure(failoverErr)
-	if account != nil && account.Platform == PlatformOpenAI && ((healthFailure && status == http.StatusBadGateway) || (statusCode == http.StatusServiceUnavailable && isOpenAIAccountCongestionFailure(failoverErr))) {
-		failoverErr.RetryableOnSameAccount = false
-	} else if s != nil && s.cfg != nil && s.cfg.Gateway.OpenAIScheduler.LatencyAwareEnabled && account != nil && account.Platform == PlatformOpenAI && account.Type == AccountTypeAPIKey && !account.IsPoolMode() && failoverErr.IsOpenAICapacityShed() {
+	if shouldDisable && account != nil && account.Platform == PlatformOpenAI && failoverErr.RequestScopedTransient {
+		// A configured model cooldown takes precedence over capacity-shed replay.
 		failoverErr.RetryableOnSameAccount = false
 	}
 	if oauth429Retry {

@@ -104,9 +104,9 @@ func TestOpenAIOverloadGatewayFailuresSwitchPoolsAndOAuth(t *testing.T) {
 		account *Account
 		same    bool
 	}{
-		{"independent relay", &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}, false},
-		{"explicit pool", &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Credentials: map[string]any{"pool_mode": true}}, false},
-		{"oauth", &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth}, false},
+		{"independent relay", &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}, true},
+		{"explicit pool", &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Credentials: map[string]any{"pool_mode": true}}, true},
+		{"oauth", &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			failure := overloadTestError(svc, tc.account)
@@ -121,7 +121,8 @@ func TestOpenAIOverloadGatewayFailuresSwitchEvenWithLatencyAwareDisabled(t *test
 	svc := &OpenAIGatewayService{cfg: dispatchTestScheduler().service.cfg}
 	svc.cfg.Gateway.OpenAIScheduler.LatencyAwareEnabled = false
 	account := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
-	require.False(t, overloadTestError(svc, account).RetryableOnSameAccount)
+	// 上游 v0.2.23 语义：过载故障允许同账号重试。
+	require.True(t, overloadTestError(svc, account).RetryableOnSameAccount)
 }
 
 func TestOpenAIOverloadAllowsUnboundResponsesEscapeButPreservesOwners(t *testing.T) {
@@ -242,7 +243,8 @@ func TestOpenAIOverloadFullSelectionMovesFromRelayToEligibleOAuth(t *testing.T) 
 	require.Equal(t, int64(279), first.Account.ID)
 	first.ReleaseFunc()
 	failure := overloadTestError(svc, first.Account)
-	require.False(t, failure.RetryableOnSameAccount)
+	// 上游 v0.2.23 语义：过载故障允许同账号重试。
+	require.True(t, failure.RetryableOnSameAccount)
 	svc.ReportOpenAIAccountScheduleResult(first.Account, "model", false, nil, failure)
 	second, _, err := svc.SelectAccountWithScheduler(context.Background(), &group, "", "", "model", nil, OpenAIUpstreamTransportAny, false)
 	require.NoError(t, err)

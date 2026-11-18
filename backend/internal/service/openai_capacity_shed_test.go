@@ -237,10 +237,18 @@ func TestOpenAIStreamMetadataAndKeepaliveBeforeOverloadFailOver(t *testing.T) {
 			require.Error(t, err)
 			var failoverErr *UpstreamFailoverError
 			require.ErrorAs(t, err, &failoverErr)
-			require.False(t, failoverErr.RetryableOnSameAccount)
+			// 上游 v0.2.23 语义：capacity-shed 属请求级故障，先允许同账号重试，再由引擎决定换号。
+			require.True(t, failoverErr.RetryableOnSameAccount)
 			require.True(t, failoverErr.RequestScopedTransient)
 			require.Equal(t, http.StatusServiceUnavailable, failoverErr.ClientStatusCode)
 			require.Contains(t, failoverErr.ClientMessage, "servers are currently overloaded")
+			if tt.name == "native" {
+				// Only the upstream keepalive events reach the client before first output.
+				require.Equal(t, "event: keepalive\ndata: {\"type\":\"keepalive\"}\n\ndata: {\"type\":\"keepalive\"}\n\n", rec.Body.String())
+				require.Equal(t, -1, OpenAICompactKeepaliveAdjustedWrittenSize(c))
+				require.Empty(t, rec.Header().Get("X-Request-Id"))
+				return
+			}
 			require.False(t, c.Writer.Written())
 			require.Empty(t, rec.Body.String())
 		})
@@ -352,8 +360,15 @@ func TestOpenAIStreamKeepaliveOnlyFailureDoesNotRecordFirstToken(t *testing.T) {
 			}
 			var failoverErr *UpstreamFailoverError
 			require.ErrorAs(t, err, &failoverErr)
-			require.False(t, failoverErr.RetryableOnSameAccount)
+			// 上游 v0.2.23 语义：capacity-shed 属请求级故障，先允许同账号重试，再由引擎决定换号。
+			require.True(t, failoverErr.RetryableOnSameAccount)
 			require.True(t, failoverErr.RequestScopedTransient)
+			if !passthrough {
+				// Only the upstream keepalive event reaches the client before first output.
+				require.Equal(t, "data: {\"type\":\"keepalive\"}\n\n", rec.Body.String())
+				require.Equal(t, -1, OpenAICompactKeepaliveAdjustedWrittenSize(c))
+				return
+			}
 			require.Empty(t, rec.Body.String())
 		})
 	}
@@ -395,7 +410,8 @@ func TestOpenAIStreamCapacityShedErrorFramePrecedingFailedStillFailsOver(t *test
 	require.Error(t, err)
 	var failoverErr *UpstreamFailoverError
 	require.ErrorAs(t, err, &failoverErr)
-	require.False(t, failoverErr.RetryableOnSameAccount)
+	// 上游 v0.2.23 语义：capacity-shed 属请求级故障，先允许同账号重试，再由引擎决定换号。
+	require.True(t, failoverErr.RetryableOnSameAccount)
 	require.True(t, failoverErr.RequestScopedTransient)
 	require.False(t, c.Writer.Written())
 	require.Empty(t, rec.Body.String())

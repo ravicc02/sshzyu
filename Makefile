@@ -8,6 +8,7 @@ FRONTEND_CRITICAL_VITEST := \
 	src/composables/__tests__/useModelWhitelist.spec.ts \
 	src/constants/__tests__/platforms.spec.ts \
 	src/components/account/__tests__/credentialsBuilder.platformCatalog.spec.ts \
+	src/components/account/__tests__/CNProviderQuotaCell.spec.ts \
 	src/components/account/__tests__/CreateAccountModal.spec.ts \
 	src/components/account/__tests__/EditAccountModal.spec.ts \
 	src/components/account/__tests__/credentialsBuilder.spec.ts \

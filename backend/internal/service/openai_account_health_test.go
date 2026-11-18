@@ -189,7 +189,8 @@ func TestOpenAIAccountHealthGatewayRetryPolicyDoesNotAlterQuotaOrPayloadPolicy(t
 		account := &Account{ID: 42, Platform: PlatformOpenAI, Type: kind, Credentials: map[string]any{"pool_mode": true}}
 		for _, status := range []int{502, 503} {
 			failure := svc.newOpenAIAccountFailoverError(account, status, nil, nil, "bad gateway", false, true)
-			require.False(t, failure.RetryableOnSameAccount)
+			// 上游 v0.2.23 语义：请求级网关故障允许同账号重试，换号由引擎决定。
+			require.True(t, failure.RetryableOnSameAccount)
 			require.True(t, failure.ShouldRetryNextAccount())
 		}
 		failure := svc.newOpenAIAccountFailoverError(account, 400, nil, nil, "bad payload", false, true)

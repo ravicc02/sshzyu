@@ -77,8 +77,8 @@ func TestNonStreamingSSEToJSON_CapacityFailedEventFailsOver(t *testing.T) {
 	var failoverErr *UpstreamFailoverError
 	require.ErrorAs(t, err, &failoverErr)
 	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
-	// 502 直接切到其他健康账号，与流式路径使用同一套策略。
-	require.False(t, failoverErr.RetryableOnSameAccount)
+	// 上游 v0.2.23 语义：502 容量降载为请求级故障，允许同账号重试后再换号。
+	require.True(t, failoverErr.RetryableOnSameAccount)
 	require.Contains(t, string(failoverErr.ResponseBody), "Selected model is at capacity")
 	// 换号的前提：一个字节都没写出去。
 	require.False(t, c.Writer.Written())
