@@ -124,7 +124,8 @@ func TestNotificationEmailAuthTemplatesAreListedAndPreviewable(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Contains(t, resetPreview.Subject, "Password reset")
-	require.Contains(t, resetPreview.HTML, "https://example.com/reset?token=abc")
+	require.Contains(t, resetPreview.HTML, "https://example.com/reset?email=user%40example.com")
+	require.Contains(t, resetPreview.HTML, "654321")
 }
 
 func TestNotificationEmailAdditionalEventsAreListedAndPreviewable(t *testing.T) {
