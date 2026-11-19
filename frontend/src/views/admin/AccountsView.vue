@@ -2,11 +2,7 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
-        <AccountManagementTabs :hosted="props.hosted" />
-        <div class="flex gap-2" role="group" :aria-label="t('admin.accounts.accountList')">
-          <button type="button" class="btn" :class="!archiveView ? 'btn-primary' : 'btn-secondary'" :aria-pressed="!archiveView" @click="switchArchiveView(false)">{{ t('admin.accounts.accountList') }}</button>
-          <button type="button" class="btn" :class="archiveView ? 'btn-primary' : 'btn-secondary'" :aria-pressed="archiveView" @click="switchArchiveView(true)">{{ t('admin.accounts.archivedAccounts') }}</button>
-        </div>
+        <AccountManagementTabs :hosted="props.hosted" :archived="archiveView" @archive="switchArchiveView(true)" @standard="switchArchiveView(false)" />
         <div class="flex flex-wrap-reverse items-start justify-between gap-3">
           <AccountTableFilters
             v-model:searchQuery="params.search"
@@ -182,6 +178,8 @@
       </template>
       <template #table>
         <AccountBulkActionsBar
+          :archived="archiveView"
+          @archive="bulkArchiveIds = [...selIds]"
           :selected-ids="selIds"
           :total-results="pagination.total"
           :selecting-all="selectingAllResults"
@@ -485,6 +483,7 @@
       @updated="handleBulkUpdated"
     />
     <TempUnschedStatusModal :show="showTempUnsched" :account="tempUnschedAcc" @close="showTempUnsched = false" @reset="handleTempUnschedReset" />
+    <ConfirmDialog :show="bulkArchiveIds.length > 0" :title="t('admin.accounts.bulkArchive')" :message="t('admin.accounts.bulkArchiveConfirm', { count: bulkArchiveIds.length })" @confirm="confirmBulkArchive" @cancel="!archiveBusy && (bulkArchiveIds = [])" />
     <ConfirmDialog :show="!!archivingAcc" :title="t(archivingAcc?.status === 'archived' ? 'admin.accounts.restoreAccount' : 'admin.accounts.archiveAccount')" :message="t(archivingAcc?.status === 'archived' ? 'admin.accounts.restoreConfirm' : 'admin.accounts.archiveConfirm', { name: archivingAcc?.name })" @confirm="confirmArchive" @cancel="archivingAcc = null" />
     <ConfirmDialog :show="showDeleteDialog" :title="t('admin.accounts.deleteAccount')" :message="t('admin.accounts.deleteConfirm', { name: deletingAcc?.name })" :confirm-text="t('common.delete')" :cancel-text="t('common.cancel')" :danger="true" @confirm="confirmDelete" @cancel="showDeleteDialog = false" />
     <ConfirmDialog :show="showCreateShadowDialog" :title="t('admin.accounts.createSparkShadow')" :message="t('admin.accounts.createSparkShadowConfirm', { name: creatingShadowAcc?.name })" @confirm="confirmCreateSparkShadow" @cancel="showCreateShadowDialog = false" />
@@ -1104,6 +1103,26 @@ const toggleColumn = (key: string) => {
   }
 }
 
+const bulkArchiveIds = ref<number[]>([])
+const confirmBulkArchive = async () => {
+  if (archiveBusy.value || bulkArchiveIds.value.length === 0) return
+  archiveBusy.value = true
+  const ids = [...bulkArchiveIds.value]
+  const failed: number[] = []
+  for (const id of ids) {
+    try {
+      await adminAPI.accounts.update(id, { status: 'archived' })
+    } catch {
+      failed.push(id)
+    }
+  }
+  bulkArchiveIds.value = []
+  archiveBusy.value = false
+  setSelectedIds(failed)
+  if (failed.length) appStore.showError(t('admin.accounts.bulkArchiveResult', { success: ids.length - failed.length, failed: failed.length }))
+  else appStore.showSuccess(t('admin.accounts.archiveSuccess'))
+  await reload()
+}
 const archiveView = ref(false)
 const archivingAcc = ref<Account | null>(null)
 const archiveBusy = ref(false)

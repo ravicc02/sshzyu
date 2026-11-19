@@ -42,8 +42,9 @@
         </button>
       </template>
     </div>
-    <div class="flex gap-2">
+    <div class="flex flex-wrap gap-2">
       <template v-if="selectedIds.length > 0">
+        <button v-if="!archived" @click="$emit('archive')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkArchive') }}</button>
         <button @click="$emit('delete')" class="btn btn-danger btn-sm">{{ t('admin.accounts.bulkActions.delete') }}</button>
         <button @click="$emit('reset-status')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.resetStatus') }}</button>
         <button @click="$emit('refresh-token')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.refreshToken') }}</button>
@@ -63,6 +64,7 @@
 import { useI18n } from 'vue-i18n'
 
 defineProps<{
+  archived?: boolean
   selectedIds: number[]
   totalResults: number
   selectingAll: boolean
@@ -70,6 +72,7 @@ defineProps<{
 }>()
 
 defineEmits([
+  'archive',
   'delete',
   'edit-selected',
   'edit-filtered',
