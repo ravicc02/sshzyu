@@ -1119,7 +1119,7 @@ const confirmArchive = async () => {
   archiveBusy.value = true
   const restoring = archivingAcc.value.status === 'archived'
   try {
-    await adminAPI.accounts.update(archivingAcc.value.id, { status: restoring ? 'inactive' : 'archived' })
+    await adminAPI.accounts.update(archivingAcc.value.id, { status: restoring ? 'active' : 'archived' })
     archivingAcc.value = null
     clearSelection()
     appStore.showSuccess(t(restoring ? 'admin.accounts.restoreSuccess' : 'admin.accounts.archiveSuccess'))
