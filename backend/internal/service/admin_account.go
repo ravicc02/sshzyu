@@ -862,7 +862,14 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		}
 	}
 	if input.Status != "" {
+		if account.Status == "archived" && input.Status != "archived" {
+			// 恢复只移回普通列表，保持停用，避免意外恢复计费流量。
+			account.Schedulable = false
+		}
 		account.Status = input.Status
+		if input.Status == "archived" {
+			account.Schedulable = false
+		}
 	}
 	if input.ExpiresAt != nil {
 		if *input.ExpiresAt <= 0 {
@@ -1032,12 +1039,17 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 
 	// 预取所有目标账号，供凭据守卫/代理守卫/混合渠道检查共用，避免多次 DB 查询。
 	var cachedTargets []*Account
-	if len(input.Credentials) > 0 || input.ProxyID != nil || needMixedChannelCheck || openAISettings.any() || input.ProbeEnabled != nil || input.RateMultiplier != nil {
+	if len(input.AccountIDs) > 0 {
 		loaded, err := s.accountRepo.GetByIDs(ctx, input.AccountIDs)
 		if err != nil {
 			return nil, err
 		}
 		cachedTargets = loaded
+		for _, account := range loaded {
+			if account != nil && account.Status == "archived" {
+				return nil, infraerrors.BadRequest("ACCOUNT_ARCHIVED", "restore archived accounts before using bulk actions")
+			}
+		}
 	}
 	targetsByID := make(map[int64]*Account, len(cachedTargets))
 	for _, account := range cachedTargets {
@@ -1377,6 +1389,13 @@ func (s *adminServiceImpl) SetAccountError(ctx context.Context, id int64, errorM
 }
 
 func (s *adminServiceImpl) SetAccountSchedulable(ctx context.Context, id int64, schedulable bool) (*Account, error) {
+	account, err := s.accountRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if schedulable && account.Status == "archived" {
+		return nil, infraerrors.BadRequest("ACCOUNT_ARCHIVED", "restore the archived account before enabling scheduling")
+	}
 	if err := s.accountRepo.SetSchedulable(ctx, id, schedulable); err != nil {
 		return nil, err
 	}

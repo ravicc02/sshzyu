@@ -539,7 +539,7 @@ func (r *accountRepository) updateLockedAccount(
 	account.Extra = extra
 
 	schedulable := account.Schedulable
-	if account.Status == service.StatusError {
+	if account.Status == service.StatusError || account.Status == "archived" {
 		schedulable = false
 	}
 
@@ -1039,6 +1039,9 @@ func (r *accountRepository) List(ctx context.Context, params pagination.Paginati
 
 func (r *accountRepository) accountListFilteredQuery(platform, accountType, status, search string, groupID int64, privacyMode string) *dbent.AccountQuery {
 	q := r.client.Account.Query()
+	if status != "archived" {
+		q = q.Where(dbaccount.StatusNEQ("archived"))
+	}
 
 	if platform != "" {
 		q = q.Where(dbaccount.PlatformEQ(platform))
@@ -1525,7 +1528,7 @@ func (r *accountRepository) BatchUpdateLastUsed(ctx context.Context, updates map
 
 func (r *accountRepository) SetError(ctx context.Context, id int64, errorMsg string) error {
 	_, err := r.client.Account.Update().
-		Where(dbaccount.IDEQ(id)).
+		Where(dbaccount.IDEQ(id), dbaccount.StatusNEQ("archived")).
 		SetStatus(service.StatusError).
 		SetErrorMessage(errorMsg).
 		SetSchedulable(false).
@@ -1914,7 +1917,7 @@ func (r *accountRepository) ClearError(ctx context.Context, id int64) error {
 		return scoped.ClearError(ctx, id)
 	}
 	_, err := r.client.Account.Update().
-		Where(dbaccount.IDEQ(id)).
+		Where(dbaccount.IDEQ(id), dbaccount.StatusNEQ("archived")).
 		SetStatus(service.StatusActive).
 		SetErrorMessage("").
 		Save(ctx)
@@ -2808,7 +2811,7 @@ func (r *accountRepository) SetSchedulable(ctx context.Context, id int64, schedu
 		return scoped.SetSchedulable(ctx, id, schedulable)
 	}
 	_, err := r.client.Account.Update().
-		Where(dbaccount.IDEQ(id)).
+		Where(dbaccount.IDEQ(id), dbaccount.StatusNEQ("archived")).
 		SetSchedulable(schedulable).
 		Save(ctx)
 	if err != nil {
@@ -3357,7 +3360,8 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 
 	setClauses = append(setClauses, "updated_at = NOW()")
 
-	whereClause := " WHERE id = ANY($" + itoa(idx) + ") AND deleted_at IS NULL"
+	// 归档账号只能通过单账号恢复操作退出归档，批量工具不得重新启用。
+	whereClause := " WHERE id = ANY($" + itoa(idx) + ") AND deleted_at IS NULL AND status <> 'archived'"
 	args = append(args, pq.Array(ids))
 	idx++
 	if updates.ProbeEnabled != nil {

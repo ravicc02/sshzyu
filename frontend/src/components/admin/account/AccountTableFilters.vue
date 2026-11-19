@@ -10,7 +10,7 @@
     />
     <Select :model-value="filters.platform" class="min-w-0 sm:w-40" :options="pOpts" @update:model-value="updatePlatform" @change="$emit('change')" />
     <Select :model-value="filters.type" class="min-w-0 sm:w-40" :options="tOpts" @update:model-value="updateType" @change="$emit('change')" />
-    <Select :model-value="filters.status" class="min-w-0 sm:w-40" :options="sOpts" @update:model-value="updateStatus" @change="$emit('change')" />
+    <Select v-if="filters.status !== 'archived'" :model-value="filters.status" class="min-w-0 sm:w-40" :options="sOpts" @update:model-value="updateStatus" @change="$emit('change')" />
     <Select :model-value="filters.privacy_mode" class="min-w-0 sm:w-48" :options="privacyOpts" @update:model-value="updatePrivacyMode" @change="$emit('change')" />
     <Select :model-value="filters.group" class="col-span-2 min-w-0 sm:w-40" :options="gOpts" @update:model-value="updateGroup" @change="$emit('change')" />
   </div>

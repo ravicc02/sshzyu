@@ -3,12 +3,16 @@
     <TablePageLayout>
       <template #filters>
         <AccountManagementTabs :hosted="props.hosted" />
+        <div class="flex gap-2" role="group" :aria-label="t('admin.accounts.accountList')">
+          <button type="button" class="btn" :class="!archiveView ? 'btn-primary' : 'btn-secondary'" :aria-pressed="!archiveView" @click="switchArchiveView(false)">{{ t('admin.accounts.accountList') }}</button>
+          <button type="button" class="btn" :class="archiveView ? 'btn-primary' : 'btn-secondary'" :aria-pressed="archiveView" @click="switchArchiveView(true)">{{ t('admin.accounts.archivedAccounts') }}</button>
+        </div>
         <div class="flex flex-wrap-reverse items-start justify-between gap-3">
           <AccountTableFilters
             v-model:searchQuery="params.search"
             :filters="params"
             :groups="groups"
-            @update:filters="(newFilters) => Object.assign(params, newFilters)"
+            @update:filters="(newFilters) => Object.assign(params, newFilters, archiveView ? { status: 'archived' } : {})"
             @change="debouncedReload"
             @update:searchQuery="debouncedReload"
           />
@@ -441,6 +445,10 @@
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                 <span class="text-xs">{{ t('common.edit') }}</span>
               </button>
+              <button type="button" @click="archivingAcc = row" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4h18v4H3zM5 8v12h14V8M10 12h4" /></svg>
+                <span class="whitespace-nowrap text-xs">{{ t(row.status === 'archived' ? 'admin.accounts.restoreAccount' : 'admin.accounts.archiveAccount') }}</span>
+              </button>
               <button @click="handleDelete(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                 <span class="text-xs">{{ t('common.delete') }}</span>
@@ -477,6 +485,7 @@
       @updated="handleBulkUpdated"
     />
     <TempUnschedStatusModal :show="showTempUnsched" :account="tempUnschedAcc" @close="showTempUnsched = false" @reset="handleTempUnschedReset" />
+    <ConfirmDialog :show="!!archivingAcc" :title="t(archivingAcc?.status === 'archived' ? 'admin.accounts.restoreAccount' : 'admin.accounts.archiveAccount')" :message="t(archivingAcc?.status === 'archived' ? 'admin.accounts.restoreConfirm' : 'admin.accounts.archiveConfirm', { name: archivingAcc?.name })" @confirm="confirmArchive" @cancel="archivingAcc = null" />
     <ConfirmDialog :show="showDeleteDialog" :title="t('admin.accounts.deleteAccount')" :message="t('admin.accounts.deleteConfirm', { name: deletingAcc?.name })" :confirm-text="t('common.delete')" :cancel-text="t('common.cancel')" :danger="true" @confirm="confirmDelete" @cancel="showDeleteDialog = false" />
     <ConfirmDialog :show="showCreateShadowDialog" :title="t('admin.accounts.createSparkShadow')" :message="t('admin.accounts.createSparkShadowConfirm', { name: creatingShadowAcc?.name })" @confirm="confirmCreateSparkShadow" @cancel="showCreateShadowDialog = false" />
     <ConfirmDialog :show="showExportDataDialog" :title="t('admin.accounts.dataExport')" :message="t('admin.accounts.dataExportConfirmMessage')" :confirm-text="t('admin.accounts.dataExportConfirm')" :cancel-text="t('common.cancel')" @confirm="handleExportData" @cancel="showExportDataDialog = false">
@@ -1095,12 +1104,39 @@ const toggleColumn = (key: string) => {
   }
 }
 
+const archiveView = ref(false)
+const archivingAcc = ref<Account | null>(null)
+const archiveBusy = ref(false)
+const switchArchiveView = (archived: boolean) => {
+  if (archiveView.value === archived) return
+  archiveView.value = archived
+  params.status = archived ? 'archived' : ''
+  clearSelection()
+  reload()
+}
+const confirmArchive = async () => {
+  if (!archivingAcc.value || archiveBusy.value) return
+  archiveBusy.value = true
+  const restoring = archivingAcc.value.status === 'archived'
+  try {
+    await adminAPI.accounts.update(archivingAcc.value.id, { status: restoring ? 'inactive' : 'archived' })
+    archivingAcc.value = null
+    clearSelection()
+    appStore.showSuccess(t(restoring ? 'admin.accounts.restoreSuccess' : 'admin.accounts.archiveSuccess'))
+    await reload()
+  } catch (error: any) {
+    appStore.showError(error?.response?.data?.message || t('common.error'))
+  } finally {
+    archiveBusy.value = false
+  }
+}
 const isColumnVisible = (key: string) => !hiddenColumns.has(key)
 const shouldIncludeSchedulerScore = () => isColumnVisible('scheduler_score')
 const syncAccountListDerivedParams = () => {
   // Keep every load path, including auto-refresh and sorting, aligned with the current column visibility.
   const requestParams = params as any
   requestParams.ownership = accountOwnership.value
+  if (archiveView.value) requestParams.status = 'archived'
   requestParams.include_scheduler_score = shouldIncludeSchedulerScore() ? '1' : '0'
 }
 
