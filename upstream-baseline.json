@@ -3,7 +3,7 @@
   "upstream_release": "v0.2.23",
   "upstream_commit": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
   "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.23",
-  "local_build_version": "0.2.23-r1",
+  "local_build_version": "0.2.23-r2",
   "integration_commit": "a27b27832",
   "integrated_at": "2026-11-18",
   "verified_at": "2026-11-18",
