@@ -543,7 +543,7 @@ export interface ForgotPasswordResponse {
 }
 
 /**
- * Request password reset link
+ * Request a password reset verification code
  * @param request - Email and optional Turnstile token
  * @returns Response with message
  */
@@ -569,8 +569,8 @@ export interface ResetPasswordResponse {
 }
 
 /**
- * Reset password with token
- * @param request - Email, token, and new password
+ * Reset password with an emailed code (or a previously issued legacy link token)
+ * @param request - Email, verification code in token, and new password
  * @returns Response with message
  */
 export async function resetPassword(request: ResetPasswordRequest): Promise<ResetPasswordResponse> {

@@ -15,9 +15,7 @@
       <div v-if="isSubmitted" class="space-y-6">
         <div class="rounded-xl border border-green-200 bg-green-50 p-6 dark:border-green-800/50 dark:bg-green-900/20">
           <div class="flex flex-col items-center gap-4 text-center">
-            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-800/50">
-              <Icon name="checkCircle" size="lg" class="text-green-600 dark:text-green-400" />
-            </div>
+            <Icon name="checkCircle" size="lg" class="text-green-600 dark:text-green-400" />
             <div>
               <h3 class="text-lg font-semibold text-green-800 dark:text-green-200">
                 {{ t('auth.resetEmailSent') }}
@@ -28,16 +26,10 @@
             </div>
           </div>
         </div>
-
-        <div class="text-center">
-          <router-link
-            to="/login"
-            class="inline-flex items-center gap-2 font-medium text-primary-600 transition-colors hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
-          >
-            <Icon name="arrowLeft" size="sm" />
-            {{ t('auth.backToLogin') }}
-          </router-link>
-        </div>
+        <router-link
+          :to="{ path: '/reset-password', query: { email: formData.email.trim() } }"
+          class="btn btn-primary w-full text-center"
+        >{{ t('auth.enterResetCode') }}</router-link>
       </div>
 
       <!-- Form State -->

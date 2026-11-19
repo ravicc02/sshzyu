@@ -501,24 +501,36 @@ func (s *EmailService) GeneratePasswordResetToken() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-// SendPasswordResetEmail sends a password reset email with a reset link
+// SendPasswordResetEmail sends a password reset code; legacy custom templates still receive a link
 func (s *EmailService) SendPasswordResetEmail(ctx context.Context, email, siteName, resetURL string, locale ...string) error {
-	// Only the SHA-256 hash of the token is stored, so an existing token cannot be
-	// re-sent; always issue a fresh token (the email cooldown bounds resend frequency).
-	token, err := s.GeneratePasswordResetToken()
+	// Store only a hash of the one-time code; the email cooldown bounds resends.
+	token, err := s.GenerateVerifyCode()
 	if err != nil {
-		return fmt.Errorf("generate token: %w", err)
+		return fmt.Errorf("generate reset code: %w", err)
 	}
 	data := &PasswordResetTokenData{
 		Token:     hashPasswordResetToken(token),
 		CreatedAt: time.Now(),
 	}
+
+	// Custom legacy templates may still only contain {{reset_url}}. Preserve their
+	// working one-time link until administrators update them to include the code.
+	fullResetURL := fmt.Sprintf("%s?email=%s", resetURL, url.QueryEscape(email))
+	if s.notificationEmailService != nil {
+		tmpl, templateErr := s.notificationEmailService.GetTemplate(ctx, NotificationEmailEventAuthPasswordReset, firstEmailLocale(locale))
+		if templateErr == nil && !strings.Contains(tmpl.Subject+tmpl.HTML, "{{verification_code}}") {
+			legacyToken, err := s.GeneratePasswordResetToken()
+			if err != nil {
+				return fmt.Errorf("generate legacy reset token: %w", err)
+			}
+			token = legacyToken
+			data.Token = hashPasswordResetToken(token)
+			fullResetURL += "&token=" + url.QueryEscape(token)
+		}
+	}
 	if err := s.cache.SetPasswordResetToken(ctx, email, data, passwordResetTokenTTL); err != nil {
 		return fmt.Errorf("save reset token: %w", err)
 	}
-
-	// Build full reset URL with URL-encoded token and email
-	fullResetURL := fmt.Sprintf("%s?email=%s&token=%s", resetURL, url.QueryEscape(email), url.QueryEscape(token))
 
 	if s.notificationEmailService != nil {
 		err := s.notificationEmailService.Send(ctx, NotificationEmailSendInput{
@@ -528,6 +540,7 @@ func (s *EmailService) SendPasswordResetEmail(ctx context.Context, email, siteNa
 			RecipientName:  emailRecipientName(email),
 			Variables: map[string]string{
 				"reset_url":          fullResetURL,
+				"verification_code":  token,
 				"expires_in_minutes": strconv.Itoa(int(passwordResetTokenTTL / time.Minute)),
 			},
 		})
@@ -540,9 +553,23 @@ func (s *EmailService) SendPasswordResetEmail(ctx context.Context, email, siteNa
 		slog.Warn("failed to send templated password reset email, falling back to legacy template", "recipient_hash", notificationEmailHash(email), "error", err)
 	}
 
+	// If the custom template cannot be delivered, the fallback must use a
+	// six-digit code rather than exposing a legacy link token as a code.
+	if len(token) != 6 {
+		code, codeErr := s.GenerateVerifyCode()
+		if codeErr != nil {
+			return fmt.Errorf("generate fallback reset code: %w", codeErr)
+		}
+		token = code
+		data.Token = hashPasswordResetToken(code)
+		if err := s.cache.SetPasswordResetToken(ctx, email, data, passwordResetTokenTTL); err != nil {
+			return fmt.Errorf("save fallback reset code: %w", err)
+		}
+		fullResetURL = fmt.Sprintf("%s?email=%s", resetURL, url.QueryEscape(email))
+	}
 	// Build email content
 	subject := fmt.Sprintf("[%s] 密码重置请求", siteName)
-	body := s.buildPasswordResetEmailBody(fullResetURL, siteName)
+	body := s.buildPasswordResetEmailBody(fullResetURL, siteName, token)
 
 	// Send email
 	if err := s.SendEmail(ctx, email, subject, body); err != nil {
@@ -597,9 +624,10 @@ func (s *EmailService) VerifyPasswordResetToken(ctx context.Context, email, toke
 
 // ConsumePasswordResetToken verifies and deletes the token atomically (one-time use).
 func (s *EmailService) ConsumePasswordResetToken(ctx context.Context, email, token string) error {
-	// Constant-time pre-check in Go; the atomic compare-and-delete below is authoritative.
-	if err := s.VerifyPasswordResetToken(ctx, email, token); err != nil {
-		return err
+	// Redis performs compare, attempt accounting and single-use deletion atomically.
+	// Avoid a separate pre-check: concurrent guesses must count towards the same cap.
+	if token == "" {
+		return ErrInvalidResetToken
 	}
 	ok, err := s.cache.ConsumePasswordResetToken(ctx, email, hashPasswordResetToken(token))
 	if err != nil {
@@ -613,7 +641,7 @@ func (s *EmailService) ConsumePasswordResetToken(ctx context.Context, email, tok
 }
 
 // buildPasswordResetEmailBody builds the HTML content for password reset email
-func (s *EmailService) buildPasswordResetEmailBody(resetURL, siteName string) string {
+func (s *EmailService) buildPasswordResetEmailBody(resetURL, siteName, code string) string {
 	return fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
@@ -640,10 +668,11 @@ func (s *EmailService) buildPasswordResetEmailBody(resetURL, siteName string) st
         </div>
         <div class="content">
             <p style="font-size: 18px; color: #333;">密码重置请求</p>
-            <p style="color: #666;">您已请求重置密码。请点击下方按钮设置新密码：</p>
-            <a href="%s" class="button">重置密码</a>
+            <p style="color: #666;">您已请求重置密码，请输入以下验证码并设置新密码：</p>
+            <p style="font-size: 32px; font-weight: 700; letter-spacing: 8px;">%s</p>
+            <a href="%s" class="button">设置新密码</a>
             <div class="info">
-                <p>此链接将在 <strong>30 分钟</strong>后失效。</p>
+                <p>验证码将在 <strong>30 分钟</strong>后失效。</p>
                 <p class="warning">如果您没有请求重置密码，请忽略此邮件。您的密码将保持不变。</p>
             </div>
             <div class="link-fallback">
@@ -657,5 +686,5 @@ func (s *EmailService) buildPasswordResetEmailBody(resetURL, siteName string) st
     </div>
 </body>
 </html>
-`, html.EscapeString(siteName), html.EscapeString(resetURL), html.EscapeString(resetURL))
+`, html.EscapeString(siteName), html.EscapeString(code), html.EscapeString(resetURL), html.EscapeString(resetURL))
 }

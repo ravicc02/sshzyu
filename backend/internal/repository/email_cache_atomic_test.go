@@ -130,20 +130,31 @@ func TestEmailCache_PasswordResetTokenHashedAndSingleUse(t *testing.T) {
 	require.False(t, mr.Exists(passwordResetKey(email)))
 }
 
-func TestEmailCache_ConsumePasswordResetTokenMismatchKeepsToken(t *testing.T) {
+func TestEmailCache_ResetCodeAttemptLimitAndSingleUse(t *testing.T) {
 	cache, mr, _ := newMiniredisEmailCache(t)
 	ctx := context.Background()
 	email := "keep@example.com"
+	key := passwordResetKey(email)
 	require.NoError(t, cache.SetPasswordResetToken(ctx, email, &service.PasswordResetTokenData{Token: "abc"}, time.Minute))
 
-	ok, err := cache.ConsumePasswordResetToken(ctx, email, "xyz")
-	require.NoError(t, err)
-	require.False(t, ok)
-	require.True(t, mr.Exists(passwordResetKey(email)))
-
-	ok, err = cache.ConsumePasswordResetToken(ctx, email, "abc")
+	for i := 0; i < 4; i++ {
+		ok, err := cache.ConsumePasswordResetToken(ctx, email, "xyz")
+		require.NoError(t, err)
+		require.False(t, ok)
+		require.True(t, mr.Exists(key))
+	}
+	ok, err := cache.ConsumePasswordResetToken(ctx, email, "abc")
 	require.NoError(t, err)
 	require.True(t, ok)
+	require.False(t, mr.Exists(key+attemptsKeySuffix))
+
+	require.NoError(t, cache.SetPasswordResetToken(ctx, email, &service.PasswordResetTokenData{Token: "abc"}, time.Minute))
+	for i := 0; i < 5; i++ {
+		ok, err = cache.ConsumePasswordResetToken(ctx, email, "xyz")
+		require.NoError(t, err)
+		require.False(t, ok)
+	}
+	require.False(t, mr.Exists(key))
 	ok, err = cache.ConsumePasswordResetToken(ctx, email, "abc")
 	require.NoError(t, err)
 	require.False(t, ok)

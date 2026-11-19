@@ -629,7 +629,7 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	}
 
 	response.Success(c, ForgotPasswordResponse{
-		Message: "If your email is registered, you will receive a password reset link shortly.",
+		Message: "If your email is registered, you will receive a password reset code shortly.",
 	})
 }
 

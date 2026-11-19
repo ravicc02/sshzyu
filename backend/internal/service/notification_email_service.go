@@ -1048,10 +1048,10 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 	NotificationEmailEventAuthPasswordReset: {
 		Event:        NotificationEmailEventAuthPasswordReset,
 		Label:        "Password reset",
-		Description:  "Sent when a user requests a password reset link.",
+		Description:  "Sent when a user requests a password reset verification code.",
 		Category:     "auth",
 		Optional:     false,
-		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "reset_url", "expires_in_minutes"),
+		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "reset_url", "verification_code", "expires_in_minutes"),
 	},
 	NotificationEmailEventNotificationEmailVerifyCode: {
 		Event:        NotificationEmailEventNotificationEmailVerifyCode,
@@ -1180,9 +1180,10 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 			Subject: "[{{site_name}}] Password reset request",
 			HTML: notificationEmailCard("#7c3aed", "Password reset", `
 <p>Hello {{recipient_name}},</p>
-<p>We received a request to reset your password. Click the button below to set a new password.</p>
-<p><a class="button" href="{{reset_url}}">Reset password</a></p>
-<p>This link expires in <strong>{{expires_in_minutes}}</strong> minutes.</p>
+<p>We received a request to reset your password. Enter this verification code and choose a new password:</p>
+<p style="font-size: 32px; font-weight: 700; letter-spacing: 8px; text-align: center;">{{verification_code}}</p>
+<p><a class="button" href="{{reset_url}}">Set new password</a></p>
+<p>This code expires in <strong>{{expires_in_minutes}}</strong> minutes.</p>
 <p class="muted">If the button does not work, copy this link into your browser:<br>{{reset_url}}</p>
 <p>If you did not request this, you can safely ignore this email.</p>`),
 		},
@@ -1190,9 +1191,10 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 			Subject: "[{{site_name}}] 密码重置请求",
 			HTML: notificationEmailCard("#7c3aed", "密码重置", `
 <p>{{recipient_name}}，您好：</p>
-<p>我们收到了您的密码重置请求，请点击下方按钮设置新密码。</p>
-<p><a class="button" href="{{reset_url}}">重置密码</a></p>
-<p>此链接将在 <strong>{{expires_in_minutes}}</strong> 分钟后失效。</p>
+<p>我们收到了您的密码重置请求，请输入以下验证码并设置新密码。</p>
+<p style="font-size: 32px; font-weight: 700; letter-spacing: 8px; text-align: center;">{{verification_code}}</p>
+<p><a class="button" href="{{reset_url}}">设置新密码</a></p>
+<p>验证码将在 <strong>{{expires_in_minutes}}</strong> 分钟后失效。</p>
 <p class="muted">如果按钮无法点击，请复制以下链接到浏览器中打开：<br>{{reset_url}}</p>
 <p>如果不是您本人操作，请忽略此邮件。</p>`),
 		},

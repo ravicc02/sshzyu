@@ -99,6 +99,7 @@ func TestNotificationEmailAuthTemplatesAreListedAndPreviewable(t *testing.T) {
 	require.False(t, events[NotificationEmailEventAuthPasswordReset].Optional)
 	require.Contains(t, events[NotificationEmailEventAuthVerifyCode].Placeholders, "verification_code")
 	require.Contains(t, events[NotificationEmailEventAuthPasswordReset].Placeholders, "reset_url")
+	require.Contains(t, events[NotificationEmailEventAuthPasswordReset].Placeholders, "verification_code")
 
 	verifyPreview, err := svc.PreviewTemplate(ctx, NotificationEmailPreviewInput{
 		Event:  NotificationEmailEventAuthVerifyCode,
@@ -116,7 +117,8 @@ func TestNotificationEmailAuthTemplatesAreListedAndPreviewable(t *testing.T) {
 		Event:  NotificationEmailEventAuthPasswordReset,
 		Locale: "en",
 		Variables: map[string]string{
-			"reset_url":          "https://example.com/reset?token=abc",
+			"reset_url":          "https://example.com/reset?email=user%40example.com",
+			"verification_code":  "654321",
 			"expires_in_minutes": "30",
 		},
 	})

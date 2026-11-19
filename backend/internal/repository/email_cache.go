@@ -38,19 +38,24 @@ end
 return n
 `)
 
-// consumeResetTokenScript atomically compares the stored token hash and deletes it.
-// KEYS[1] = reset key, ARGV[1] = expected token hash. Returns 1 on success, 0 otherwise.
+// Each failed reset-code guess consumes an attempt atomically; the fifth failure
+// invalidates the code. Legacy high-entropy reset links remain single-use.
 var consumeResetTokenScript = redis.NewScript(`
 local v = redis.call('GET', KEYS[1])
-if not v then
-  return 0
-end
+if not v then return 0 end
 local ok, d = pcall(cjson.decode, v)
-if not ok or type(d) ~= 'table' or d['Token'] ~= ARGV[1] then
-  return 0
+if not ok or type(d) ~= 'table' then return 0 end
+if d['Token'] == ARGV[1] then
+  redis.call('DEL', KEYS[1], KEYS[2])
+  return 1
 end
-redis.call('DEL', KEYS[1])
-return 1
+if ARGV[2] == '1' then
+  local n = redis.call('INCR', KEYS[2])
+  local ttl = redis.call('PTTL', KEYS[1])
+  if ttl > 0 then redis.call('PEXPIRE', KEYS[2], ttl) end
+  if n >= 5 then redis.call('DEL', KEYS[1], KEYS[2]) end
+end
+return 0
 `)
 
 // verifyCodeKey generates the Redis key for email verification code.
@@ -166,13 +171,18 @@ func (c *emailCache) SetPasswordResetToken(ctx context.Context, email string, da
 	if err != nil {
 		return err
 	}
-	return c.rdb.Set(ctx, key, val, ttl).Err()
+	pipe := c.rdb.TxPipeline()
+	pipe.Set(ctx, key, val, ttl)
+	pipe.Del(ctx, key+attemptsKeySuffix)
+	_, err = pipe.Exec(ctx)
+	return err
 }
 
 // ConsumePasswordResetToken atomically deletes the stored reset token when its
 // stored hash equals tokenHash. Returns true only for the single winning caller.
 func (c *emailCache) ConsumePasswordResetToken(ctx context.Context, email, tokenHash string) (bool, error) {
-	n, err := consumeResetTokenScript.Run(ctx, c.rdb, []string{passwordResetKey(email)}, tokenHash).Int()
+	key := passwordResetKey(email)
+	n, err := consumeResetTokenScript.Run(ctx, c.rdb, []string{key, key + attemptsKeySuffix}, tokenHash, "1").Int()
 	if err != nil {
 		return false, err
 	}

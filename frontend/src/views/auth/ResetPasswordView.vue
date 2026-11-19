@@ -11,7 +11,7 @@
         </p>
       </div>
 
-      <!-- Invalid Link State -->
+      <!-- Missing email state -->
       <div v-if="isInvalidLink" class="space-y-6">
         <div class="rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800/50 dark:bg-amber-900/20">
           <div class="flex flex-col items-center gap-4 text-center">
@@ -88,6 +88,25 @@
               class="input pl-11 bg-gray-50 dark:bg-dark-700"
             />
           </div>
+        </div>
+
+        <!-- Email verification code -->
+        <div v-if="!legacyLink">
+          <label for="resetCode" class="input-label">{{ t('auth.resetCode') }}</label>
+          <input
+            id="resetCode"
+            v-model="formData.code"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            pattern="[0-9]{6}"
+            maxlength="6"
+            required
+            :disabled="isLoading"
+            class="input"
+            :class="{ 'input-error': errors.code }"
+            :placeholder="t('auth.resetCodePlaceholder')"
+          />
         </div>
 
         <!-- New Password Input -->
@@ -226,19 +245,22 @@ const showConfirmPassword = ref<boolean>(false)
 // URL parameters
 const email = ref<string>('')
 const token = ref<string>('')
+const legacyLink = computed(() => Boolean(token.value))
 
 const formData = reactive({
+  code: '',
   password: '',
   confirmPassword: ''
 })
 
 const errors = reactive({
+  code: '',
   password: '',
   confirmPassword: ''
 })
 
 const validationToastMessage = computed(
-  () => errors.password || errors.confirmPassword || ''
+  () => errors.code || errors.password || errors.confirmPassword || ''
 )
 
 watch(validationToastMessage, (value, previousValue) => {
@@ -247,17 +269,17 @@ watch(validationToastMessage, (value, previousValue) => {
   }
 })
 
-// Check if the reset link is valid (has email and token)
-const isInvalidLink = computed(() => !email.value || !token.value)
+// A reset email is required; the code is entered on this page.
+const isInvalidLink = computed(() => !email.value)
 
 // ==================== Lifecycle ====================
 
 onMounted(() => {
-  // Get email and token from URL query parameters
+  // Legacy reset links retain their one-time token; new emails contain a code.
   email.value = (route.query.email as string) || ''
   token.value = (route.query.token as string) || ''
 
-  if (!email.value || !token.value) {
+  if (!email.value) {
     appStore.showError(t('auth.invalidResetLink'))
   }
 })
@@ -265,10 +287,15 @@ onMounted(() => {
 // ==================== Validation ====================
 
 function validateForm(): boolean {
+  errors.code = ''
   errors.password = ''
   errors.confirmPassword = ''
 
   let isValid = true
+  if (!legacyLink.value && !/^[0-9]{6}$/.test(formData.code)) {
+    errors.code = t('auth.invalidResetCode')
+    isValid = false
+  }
 
   // Password validation
   if (!formData.password) {
@@ -305,7 +332,7 @@ async function handleSubmit(): Promise<void> {
   try {
     await resetPassword({
       email: email.value,
-      token: token.value,
+      token: legacyLink.value ? token.value : formData.code,
       new_password: formData.password
     })
 

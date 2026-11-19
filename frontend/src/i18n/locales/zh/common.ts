@@ -431,18 +431,22 @@ export default {
     // 忘记密码
     forgotPassword: '忘记密码？',
     forgotPasswordTitle: '重置密码',
-    forgotPasswordHint: '输入您的邮箱地址，我们将向您发送密码重置链接。',
-    sendResetLink: '发送重置链接',
+    forgotPasswordHint: '输入您的邮箱地址，我们将向您发送密码重置验证码。',
+    sendResetLink: '发送验证码',
     sendingResetLink: '发送中...',
-    sendResetLinkFailed: '发送重置链接失败，请重试。',
-    resetEmailSent: '重置链接已发送',
+    sendResetLinkFailed: '发送验证码失败，请重试。',
+    resetEmailSent: '请求已受理',
     resetEmailSentHint:
-      '如果该邮箱已注册，您将很快收到密码重置链接。请检查您的收件箱和垃圾邮件文件夹。',
+      '如果该邮箱已注册，您将很快收到密码重置验证码。请检查收件箱和垃圾邮件文件夹。验证码 30 分钟内有效。',
+    enterResetCode: '输入验证码并设置新密码',
+    resetCode: '邮件验证码',
+    resetCodePlaceholder: '请输入 6 位验证码',
+    invalidResetCode: '请输入有效的 6 位验证码',
     backToLogin: '返回登录',
     rememberedPassword: '想起密码了？',
     // 重置密码
     resetPasswordTitle: '设置新密码',
-    resetPasswordHint: '请在下方输入您的新密码。',
+    resetPasswordHint: '输入邮件验证码，并设置您的新密码。',
     newPassword: '新密码',
     newPasswordPlaceholder: '输入新密码',
     confirmPassword: '确认密码',
@@ -454,10 +458,10 @@ export default {
     resetPasswordFailed: '重置密码失败，请重试。',
     passwordResetSuccess: '密码重置成功',
     passwordResetSuccessHint: '您的密码已重置。现在可以使用新密码登录。',
-    invalidResetLink: '无效的重置链接',
-    invalidResetLinkHint: '此密码重置链接无效或已过期。请重新请求一个新链接。',
-    requestNewResetLink: '请求新的重置链接',
-    invalidOrExpiredToken: '密码重置链接无效或已过期。请重新请求一个新链接。'
+    invalidResetLink: '缺少邮箱地址',
+    invalidResetLinkHint: '请先在忘记密码页面填写邮箱并获取验证码。',
+    requestNewResetLink: '获取新的验证码',
+    invalidOrExpiredToken: '验证码无效、已过期或尝试次数过多，请重新获取验证码。'
   },
 
   // Step-up（敏感操作二次验证）
