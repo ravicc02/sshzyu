@@ -37,29 +37,30 @@ func TestBuildPasswordResetEmailBody_EscapesSiteName(t *testing.T) {
 	svc := &EmailService{}
 
 	t.Run("escapes_html_tags_in_site_name", func(t *testing.T) {
-		body := svc.buildPasswordResetEmailBody("https://example.com/reset?token=abc", `</h1><img src=x onerror=alert(1)>`)
+		body := svc.buildPasswordResetEmailBody("https://example.com/reset?token=abc", `</h1><img src=x onerror=alert(1)>`, "123456")
 
 		assert.NotContains(t, body, "<img src=x")
 		assert.True(t, strings.Contains(body, "&lt;img"))
 	})
 
 	t.Run("escapes_html_entities", func(t *testing.T) {
-		body := svc.buildPasswordResetEmailBody("https://example.com/reset", `A&B<C>`)
+		body := svc.buildPasswordResetEmailBody("https://example.com/reset", `A&B<C>`, "123456")
 
 		assert.Contains(t, body, "A&amp;B&lt;C&gt;")
 	})
 
 	t.Run("normal_site_name_and_url_unchanged", func(t *testing.T) {
 		resetURL := "https://example.com/reset?token=xyz"
-		body := svc.buildPasswordResetEmailBody(resetURL, "Sub2API")
+		body := svc.buildPasswordResetEmailBody(resetURL, "Sub2API", "654321")
 
 		assert.Contains(t, body, "<h1>Sub2API</h1>")
+		assert.Contains(t, body, "654321")
 		assert.Contains(t, body, resetURL)
 	})
 
 	t.Run("escapes_ampersand_in_reset_url", func(t *testing.T) {
 		resetURL := "https://example.com/reset?a=1&b=2"
-		body := svc.buildPasswordResetEmailBody(resetURL, "Site")
+		body := svc.buildPasswordResetEmailBody(resetURL, "Site", "123456")
 
 		assert.NotContains(t, body, `href="https://example.com/reset?a=1&b=2"`)
 		assert.Contains(t, body, `href="https://example.com/reset?a=1&amp;b=2"`)

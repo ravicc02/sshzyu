@@ -323,7 +323,7 @@ func TestBulkUpdateProbeEligibilityMismatchRollsBack(t *testing.T) {
 
 	enabled := true
 	mock.ExpectBegin()
-	mock.ExpectExec(`(?s)UPDATE accounts SET extra = .* WHERE id = ANY\(\$2\) AND deleted_at IS NULL AND type = \$3`).
+	mock.ExpectExec(`(?s)UPDATE accounts SET extra = .* WHERE id = ANY\(\$2\) AND deleted_at IS NULL AND status <> 'archived' AND type = \$3`).
 		WithArgs(sqlmock.AnyArg(), `{27,28}`, service.AccountTypeAPIKey).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectRollback()
