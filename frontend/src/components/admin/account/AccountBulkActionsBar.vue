@@ -44,7 +44,8 @@
     </div>
     <div class="flex flex-wrap gap-2">
       <template v-if="selectedIds.length > 0">
-        <button v-if="!archived" @click="$emit('archive')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkArchive') }}</button>
+        <button v-if="archived" @click="$emit('restore')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkRestore') }}</button>
+        <button v-else @click="$emit('archive')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkArchive') }}</button>
         <button @click="$emit('delete')" class="btn btn-danger btn-sm">{{ t('admin.accounts.bulkActions.delete') }}</button>
         <button @click="$emit('reset-status')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.resetStatus') }}</button>
         <button @click="$emit('refresh-token')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.refreshToken') }}</button>
@@ -73,6 +74,7 @@ defineProps<{
 
 defineEmits([
   'archive',
+  'restore',
   'delete',
   'edit-selected',
   'edit-filtered',

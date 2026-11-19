@@ -9,6 +9,7 @@
       {{ t('nav.hostedAccounts') }}
     </RouterLink>
     <button type="button" :class="{ active: archived }" :aria-pressed="!!archived" @click="$emit('archive')">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4h18v4H3zM5 8v12h14V8M10 12h4" /></svg>
       {{ t('admin.accounts.archivedAccounts') }}
     </button>
   </nav>
