@@ -209,13 +209,15 @@ func anthropicMsgToResponsesItems(m AnthropicMessage) ([]ResponsesInputItem, err
 	case "system":
 		// Mid-conversation system turns (e.g. hook output) keep system-level
 		// authority: Responses uses developer for them, not user.
-		items, err := anthropicUserToResponses(m.Content)
-		for i := range items {
-			if items[i].Role == "user" {
-				items[i].Role = "developer"
-			}
+		parts, err := parseAnthropicSystemContentParts(m.Content)
+		if err != nil || len(parts) == 0 {
+			return nil, err
 		}
-		return items, err
+		content, err := json.Marshal(parts)
+		if err != nil {
+			return nil, err
+		}
+		return []ResponsesInputItem{{Type: "message", Role: "developer", Content: content}}, nil
 	default:
 		return anthropicUserToResponses(m.Content)
 	}

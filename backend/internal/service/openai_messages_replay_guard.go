@@ -8,6 +8,15 @@ import (
 
 const openAICompatAnthropicReplayMaxTailMessages = 12
 
+func hasAnthropicInlineSystemMessages(messages []apicompat.AnthropicMessage) bool {
+	for _, message := range messages {
+		if message.Role == "system" {
+			return true
+		}
+	}
+	return false
+}
+
 func applyAnthropicCompatFullReplayGuard(req *apicompat.AnthropicRequest) bool {
 	if req == nil || len(req.Messages) <= openAICompatAnthropicReplayMaxTailMessages {
 		return false

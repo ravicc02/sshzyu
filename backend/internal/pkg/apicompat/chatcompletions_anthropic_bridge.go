@@ -155,6 +155,17 @@ func anthropicMsgToChatMessages(m AnthropicMessage) ([]ChatMessage, error) {
 	switch m.Role {
 	case "assistant":
 		return anthropicAssistantToChatMessages(m.Content)
+	case "system":
+		// Keep inline instructions in their own role, not as a fresh user turn.
+		parts, err := parseAnthropicSystemContentParts(m.Content)
+		if err != nil || len(parts) == 0 {
+			return nil, err
+		}
+		content, err := json.Marshal(joinResponsesContentPartText(parts))
+		if err != nil {
+			return nil, err
+		}
+		return []ChatMessage{{Role: "system", Content: content}}, nil
 	default: // "user" and any unknown role
 		return anthropicUserToChatMessages(m.Content)
 	}

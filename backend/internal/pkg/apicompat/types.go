@@ -48,7 +48,7 @@ type AnthropicThinking struct {
 
 // AnthropicMessage is a single message in the Anthropic conversation.
 type AnthropicMessage struct {
-	Role    string          `json:"role"` // "user" | "assistant"
+	Role    string          `json:"role"` // "user" | "assistant" | "system"
 	Content json.RawMessage `json:"content"`
 }
 

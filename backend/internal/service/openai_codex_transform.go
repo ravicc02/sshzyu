@@ -1405,7 +1405,9 @@ func extractLosslessTextFromContent(content any) (string, bool) {
 	}
 }
 
-func extractPromptLikeInstructionsFromInput(reqBody map[string]any) string {
+// Only the leading instruction prefix can be mirrored into a global forced
+// template. Later developer messages apply at their original position.
+func extractLeadingInstructionsFromInput(reqBody map[string]any) string {
 	input, ok := reqBody["input"].([]any)
 	if !ok || len(input) == 0 {
 		return ""
@@ -1413,15 +1415,11 @@ func extractPromptLikeInstructionsFromInput(reqBody map[string]any) string {
 	var texts []string
 	for _, item := range input {
 		m, ok := item.(map[string]any)
-		if !ok {
-			continue
+		if !ok || (m["role"] != "developer" && m["role"] != "system") {
+			break
 		}
-		role, _ := m["role"].(string)
-		switch role {
-		case "developer", "system":
-			if text := strings.TrimSpace(extractTextFromContent(m["content"])); text != "" {
-				texts = append(texts, text)
-			}
+		if text := strings.TrimSpace(extractTextFromContent(m["content"])); text != "" {
+			texts = append(texts, text)
 		}
 	}
 	return strings.Join(texts, "\n\n")

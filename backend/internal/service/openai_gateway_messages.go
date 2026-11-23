@@ -137,9 +137,14 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	}
 	compatReplayTrimmed := false
 	compatReplayGuardEnabled := shouldAutoInjectPromptCacheKeyForCompat(upstreamModel)
+	// Inline system messages can follow tool results or add instructions to
+	// earlier turns. A cached response ID does not prove that the upstream
+	// already has that exact history, and tail trimming can leave only the
+	// last system notice. Replay the transcript without either optimization.
+	replayFullTranscript := hasAnthropicInlineSystemMessages(anthropicReq.Messages)
 	compatContinuationEnabled := openAICompatContinuationEnabled(account, upstreamModel)
 	previousResponseID := ""
-	if compatContinuationEnabled {
+	if compatContinuationEnabled && !replayFullTranscript {
 		previousResponseID = s.getOpenAICompatSessionResponseID(ctx, c, account, promptCacheKey)
 	}
 	compatContinuationDisabled := compatContinuationEnabled &&
@@ -148,7 +153,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	// ChatGPT/Codex credentials rely on session_id + x-codex-turn-state; trimming to a
 	// sliding 12-message window makes the cached prefix stall at system/tools.
 	// Keep full replay there so upstream prompt caching can grow turn by turn.
-	if compatReplayGuardEnabled && !account.UsesOpenAICodexProtocol() && previousResponseID == "" && !compatContinuationDisabled {
+	if compatReplayGuardEnabled && !replayFullTranscript && !account.UsesOpenAICodexProtocol() && previousResponseID == "" && !compatContinuationDisabled {
 		compatReplayTrimmed = applyAnthropicCompatFullReplayGuard(&anthropicReq)
 	}
 
@@ -245,7 +250,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		}
 		existingInstructions, _ := reqBody["instructions"].(string)
 		if strings.TrimSpace(existingInstructions) == "" {
-			existingInstructions = extractPromptLikeInstructionsFromInput(reqBody)
+			existingInstructions = extractLeadingInstructionsFromInput(reqBody)
 		}
 		if _, err := applyForcedCodexInstructionsTemplate(reqBody, forcedTemplateText, forcedCodexInstructionsTemplateData{
 			ExistingInstructions: strings.TrimSpace(existingInstructions),
