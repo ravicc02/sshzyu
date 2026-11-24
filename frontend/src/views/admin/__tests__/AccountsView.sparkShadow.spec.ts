@@ -343,7 +343,8 @@ describe('admin AccountsView — 账号行展示', () => {
     const tooltip = wrapper.findComponent(HelpTooltip)
     expect(tooltip.props('content')).toBe('https://relay.example.com')
     expect(tooltip.props('widthClass')).toBe('w-max max-w-sm break-all')
-    expect(tooltip.classes()).toEqual(expect.arrayContaining(['self-start']))
+    // The account link and upstream sync button now share a centered row.
+    expect(tooltip.element.parentElement?.classList.contains('items-center')).toBe(true)
     expect(wrapper.text()).toContain('oauth-account')
     expect(wrapper.text()).toContain('invalid-url')
 
