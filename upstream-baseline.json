@@ -1,12 +1,12 @@
 {
   "upstream_repository": "Wei-Shaw/sub2api",
-  "upstream_release": "v0.2.23",
-  "upstream_commit": "5af9afb588c4b014b3df9db7d4073af1f8ae01b6",
-  "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.23",
-  "local_build_version": "0.2.23-r2",
-  "integration_commit": "a27b27832",
-  "integrated_at": "2026-11-18",
-  "verified_at": "2026-11-18",
-  "note": "Integrates upstream v0.2.21 through v0.2.23 (301 commits) on top of the v0.2.20 base. Upstream VERSION file lags at 0.2.22; the custom build version follows the release tag. New migrations: 249_add_usage_logs_api_key_cost_index_notx, 250_openai_cache_write_ttl, 251_group_force_openai_ultrafast, 251_group_usage_rollup_nonblocking_build, 252_channel_pricing_ultrafast_multiplier. The two 251_ files are not a numbering collision: migrations_runner keys versions by full file name and sorts by name. The local group-usage-rollup customization (transaction-scoped advisory lock, single-day window, MATERIALIZED source CTE) is superseded by the upstream non-blocking rebuild state machine (session-level advisory lock, building_until/build_dirty_from). usage_logs columns are the union of upstream cache_creation_30m_tokens/cache_creation_12h_tokens and the local rate_multiplier_without_model. Retained local customizations: first-output guard in raw chat completions, video/image reference billing, concurrency user-wait timeout, per-key model restrictions, lottery and agent modules, and the SSHZYU release chain. ent and wire generated code was regenerated from the merged schema. Production migration and activation remain manual. Capacity-shed and overload policy now follows upstream v0.2.23: request-scoped transient failures stay retryable on the same account first, and candidate switching is decided by the failover engine. The previous local policy (immediately setting RetryableOnSameAccount=false on 502/503/congestion) was retired and its test expectations were rebased onto the upstream semantics.",
+  "upstream_release": "v0.2.25",
+  "upstream_commit": "348997267d756eab5729bb6b78a275a15d18796a",
+  "upstream_release_url": "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.25",
+  "local_build_version": "0.2.25-r1",
+  "integration_commit": "ff42c851da6d29ba74f45225fb7e5eb1d97c5266",
+  "integrated_at": "2026-11-24",
+  "verified_at": "2026-11-24",
+  "note": "Integrates the official v0.2.24 and v0.2.25 delta (125 commits) over v0.2.23 with local customizations preserved. No added or changed migrations. Includes the SSHZY Anthropic inline-system and tool-turn fidelity fix.",
   "integration_status": "committed"
 }
