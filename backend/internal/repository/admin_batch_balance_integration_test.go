@@ -30,7 +30,7 @@ func TestAdminBatchBalancePartialResultsAndAtomicAudit(t *testing.T) {
 			require.NoError(t, err)
 		}
 	})
-	admin := service.NewAdminService(nil, userRepo, nil, nil, nil, nil, codes, nil, nil, nil, nil, nil, nil, client, nil, nil, nil, nil, nil, nil, nil, nil, nil).(service.BatchBalanceAdminService)
+	admin := service.NewAdminService(nil, userRepo, nil, nil, nil, nil, codes, nil, nil, nil, nil, nil, nil, client, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil).(service.BatchBalanceAdminService)
 	result := admin.BatchUpdateBalance(ctx, []int64{users[0].ID, users[0].ID, users[1].ID}, 5, "subtract", "test batch deduction")
 	require.Equal(t, 1, result.Success)
 	require.Equal(t, 1, result.Failed)
@@ -45,7 +45,7 @@ func TestAdminBatchBalancePartialResultsAndAtomicAudit(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, history, 1)
 	require.Equal(t, -5.0, history[0].Value)
-	brokenAdmin := service.NewAdminService(nil, userRepo, nil, nil, nil, nil, &batchBalanceAuditFailure{RedeemCodeRepository: codes}, nil, nil, nil, nil, nil, nil, client, nil, nil, nil, nil, nil, nil, nil, nil, nil).(service.BatchBalanceAdminService)
+	brokenAdmin := service.NewAdminService(nil, userRepo, nil, nil, nil, nil, &batchBalanceAuditFailure{RedeemCodeRepository: codes}, nil, nil, nil, nil, nil, nil, client, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil).(service.BatchBalanceAdminService)
 	broken := brokenAdmin.BatchUpdateBalance(ctx, []int64{users[0].ID}, 7, "add", "audit must be atomic")
 	require.Equal(t, 1, broken.Failed)
 	first, err = userRepo.GetByID(ctx, users[0].ID)
