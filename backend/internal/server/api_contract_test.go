@@ -1529,7 +1529,7 @@ func newContractDeps(t *testing.T) *contractDeps {
 	settingRepo := newStubSettingRepo()
 	settingService := service.NewSettingService(settingRepo, cfg)
 
-	adminService := service.NewAdminService(nil, userRepo, groupRepo, &accountRepo, proxyRepo, apiKeyRepo, redeemRepo, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	adminService := service.NewAdminService(nil, userRepo, groupRepo, &accountRepo, proxyRepo, apiKeyRepo, redeemRepo, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	authHandler := handler.NewAuthHandler(cfg, nil, userService, settingService, nil, redeemService, nil, nil)
 	apiKeyHandler := handler.NewAPIKeyHandler(apiKeyService)
 	usageHandler := handler.NewUsageHandler(usageService, apiKeyService, nil, nil)
@@ -1944,9 +1944,7 @@ func (s *stubAccountRepo) Update(ctx context.Context, account *service.Account) 
 func (s *stubAccountRepo) UpdateWithAccountBillingSettings(
 	ctx context.Context,
 	account *service.Account,
-	probeEnabled *bool,
-	rateSyncEnabled *bool,
-	rateMultiplier *float64,
+	settings service.AccountBillingSettingsUpdate,
 ) error {
 	return errors.New("not implemented")
 }

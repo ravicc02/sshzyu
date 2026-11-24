@@ -32,7 +32,7 @@ func (t *balanceMonitorTransport) Get(ctx context.Context, accountID int64, base
 		return nil, upstreammonitor.Fail("MONITOR_INVALID_URL")
 	}
 	if credential.UseAccountKey || credential.AccessToken != "" {
-		a.ApplyHeaderOverrides(req.Header)
+		a.ApplyHeaderOverrides(req.Context(), req.Header)
 		key := credential.AccessToken
 		if credential.UseAccountKey {
 			key = strings.TrimSpace(a.GetCredential("api_key"))

@@ -795,6 +795,7 @@ export default {
       model: 'Model',
       inputShort: 'In',
       outputShort: 'Out',
+      copyModelId: 'Copy model ID {model}',
       input: 'Input',
       output: 'Output',
       cache: 'Cache',

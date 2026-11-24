@@ -651,7 +651,7 @@ func (p *OpenAIBatchImageProvider) requestImage(ctx context.Context, account *Ac
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Idempotency-Key", openAIBatchItemIdempotencyKey(input.BatchID, item.CustomID))
-	account.ApplyHeaderOverrides(req.Header)
+	account.ApplyHeaderOverrides(req.Context(), req.Header)
 	client, err := openAIBatchHTTPClient(resolveAccountProxyURL(account))
 	if err != nil {
 		return nil, err

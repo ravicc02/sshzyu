@@ -683,7 +683,10 @@ func upstreamModelRegistryBaseURL(account *Account) string {
 	case account.IsGemini():
 		return account.GetGeminiBaseURL(geminicli.AIStudioBaseURL)
 	case account.IsAnthropic():
-		return account.GetBaseURL()
+		if baseURL := strings.TrimSpace(account.GetCredential("base_url")); baseURL != "" {
+			return baseURL
+		}
+		return "https://api.anthropic.com"
 	case account.Platform == PlatformAntigravity:
 		return account.GetGeminiBaseURL(geminicli.AIStudioBaseURL)
 	default:
@@ -734,6 +737,8 @@ func matchModelsDevProviderByKnownHost(registry map[string]modelsDevProvider, ac
 	}
 	providerID := ""
 	switch host {
+	case "api.anthropic.com":
+		providerID = "anthropic"
 	case "api.openai.com", "chatgpt.com":
 		providerID = "openai"
 	case "opencode.ai":
@@ -1088,7 +1093,7 @@ func (s *AccountTestService) buildGrokUpstreamModelsRequest(ctx context.Context,
 			}
 		}
 	}
-	account.ApplyHeaderOverrides(req.Header)
+	account.ApplyHeaderOverrides(withoutHeaderOverrideRequestScope(req.Context()), req.Header)
 	return req, nil
 }
 
@@ -1159,7 +1164,7 @@ func (s *AccountTestService) buildAnthropicUpstreamModelsRequest(ctx context.Con
 		setAnthropicAPIKeyAuthHeader(req.Header, account, apiKeyAuthToken, normalizedBaseURL)
 	}
 	// 账号级请求头覆写：模型列表探测与真实转发保持一致的最终头
-	account.ApplyHeaderOverrides(req.Header)
+	account.ApplyHeaderOverrides(withoutHeaderOverrideRequestScope(req.Context()), req.Header)
 	return req, nil
 }
 
@@ -1241,7 +1246,7 @@ func buildOpenAIAPIKeyModelsRequest(ctx context.Context, account *Account, valid
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	// 账号级请求头覆写：模型列表探测与真实转发保持一致的最终头
-	account.ApplyHeaderOverrides(req.Header)
+	account.ApplyHeaderOverrides(withoutHeaderOverrideRequestScope(req.Context()), req.Header)
 	return req, nil
 }
 
@@ -1302,7 +1307,7 @@ func (s *AccountTestService) buildOpenAIOAuthUpstreamModelsRequest(ctx context.C
 	req.Header.Set("User-Agent", identity.userAgent)
 	req.Header.Set("Version", identity.version)
 	setOpenAIChatGPTAccountHeaders(req.Header, credentialAccount)
-	credentialAccount.ApplyHeaderOverrides(req.Header)
+	credentialAccount.ApplyHeaderOverrides(withoutHeaderOverrideRequestScope(req.Context()), req.Header)
 	enforceCodexIdentityHeadersWithUA(req.Header, credentialAccount.GetOpenAIUserAgent())
 	return req, nil
 }
@@ -1723,7 +1728,7 @@ func normalizeCodexInputModalities(modalities []string) []string {
 	normalized := make([]string, 0, len(modalities))
 	for _, modality := range modalities {
 		modality = strings.ToLower(strings.TrimSpace(modality))
-		if modality != "text" && modality != "image" {
+		if modality != "text" && modality != "image" && modality != "audio" {
 			continue
 		}
 		if _, exists := seen[modality]; exists {

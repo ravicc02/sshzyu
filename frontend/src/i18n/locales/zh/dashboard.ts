@@ -800,6 +800,7 @@ export default {
       model: '模型',
       inputShort: '入',
       outputShort: '出',
+      copyModelId: '复制模型 ID {model}',
       input: '输入',
       output: '输出',
       cache: '缓存',

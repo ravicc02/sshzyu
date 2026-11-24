@@ -691,7 +691,7 @@ func (s *OpenAIGatewayService) ForwardVideoAPI(
 		}
 		req.Header.Set("Content-Type", contentType)
 	}
-	account.ApplyHeaderOverrides(req.Header)
+	account.ApplyHeaderOverrides(req.Context(), req.Header)
 
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
@@ -794,7 +794,7 @@ func (s *OpenAIGatewayService) forwardVideoAPIContent(
 	}
 	applyVideoAPIAuth(statusReq, cfg, token)
 	statusReq.Header.Set("Accept", "application/json")
-	account.ApplyHeaderOverrides(statusReq.Header)
+	account.ApplyHeaderOverrides(statusReq.Context(), statusReq.Header)
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
@@ -832,7 +832,7 @@ func (s *OpenAIGatewayService) forwardVideoAPIContent(
 	}
 	if !signedContent {
 		applyVideoAPIAuth(contentReq, cfg, token)
-		account.ApplyHeaderOverrides(contentReq.Header)
+		account.ApplyHeaderOverrides(contentReq.Context(), contentReq.Header)
 	}
 	contentResp, err := s.httpUpstream.Do(contentReq, proxyURL, account.ID, account.Concurrency)
 	SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
